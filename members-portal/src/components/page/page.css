@@ -1,0 +1,265 @@
+/* ============================================
+   PAGE LAYOUT — Centralized page-level styles
+   Used by: TeamsPage, MembersPage, AlumniPage,
+            ProjectsPage, HelpAndSupportPage,
+            AdministrationPage, UserPage
+   ============================================ */
+
+
+/* ============================================
+   PAGE CONTAINERS
+   ============================================ */
+
+.teams-page,
+.projects-page,
+.members-page,
+.help-support-page,
+.administration-page {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+
+/* ============================================
+   PAGE TITLE (shared base)
+   ============================================ */
+
+.page-title,
+.members-page-title,
+.projects-title,
+.page-title-dropdown {
+    font-family: var(--font-heading);
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--purple-800);
+}
+
+.page-title {
+    margin-bottom: 2rem;
+}
+
+.members-page-title {
+    margin: 0;
+}
+
+.members-page-title-inline {
+    flex-shrink: 0;
+}
+
+
+/* ============================================
+   PAGE HEADER (flex row: title + actions)
+   ============================================ */
+
+.page-header {
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.page-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+
+/* ============================================
+   TITLE DIVIDER (gradient rule below header)
+   ============================================ */
+
+.title-divider {
+    height: 2px;
+    background: var(--gradient-primary);
+    border: none;
+    margin: 2rem 0;
+    border-radius: 2px;
+    opacity: 0.2;
+}
+
+
+/* ============================================
+   INFO DISPLAY — label / value pairs
+   Shared across modals and page components.
+   Model: .role-details, .subteam-details pattern.
+   ============================================ */
+
+/* Info container (read-only data card) */
+.info-section {
+    background-color: var(--gray-50);
+    padding: 1.25rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
+    border-bottom: none;
+    margin-bottom: 2rem;
+}
+
+/* Info grid layout */
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+/* Individual info items (vertical label + value) */
+.info-item,
+.exp-badges-item,
+.exp-date-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.detail-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 120px;
+}
+
+/* Info labels (uppercase, small, heading font) */
+.info-label,
+.exp-badges-label,
+.exp-date-label,
+.exp-creator-label {
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-600);
+}
+
+/* Detail labels (larger variant for full-page panels) */
+.detail-info-label {
+    font-family: var(--font-heading);
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-400);
+}
+
+/* Info values */
+.info-value,
+.exp-badges-value,
+.exp-date-value {
+    font-family: var(--font-body);
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--gray-900);
+    margin: 0;
+}
+
+/* Detail values (larger variant) */
+.detail-info-value {
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: var(--gray-700);
+}
+
+/* Info rows (horizontal layout) */
+.detail-info-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+
+/* ============================================
+   EMPTY STATE (no-data placeholder)
+   ============================================ */
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: var(--gray-500);
+}
+
+.empty-state-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 1rem;
+    color: var(--gray-400);
+}
+
+.empty-state-title {
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-text {
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    color: var(--gray-500);
+    margin-bottom: 2rem;
+}
+
+.empty-state-btn {
+    font-family: var(--font-heading);
+    padding: 0.75rem 1.5rem;
+    background: var(--gradient-primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.empty-state-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.empty-state-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+
+    .page-title,
+    .members-page-title,
+    .projects-title,
+    .page-title-dropdown {
+        font-size: 2rem;
+    }
+
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1.5rem;
+    }
+
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+
+    .page-title,
+    .members-page-title,
+    .projects-title,
+    .page-title-dropdown {
+        font-size: 1.75rem;
+    }
+}

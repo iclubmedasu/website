@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { teamMembersAPI } from '../../../services/api';
-import './EditMembersModal.css';
 
 // Four main options
 const EDIT_MODES = {

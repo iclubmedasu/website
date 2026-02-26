@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle, X } from 'lucide-react';
 import { teamSubteamsAPI } from '../../../services/api';
-import './ActivateTeamModal.css';
-import './ActivateSubteamModal.css';
 
 const ActivateSubteamModal = ({ isOpen, onClose, onSubmit, teamId, initialSubteamId }) => {
     const [selectedSubteamId, setSelectedSubteamId] = useState('');

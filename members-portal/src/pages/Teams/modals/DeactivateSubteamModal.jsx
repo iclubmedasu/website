@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { teamSubteamsAPI } from '../../../services/api';
-import './DeactivateTeamModal.css';
-import './DeactivateSubteamModal.css';
 
 const DeactivateSubteamModal = ({ isOpen, onClose, onSubmit, teamId, initialSubteamId }) => {
     const [selectedSubteamId, setSelectedSubteamId] = useState('');

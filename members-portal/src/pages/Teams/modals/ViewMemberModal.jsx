@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Calendar, Briefcase, MapPin, MessageCircle } from 'lucide-react';
 import { roleHistoryAPI, membersAPI } from '../../../services/api';
-import './ViewMemberModal.css';
 
 const ViewMemberModal = ({ isOpen, onClose, memberId }) => {
     const [member, setMember] = useState(null);
@@ -143,17 +142,20 @@ const ViewMemberModal = ({ isOpen, onClose, memberId }) => {
 
                                                     <div className="role-info">
                                                         <div className="role-item">
-                                                            <Briefcase size={16} />
+                                                            <Briefcase size={14} />
+                                                            <span className="role-item-label">Role:</span>
                                                             <span className="role-name">{entry.roleName}</span>
                                                         </div>
                                                         <div className="role-item">
-                                                            <MapPin size={16} />
+                                                            <MapPin size={14} />
+                                                            <span className="role-item-label">Team:</span>
                                                             <span className="team-name">{entry.teamName}</span>
                                                         </div>
                                                         {entry.subteamName && (
                                                             <div className="role-item">
-                                                                <Briefcase size={16} />
-                                                                <span className="subteam-name">Subteam: {entry.subteamName}</span>
+                                                                <Briefcase size={14} />
+                                                                <span className="role-item-label">Subteam:</span>
+                                                                <span className="subteam-name">{entry.subteamName}</span>
                                                             </div>
                                                         )}
                                                     </div>

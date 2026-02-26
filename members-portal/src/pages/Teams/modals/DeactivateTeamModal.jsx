@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
-import './DeactivateTeamModal.css';
 
 const DeactivateTeamModal = ({ isOpen, onClose, onConfirm, team }) => {
     const [confirmText, setConfirmText] = useState('');

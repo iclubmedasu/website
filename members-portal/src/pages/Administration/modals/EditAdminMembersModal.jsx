@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { teamMembersAPI } from '../../../services/api';
-import "../../Teams/modals/EditMembersModal.css";
-import './EditAdminMembersModal.css';
 
 // Administration: no Assignment (roles assigned directly, no subteams). Three options only.
 const EDIT_MODES = {

@@ -2,30 +2,12 @@
    PROJECTS PAGE STYLES
    ============================================ */
 
+/* projects-page container: max-width/margin now in shared page.css */
 .projects-page {
-    max-width: 1200px;
-    margin: 0 auto;
     padding: 2rem;
 }
 
-/* ============================================
-   PAGE HEADER
-   ============================================ */
-.projects-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 2rem;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.projects-title {
-    font-family: var(--font-heading);
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: var(--purple-800);
-}
+/* projects-title base: now in shared page.css */
 
 /* Filter dropdowns are handled by the manage-* classes imported from TeamsPage.css */
 
@@ -278,32 +260,7 @@
     white-space: pre-wrap;
 }
 
-.expanded-info-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-}
-
-.expanded-info-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-}
-
-.expanded-info-label {
-    font-family: var(--font-heading);
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--gray-400);
-}
-
-.expanded-info-value {
-    font-size: 0.88rem;
-    color: var(--gray-700);
-    font-weight: 500;
-}
+/* expanded-info-*: removed (unused dead CSS) */
 
 .expanded-teams-list {
     display: flex;
@@ -772,34 +729,7 @@
     gap: 1.5rem;
 }
 
-/* ── info rows ── */
-.detail-info-row {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.detail-info-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    min-width: 120px;
-}
-
-.detail-info-label {
-    font-family: var(--font-heading);
-    font-size: 0.95rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--gray-400);
-}
-
-.detail-info-value {
-    font-size: 1.25rem;
-    color: var(--gray-700);
-    font-weight: 500;
-}
+/* detail-info-row, detail-info-item, detail-info-label, detail-info-value: now in shared page.css */
 
 /* ── description ── */
 .detail-section-title {
@@ -1162,11 +1092,11 @@
 }
 
 .icon-btn.edit-btn {
-    color: var(--purple-700);
+    color: #2563eb;
 }
 
 .icon-btn.edit-btn:hover {
-    background: var(--purple-700);
+    background: #2563eb;
     color: white;
     transform: scale(1.05);
     box-shadow: var(--shadow-md);
@@ -1335,32 +1265,12 @@
 }
 
 /* Details section – row 1: badges */
+/* exp-badges-item, exp-badges-label, exp-badges-value base: now in shared page.css */
 .exp-badges-row {
     display: flex;
     gap: 2rem;
     flex-wrap: wrap;
     margin-bottom: 1.2rem;
-}
-
-.exp-badges-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-}
-
-.exp-badges-label {
-    font-family: var(--font-heading);
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--gray-600);
-}
-
-.exp-badges-value {
-    font-size: 1rem;
-    font-weight: 500;
-    color: var(--gray-900);
 }
 
 .exp-badges-value .badge {
@@ -1369,31 +1279,11 @@
 }
 
 /* Details section – row 2: dates */
+/* exp-date-item, exp-date-label, exp-date-value base: now in shared page.css */
 .exp-dates-row {
     display: flex;
     gap: 3.5rem;
     flex-wrap: wrap;
-}
-
-.exp-date-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-}
-
-.exp-date-label {
-    font-family: var(--font-heading);
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--gray-600);
-}
-
-.exp-date-value {
-    font-size: 1rem;
-    font-weight: 500;
-    color: var(--gray-900);
 }
 
 .exp-date-value.overdue {
@@ -1402,14 +1292,7 @@
 }
 
 /* Teams section – row 1: creator + their team */
-.exp-creator-label {
-    font-family: var(--font-heading);
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--gray-600);
-}
+/* exp-creator-label base: now in shared page.css */
 
 .exp-creator-name {
     font-size: 0.85rem;

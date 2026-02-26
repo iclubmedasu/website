@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { X, CheckCircle } from 'lucide-react';
-import './ActivateTeamModal.css';
 
 const ActivateTeamModal = ({ isOpen, onClose, onConfirm, team }) => {
     const [confirmText, setConfirmText] = useState('');

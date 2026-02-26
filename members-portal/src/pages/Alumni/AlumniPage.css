@@ -1,21 +1,5 @@
-/* Members page layout - matches Teams page (no extra padding; main-content provides it) */
-.members-page {
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-/* Title same as Teams page (purple, 2.5rem, Poppins); inline in page-header row */
-.members-page-title {
-    font-family: var(--font-heading);
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: var(--purple-800);
-    margin: 0;
-}
-
-.members-page-title-inline {
-    flex-shrink: 0;
-}
+/* members-page container: now in shared page.css */
+/* members-page-title base + inline: now in shared page.css */
 
 /* Filter dropdowns use Teams page classes: manage-roles-container, manage-combobox-trigger, manage-dropdown-menu, manage-dropdown-item */
 
@@ -37,15 +21,4 @@
     color: var(--error-text);
 }
 
-/* ── Responsive ── */
-@media (max-width: 768px) {
-    .members-page-title {
-        font-size: 2rem;
-    }
-}
-
-@media (max-width: 480px) {
-    .members-page-title {
-        font-size: 1.75rem;
-    }
-}
+/* members-page-title responsive: now in shared page.css */

@@ -2,9 +2,8 @@
    ADMINISTRATION PAGE – 3 role sections
    ============================================ */
 
+/* administration-page container: max-width/margin now in shared page.css */
 .administration-page {
-    max-width: 1200px;
-    margin: 0 auto;
     width: 100%;
 }
 

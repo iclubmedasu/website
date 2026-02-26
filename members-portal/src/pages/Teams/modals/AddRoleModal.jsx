@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import './AddRoleModal.css';
 
 const AddRoleModal = ({ isOpen, onClose, onSubmit, teamId }) => {
     const [formData, setFormData] = useState({

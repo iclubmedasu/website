@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { teamRolesAPI } from '../../../services/api';
-import './DeactivateTeamModal.css';
-import './DeactivateRoleModal.css';
 
 const DeactivateRoleModal = ({ isOpen, onClose, onSubmit, teamId, initialRoleId }) => {
     const [selectedRoleId, setSelectedRoleId] = useState('');

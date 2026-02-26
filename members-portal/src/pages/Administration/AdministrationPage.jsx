@@ -7,7 +7,6 @@ import EditAdminMembersModal from './modals/EditAdminMembersModal';
 import AddOfficerModal, { officerPlaceholderStudentId } from './modals/AddOfficerModal';
 import OfficerHandoverModal from './modals/OfficerHandoverModal';
 import '../Teams/TeamsPage.css';
-import '../Teams/modals/AddMembersModal.css';
 import './AdministrationPage.css';
 
 // Administration team role names (hierarchy: Officer highest, then President, then Vice President lowest)
@@ -336,7 +335,7 @@ function RoleSection({ roleName, roleLabel, assignee, isOfficer, canEdit, onAssi
                             {canEdit && (isOfficer ? (
                                 <button
                                     type="button"
-                                    className="table-action-btn"
+                                    className="table-action-btn edit-btn"
                                     onClick={() => onOfficerManage(assignee)}
                                     title="Handover / Retire"
                                 >

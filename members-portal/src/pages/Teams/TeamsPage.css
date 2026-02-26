@@ -2,10 +2,7 @@
    TEAMS PAGE STYLES
    ============================================ */
 
-.teams-page {
-    max-width: 1200px;
-    margin: 0 auto;
-}
+/* teams-page container: now in shared page.css */
 
 .empty-teams-message {
     padding: 1rem 0;
@@ -93,60 +90,7 @@
     color: var(--gray-600);
 }
 
-/* Empty State */
-.empty-state {
-    text-align: center;
-    padding: 3rem 2rem;
-}
-
-.empty-state-icon {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 1rem;
-    color: var(--gray-400);
-}
-
-.empty-state-title {
-    font-family: var(--font-heading);
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--gray-700);
-    margin-bottom: 0.5rem;
-}
-
-.empty-state-text {
-    font-family: var(--font-body);
-    font-size: 0.95rem;
-    color: var(--gray-500);
-    margin-bottom: 2rem;
-}
-
-.empty-state-btn {
-    font-family: var(--font-heading);
-    padding: 0.75rem 1.5rem;
-    background: var(--gradient-primary);
-    color: white;
-    border: none;
-    border-radius: var(--radius-md);
-    font-size: 0.95rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 1rem;
-}
-
-.empty-state-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-}
-
-.empty-state-btn svg {
-    width: 18px;
-    height: 18px;
-}
+/* empty-state: now in shared page.css */
 
 /* Member Action Buttons */
 .member-actions {
@@ -420,32 +364,15 @@
    TEAM TITLE WITH DROPDOWN AND TOGGLE
    ============================================ */
 
-.page-header {
-    margin-bottom: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 2rem;
-    flex-wrap: wrap;
-}
-
-.page-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
+/* page-header, page-header-actions: now in shared page.css */
 
 .title-dropdown-container {
     position: relative;
     display: inline-block;
 }
 
+/* page-title-dropdown base title: now in shared page.css */
 .page-title-dropdown {
-    font-family: var(--font-heading);
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: var(--purple-800);
     margin-bottom: 0;
     display: flex;
     align-items: center;
@@ -646,15 +573,7 @@
 
 /* toggle styles: now in shared toggle.css (imported globally) */
 
-/* Title Divider */
-.title-divider {
-    height: 2px;
-    background: var(--gradient-primary);
-    border: none;
-    margin: 2rem 0;
-    border-radius: 2px;
-    opacity: 0.2;
-}
+/* title-divider: now in shared page.css */
 
 /* Backdrop for closing dropdown */
 .dropdown-backdrop {
@@ -672,9 +591,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
     flex-shrink: 0;
-    padding: 1.25rem 1.5rem;
+    padding: 0.75rem 1rem;
     border: 2px solid var(--purple-500);
     border-radius: var(--radius-xl);
     background: var(--bg-card);
@@ -710,14 +629,13 @@
     font-weight: 600;
     color: var(--purple-800);
     background: white;
-    border: 2px solid var(--purple-300);
+    border: none;
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: all 0.2s;
 }
 
 .manage-combobox-trigger:hover {
-    border-color: var(--purple-500);
     background: var(--gradient-light);
     color: white;
 }
@@ -894,9 +812,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
     flex-shrink: 0;
-    padding: 1.25rem 1.5rem;
+    padding: 0.75rem 1rem;
     border: 2px solid var(--purple-500);
     border-radius: var(--radius-xl);
     background: var(--bg-card);
@@ -922,15 +840,7 @@
    RESPONSIVE DESIGN
    ============================================ */
 @media (max-width: 768px) {
-    .page-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 1.5rem;
-    }
-
-    .page-title-dropdown {
-        font-size: 2rem;
-    }
+    /* page-header, page-title-dropdown responsive: now in shared page.css */
 
     .dropdown-icon {
         width: 28px;

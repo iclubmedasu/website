@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { membersAPI, teamMembersAPI, teamRolesAPI } from '../../../services/api';
 import { PhoneInput } from '../../../components/PhoneInput/PhoneInput';
-import './AddMembersModal.css';
 
 const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, roles }) => {
     const [formData, setFormData] = useState({
@@ -221,7 +220,7 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
                         {/* Personal Information – Student ID required; official email = StudentID@med.asu.edu.eg (auto) */}
                         <div className="form-section">
                             <h3 className="form-section-title">Personal Information</h3>
-                          {/*  <p className="form-section-hint">
+                            {/*  <p className="form-section-hint">
                                 Only Student ID is required. Official email will be set automatically to <strong>StudentID@med.asu.edu.eg</strong>.
                             </p>*/}
 

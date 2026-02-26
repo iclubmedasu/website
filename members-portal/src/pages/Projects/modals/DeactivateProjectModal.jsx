@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 import { projectsAPI } from '../../../services/api';
-import './DeactivateProjectModal.css';
 
 function DeactivateProjectModal({ project, onClose, onConfirmed }) {
     const [confirmText, setConfirmText] = useState('');

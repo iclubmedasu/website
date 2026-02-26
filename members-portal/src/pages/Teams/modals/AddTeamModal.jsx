@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import './AddTeamModal.css';
 
 const AddTeamModal = ({ isOpen, onClose, onSubmit }) => {
     const [formData, setFormData] = useState({

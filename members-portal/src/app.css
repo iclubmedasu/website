@@ -16,9 +16,9 @@
 @import './components/header/header.css';
 @import './components/input/input.css';
 @import './components/scrollbar/scrollbar.css';
+@import './components/page/page.css';
 @import './components/modal/modal.css';
 @import './components/toggle/toggle.css';
-@import './components/pagetitle/pagetitle.css';
 @import './pages/SideBarNavigationSlim.css';
 
 

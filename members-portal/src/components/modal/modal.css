@@ -594,3 +594,844 @@
         padding-bottom: 1.5rem;
     }
 }
+
+
+/* ╔════════════════════════════════════════════╗
+   ║  VARIANT-SPECIFIC STYLES                  ║
+   ║  (not global — used by individual modals) ║
+   ╚════════════════════════════════════════════╝ */
+
+
+/* ============================================
+   DETAIL CARDS (Deactivate / Activate role & subteam modals)
+   ============================================ */
+
+.role-details,
+.subteam-details {
+    padding: 1rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+    margin-bottom: 1.5rem;
+    border-left: 4px solid var(--purple-700);
+}
+
+.role-detail-item,
+.subteam-detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+    color: var(--gray-700);
+}
+
+.role-detail-item:last-child,
+.subteam-detail-item:last-child {
+    margin-bottom: 0;
+}
+
+/* Activate context — tighter spacing */
+.activate-info-box~.role-detail-item,
+.activate-info-box~.subteam-detail-item {
+    margin: 0.25rem 0;
+}
+
+.role-detail-label,
+.subteam-detail-label {
+    font-weight: 600;
+    color: var(--gray-700);
+    min-width: 100px;
+    margin-right: 0.5rem;
+}
+
+.role-detail-value,
+.subteam-detail-value {
+    font-weight: 500;
+    color: var(--gray-900);
+}
+
+.role-detail-value.active,
+.subteam-detail-value.active {
+    color: var(--success-text);
+}
+
+.role-detail-value.inactive,
+.subteam-detail-value.inactive {
+    color: var(--gray-500);
+}
+
+
+/* ============================================
+   ADD MEMBERS — Section hint, student ID row, email preview
+   ============================================ */
+
+.form-section-hint {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin: -0.5rem 0 0.75rem 0;
+    line-height: 1.4;
+}
+
+.student-id-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: nowrap;
+}
+
+.student-id-input-row .form-input {
+    width: 13.75rem;
+    max-width: 13.75rem;
+    flex: 0 0 auto;
+}
+
+.official-email-hint {
+    display: flex;
+    flex-direction: column;
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    flex-shrink: 0;
+}
+
+.official-email-label {
+    font-weight: 500;
+}
+
+.official-email-value {
+    font-size: 0.6875rem;
+    color: var(--gray-400);
+    word-break: break-all;
+}
+
+
+/* ============================================
+   EDIT MEMBERS — Info section, checkbox group, radio cards
+   ============================================ */
+
+/* info-section, info-grid, info-item, info-label, info-value: now in shared page.css */
+
+/* Checkbox group — selectable option blocks */
+.checkbox-group {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: var(--gray-50);
+    border-radius: var(--radius-md);
+    border: 2px solid var(--gray-200);
+    transition: all 0.2s;
+}
+
+.checkbox-group:last-child {
+    margin-bottom: 0;
+}
+
+.checkbox-group .checkbox-label {
+    margin: 0;
+}
+
+.checkbox-group .checkbox-label input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    cursor: pointer;
+    accent-color: var(--purple-700);
+    margin-right: 0.75rem;
+    border-radius: var(--radius-sm);
+}
+
+.checkbox-group .checkbox-label input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.checkbox-description {
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    color: var(--gray-600);
+    margin: 0.75rem 0 0 2.5rem;
+    line-height: 1.4;
+}
+
+.checkbox-group:has(input[type="checkbox"]:checked) {
+    background-color: rgba(122, 71, 163, 0.05);
+    border-color: var(--purple-300);
+}
+
+/* Radio option cards — single-choice selection */
+.radio-group-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.radio-option-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 1rem 1.25rem;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg-card);
+}
+
+.radio-option-card:hover {
+    border-color: var(--purple-300);
+    background: rgba(122, 71, 163, 0.03);
+}
+
+.radio-option-card.selected {
+    border-color: var(--purple-500);
+    background: rgba(122, 71, 163, 0.08);
+}
+
+.radio-option-card input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.radio-option-title {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.radio-option-desc {
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    color: var(--gray-600);
+    line-height: 1.4;
+}
+
+/* Compact sub-options (second-level choices) */
+.radio-group-list-compact {
+    gap: 0.5rem;
+}
+
+.radio-group-list-compact .radio-option-card {
+    padding: 0.75rem 1rem;
+}
+
+.radio-group-list-compact .radio-option-title {
+    font-size: 0.9375rem;
+}
+
+.radio-group-list-compact .radio-option-desc {
+    font-size: 0.8125rem;
+}
+
+.sub-options-section {
+    margin-top: 0.25rem;
+}
+
+.nested-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.nested-section .form-section-title {
+    font-size: 0.9375rem;
+    margin-bottom: 0.75rem;
+}
+
+/* Inline radio group (horizontal) */
+.radio-inline-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+}
+
+.radio-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    color: var(--gray-800);
+}
+
+.radio-inline input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--purple-700);
+    cursor: pointer;
+}
+
+/* Conditional sections (animated reveal) */
+.conditional-section {
+    animation: expandHeight 0.3s ease-out;
+    background-color: var(--gray-50);
+    padding: 1.5rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
+    min-height: 120px;
+    overflow: visible;
+}
+
+@keyframes expandHeight {
+    from {
+        opacity: 0;
+        max-height: 0;
+    }
+
+    to {
+        opacity: 1;
+        max-height: 600px;
+    }
+}
+
+
+/* ============================================
+   CREATE PROJECT — Badge picker
+   ============================================ */
+
+.team-badge-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.team-badge-option {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.85rem;
+    border-radius: 99px;
+    border: 2px solid var(--gray-300);
+    background: var(--bg-card);
+    color: var(--gray-600);
+    font-family: var(--font-heading);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.team-badge-option:hover {
+    border-color: var(--purple-400);
+    color: var(--purple-700);
+    background: rgba(122, 71, 163, 0.06);
+}
+
+.team-badge-option--selected {
+    background: rgba(122, 71, 163, 0.06);
+    border-color: var(--purple-400);
+    color: var(--purple-800);
+    font-weight: 600;
+}
+
+.team-badge-option--selected:hover {
+    background: rgba(122, 71, 163, 0.1);
+    border-color: var(--purple-600);
+    color: var(--purple-800);
+}
+
+
+/* ============================================
+   VIEW MEMBER — Member info card + timeline
+   ============================================ */
+
+.view-member-modal {
+    max-width: 600px;
+    max-height: 90vh;
+}
+
+.view-member-modal .modal-content {
+    padding: 0;
+}
+
+/* Member info card */
+.member-info-card {
+    display: flex;
+    gap: 1.25rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, white 0%, rgba(122, 71, 163, 0.05) 100%);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.member-avatar {
+    flex-shrink: 0;
+}
+
+.member-avatar img {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--purple-700);
+}
+
+.avatar-placeholder {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--purple-700), var(--purple-600));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: white;
+    font-weight: bold;
+}
+
+.member-info-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.member-name {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.member-email,
+.member-phone,
+.member-student-id,
+.member-join-date {
+    margin: 0.25rem 0 0 0;
+    font-size: 0.813rem;
+    color: var(--gray-500);
+}
+
+.member-student-id {
+    color: var(--purple-700);
+    font-weight: 500;
+}
+
+/* Timeline section */
+.timeline-section {
+    padding: 1.5rem;
+}
+
+.timeline-title {
+    margin: 0 0 1.5rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.vertical-timeline {
+    position: relative;
+}
+
+.timeline-item {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.75rem;
+    position: relative;
+}
+
+.timeline-marker {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    min-width: 50px;
+}
+
+.timeline-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--gray-50);
+    border: 2px solid var(--purple-700);
+    position: relative;
+    z-index: 2;
+    flex-shrink: 0;
+}
+
+.timeline-line {
+    width: 2px;
+    flex: 1;
+    background: linear-gradient(to bottom, var(--purple-700), var(--gray-200));
+    margin-top: 0.5rem;
+    min-height: 2.5rem;
+}
+
+/* Change type dot color variations */
+.change-type-new .timeline-dot {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.change-type-promotion .timeline-dot {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.change-type-demotion .timeline-dot {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.change-type-transfer .timeline-dot {
+    border-color: #8b5cf6;
+    background: rgba(139, 92, 246, 0.1);
+}
+
+.change-type-resignation .timeline-dot {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.change-type-expelled .timeline-dot {
+    border-color: #dc2626;
+    background: rgba(220, 38, 38, 0.1);
+}
+
+.change-type-graduated .timeline-dot {
+    border-color: #06b6d4;
+    background: rgba(6, 182, 212, 0.1);
+}
+
+.change-type-default .timeline-dot {
+    border-color: var(--purple-700);
+}
+
+/* Timeline content cards */
+.timeline-content {
+    flex: 1;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    transition: all 0.3s ease;
+}
+
+.timeline-content:hover {
+    border-color: var(--purple-700);
+    box-shadow: 0 4px 12px rgba(122, 71, 163, 0.1);
+    background: rgba(122, 71, 163, 0.02);
+}
+
+.timeline-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    justify-content: space-between;
+}
+
+/* Change type badges */
+.change-type-badge {
+    font-size: 0.688rem;
+    font-weight: 700;
+    padding: 0.25rem 0.625rem;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    width: fit-content;
+}
+
+.change-type-new {
+    background: rgba(59, 130, 246, 0.15);
+    color: #1e40af;
+}
+
+.change-type-promotion {
+    background: rgba(16, 185, 129, 0.15);
+    color: #065f46;
+}
+
+.change-type-demotion {
+    background: rgba(245, 158, 11, 0.15);
+    color: #92400e;
+}
+
+.change-type-transfer {
+    background: rgba(139, 92, 246, 0.15);
+    color: #5b21b6;
+}
+
+.change-type-resignation {
+    background: rgba(239, 68, 68, 0.15);
+    color: #7f1d1d;
+}
+
+.change-type-expelled {
+    background: rgba(220, 38, 38, 0.15);
+    color: #7f1d1d;
+}
+
+.change-type-graduated {
+    background: rgba(6, 182, 212, 0.15);
+    color: #164e63;
+}
+
+.change-type-default {
+    background: rgba(107, 114, 128, 0.15);
+    color: #374151;
+}
+
+.timeline-date {
+    font-size: 0.813rem;
+    color: var(--gray-500);
+    font-weight: 500;
+}
+
+/* Role info */
+.role-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.role-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--gray-900);
+}
+
+.role-item svg {
+    color: var(--purple-700);
+    flex-shrink: 0;
+}
+
+.role-item-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    min-width: 52px;
+}
+
+.role-name {
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.team-name {
+    color: var(--gray-500);
+    font-size: 0.813rem;
+}
+
+/* Duration */
+.duration-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--gray-200);
+    margin: 0.75rem 0;
+}
+
+.duration-info svg {
+    color: var(--purple-700);
+    flex-shrink: 0;
+}
+
+.duration-text {
+    line-height: 1.4;
+}
+
+/* Reason & notes */
+.reason-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    background: rgba(122, 71, 163, 0.05);
+    border-radius: var(--radius-sm);
+}
+
+.reason-info svg {
+    color: var(--purple-700);
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.reason-text {
+    line-height: 1.4;
+    color: var(--gray-900);
+}
+
+.notes-info {
+    margin-top: 0.75rem;
+}
+
+.notes-label {
+    margin: 0 0 0.25rem 0;
+    font-size: 0.688rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.notes-text {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    line-height: 1.4;
+    padding: 0.5rem;
+    background: rgba(107, 114, 128, 0.05);
+    border-left: 3px solid var(--purple-700);
+    border-radius: 2px;
+}
+
+/* empty-state: now in shared page.css */
+
+.empty-state p {
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3.75rem 1.25rem;
+    gap: 1rem;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--gray-200);
+    border-top-color: var(--purple-700);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-state p {
+    margin: 0;
+    color: var(--gray-500);
+    font-size: 0.875rem;
+}
+
+.error-state {
+    padding: 2.5rem 1.25rem;
+    text-align: center;
+}
+
+
+/* ============================================
+   EDIT TEAM — Hint text indent
+   ============================================ */
+
+.form-hint-small {
+    margin-left: 2rem;
+}
+
+
+/* ============================================
+   MODAL SIZE OVERRIDES (admin, members, etc.)
+   ============================================ */
+
+.assign-to-team-modal.modal-container {
+    max-width: 500px;
+    width: 90%;
+}
+
+.add-officer-modal .modal-container {
+    max-width: 500px;
+    width: 90%;
+}
+
+.add-officer-modal .modal-container.modal-large {
+    max-width: 700px;
+}
+
+.officer-handover-modal .modal-container {
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+}
+
+
+/* ============================================
+   VARIANT-SPECIFIC RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+
+    .role-detail-item,
+    .subteam-detail-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+
+    /* info-grid responsive: now in shared page.css */
+
+    .modal-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .modal-close-btn {
+        align-self: flex-end;
+        margin-top: -0.5rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .view-member-modal {
+        max-width: 95%;
+        max-height: 95vh;
+    }
+
+    .member-info-card {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+
+    .member-info-details {
+        align-items: center;
+    }
+
+    .timeline-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .timeline-content {
+        padding: 0.75rem;
+    }
+
+    .role-item {
+        font-size: 0.813rem;
+    }
+
+    .duration-info {
+        font-size: 0.688rem;
+    }
+
+    .duration-text {
+        word-break: break-word;
+    }
+}

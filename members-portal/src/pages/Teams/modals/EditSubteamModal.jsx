@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { teamSubteamsAPI } from '../../../services/api';
-import './EditSubteamModal.css';
 
 const EditSubteamModal = ({ isOpen, onClose, onSubmit, teamId, initialSubteamId }) => {
     const [selectedSubteamId, setSelectedSubteamId] = useState('');

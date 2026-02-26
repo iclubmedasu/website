@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle, X } from 'lucide-react';
 import { teamRolesAPI } from '../../../services/api';
-import './ActivateTeamModal.css';
-import './ActivateRoleModal.css';
 
 const ActivateRoleModal = ({ isOpen, onClose, onSubmit, teamId, initialRoleId }) => {
     const [selectedRoleId, setSelectedRoleId] = useState('');

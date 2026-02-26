@@ -37,7 +37,7 @@ Both `.role-details` and `.subteam-details` look identical in the UI. Instead of
 .members-page,
 .help-support-page,
 .administration-page {
-    max-width: 1200px;
+    max-width: 180px;
     margin: 0 auto;
 }
 
@@ -165,23 +165,11 @@ This prevents future developers (or AI agents) from re-adding the styles.
 4. [Border Radius (Squircle Rule)](#4-border-radius-squircle-rule)
 5. [Shadows](#5-shadows)
 6. [Color System](#6-color-system)
-7. [Buttons](#7-buttons)
-8. [Form Elements](#8-form-elements)
-9. [Cards](#9-cards)
-10. [Tables](#10-tables)
-11. [Badges & Pills](#11-badges--pills)
-12. [Modals](#12-modals)
-13. [Dropdowns](#13-dropdowns)
-14. [Toggle Switches](#14-toggle-switches)
-15. [Page Layout](#15-page-layout)
-16. [Empty States](#16-empty-states)
-17. [Error, Warning & Success States](#17-error-warning--success-states)
-18. [Animations & Transitions](#18-animations--transitions)
-19. [Scrollbars](#19-scrollbars)
-20. [Responsive Breakpoints](#20-responsive-breakpoints)
-21. [Naming Conventions](#21-naming-conventions)
-22. [File Organization & Architecture](#22-file-organization--architecture)
-23. [Quick Reference: Implementing a New Feature](#23-quick-reference-implementing-a-new-feature)
+7. [Animations & Transitions](#7-animations--transitions)
+8. [Responsive Breakpoints](#8-responsive-breakpoints)
+9. [Naming Conventions](#9-naming-conventions)
+10. [File Organization & Architecture](#10-file-organization--architecture)
+11. [Quick Reference: Implementing a New Feature](#11-quick-reference-implementing-a-new-feature)
 
 ---
 
@@ -214,7 +202,7 @@ All design tokens live in `:root` inside `app.css`. **Never hard-code a value th
 |---|---|---|
 | `--gray-50` | `#fafafa` | Table header bg, subtle bg modifiers |
 | `--gray-100` | `#f5f5f5` | Hover bg, disabled input bg, scrollbar track |
-| `--gray-200` | `#e5e5e5` | Borders, dividers, table row separators |
+| `--gray-80` | `#e5e5e5` | Borders, dividers, table row separators |
 | `--gray-300` | `#d4d4d4` | Input borders (default), scrollbar thumb, toggle off |
 | `--gray-400` | `#a3a3a3` | Placeholder text, muted labels, section headers |
 | `--gray-500` | `#737373` | Secondary body text, hints |
@@ -245,7 +233,7 @@ All design tokens live in `:root` inside `app.css`. **Never hard-code a value th
   /* Success */
   --success-bg: #dcfce7;
   --success-text: #166534;
-  --success-border: #22c55e;
+  --success-border: #10c55e;
   --success-accent: #16a34a;
 
   /* Warning */
@@ -259,13 +247,13 @@ All design tokens live in `:root` inside `app.css`. **Never hard-code a value th
   --info-border: #bfdbfe;
 
   /* Borders */
-  --border-default: var(--gray-200);
+  --border-default: var(--gray-80);
   --border-subtle: var(--gray-100);
-  --border-brand: rgba(86, 23, 137, 0.08);
+  --border-brand: rgba(86, 11, 137, 0.08);
 
   /* Danger gradient (used by btn-danger) */
   --gradient-danger: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
-  --gradient-success: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  --gradient-success: linear-gradient(135deg, #16a34a 0%, #10c55e 100%);
 }
 ```
 
@@ -273,10 +261,10 @@ All design tokens live in `:root` inside `app.css`. **Never hard-code a value th
 
 | Token | Value | Usage |
 |---|---|---|
-| `--shadow-sm` | `0 1px 2px 0 rgba(86,23,137,0.05)` | Cards at rest, small buttons |
-| `--shadow-md` | `0 4px 6px -1px rgba(86,23,137,0.1)` | Sidebar expanded, cards on hover |
-| `--shadow-lg` | `0 10px 15px -3px rgba(86,23,137,0.1)` | Buttons on hover, elevated cards |
-| `--shadow-xl` | `0 20px 25px -5px rgba(86,23,137,0.15)` | Modals, dropdown menus |
+| `--shadow-sm` | `0 1px 2px 0 rgba(86,11,137,0.05)` | Cards at rest, small buttons |
+| `--shadow-md` | `0 4px 6px -1px rgba(86,11,137,0.1)` | Sidebar expanded, cards on hover |
+| `--shadow-lg` | `0 10px 15px -3px rgba(86,11,137,0.1)` | Buttons on hover, elevated cards |
+| `--shadow-xl` | `0 8px 25px -5px rgba(86,11,137,0.15)` | Modals, dropdown menus |
 
 ### 1.7 Border Radius
 
@@ -284,7 +272,7 @@ All design tokens live in `:root` inside `app.css`. **Never hard-code a value th
 |---|---|---|
 | `--radius-sm` | `12px` | Action buttons, small elements, task items |
 | `--radius-md` | `16px` | Inputs, modal close buttons, badges, nav items |
-| `--radius-lg` | `20px` | Cards, modals, dropdown menus, avatars |
+| `--radius-lg` | `8px` | Cards, modals, dropdown menus, avatars |
 | `--radius-xl` | `24px` | Login card, large card containers, manage panels |
 
 **Pill / badge radius:** `99px` (full round — use literal `99px` or add `--radius-pill: 99px`)
@@ -362,13 +350,13 @@ color: var(--gray-600);
 ### 3.2 Key Layout Values
 
 - **Main content padding:** `2rem`
-- **Page max-width:** `1200px` (centered with `margin: 0 auto`)
+- **Page max-width:** `180px` (centered with `margin: 0 auto`)
 - **Card padding (default):** `1.5rem`
 - **Card padding (large):** `2rem`
 - **Card padding (small):** `1rem`
 - **Modal padding (header/body/footer):** `1.5rem`
 - **Form group bottom margin:** `1.5rem` (standard) / `1.25rem` (compact)
-- **Section separator:** `1px solid var(--gray-200)` with `1.5–2rem` padding top/bottom
+- **Section separator:** `1px solid var(--gray-80)` with `1.5–2rem` padding top/bottom
 
 ---
 
@@ -382,10 +370,10 @@ color: var(--gray-600);
 | Inputs, selects, textareas | `--radius-md` (16px) |
 | Nav items | `--radius-md` (16px) |
 | Table status badges | `--radius-md` (16px) |
-| Cards | `--radius-lg` (20px) |
-| Modals | `--radius-lg` (20px) |
-| Dropdown menus | `--radius-lg` (20px) |
-| Avatars (grid) | `--radius-lg` (20px) |
+| Cards | `--radius-lg` (8px) |
+| Modals | `--radius-lg` (8px) |
+| Dropdown menus | `--radius-lg` (8px) |
+| Avatars (grid) | `--radius-lg` (8px) |
 | Login card | `--radius-xl` (24px) |
 | Manage-roles container | `--radius-xl` (24px) |
 | Badges / pills | `99px` (fully round) |
@@ -406,14 +394,14 @@ Use **only** the token scale. No ad-hoc `box-shadow` values.
 | Hover / expanded | `--shadow-md` |
 | Button hover / clickable card hover | `--shadow-lg` |
 | Modals, dropdown menus | `--shadow-xl` |
-| Focus ring (inputs) | `0 0 0 3px rgba(122, 71, 163, 0.1)` — standardize as `--shadow-focus` |
+| Focus ring (inputs) | `0 0 0 3px rgba(110, 71, 163, 0.1)` — standardize as `--shadow-focus` |
 | Error focus ring | `0 0 0 3px rgba(153, 27, 27, 0.1)` — standardize as `--shadow-focus-error` |
 
 **Focus-ring tokens (already added to `:root` in `app.css`):**
 
 ```css
 :root {
-  --shadow-focus: 0 0 0 3px rgba(122, 71, 163, 0.1);
+  --shadow-focus: 0 0 0 3px rgba(110, 71, 163, 0.1);
   --shadow-focus-error: 0 0 0 3px rgba(153, 27, 27, 0.1);
 }
 ```
@@ -433,7 +421,7 @@ Use these for badges, status dots, and contextual backgrounds:
 | Error / Danger / Cancelled | `#fef2f2` (var `--error-bg`) | `#991b1b` / `#b91c1c` (var `--error-text`) |
 | Info / In Progress | `#eff6ff` | `#1d4ed8` |
 | Unassigned | `#e0e7ff` | `#3730a3` |
-| Blocked | `#fdf4ff` | `#7e22ce` |
+| Blocked | `#fdf4ff` | `#7e10ce` |
 | Delayed | `#fff7ed` | `#c2410c` |
 | Neutral / Not Started | `#f1f5f9` | `#475569` |
 
@@ -449,1028 +437,9 @@ Use these for badges, status dots, and contextual backgrounds:
 
 ---
 
-## 7. Buttons
+## 7. Animations & Transitions
 
-### 7.1 Base Button (`.btn`)
-
-```css
-.btn {
-    padding: 0.75rem 1.5rem;
-    font-family: var(--font-heading);
-    font-size: 0.95rem;
-    font-weight: 500;
-    border-radius: var(--radius-md);
-    border: none;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-}
-
-.btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-```
-
-### 7.2 Button Variants
-
-| Class | Background | Text | Border | Hover |
-|---|---|---|---|---|
-| `.btn-primary` | `--gradient-primary` | `white` | none | `translateY(-2px)` + `--shadow-lg` |
-| `.btn-secondary` | `transparent` | `--gray-700` | `2px solid var(--gray-300)` | `--gray-100` bg, `--gray-400` border |
-| `.btn-danger` | `linear-gradient(135deg, #dc2626, #991b1b)` | `white` | none | `translateY(-2px)` + red shadow |
-| `.btn-primary-inverted` | `white` | `--purple-700` | `2px solid --purple-700` | `light purple bg` |
-
-### 7.3 Full-Width Login Button (`.btn-primary` in buttons.css)
-
-```css
-/* Login page uses width: 100%, padding: 1rem, font-size: 1.05rem */
-```
-
-### 7.4 Icon Action Buttons
-
-Small square buttons for table row / card header actions:
-
-```css
-.action-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-sm);
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    background: white;
-    box-shadow: var(--shadow-sm);
-}
-
-.action-btn svg {
-    width: 16px;
-    height: 16px;
-}
-
-/* Hover: fill bg with action color, white icon, scale(1.1) */
-```
-
-### 7.5 Add Button (green border style)
-
-```css
-.card-add-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius-md);
-    border: 2px solid #16a34a;
-    color: #16a34a;
-    background: white;
-}
-
-.card-add-btn:hover {
-    background: #16a34a;
-    color: white;
-    transform: scale(1.1);
-    box-shadow: var(--shadow-md);
-}
-```
-
----
-
-## 8. Form Elements
-
-### 8.1 Form Group
-
-```css
-.form-group {
-    margin-bottom: 1.5rem;
-}
-```
-
-### 8.2 Form Label
-
-```css
-.form-label {
-    display: block;
-    font-family: var(--font-heading);
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--gray-700);
-    margin-bottom: 0.5rem;
-}
-```
-
-### 8.3 Form Input (Standard)
-
-```css
-.form-input {
-    width: 100%;
-    padding: 0.75rem 1rem;
-    font-family: var(--font-body);
-    font-size: 0.95rem;
-    color: var(--gray-900);
-    background-color: var(--bg-card);
-    border: 2px solid var(--gray-300);
-    border-radius: var(--radius-md);
-    transition: all 0.2s;
-}
-
-.form-input:focus {
-    outline: none;
-    border-color: var(--purple-700);
-    box-shadow: var(--shadow-focus);
-}
-
-.form-input.error {
-    border-color: var(--error-text);
-}
-
-.form-input.error:focus {
-    box-shadow: var(--shadow-focus-error);
-}
-
-.form-input:disabled {
-    background-color: var(--gray-100);
-    cursor: not-allowed;
-    opacity: 0.6;
-}
-```
-
-### 8.4 Textarea
-
-```css
-.form-textarea {
-    resize: vertical;
-    min-height: 80px;
-    font-family: var(--font-body);
-}
-/* Inherits all .form-input styles */
-```
-
-### 8.5 Select (native)
-
-Same padding, border, and radius as `.form-input`.
-
-### 8.6 Field Error
-
-```css
-.field-error {
-    display: block;
-    font-family: var(--font-body);
-    font-size: 0.75rem;
-    color: var(--error-text);
-    margin-top: 0.375rem;
-}
-```
-
-### 8.7 Form Hint
-
-```css
-.form-hint {
-    font-family: var(--font-body);
-    font-size: 0.75rem;
-    color: var(--gray-500);
-    margin-top: 0.5rem;
-}
-```
-
-### 8.8 Form Row (side-by-side fields)
-
-```css
-.form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-@media (max-width: 768px) {
-    .form-row {
-        grid-template-columns: 1fr;
-    }
-}
-```
-
-### 8.9 Form Section (within modals)
-
-```css
-.form-section {
-    margin-bottom: 2rem;
-    padding-bottom: 2rem;
-    border-bottom: 1px solid var(--gray-200);
-}
-
-.form-section:last-of-type {
-    border-bottom: none;
-    margin-bottom: 1.5rem;
-    padding-bottom: 0;
-}
-
-.form-section-title {
-    font-family: var(--font-heading);
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--gray-400);
-    margin: 0 0 1rem 0;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-```
-
-### 8.10 Checkbox
-
-```css
-.checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    cursor: pointer;
-    user-select: none;
-}
-
-.checkbox-input {
-    width: 20px;
-    height: 20px;
-    cursor: pointer;
-    accent-color: var(--purple-700);
-}
-
-.checkbox-text {
-    font-family: var(--font-heading);
-    font-size: 0.95rem;
-    font-weight: 500;
-    color: var(--gray-700);
-}
-```
-
----
-
-## 9. Cards
-
-### 9.1 Base Card
-
-```css
-.card {
-    background-color: var(--bg-card);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    border: 1px solid rgba(86, 23, 137, 0.08);
-    padding: 1.5rem;
-    transition: all 0.2s;
-}
-
-.card:hover {
-    box-shadow: var(--shadow-md);
-}
-```
-
-### 9.2 Card Header
-
-```css
-.card-header {
-    margin-bottom: 1.5rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--gray-200);
-}
-```
-
-### 9.3 Card Header with Action Button
-
-```css
-.card-header-with-action {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-```
-
-### 9.4 Card Variants
-
-| Modifier | Padding |
-|---|---|
-| `.card` (default) | `1.5rem` |
-| `.card-lg` | `2rem` |
-| `.card-sm` | `1rem` |
-| `.card-clickable` | Add `cursor: pointer; &:hover { translateY(-2px); --shadow-lg }` |
-
----
-
-## 10. Tables
-
-### 10.1 Standard Table
-
-```css
-.members-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: var(--font-body);
-}
-```
-
-### 10.2 Table Header
-
-```css
-.members-table thead {
-    background-color: var(--gray-50);
-    border-bottom: 2px solid var(--gray-200);
-}
-
-.members-table th {
-    font-family: var(--font-heading);
-    text-align: left;
-    padding: 1rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--gray-700);
-    text-transform: uppercase;
-    letter-spacing: 0.025em;
-}
-```
-
-### 10.3 Table Body
-
-```css
-.members-table td {
-    padding: 1rem;
-    font-size: 0.95rem;
-    color: var(--gray-800);
-    border-bottom: 1px solid var(--gray-200);
-}
-
-.members-table tbody tr {
-    transition: background-color 0.15s;
-}
-
-.members-table tbody tr:hover {
-    background-color: var(--gray-50);
-}
-
-/* Zebra striping */
-.members-table tbody tr.odd-row {
-    background-color: var(--bg-card);
-}
-
-.members-table tbody tr.even-row {
-    background-color: rgba(86, 23, 137, 0.02);
-}
-```
-
-### 10.4 Table Member Cell (avatar + name)
-
-```css
-.table-member-cell {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-```
-
----
-
-## 11. Badges & Pills
-
-### 11.1 Base Badge
-
-```css
-.badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.2rem 0.55rem;
-    border-radius: 99px;
-    font-family: var(--font-heading);
-    font-size: 0.7rem;
-    font-weight: 600;
-    white-space: nowrap;
-    line-height: 1;
-}
-```
-
-### 11.2 Status Badge Palette
-
-| Class | Background | Color |
-|---|---|---|
-| `.badge-status-NOT_STARTED` | `#f1f5f9` | `#475569` |
-| `.badge-status-IN_PROGRESS` | `#eff6ff` | `#1d4ed8` |
-| `.badge-status-COMPLETED` | `#f0fdf4` | `#15803d` |
-| `.badge-status-ON_HOLD` | `#fef3c7` | `#92400e` |
-| `.badge-status-CANCELLED` | `#fef2f2` | `#b91c1c` |
-| `.badge-status-DELAYED` | `#fff7ed` | `#c2410c` |
-| `.badge-status-BLOCKED` | `#fdf4ff` | `#7e22ce` |
-
-### 11.3 Priority Badge Palette
-
-| Class | Background | Color |
-|---|---|---|
-| `.badge-priority-LOW` | `#f0fdf4` | `#15803d` |
-| `.badge-priority-MEDIUM` | `#eff6ff` | `#1d4ed8` |
-| `.badge-priority-HIGH` | `#fff7ed` | `#c2410c` |
-| `.badge-priority-URGENT` | `#fef2f2` | `#b91c1c` |
-
-### 11.4 Team Pill
-
-```css
-.badge-team {
-    background: #f3ecfb;
-    color: var(--purple-800);
-    font-family: var(--font-heading);
-    font-size: 0.68rem;
-    font-weight: 500;
-    padding: 0.15rem 0.45rem;
-    border-radius: 99px;
-    white-space: nowrap;
-}
-```
-
-### 11.5 Table Status Badge (larger)
-
-```css
-.status-badge {
-    display: inline-block;
-    padding: 0.25rem 0.75rem;
-    border-radius: var(--radius-md);
-    font-size: 0.875rem;
-    font-weight: 500;
-    font-family: var(--font-heading);
-}
-```
-
-| Modifier | Background | Color |
-|---|---|---|
-| `.status-badge.active` | `#dcfce7` | `#166534` |
-| `.status-badge.inactive` | `#fef3c7` | `#92400e` |
-| `.status-badge.unassigned` | `#e0e7ff` | `#3730a3` |
-
----
-
-## 12. Modals
-
-### 12.1 Backdrop
-
-```css
-.modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
-    animation: fadeIn 0.2s ease-out;
-}
-```
-
-### 12.2 Container
-
-```css
-.modal-container {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background-color: var(--bg-card);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
-    max-width: 500px;
-    width: 90%;
-    max-height: 90vh;
-    overflow-y: auto;
-    z-index: 1001;
-    animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-/* Size variants */
-.modal-container.modal-large {
-    max-width: 700px;
-    max-height: 85vh;
-}
-```
-
-### 12.3 Modal Animations
-
-```css
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-@keyframes slideUp {
-    from { opacity: 0; transform: translate(-50%, -45%); }
-    to   { opacity: 1; transform: translate(-50%, -50%); }
-}
-```
-
-### 12.4 Modal Header
-
-```css
-.modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--gray-200);
-}
-
-.modal-title {
-    font-family: var(--font-heading);
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--purple-900);
-    margin: 0;
-}
-
-.modal-close-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius-md);
-    border: none;
-    background: transparent;
-    color: var(--gray-600);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.modal-close-btn:hover {
-    background: var(--gray-100);
-    color: var(--gray-900);
-}
-```
-
-### 12.5 Modal Body
-
-```css
-.modal-body {
-    padding: 1.5rem;
-}
-```
-
-### 12.6 Modal Footer
-
-```css
-.modal-footer {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    padding: 1.5rem;
-    border-top: 1px solid var(--gray-200);
-}
-```
-
-### 12.7 Modal Variants (Border Accent)
-
-| Variant | Class | Border |
-|---|---|---|
-| Danger / Deactivate | `.modal-danger` | `2px solid var(--error-border)` |
-| Success / Activate | `.modal-success` | `2px solid #16a34a` |
-
-### 12.8 Modal Icon (Header)
-
-```css
-/* Danger icon */
-.modal-icon-danger {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: var(--error-bg);
-    color: var(--error-text);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* Success icon */
-.modal-icon-success {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: rgba(22, 163, 74, 0.15);
-    color: #16a34a;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-```
-
-### 12.9 Responsive Modal
-
-```css
-@media (max-width: 640px) {
-    .modal-container {
-        width: 95%;
-        max-height: 95vh;
-    }
-
-    .modal-header,
-    .modal-body,
-    .modal-footer {
-        padding: 1.25rem;
-    }
-
-    .modal-footer {
-        flex-direction: column-reverse;
-    }
-
-    .modal-footer .btn {
-        width: 100%;
-    }
-}
-```
-
----
-
-## 13. Dropdowns
-
-### 13.1 Page Title Dropdown
-
-```css
-.dropdown-menu {
-    position: absolute;
-    top: calc(100% + 1rem);
-    left: 0;
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
-    border: 1px solid rgba(86, 23, 137, 0.1);
-    min-width: 320px;
-    z-index: 1000;
-    opacity: 0;
-    transform: translateY(-10px);
-    pointer-events: none;
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    overflow: hidden;
-}
-
-.dropdown-menu.open {
-    opacity: 1;
-    transform: translateY(0);
-    pointer-events: all;
-}
-```
-
-### 13.2 Dropdown Items
-
-```css
-.dropdown-item {
-    font-family: var(--font-heading);
-    padding: 1rem 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: none;
-    background: transparent;
-    width: 100%;
-    text-align: left;
-    font-size: 1rem;
-    font-weight: 500;
-    color: var(--gray-700);
-}
-
-.dropdown-item:hover {
-    background: var(--gradient-light);
-    color: white;
-}
-
-.dropdown-item.active {
-    background: var(--gradient-primary);
-    color: white;
-}
-```
-
-### 13.3 Manage Combobox (smaller dropdown in panels)
-
-Same pattern but with smaller padding (`0.75rem 1rem`) and `0.95rem` font-size.
-
----
-
-## 14. Toggle Switches
-
-```css
-.toggle-switch {
-    position: relative;
-    display: inline-block;
-    width: 60px;
-    height: 32px;
-}
-
-.toggle-slider {
-    /* ... absolute fill ... */
-    background-color: var(--gray-300);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    border-radius: 34px;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.toggle-slider:before {
-    /* 24×24 white circle, 4px inset */
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    border-radius: 50%;
-}
-
-/* Checked: green gradient */
-input:checked + .toggle-slider {
-    background: linear-gradient(135deg, #16a34a, #22c55e);
-    box-shadow: 0 0 12px rgba(22, 163, 74, 0.3);
-}
-
-input:checked + .toggle-slider:before {
-    transform: translateX(28px);
-}
-```
-
-**Status label:** `.team-status-label.active` = `#16a34a`, `.inactive` = `var(--error-text)`.
-
----
-
-## 15. Page Layout
-
-> **All page layout styles are centralized in `components/page/page.css`.** This file uses the multi-selector model. Page-specific CSS files should only contain overrides.
-
-### 15.1 Standard Page Container (Centralized)
-
-Every page shares the same container constraints via a multi-selector rule in `page.css`:
-
-```css
-.teams-page,
-.projects-page,
-.members-page,
-.help-support-page,
-.administration-page {
-    max-width: 1200px;
-    margin: 0 auto;
-}
-```
-
-**To add a new page:** Add the new page's root class to this selector list in `page.css`.
-
-**Do NOT add extra padding** — `main-content` supplies `2rem` padding.
-
-### 15.2 Page Header (Centralized)
-
-```css
-.page-header,
-.teams-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 2rem;
-    margin-bottom: 2rem;
-    flex-wrap: wrap;
-}
-```
-
-### 15.3 Page Title (Centralized)
-
-All page titles share the same typography via a multi-selector rule in `page.css`:
-
-```css
-.page-title,
-.members-page-title,
-.projects-title,
-.page-title-dropdown {
-    font-family: var(--font-heading);
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: var(--purple-800);
-}
-```
-
-**To add a new page title:** Add the new title's class to this selector list in `page.css`.
-
-### 15.4 Page Header Actions (Centralized)
-
-```css
-.page-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-}
-```
-
-### 15.5 Title Divider (Centralized)
-
-```css
-.title-divider {
-    border: none;
-    height: 2px;
-    background: var(--purple-200);
-    margin-bottom: 2rem;
-    border-radius: var(--radius-xl);
-}
-```
-
-### 15.6 Info Display System (Centralized)
-
-The info label/value pattern is centralized in `page.css` using multi-selectors. This system covers any context where label-value pairs are displayed (modals, project details, badges, dates, etc.):
-
-```css
-/* Labels */
-.info-label,
-.exp-badges-label,
-.exp-date-label,
-.exp-creator-label {
-    font-family: var(--font-heading);
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--gray-600);
-}
-
-/* Values */
-.info-value,
-.exp-badges-value,
-.exp-date-value {
-    font-family: var(--font-body);
-    font-size: 0.95rem;
-    color: var(--gray-700);
-}
-
-/* Rows */
-.info-row,
-.exp-date-row,
-.exp-badges-row,
-.exp-creator-row {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-/* Section containers */
-.info-section {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.info-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-}
-
-.info-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-```
-
-**To add a new label/value context:** Add the new selectors to the appropriate groups in `page.css`.
-
----
-
-## 16. Empty States
-
-> **Centralized in `page.css`.** The empty state pattern is shared by all pages.
-
-```css
-.empty-state {
-    text-align: center;
-    padding: 3rem 2rem;
-}
-
-.empty-state-icon {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 1rem;
-    color: var(--gray-400);
-}
-
-.empty-state-title {
-    font-family: var(--font-heading);
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--gray-700);
-    margin-bottom: 0.5rem;
-}
-
-.empty-state-text {
-    font-family: var(--font-body);
-    font-size: 0.95rem;
-    color: var(--gray-500);
-    margin-bottom: 2rem;
-}
-
-.empty-state-btn {
-    /* Same as .btn-primary but with inline-flex + icon gap */
-    font-family: var(--font-heading);
-    padding: 0.75rem 1.5rem;
-    background: var(--gradient-primary);
-    color: white;
-    border: none;
-    border-radius: var(--radius-md);
-    font-size: 0.95rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-```
-
----
-
-## 17. Error, Warning & Success States
-
-### 17.1 Error Message Box
-
-```css
-.error-message {
-    padding: 0.875rem 1rem;
-    background-color: var(--error-bg);
-    border: 1px solid var(--error-border);
-    border-radius: var(--radius-md);
-    color: var(--error-text);
-    font-family: var(--font-body);
-    font-size: 0.875rem;
-    margin-bottom: 1rem;
-}
-```
-
-### 17.2 Success Message Box
-
-```css
-.success-message {
-    padding: 0.875rem 1rem;
-    background-color: var(--success-bg);
-    border: 1px solid var(--success-border);
-    border-radius: var(--radius-md);
-    color: var(--success-text);
-    font-family: var(--font-body);
-    font-size: 0.875rem;
-    margin-bottom: 1rem;
-    animation: slideDown 0.3s ease-out;
-}
-```
-
-### 17.3 Warning Box (inside confirm modals)
-
-```css
-.warning-box {
-    padding: 1.25rem;
-    background: var(--error-bg);
-    border: 1px solid var(--error-border);
-    border-radius: var(--radius-md);
-    margin-bottom: 1.5rem;
-}
-
-.warning-text {
-    font-family: var(--font-body);
-    font-size: 0.95rem;
-    color: var(--gray-700);
-    line-height: 1.6;
-    margin-bottom: 0.75rem;
-}
-
-.warning-text strong {
-    color: var(--error-text);
-    font-weight: 600;
-}
-```
-
-### 17.4 Info Box (activate modals)
-
-```css
-.activate-info-box {
-    padding: 1.25rem;
-    background: rgba(22, 163, 74, 0.08);
-    border: 1px solid rgba(22, 163, 74, 0.3);
-    border-radius: var(--radius-md);
-    margin-bottom: 1.5rem;
-}
-```
-
-### 17.5 Name Highlight (confirm modals)
-
-```css
-.name-highlight {
-    font-family: var(--font-heading);
-    font-size: 1.125rem;
-    font-weight: 700;
-    padding: 0.75rem;
-    background: white;
-    border-radius: var(--radius-sm);
-    margin: 0.75rem 0;
-    text-align: center;
-}
-
-/* Danger: color: var(--error-text) */
-/* Success: color: #16a34a */
-```
-
----
-
-## 18. Animations & Transitions
-
-### 18.1 Standard Transition
+### 7.1 Standard Transition
 
 ```css
 transition: all 0.2s;
@@ -1478,7 +447,7 @@ transition: all 0.2s;
 transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 ```
 
-### 18.2 Hover Lift Effect
+### 7.2 Hover Lift Effect
 
 Used on buttons and clickable cards:
 
@@ -1493,7 +462,7 @@ Used on buttons and clickable cards:
 }
 ```
 
-### 18.3 Scale Effect (action buttons)
+### 7.3 Scale Effect (action buttons)
 
 ```css
 &:hover {
@@ -1502,7 +471,7 @@ Used on buttons and clickable cards:
 }
 ```
 
-### 18.4 Reveal on Hover (action overlays)
+### 7.4 Reveal on Hover (action overlays)
 
 ```css
 /* Default hidden */
@@ -1518,12 +487,12 @@ transform: translateX(0);
 pointer-events: auto;
 ```
 
-### 18.5 Modal Entrance
+### 7.5 Modal Entrance
 
 - **Backdrop:** `fadeIn 0.2s ease-out`
 - **Container:** `slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)`
 
-### 18.6 Dropdown Entrance
+### 7.6 Dropdown Entrance
 
 ```css
 transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -1531,48 +500,14 @@ transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 /* To:   opacity: 1; translateY(0) */
 ```
 
-### 18.7 Sidebar Easing
+### 7.7 Sidebar Easing
 
 ```css
 --sidebar-ease: cubic-bezier(0.33, 1, 0.68, 1);
 --sidebar-duration: 0.38s;
 ```
 
----
-
-## 19. Scrollbars
-
-```css
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: var(--gray-100);
-}
-
-::-webkit-scrollbar-thumb {
-    background: var(--gray-300);
-    border-radius: var(--radius-sm);
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: var(--purple-500);
-}
-```
-
-For nested scroll areas (expanded cards, task panels), use a slimmer variant:
-
-```css
-&::-webkit-scrollbar { width: 5px–6px; }
-&::-webkit-scrollbar-track { background: transparent or var(--gray-100); border-radius: 10px; }
-&::-webkit-scrollbar-thumb { background: var(--gray-300) or var(--purple-400); border-radius: 10px; }
-```
-
----
-
-## 20. Responsive Breakpoints
+## 8. Responsive Breakpoints
 
 | Name | Max-width | Usage |
 |---|---|---|
@@ -1617,9 +552,9 @@ For nested scroll areas (expanded cards, task panels), use a slimmer variant:
 
 ---
 
-## 21. Naming Conventions
+## 9. Naming Conventions
 
-### 21.1 Class Naming Rules
+### 9.1 Class Naming Rules
 
 1. **Lowercase kebab-case** for all class names: `.member-avatar-sm`, `.card-header-with-action`
 2. **Page-scoped prefix** for page-specific styles: `.teams-page`, `.projects-page`, `.members-page`
@@ -1628,7 +563,7 @@ For nested scroll areas (expanded cards, task panels), use a slimmer variant:
 5. **Variant modifiers** with descriptive suffixes: `.btn-primary`, `.btn-danger`, `.card-lg`, `.card-sm`
 6. **Action-type modifiers** with chained classes: `.view-btn`, `.edit-btn`, `.deactivate-btn`
 
-### 21.2 Do NOT
+### 9.2 Do NOT
 
 - Use `camelCase` or `PascalCase` — only `kebab-case`
 - Use raw hex colors inline — use CSS variables
@@ -1638,9 +573,9 @@ For nested scroll areas (expanded cards, task panels), use a slimmer variant:
 
 ---
 
-## 22. File Organization & Architecture
+## 10. File Organization & Architecture
 
-### 22.1 Import Structure (`app.css`)
+### 10.1 Import Structure (`app.css`)
 
 ```
 app.css
@@ -1665,7 +600,7 @@ app.css
 └── Utility classes
 ```
 
-### 22.2 The Two Centralized Powerhouse Files
+### 10.2 The Two Centralized Powerhouse Files
 
 | File | Purpose | Lines | What belongs here |
 |---|---|---|---|
@@ -1686,7 +621,7 @@ Is it a modal element?
                           └── NO  → Put in the most specific relevant CSS file
 ```
 
-### 22.3 Rules for Modal CSS
+### 10.3 Rules for Modal CSS
 
 **`modal.css`** contains all shared modal styles. It is the single source of truth for modal UI.
 
@@ -1695,14 +630,14 @@ Is it a modal element?
 - **Unique layout** specific to that one modal
 - **Comments** pointing to `modal.css` for any removed duplicates
 
-### 22.4 Rules for Page CSS
+### 10.4 Rules for Page CSS
 
 **`page.css`** contains all shared page styles. Page-specific CSS files should contain **ONLY**:
 - **Unique layout** for that page (grids, flex arrangements)
 - **Unique components** (e.g., project card expanded state)
 - **Comments** pointing to `page.css` for any removed duplicates
 
-### 22.5 Folder Structure
+### 10.5 Folder Structure
 
 ```
 src/
@@ -1735,11 +670,11 @@ src/
 
 ---
 
-## 23. Quick Reference: Implementing a New Feature
+## 11. Quick Reference: Implementing a New Feature
 
 > **This section is the essential checklist for AI agents and developers implementing new UI.**
 
-### 23.1 Before Writing Any CSS
+### 11.1 Before Writing Any CSS
 
 1. **Read Section 0** (AI Agent Instructions) — understand the multi-selector centralization model
 2. **Search `page.css`** — does your page container, title, info display, or empty state already exist?
@@ -1747,7 +682,7 @@ src/
 4. **Search `app.css` `:root`** — find the correct token for every color, radius, shadow, and font
 5. **Search component CSS files** — check if your pattern is already centralized elsewhere
 
-### 23.2 When Adding a New Page
+### 11.2 When Adding a New Page
 
 1. Create `src/pages/{PageName}/{PageName}Page.jsx` and `{PageName}Page.css`
 2. In `page.css`, add the page root class to the container multi-selector:
@@ -1758,7 +693,7 @@ src/
    .help-support-page,
    .administration-page,
    .new-page {            /* ← add here */
-       max-width: 1200px;
+       max-width: 180px;
        margin: 0 auto;
    }
    ```
@@ -1766,7 +701,7 @@ src/
 4. If the page has an empty state, reuse `.empty-state` from `page.css`
 5. In `{PageName}Page.css`, write ONLY page-specific styles
 
-### 23.3 When Adding a New Modal
+### 11.3 When Adding a New Modal
 
 1. Create the modal component in `src/components/modal/` or the relevant feature folder
 2. Create `{ModalName}.css` containing ONLY unique overrides
@@ -1778,7 +713,7 @@ src/
 4. If the modal needs a unique width: `.my-modal .modal-container { max-width: 500px; }`
 5. Do NOT redefine any base modal classes — import from `modal.css` (already in `app.css`)
 
-### 23.4 When Adding a New UI Component
+### 11.4 When Adding a New UI Component
 
 1. **Create the folder:** `src/components/{component-name}/`
 2. **Create the CSS file:** `src/components/{component-name}/{component-name}.css`
@@ -1790,7 +725,7 @@ src/
 5. **Use design tokens** (`:root` variables) for all colors, radii, shadows
 6. **Add responsive rules** at the bottom of the file
 
-### 23.5 When Extending an Existing Design
+### 11.5 When Extending an Existing Design
 
 If a design pattern already exists and you need it in a new context:
 
@@ -1814,7 +749,7 @@ If a design pattern already exists and you need it in a new context:
    ```
 3. **Write overrides only** in the page/modal-specific CSS file
 
-### 23.6 Style Checklist for Every CSS Rule
+### 11.6 Style Checklist for Every CSS Rule
 
 - [ ] Colors use CSS variables from `:root` (never hex, never `rgb()`)
 - [ ] Border radius uses `--radius-sm`, `--radius-md`, `--radius-lg`, `--radius-xl`, or `99px`
@@ -1824,18 +759,18 @@ If a design pattern already exists and you need it in a new context:
 - [ ] Font sizes match the type scale (Section 2)
 - [ ] Spacing matches the spacing scale (Section 3)
 - [ ] No duplicate definitions — shared styles are in centralized files
-- [ ] Responsive rules follow the standard breakpoints: `640px`, `768px`, `900px` (Section 20)
-- [ ] Transitions use standard easing: `all 0.2s ease` or `all 0.3s ease` (Section 18)
+- [ ] Responsive rules follow the standard breakpoints: `640px`, `768px`, `900px` (Section 8)
+- [ ] Transitions use standard easing: `all 0.2s ease` or `all 0.3s ease` (Section 7)
 - [ ] Selectors are flat — max 3 levels of nesting
-- [ ] Class names follow BEM-inspired naming: `component-element` (Section 21)
+- [ ] Class names follow BEM-inspired naming: `component-element` (Section 9)
 
-### 23.7 Completed Centralizations 
+### 11.7 Completed Centralizations 
 
 The following centralizations have been completed and should never be undone:
 
 | What | Where | Details |
 |---|---|---|
-| Modal base styles | `modal.css` | Backdrop, container, header, body, footer, keyframes, form elements, buttons — extracted from 22 individual modal CSS files |
+| Modal base styles | `modal.css` | Backdrop, container, header, body, footer, keyframes, form elements, buttons — extracted from 10 individual modal CSS files |
 | Page containers | `page.css` | Multi-selector rule for all page root classes |
 | Page titles | `page.css` | Multi-selector rule for all page title variants |
 | Page headers | `page.css` | Page header flex layout + header actions |
@@ -1848,7 +783,7 @@ The following centralizations have been completed and should never be undone:
 | px → rem conversion | All files | Converted px units to rem |
 | Responsive breakpoints | All pages | Added standard breakpoint rules |
 
-### 23.8 Non-Standard Token Mapping
+### 11.8 Non-Standard Token Mapping
 
 If you encounter any of these non-standard tokens in old code, replace them:
 
@@ -1858,7 +793,7 @@ If you encounter any of these non-standard tokens in old code, replace them:
 | `--text-primary` | `--gray-900` |
 | `--text-secondary` | `--gray-600` |
 | `--bg-light` | `--gray-50` |
-| `--border-color` | `--gray-200` |
+| `--border-color` | `--gray-80` |
 | `--border-subtle` | `--gray-100` |
 | `--accent-primary` | `--purple-700` |
 | `#333` | `var(--gray-800)` |
@@ -1868,5 +803,5 @@ If you encounter any of these non-standard tokens in old code, replace them:
 | `#d32f2f` | `var(--error-text)` |
 | `#ffebee` | `var(--error-bg)` |
 | `#3f51b5` | `var(--purple-700)` |
-| `#e0e0e0` | `var(--gray-200)` |
+| `#e0e0e0` | `var(--gray-80)` |
 

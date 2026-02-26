@@ -1,8 +1,4 @@
-/* Help and Support page layout */
-.help-support-page {
-    max-width: 1200px;
-    margin: 0 auto;
-}
+/* help-support-page container: now in shared page.css */
 
 .help-support-card {
     margin-top: 0;

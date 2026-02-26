@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { teamRolesAPI } from '../../../services/api';
-import './EditRoleModal.css';
 
 const EditRoleModal = ({ isOpen, onClose, onSubmit, teamId, initialRoleId }) => {
     const [selectedRoleId, setSelectedRoleId] = useState('');
