@@ -1,0 +1,43 @@
+/* Danger + warning styles; detail block for subteam */
+@import './DeactivateRoleModal.css';
+
+.subteam-details {
+    padding: 1rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+    margin-bottom: 1.5rem;
+    border-left: 4px solid var(--purple-700);
+}
+
+.subteam-detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+    color: var(--gray-700);
+}
+
+.subteam-detail-item:last-child {
+    margin-bottom: 0;
+}
+
+.subteam-detail-label {
+    font-weight: 600;
+    color: var(--gray-700);
+    min-width: 100px;
+}
+
+.subteam-detail-value {
+    font-weight: 500;
+    color: var(--gray-900);
+}
+
+.subteam-detail-value.active {
+    color: var(--success-text);
+}
+
+.subteam-detail-value.inactive {
+    color: var(--gray-500);
+}

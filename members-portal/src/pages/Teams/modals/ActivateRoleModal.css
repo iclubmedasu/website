@@ -1,0 +1,19 @@
+/* ============================================
+   ACTIVATE ROLE MODAL
+   Base styles provided by components/modal/modal.css
+   (success variant, activate-info-box all inherited)
+   ============================================ */
+
+/* Role detail overrides for activate context */
+.role-detail-item {
+    margin: 0.25rem 0;
+}
+
+.role-detail-label {
+    font-weight: 600;
+    margin-right: 0.5rem;
+}
+
+.role-detail-value {
+    color: var(--gray-800);
+}

@@ -1,0 +1,1457 @@
+/* ============================================
+   PROJECTS PAGE STYLES
+   ============================================ */
+
+.projects-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* ============================================
+   PAGE HEADER
+   ============================================ */
+.projects-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.projects-title {
+    font-family: var(--font-heading);
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--purple-800);
+}
+
+/* Filter dropdowns are handled by the manage-* classes imported from TeamsPage.css */
+
+/* ============================================
+   PROJECT CARDS GRID
+   ============================================ */
+.projects-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+    margin-top: 0.5rem;
+    position: relative;
+}
+
+@media (max-width: 900px) {
+    .projects-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================
+   PROJECT CARD
+   ============================================ */
+.project-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    border: 2px solid var(--gray-200);
+    padding: 1.25rem 1.4rem;
+    cursor: pointer;
+    transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        grid-row 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.project-card:hover:not(.project-card--expanded) {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.project-card--selected {
+    border-color: var(--purple-400);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12), var(--shadow-md);
+}
+
+/* Expanded state - occupies 2 columns x 3 rows (6 card spaces) */
+.project-card--expanded {
+    grid-column: span 2;
+    grid-row: span 3;
+    z-index: 10;
+    /*  box-shadow: 0 20px 60px rgba(124, 58, 237, 0.25),
+        0 10px 30px rgba(0, 0, 0, 0.15); */
+    /* border-color: var(--purple-600); */
+    transform: scale(1.01);
+    cursor: default;
+    max-height: none;
+}
+
+@media (max-width: 900px) {
+    .project-card--expanded {
+        grid-column: span 1;
+    }
+}
+
+/* Hide collapsed content when expanded */
+.project-card--expanded .project-card-collapsed-content {
+    opacity: 0;
+    height: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease, height 0.2s ease;
+}
+
+/* Show expanded content */
+.project-card--expanded .project-card-expanded-content {
+    opacity: 1;
+    transition: opacity 0.3s ease 0.2s;
+}
+
+/* Default state for expanded content */
+.project-card-expanded-content {
+    opacity: 0;
+    height: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.project-card--expanded .project-card-expanded-content {
+    opacity: 1;
+    height: auto;
+    overflow: visible;
+    pointer-events: auto;
+}
+
+.project-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.project-card-title {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    line-height: 1.3;
+    flex: 1;
+}
+
+.project-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.project-card-description {
+    font-size: 0.82rem;
+    color: var(--gray-500);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    /* border-top: 1px solid var(--gray-200); */
+    padding-top: 0.05rem;
+    margin-top: 0.65rem;
+}
+
+.project-card-badges {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+    align-items: center;
+    border-top: 1px solid var(--gray-200);
+    padding-top: 0.65rem;
+    margin-top: 0.65rem;
+}
+
+.project-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-top: 0.65rem;
+    margin-top: 0.65rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.project-card-teams {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.project-card-due {
+    font-size: 0.75rem;
+    color: var(--gray-400);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.project-card-due.overdue {
+    color: var(--error-text);
+    font-weight: 600;
+}
+
+.project-card-task-count {
+    font-size: 0.75rem;
+    color: var(--gray-400);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* ============================================
+   EXPANDED CARD CONTENT
+   ============================================ */
+.expanded-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding-top: 1rem;
+    max-height: 900px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Custom scrollbar for expanded content */
+.expanded-content-wrapper::-webkit-scrollbar {
+    width: 6px;
+}
+
+.expanded-content-wrapper::-webkit-scrollbar-track {
+    background: var(--gray-100);
+    border-radius: 10px;
+}
+
+.expanded-content-wrapper::-webkit-scrollbar-thumb {
+    background: var(--purple-400);
+    border-radius: 10px;
+}
+
+.expanded-content-wrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--purple-600);
+}
+
+.expanded-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-top: 1.25rem;
+}
+
+.expanded-section:first-child {
+    padding-top: 0;
+}
+
+.expanded-content-wrapper>.expanded-section+.expanded-section {
+    border-top: 1px solid var(--gray-100);
+}
+
+.expanded-section-title {
+    font-family: var(--font-heading);
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--purple-700);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.expanded-description {
+    font-size: 0.9rem;
+    color: var(--gray-600);
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.expanded-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.expanded-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.expanded-info-label {
+    font-family: var(--font-heading);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-400);
+}
+
+.expanded-info-value {
+    font-size: 0.88rem;
+    color: var(--gray-700);
+    font-weight: 500;
+}
+
+.expanded-teams-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.expanded-tasks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.25rem;
+}
+
+/* Custom scrollbar for tasks list */
+.expanded-tasks-list::-webkit-scrollbar {
+    width: 5px;
+}
+
+.expanded-tasks-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.expanded-tasks-list::-webkit-scrollbar-thumb {
+    background: var(--gray-300);
+    border-radius: 10px;
+}
+
+.expanded-tasks-list::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-400);
+}
+
+.expanded-task-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 0.8rem;
+    background: var(--bg-subtle);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--gray-100);
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+}
+
+.expanded-task-item:hover {
+    background: var(--purple-50);
+    border-color: var(--purple-200);
+    transform: translateX(2px);
+}
+
+.expanded-task-title {
+    color: var(--gray-700);
+    font-weight: 500;
+    flex: 1;
+}
+
+.expanded-close-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: var(--bg-card);
+    border: 2px solid var(--gray-300);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--gray-500);
+    transition: all 0.2s ease;
+    z-index: 20;
+}
+
+.expanded-close-btn:hover {
+    background: var(--purple-50);
+    border-color: var(--purple-500);
+    color: var(--purple-700);
+    transform: rotate(90deg);
+}
+
+.expanded-actions {
+    display: flex;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--gray-100);
+    margin: 0.75rem;
+}
+
+/* ── Expanded card task rows ── */
+.exp-task {
+    border: 1px solid var(--gray-100);
+    border-radius: var(--radius-sm);
+    background: var(--bg-subtle);
+    overflow: hidden;
+    transition: border-color 0.15s;
+}
+
+.exp-task+.exp-task {
+    margin-top: 0.4rem;
+}
+
+.exp-task:hover {
+    border-color: var(--gray-200);
+}
+
+.exp-task-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem;
+}
+
+.exp-task-left {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.exp-task-title {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--gray-800);
+    font-family: var(--font-heading);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.exp-task-meta {
+    display: flex;
+    gap: 0.3rem;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.exp-task-sub {
+    padding: 0 0.75rem 0.45rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.exp-task-assignees {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem;
+}
+
+/* ── Expanded card subtask rows ── */
+.exp-subtask-list {
+    border-top: 1px solid var(--gray-100);
+    background: var(--bg-card);
+    padding: 0.35rem 0.75rem 0.35rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.exp-subtask-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid var(--gray-50);
+}
+
+.exp-subtask-row:last-child {
+    border-bottom: none;
+}
+
+.exp-subtask-title {
+    font-size: 0.9rem;
+    color: var(--gray-600);
+    font-family: var(--font-heading);
+    font-weight: 400;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ============================================
+   BADGES / PILLS
+   ============================================ */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 99px;
+    font-family: var(--font-heading);
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+    line-height: 1;
+}
+
+/* Status badges */
+.badge-status-NOT_STARTED {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.badge-status-IN_PROGRESS {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.badge-status-COMPLETED {
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+.badge-status-ON_HOLD {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.badge-status-CANCELLED {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.badge-status-DELAYED {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.badge-status-BLOCKED {
+    background: #fdf4ff;
+    color: #7e22ce;
+}
+
+/* Priority badges */
+.badge-priority-LOW {
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+.badge-priority-MEDIUM {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.badge-priority-HIGH {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.badge-priority-URGENT {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+/* Type badge (neutral) */
+.badge-type {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+/* ── Category badges (11 categories) ── */
+/* Events & Activities */
+.badge-category-events-activities {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+/* Marketing & Communications */
+.badge-category-marketing-communications {
+    background: #fff1f2;
+    color: #be123c;
+}
+
+/* Technology & Development */
+.badge-category-technology-development {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+/* Research & Academic */
+.badge-category-research-academic {
+    background: #f0fdfa;
+    color: #0f766e;
+}
+
+/* Business & Operations */
+.badge-category-business-operations {
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+/* Creative & Design */
+.badge-category-creative-design {
+    background: #fdf4ff;
+    color: #7e22ce;
+}
+
+/* Collaboration & Partnerships */
+.badge-category-collaboration-partnerships {
+    background: #eef2ff;
+    color: #4338ca;
+}
+
+/* Internal Operations */
+.badge-category-internal-operations {
+    background: #f8fafc;
+    color: #334155;
+}
+
+/* Product & Innovation */
+.badge-category-product-innovation {
+    background: #f0f9ff;
+    color: #0369a1;
+}
+
+/* Maintenance & Support */
+.badge-category-maintenance-support {
+    background: #fefce8;
+    color: #854d0e;
+}
+
+/* Other */
+.badge-category-other {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+/* Team pill */
+.badge-team {
+    background: #f3ecfb;
+    color: var(--purple-800);
+    font-family: var(--font-heading);
+    font-size: 0.68rem;
+    font-weight: 500;
+    padding: 0.15rem 0.45rem;
+    border-radius: 99px;
+    white-space: nowrap;
+}
+
+/* ============================================
+   EMPTY STATE
+   ============================================ */
+.projects-empty {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--gray-400);
+}
+
+.projects-empty-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.4;
+}
+
+.projects-empty-title {
+    font-family: var(--font-heading);
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    margin-bottom: 0.4rem;
+}
+
+.projects-empty-subtitle {
+    font-size: 0.85rem;
+}
+
+/* ============================================
+   PROJECT DETAIL PANEL (slide-in drawer)
+   ============================================ */
+.project-detail-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 5, 40, 0.22);
+    z-index: 200;
+    display: flex;
+    justify-content: flex-end;
+    animation: overlayFadeIn 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.project-detail-panel {
+    width: min(680px, 96vw);
+    height: 100vh;
+    background: var(--bg-card);
+    box-shadow: -4px 0 32px rgba(20, 5, 40, 0.1), var(--shadow-xl);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: panelSlideIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes overlayFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes panelSlideIn {
+    from {
+        transform: translateX(32px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.project-detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.5rem 1.75rem 1rem;
+    border-bottom: 1px solid var(--gray-100);
+    background: var(--bg-subtle);
+}
+
+.project-detail-title {
+    font-family: var(--font-heading);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1.3;
+}
+
+.project-detail-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--gray-400);
+    padding: 0.25rem;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, background 0.15s;
+    flex-shrink: 0;
+}
+
+.project-detail-close:hover {
+    color: var(--gray-700);
+    background: var(--gray-100);
+}
+
+.project-detail-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.25rem 1.75rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* ── info rows ── */
+.detail-info-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.detail-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 120px;
+}
+
+.detail-info-label {
+    font-family: var(--font-heading);
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-400);
+}
+
+.detail-info-value {
+    font-size: 1.25rem;
+    color: var(--gray-700);
+    font-weight: 500;
+}
+
+/* ── description ── */
+.detail-section-title {
+    font-family: var(--font-heading);
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--gray-400);
+    margin-bottom: 0.6rem;
+}
+
+.detail-description {
+    font-size: 1.15rem;
+    color: var(--gray-600);
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+/* ── teams list ── */
+.detail-teams-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+/* ── task list ── */
+.task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.task-item {
+    background: var(--bg-subtle);
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 0.7rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    transition: border-color 0.15s;
+    cursor: pointer;
+}
+
+.task-item:hover {
+    border-color: var(--purple-500);
+}
+
+.task-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.task-item-title {
+    font-family: var(--font-heading);
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    flex: 1;
+}
+
+.task-item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    align-items: center;
+}
+
+.task-item-assignees {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.15rem;
+}
+
+.assignee-chip {
+    font-size: 0.95rem;
+    background: #f3ecfb;
+    color: var(--purple-800);
+    padding: 0.2rem 0.5rem;
+    border-radius: 99px;
+    font-family: var(--font-heading);
+    font-weight: 500;
+}
+
+/* ── subtasks indent ── */
+.subtask-list {
+    margin-top: 0.4rem;
+    margin-left: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    border-left: 2px solid var(--gray-200);
+    padding-left: 0.75rem;
+}
+
+.subtask-item {
+    background: var(--bg-card);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    padding: 0.45rem 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.subtask-item:hover {
+    border-color: var(--purple-400);
+}
+
+.subtask-item-title {
+    font-size: 1.05rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    font-family: var(--font-heading);
+}
+
+/* ── expand/collapse toggle ── */
+.task-expand-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--gray-400);
+    display: flex;
+    align-items: center;
+    padding: 0;
+    transition: color 0.15s;
+    flex-shrink: 0;
+}
+
+.task-expand-btn:hover {
+    color: var(--purple-700);
+}
+
+/* ── task detail panel (nested inside project panel) ── */
+.task-detail-section {
+    background: var(--bg-subtle);
+    border: 2px solid var(--purple-500);
+    border-radius: var(--radius-md);
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.task-detail-title {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--purple-800);
+}
+
+/* ============================================
+   MODALS (modal-overlay / modal-box removed — dead CSS)
+   ============================================ */
+
+.modal-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.modal-label {
+    font-family: var(--font-heading);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.modal-input,
+.modal-textarea,
+.modal-select {
+    font-family: var(--font-heading);
+    font-size: 0.875rem;
+    padding: 0.6rem 0.85rem;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    background: var(--bg-subtle);
+    color: var(--gray-800);
+    transition: border-color 0.15s, background 0.15s;
+    width: 100%;
+}
+
+.modal-input:focus,
+.modal-textarea:focus,
+.modal-select:focus {
+    outline: none;
+    border-color: var(--purple-600);
+    background: var(--bg-card);
+}
+
+.modal-textarea {
+    resize: vertical;
+    min-height: 80px;
+    line-height: 1.5;
+}
+
+.modal-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--gray-100);
+}
+
+.modal-btn-cancel {
+    font-family: var(--font-heading);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.55rem 1.25rem;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--gray-600);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.modal-btn-cancel:hover {
+    background: var(--gray-100);
+    border-color: var(--gray-300);
+}
+
+.modal-btn-submit {
+    font-family: var(--font-heading);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.55rem 1.4rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--gradient-primary);
+    color: #fff;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.modal-btn-submit:hover:not(:disabled) {
+    opacity: 0.88;
+}
+
+.modal-btn-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* team checkboxes inside modal */
+.team-checkbox-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 180px;
+    overflow-y: auto;
+    padding: 0.25rem 0;
+}
+
+.team-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.team-checkbox-item:hover {
+    background: var(--gray-50);
+}
+
+.team-checkbox-item input[type='checkbox'] {
+    accent-color: var(--purple-700);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+}
+
+.team-checkbox-label {
+    font-family: var(--font-heading);
+    font-size: 0.83rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* ============================================
+   ADD / ACTION BUTTON (header)
+   ============================================ */
+.btn-add-project {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: var(--font-heading);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.55rem 1.2rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--gradient-primary);
+    color: #fff;
+    cursor: pointer;
+    transition: opacity 0.15s, box-shadow 0.15s;
+    box-shadow: var(--shadow-sm);
+    white-space: nowrap;
+}
+
+.btn-add-project:hover {
+    opacity: 0.88;
+    box-shadow: var(--shadow-md);
+}
+
+/* ── icon button (panel actions) ── */
+.icon-btn {
+    border-radius: var(--radius-sm);
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    background: white;
+    box-shadow: var(--shadow-sm);
+    color: var(--gray-600);
+}
+
+/* Icon-only buttons (in collapsed card) */
+.project-card-meta .icon-btn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+}
+
+.project-card-meta .icon-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Text + icon buttons (in detail panel) */
+.icon-btn.icon-btn--text {
+    padding: 0.35rem 0.6rem;
+    gap: 0.3rem;
+    font-family: var(--font-heading);
+    font-size: 0.78rem;
+    font-weight: 500;
+}
+
+.icon-btn.edit-btn {
+    color: var(--purple-700);
+}
+
+.icon-btn.edit-btn:hover {
+    background: var(--purple-700);
+    color: white;
+    transform: scale(1.05);
+    box-shadow: var(--shadow-md);
+}
+
+.project-card-meta .icon-btn.edit-btn:hover {
+    transform: scale(1.15);
+}
+
+.icon-btn.deactivate-btn,
+.icon-btn.danger {
+    color: var(--error-text);
+}
+
+.icon-btn.deactivate-btn:hover,
+.icon-btn.danger:hover {
+    background: var(--error-text);
+    color: white;
+    transform: scale(1.05);
+    box-shadow: var(--shadow-md);
+}
+
+.project-card-meta .icon-btn.deactivate-btn:hover {
+    transform: scale(1.15);
+}
+
+/* ── loading / error states ── */
+.projects-loading,
+.projects-error {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--gray-400);
+    font-family: var(--font-heading);
+    font-size: 0.95rem;
+}
+
+.projects-error {
+    color: var(--error-text);
+}
+
+/* ── status indicator dot ── */
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-dot-NOT_STARTED {
+    background: #94a3b8;
+}
+
+.status-dot-IN_PROGRESS {
+    background: #3b82f6;
+}
+
+.status-dot-COMPLETED {
+    background: #22c55e;
+}
+
+.status-dot-ON_HOLD {
+    background: #f59e0b;
+}
+
+.status-dot-CANCELLED {
+    background: #ef4444;
+}
+
+.status-dot-DELAYED {
+    background: #f97316;
+}
+
+.status-dot-BLOCKED {
+    background: #a855f7;
+}
+
+/* ============================================
+   TASK STATUS QUICK-CHANGE SELECTOR
+   ============================================ */
+.status-select-inline {
+    font-family: var(--font-heading);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.2rem 1.4rem 0.2rem 0.45rem;
+    border-radius: 99px;
+    border: 2px solid transparent;
+    background-repeat: no-repeat;
+    background-position: right 0.3rem center;
+    background-size: 10px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: opacity 0.15s;
+}
+
+.status-select-inline:focus {
+    outline: none;
+    opacity: 0.85;
+}
+
+/* match badge colours */
+.status-select-inline.s-NOT_STARTED {
+    background-color: #f1f5f9;
+    color: #475569;
+    border-color: #e2e8f0;
+}
+
+.status-select-inline.s-IN_PROGRESS {
+    background-color: #eff6ff;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+
+.status-select-inline.s-COMPLETED {
+    background-color: #f0fdf4;
+    color: #15803d;
+    border-color: #bbf7d0;
+}
+
+.status-select-inline.s-DELAYED {
+    background-color: #fff7ed;
+    color: #c2410c;
+    border-color: #fed7aa;
+}
+
+.status-select-inline.s-BLOCKED {
+    background-color: #fdf4ff;
+    color: #7e22ce;
+    border-color: #e9d5ff;
+}
+
+.status-select-inline.s-ON_HOLD {
+    background-color: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+}
+
+.status-select-inline.s-CANCELLED {
+    background-color: #fef2f2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+/* ============================================
+   EXPANDED CARD – STRUCTURED SECTIONS
+   (Administration-style divider headers)
+   ============================================ */
+
+/* Section wrapper: top border separates sections */
+.exp-card-section {
+    padding-top: 1.1rem;
+    margin-top: 1.1rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+/* Section header: matches .card-header border-bottom from universalcard.css */
+.exp-card-section-header {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--gray-400);
+    padding-bottom: 0.6rem;
+    margin-bottom: 0.8rem;
+}
+
+/* Details section – row 1: badges */
+.exp-badges-row {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.2rem;
+}
+
+.exp-badges-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.exp-badges-label {
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-600);
+}
+
+.exp-badges-value {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--gray-900);
+}
+
+.exp-badges-value .badge {
+    font-size: 0.82rem;
+    padding: 0.32rem 0.75rem;
+}
+
+/* Details section – row 2: dates */
+.exp-dates-row {
+    display: flex;
+    gap: 3.5rem;
+    flex-wrap: wrap;
+}
+
+.exp-date-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.exp-date-label {
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-600);
+}
+
+.exp-date-value {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--gray-900);
+}
+
+.exp-date-value.overdue {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+/* Teams section – row 1: creator + their team */
+.exp-creator-label {
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-600);
+}
+
+.exp-creator-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.exp-creator-value {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--gray-900);
+}
+
+/* Teams block: label above, pills wrapping below */
+.exp-teams-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+}
+
+.exp-teams-block:last-child {
+    margin-bottom: 0;
+}
+
+.exp-teams-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.exp-teams-pills .badge-team {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.55rem;
+}
+
+/* Tasks section – empty placeholder */
+.exp-tasks-placeholder {
+    font-size: 0.82rem;
+    color: var(--gray-400);
+    text-align: center;
+    padding: 1rem 0;
+    font-style: italic;
+}

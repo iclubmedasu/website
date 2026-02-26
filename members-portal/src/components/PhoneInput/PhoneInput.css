@@ -1,0 +1,71 @@
+.phone-input-wrapper {
+    margin-bottom: 1rem;
+}
+
+.phone-input-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-900);
+    margin-bottom: 0.35rem;
+}
+
+.phone-input-required {
+    color: var(--error-text);
+}
+
+.phone-input-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+}
+
+.phone-input-select {
+    flex: 0 0 auto;
+    min-width: 140px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    border: 2px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--gray-900);
+}
+
+.phone-input-select:disabled {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+}
+
+.phone-input-number {
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    border: 2px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+}
+
+.phone-input-number:focus {
+    outline: none;
+    border-color: var(--purple-700);
+    box-shadow: var(--shadow-focus);
+}
+
+.phone-input-number:disabled {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+}
+
+.phone-input-number.error,
+.phone-input-row:has(.phone-input-number.error) .phone-input-number {
+    border-color: var(--error-text);
+}
+
+.phone-input-error {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--error-text);
+    margin-top: 0.25rem;
+}

@@ -1,0 +1,122 @@
+/* ============================================
+   ADMINISTRATION PAGE – 3 role sections
+   ============================================ */
+
+.administration-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.administration-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    width: 100%;
+}
+
+.administration-role-section {
+    margin-bottom: 0;
+    width: 100%;
+}
+
+.administration-role-section .card-header-with-action {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.administration-assignee {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.25rem 0;
+    flex-wrap: wrap;
+}
+
+.administration-assignee .table-member-cell {
+    flex: 1;
+    min-width: 0;
+}
+
+.administration-assignee .member-name-text {
+    display: block;
+}
+
+.administration-start-date {
+    display: block;
+    font-size: 0.8125rem;
+    color: var(--gray-600);
+    margin-top: 0.125rem;
+}
+
+.administration-empty {
+    padding: 1.5rem;
+    text-align: center;
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--gray-200);
+}
+
+.administration-empty-text {
+    font-family: var(--font-body);
+    color: var(--gray-600);
+    margin-bottom: 0.75rem;
+}
+
+.administration-empty-state {
+    margin-top: 1.5rem;
+    width: 100%;
+}
+
+.administration-empty-state .card-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 2rem;
+}
+
+.administration-empty-state .empty-state-icon {
+    color: var(--gray-400);
+    margin-bottom: 1rem;
+}
+
+.administration-empty-state .empty-state-title {
+    margin-bottom: 0.5rem;
+}
+
+.administration-empty-state .empty-state-text {
+    color: var(--gray-600);
+    max-width: 400px;
+}
+
+/* ============================================
+   ASSIGN MODAL – same structure as Add Members modal
+   (Button styles come from AddMembersModal.css: .btn .btn-primary .btn-secondary)
+   ============================================ */
+
+.administration-assign-modal .modal-container {
+    max-width: 500px;
+    width: 90%;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .administration-assignee {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .administration-empty-state .card-body {
+        padding: 1.25rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .administration-role-section .card-header-with-action {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

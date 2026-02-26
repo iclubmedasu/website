@@ -1,0 +1,19 @@
+.env
+.env.local
+.env.*.local
+
+node_modules/
+/.react-router/
+build/
+dist/
+
+*.log
+
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db

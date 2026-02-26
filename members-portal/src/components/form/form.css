@@ -1,0 +1,38 @@
+/* ============================================
+   FORM STYLES
+   ============================================ */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: block;
+    font-family: var(--font-heading);
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* ============================================
+   TOGGLE FORM
+   ============================================ */
+.toggle-form {
+    text-align: center;
+    margin-top: 1.5rem;
+    color: var(--gray-600);
+}
+
+.toggle-form button {
+    background: none;
+    border: none;
+    color: var(--purple-700);
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+}
+
+.toggle-form button:hover {
+    color: var(--purple-900);
+}

@@ -1,0 +1,47 @@
+/* ============================================
+   ADD MEMBERS MODAL
+   Base styles provided by components/modal/modal.css
+   This file contains only AddMembers-specific overrides.
+   ============================================ */
+
+/* Section hint text (below section title) */
+.form-section-hint {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin: -0.5rem 0 0.75rem 0;
+    line-height: 1.4;
+}
+
+/* Student ID row with email preview */
+.student-id-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: nowrap;
+}
+
+.student-id-input-row .form-input {
+    width: 13.75rem;
+    max-width: 13.75rem;
+    flex: 0 0 auto;
+}
+
+.official-email-hint {
+    display: flex;
+    flex-direction: column;
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    flex-shrink: 0;
+}
+
+.official-email-label {
+    font-weight: 500;
+}
+
+.official-email-value {
+    font-size: 0.6875rem;
+    color: var(--gray-400);
+    word-break: break-all;
+}

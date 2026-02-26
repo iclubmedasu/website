@@ -1,0 +1,480 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// MEMBERS - Core member information
+// ============================================
+model Member {
+  id                Int       @id @default(autoincrement())
+  fullName          String
+  email             String    @unique   // Official: studentId@med.asu.edu.eg (auto, not editable by user)
+  email2            String?   @unique   // Optional secondary email (editable)
+  email3            String?   @unique   // Optional tertiary email (editable)
+  phoneNumber       String    @unique   // Primary phone (with country code, e.g. +201234567890)
+  phoneNumber2      String?   @unique   // Optional second phone (with country code)
+  studentId         Int       @unique
+  profilePhotoUrl   String?
+  linkedInUrl       String?
+  isActive          Boolean   @default(true)  // Overall active status
+  assignmentStatus  String    @default("UNASSIGNED")  // ASSIGNED | UNASSIGNED | ALUMNI (explicit tag for filtering)
+  joinDate          DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  user            User?
+  teamMemberships TeamMember[]
+  roleHistory     MemberRoleHistory[]
+  alumniRecords   Alumni[]
+  createdProjects     Project[]               // Projects created by this member
+  taskAssignments     TaskAssignment[]        // Tasks assigned to this member
+  taskComments        TaskComment[]           // Comments on tasks
+  taskActivityLog     TaskActivityLog[]       // Activity log entries
+}
+
+// ============================================
+// TEAMS - Teams/Committees/Departments
+// ============================================
+model Team {
+  id               Int       @id @default(autoincrement())
+  name             String    @unique
+  isActive         Boolean   @default(true)
+  establishedDate  DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  // Relations
+  members          TeamMember[]
+  roles            TeamRole[]
+  subteams         Subteam[]
+  roleHistory      MemberRoleHistory[]
+  alumni           Alumni[]
+  projectTeams     ProjectTeam[]           // Projects assigned to this team
+  taskTeams        TaskTeam[]              // Tasks assigned to this team
+}
+
+// ============================================
+// TEAM ROLES - Available roles per team
+// ============================================
+model TeamRole {
+  id             Int       @id @default(autoincrement())
+  teamId         Int
+  roleName       String
+  roleType       String    @default("Member")
+  maxCount       Int?      // Null = unlimited, number = max people allowed
+  isActive       Boolean   @default(true)
+  systemRoleKey  Int?      // 1=Head of Team, 2=Vice Head of Team, 3=Member; null=custom (can be deactivated)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  
+  // Relations
+  team            Team              @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  assignments     TeamMember[]
+  roleHistory     MemberRoleHistory[]
+  alumni          Alumni[]
+  
+  // Unique constraint: same role name can't exist twice in same team
+  @@unique([teamId, roleName])
+  // One system role per key per team (1=Head, 2=Vice, 3=Member)
+  @@unique([teamId, systemRoleKey])
+  @@index([teamId])
+}
+
+// ============================================
+// SUBTEAMS - Subteams within a team (like roles, per-team)
+// ============================================
+model Subteam {
+  id          Int       @id @default(autoincrement())
+  teamId      Int
+  name        String
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  team            Team                @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  assignments     TeamMember[]
+  roleHistory     MemberRoleHistory[]
+  alumni          Alumni[]
+  
+  @@unique([teamId, name])
+  @@index([teamId])
+}
+
+// ============================================
+// TEAM MEMBERS - Current team assignments
+// ============================================
+model TeamMember {
+  id         Int       @id @default(autoincrement())
+  teamId     Int
+  memberId   Int
+  roleId     Int
+  subteamId  Int?      // Optional: member can be assigned to a subteam within the team
+  joinedDate DateTime  @default(now())
+  leftDate   DateTime? // When they left (null if current)
+  isActive   Boolean   @default(true)   // Currently active in this team?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  
+  // Relations
+  team    Team      @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  member  Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  role    TeamRole  @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  subteam Subteam?  @relation(fields: [subteamId], references: [id], onDelete: SetNull)
+  
+  // Unique constraint: A member can only be in a team once (active or not)
+  // If they rejoin later, you update the existing row, not create new one
+  @@unique([teamId, memberId])
+  @@index([memberId])
+  @@index([teamId, isActive])
+  @@index([subteamId])
+}
+
+// ============================================
+// MEMBER ROLE HISTORY - Complete timeline
+// ============================================
+model MemberRoleHistory {
+  id           Int       @id @default(autoincrement())
+  memberId     Int
+  teamId       Int
+  roleId       Int
+  subteamId    Int?      // Subteam at time of this history entry
+  changeType   String    // "Assignment", "Promotion", "Demotion", "New", "Transfer", "Resignation", "Expulsion", "Graduation", "Retirement", etc.
+  changeReason String?   // Free text explanation
+  notes        String?
+  startDate    DateTime  @default(now())
+  endDate     DateTime? // Null if current
+  isActive     Boolean   @default(true)  // Is this the active entry?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  // Relations
+  member  Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  team    Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  role    TeamRole? @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  subteam Subteam?  @relation(fields: [subteamId], references: [id], onDelete: SetNull)
+  
+  // Indexes for common queries
+  @@index([memberId, startDate])
+  @@index([teamId, startDate])
+  @@index([memberId, isActive])
+}
+
+// ============================================
+// ALUMNI - Members who left the club (separate from current assignments)
+// ============================================
+model Alumni {
+  id           Int       @id @default(autoincrement())
+  memberId     Int
+  teamId       Int?      // Last team they were in (for display: "Left from X"); null if team deleted
+  roleId       Int?      // Last role; null if role deleted
+  subteamId    Int?      // Last subteam if any
+  leaveType    String    // Graduation, Resignation, Expulsion, Retirement
+  leftDate     DateTime  @default(now())
+  changeReason String?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations (SetNull so alumni record stays if team/role/subteam removed)
+  member  Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  team    Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  role    TeamRole? @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  subteam Subteam?  @relation(fields: [subteamId], references: [id], onDelete: SetNull)
+
+  @@index([memberId])
+  @@index([teamId])
+  @@index([leftDate])
+}
+
+// ============================================
+// USERS - Authentication & Access Control
+// ============================================
+model User {
+  id              Int       @id @default(autoincrement())
+  memberId        Int       @unique  // Links to Member table
+  passwordHash    String
+  lastLogin       DateTime?
+  resetToken      String?   @unique
+  resetTokenExpiry DateTime?
+  isVerified      Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  member          Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  
+  @@index([memberId])
+}
+
+// ============================================
+// PROJECTS - Main project entity
+// ============================================
+model Project {
+  id              Int       @id @default(autoincrement())
+  projectTypeId   Int
+  title           String
+  description     String?
+  createdByMemberId Int
+  status          String    @default("NOT_STARTED")  // NOT_STARTED, IN_PROGRESS, COMPLETED, ON_HOLD, CANCELLED
+  priority        String    @default("MEDIUM")       // LOW, MEDIUM, HIGH, URGENT
+  startDate       DateTime?
+  dueDate         DateTime?
+  completedDate   DateTime?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  createdBy       Member           @relation(fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  projectTeams    ProjectTeam[]    // Teams assigned to this project
+  tasks           Task[]           // Tasks under this project
+  tags            ProjectTag[]     // Tags for categorization
+  projectType     ProjectType      @relation(fields: [projectTypeId], references: [id], onDelete: Restrict)
+  
+  @@index([createdByMemberId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([priority])
+  @@index([projectTypeId])
+}
+
+// ============================================
+// PROJECT TEAMS - Which teams can access/edit a project
+// ============================================
+model ProjectTeam {
+  id              Int       @id @default(autoincrement())
+  projectId       Int
+  teamId          Int
+  canEdit         Boolean   @default(true)   // Can this team edit the project?
+  isOwner         Boolean   @default(false)  // Is this the team that created it?
+  assignedDate    DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  team            Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  
+  @@unique([projectId, teamId])
+  @@index([projectId])
+  @@index([teamId])
+  @@index([projectId, canEdit])
+}
+
+// ============================================
+// PROJECT TAGS - For categorizing projects
+// ============================================
+model ProjectTag {
+  id          Int       @id @default(autoincrement())
+  projectId   Int
+  tagName     String    // e.g., "urgent", "client-project", "internal"
+  createdAt   DateTime  @default(now())
+  
+  // Relations
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@unique([projectId, tagName])
+  @@index([projectId])
+  @@index([tagName])
+}
+
+// ============================================
+// PROJECT TYPES - For categorizing projects
+// ============================================
+
+model ProjectType {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  category    String    // "Events & Activities", "Technology", etc.
+  description String?
+  icon        String?   // For UI display
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  
+  // Relations
+  projects    Project[]
+  
+  @@index([category])
+  @@index([isActive])
+}
+
+// ============================================
+// TASKS - Tasks within a project
+// ============================================
+model Task {
+  id              Int       @id @default(autoincrement())
+  projectId       Int
+  parentTaskId    Int?      // For subtasks - null if top-level task
+  type            String
+  title           String
+  description     String?
+  status          String    @default("NOT_STARTED")  // NOT_STARTED, IN_PROGRESS, COMPLETED, DELAYED, BLOCKED
+  difficulty      String    @default("MEDIUM")
+  priority        String    @default("MEDIUM")       // LOW, MEDIUM, HIGH, URGENT
+  startDate       DateTime?
+  dueDate         DateTime?
+  completedDate   DateTime?
+  estimatedHours  Float?
+  actualHours     Float?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentTask      Task?              @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subtasks        Task[]             @relation("TaskSubtasks")
+  taskTeams       TaskTeam[]         // Teams assigned to this task
+  assignments     TaskAssignment[]   // Individual members assigned
+  comments        TaskComment[]      // Comments/discussion
+  activityLog     TaskActivityLog[]  // History of changes
+  tags            TaskTag[]          // Status tags
+  dependencies    TaskDependency[]   @relation("DependentTask")      // Tasks that depend on this one
+  dependsOn       TaskDependency[]   @relation("DependsOnTask")      // Tasks this one depends on
+  
+  @@index([projectId])
+  @@index([parentTaskId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([priority])
+  @@index([projectId, status])
+}
+
+// ============================================
+// TASK TEAMS - Which teams are assigned to a task
+// ============================================
+model TaskTeam {
+  id              Int       @id @default(autoincrement())
+  taskId          Int
+  teamId          Int
+  canEdit         Boolean   @default(true)
+  assignedDate    DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  team            Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  
+  @@unique([taskId, teamId])
+  @@index([taskId])
+  @@index([teamId])
+}
+
+// ============================================
+// TASK ASSIGNMENTS - Individual members assigned to tasks
+// ============================================
+model TaskAssignment {
+  id              Int       @id @default(autoincrement())
+  taskId          Int
+  memberId        Int
+  assignedBy      Int?      // Member who made the assignment (null if self-assigned)
+  isSelfAssigned  Boolean   @default(false)
+  status          String    @default("ASSIGNED")  // ASSIGNED, ACCEPTED, IN_PROGRESS, COMPLETED
+  assignedDate    DateTime  @default(now())
+  acceptedDate    DateTime?
+  completedDate   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  member          Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  
+  @@unique([taskId, memberId])
+  @@index([taskId])
+  @@index([memberId])
+  @@index([taskId, status])
+  @@index([memberId, status])
+}
+
+// ============================================
+// TASK TAGS - Status and category tags for tasks
+// ============================================
+model TaskTag {
+  id          Int       @id @default(autoincrement())
+  taskId      Int
+  tagType     String    // "STATUS", "CATEGORY", "CUSTOM"
+  tagName     String    // "yet-to-start", "in-progress", "completed", "delayed", "blocked", etc.
+  createdAt   DateTime  @default(now())
+  
+  // Relations
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  @@unique([taskId, tagName])
+  @@index([taskId])
+  @@index([tagName])
+  @@index([taskId, tagType])
+}
+
+// ============================================
+// TASK DEPENDENCIES - Tasks that depend on other tasks
+// ============================================
+model TaskDependency {
+  id              Int       @id @default(autoincrement())
+  taskId          Int       // Task that has the dependency
+  dependsOnTaskId Int       // Task that must be completed first
+  dependencyType  String    @default("FINISH_TO_START")  // FINISH_TO_START, START_TO_START, etc.
+  createdAt       DateTime  @default(now())
+  
+  // Relations
+  task            Task      @relation("DependentTask", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOnTask   Task      @relation("DependsOnTask", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+  
+  @@unique([taskId, dependsOnTaskId])
+  @@index([taskId])
+  @@index([dependsOnTaskId])
+}
+
+// ============================================
+// TASK COMMENTS - Discussion/notes on tasks
+// ============================================
+model TaskComment {
+  id          Int       @id @default(autoincrement())
+  taskId      Int
+  memberId    Int
+  comment     String
+  isEdited    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  member      Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  
+  @@index([taskId])
+  @@index([memberId])
+  @@index([taskId, createdAt])
+}
+
+// ============================================
+// TASK ACTIVITY LOG - Complete history of changes
+// ============================================
+model TaskActivityLog {
+  id          Int       @id @default(autoincrement())
+  taskId      Int
+  memberId    Int       // Who made the change
+  actionType  String    // "CREATED", "STATUS_CHANGED", "ASSIGNED", "COMMENTED", "DEADLINE_CHANGED", etc.
+  oldValue    String?   // Previous value (JSON string)
+  newValue    String?   // New value (JSON string)
+  description String?   // Human-readable description
+  createdAt   DateTime  @default(now())
+  
+  // Relations
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  member      Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  
+  @@index([taskId])
+  @@index([memberId])
+  @@index([taskId, createdAt])
+  @@index([actionType])
+}

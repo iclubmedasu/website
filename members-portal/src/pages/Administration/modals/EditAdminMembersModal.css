@@ -1,0 +1,9 @@
+/* ============================================
+   EDIT ADMIN MEMBERS MODAL
+   Base styles: components/modal/modal.css
+   Shared styles: Teams/modals/EditMembersModal.css (imported by JSX)
+   
+   The JSX uses standard modal-* class names, so all
+   styles are inherited from modal.css + EditMembersModal.css.
+   This file only contains Administration-specific overrides.
+   ============================================ */

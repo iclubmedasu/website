@@ -1,0 +1,51 @@
+/* ============================================
+   CREATE PROJECT MODAL
+   Base styles provided by components/modal/modal.css
+   This file contains only CreateProject-specific overrides.
+   ============================================ */
+
+/* ============================================
+   TEAM BADGE PICKER
+   ============================================ */
+
+.team-badge-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.team-badge-option {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.85rem;
+    border-radius: 99px;
+    border: 2px solid var(--gray-300);
+    background: var(--bg-card);
+    color: var(--gray-600);
+    font-family: var(--font-heading);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.team-badge-option:hover {
+    border-color: var(--purple-400);
+    color: var(--purple-700);
+    background: rgba(122, 71, 163, 0.06);
+}
+
+.team-badge-option--selected {
+    background: rgba(122, 71, 163, 0.06);
+    border-color: var(--purple-400);
+    color: var(--purple-800);
+    font-weight: 600;
+}
+
+.team-badge-option--selected:hover {
+    background: rgba(122, 71, 163, 0.1);
+    border-color: var(--purple-600);
+    color: var(--purple-800);
+}

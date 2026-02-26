@@ -1,0 +1,60 @@
+/* ============================================
+   BUTTON STYLES
+   ============================================ */
+.btn-primary {
+    width: 100%;
+    padding: 1rem;
+    background: var(--gradient-secondary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1.05rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+
+.btn-primary-inverted {
+    width: 100%;
+    padding: 1rem;
+    background: white;
+    color: var(--purple-700);
+    border: 2px solid var(--purple-700);
+    border-radius: var(--radius-md);
+    font-size: 1.05rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary-inverted:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    background: var(--purple-50);
+}
+
+.btn-primary-inverted:active {
+    transform: translateY(0);
+}
+
+.btn-primary-inverted:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}

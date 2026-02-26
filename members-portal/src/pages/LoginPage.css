@@ -1,0 +1,111 @@
+/* ============================================
+   LOGIN PAGE STYLES
+   ============================================ */
+.login-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-color: var(--bg-subtle);
+}
+
+.login-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 100vh;
+}
+
+.login-form-section {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    flex: 1;
+    order: 1;
+}
+
+.login-logo-section {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 3rem 2rem;
+    background-color: var(--bg-subtle);
+    order: 2;
+}
+
+.login-logo {
+    width: 100%;
+    max-width: 280px;
+    height: auto;
+    display: block;
+    opacity: 0.95;
+}
+
+.login-card {
+    background: var(--bg-card);
+    padding: 3rem 2.5rem;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 440px;
+    border: 1px solid rgba(86, 23, 137, 0.08);
+}
+
+.login-title {
+    font-family: var(--font-heading);
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 0.5rem;
+    text-align: center;
+}
+
+.login-subtitle {
+    font-family: var(--font-body);
+    color: var(--gray-600);
+    text-align: center;
+    margin-bottom: 2rem;
+    font-size: 0.95rem;
+}
+
+.password-requirements {
+    font-size: 0.8rem;
+    color: var(--gray-500);
+    margin-top: 0.35rem;
+    margin-bottom: 0;
+}
+
+.login-divider {
+    text-align: center;
+    color: var(--gray-500);
+    font-size: 0.875rem;
+    margin: 1.25rem 0 0.75rem;
+}
+
+/* Desktop layout - side by side */
+@media (min-width: 768px) {
+    .login-content-wrapper {
+        flex-direction: row;
+    }
+
+    .login-form-section {
+        flex: 1;
+        order: 1;
+    }
+
+    .login-logo-section {
+        flex: 1;
+        order: 2;
+        background-color: var(--bg-subtle);
+        padding: 4rem;
+    }
+
+    .login-logo {
+        min-width: 2000;
+        max-width: 3080px;
+    }
+
+    .login-card {
+        max-width: 460px;
+    }
+}

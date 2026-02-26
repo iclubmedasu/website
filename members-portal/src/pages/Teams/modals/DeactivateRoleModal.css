@@ -1,0 +1,59 @@
+/* ============================================
+   DEACTIVATE ROLE MODAL
+   Base styles provided by components/modal/modal.css
+   (danger variant, warning-box all inherited)
+   ============================================ */
+
+/* ============================================
+   ROLE DETAILS SECTION
+   ============================================ */
+
+.role-details {
+    padding: 1rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+    margin-bottom: 1.5rem;
+    border-left: 4px solid var(--purple-700);
+}
+
+.role-detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+    color: var(--gray-700);
+}
+
+.role-detail-item:last-child {
+    margin-bottom: 0;
+}
+
+.role-detail-label {
+    font-weight: 600;
+    color: var(--gray-700);
+    min-width: 100px;
+}
+
+.role-detail-value {
+    font-weight: 500;
+    color: var(--gray-900);
+}
+
+.role-detail-value.active {
+    color: var(--success-text);
+}
+
+.role-detail-value.inactive {
+    color: var(--gray-500);
+}
+
+/* Responsive override for role details */
+@media (max-width: 768px) {
+    .role-detail-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+}

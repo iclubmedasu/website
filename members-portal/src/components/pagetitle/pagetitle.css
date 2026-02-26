@@ -1,0 +1,10 @@
+/* ============================================
+   PAGE TITLE (Poppins Purple)
+   ============================================ */
+.page-title {
+    font-family: var(--font-heading);
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--purple-800);
+    margin-bottom: 2rem;
+}

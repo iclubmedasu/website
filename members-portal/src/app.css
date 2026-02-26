@@ -1,0 +1,214 @@
+/* ============================================
+   FONT IMPORTS
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Arial:wght@400;500;600;700&display=swap');
+
+
+/* ============================================
+   COMPONENTS CSS 
+   ============================================ */
+
+/* Component styles */
+@import './components/buttons/buttons.css';
+@import './components/cards/universalcard.css';
+@import './components/errormsg/errormsg.css';
+@import './components/form/form.css';
+@import './components/header/header.css';
+@import './components/input/input.css';
+@import './components/scrollbar/scrollbar.css';
+@import './components/modal/modal.css';
+@import './components/toggle/toggle.css';
+@import './components/pagetitle/pagetitle.css';
+@import './pages/SideBarNavigationSlim.css';
+
+
+/* ============================================
+   CSS VARIABLES - Design System
+   ============================================ */
+:root {
+  /* Purple Gradient Scale (darkest to lightest) */
+  --purple-900: #561789;
+  --purple-800: #662f91;
+  --purple-700: #7a47a3;
+  --purple-600: #9063b3;
+  --purple-500: #af8fc8;
+  --purple-400: #c4b0d8;
+  --purple-300: #d6c8e5;
+  --purple-50: #f5f3ff;
+
+  /* Gradient Combinations */
+  --gradient-primary: linear-gradient(135deg, var(--purple-900) 0%, var(--purple-800) 100%);
+  --gradient-secondary: linear-gradient(135deg, var(--purple-800) 0%, var(--purple-700) 100%);
+  --gradient-light: linear-gradient(135deg, var(--purple-600) 0%, var(--purple-500) 100%);
+  --gradient-full: linear-gradient(135deg, var(--purple-900) 0%, var(--purple-700) 50%, var(--purple-500) 100%);
+
+  /* Subtle Background - Light gray with purple tint (expert's eye only) */
+  --bg-subtle: #f8f7f9;
+  --bg-card: #ffffff;
+
+  /* Neutral Colors */
+  --gray-50: #fafafa;
+  --gray-100: #f5f5f5;
+  --gray-200: #e5e5e5;
+  --gray-300: #d4d4d4;
+  --gray-400: #a3a3a3;
+  --gray-500: #737373;
+  --gray-600: #525252;
+  --gray-700: #404040;
+  --gray-800: #262626;
+  --gray-900: #171717;
+
+  /* Semantic Colors — Error */
+  --error-bg: #fef2f2;
+  --error-text: #991b1b;
+  --error-border: #fecaca;
+
+  /* Semantic Colors — Success */
+  --success-bg: #dcfce7;
+  --success-text: #166534;
+  --success-border: #22c55e;
+  --success-accent: #16a34a;
+
+  /* Semantic Colors — Warning */
+  --warning-bg: #fef3c7;
+  --warning-text: #92400e;
+  --warning-border: #fde68a;
+
+  /* Semantic Colors — Info */
+  --info-bg: #eff6ff;
+  --info-text: #1d4ed8;
+  --info-border: #bfdbfe;
+
+  /* Gradients — Danger / Success */
+  --gradient-danger: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  --gradient-success: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(86, 23, 137, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(86, 23, 137, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(86, 23, 137, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(86, 23, 137, 0.15);
+  --shadow-focus: 0 0 0 3px rgba(122, 71, 163, 0.1);
+  --shadow-focus-error: 0 0 0 3px rgba(153, 27, 27, 0.1);
+
+  /* Border Radius - Squircle (app-wide rule: all bordered elements use squircle corners) */
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+
+  /* Typography */
+  --font-heading: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Arial', Georgia, serif;
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg-subtle);
+}
+
+/* All headings use Poppins */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.app-title,
+.login-title,
+.nav-text,
+button,
+.form-label {
+  font-family: var(--font-heading);
+}
+
+/* ============================================
+   APP LAYOUT
+   ============================================ */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-container.login-view {
+  background-color: var(--bg-subtle);
+}
+
+.app-container.dashboard-view {
+  background-color: var(--bg-subtle);
+}
+
+/* ============================================
+   BODY LAYOUT
+   ============================================ */
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ============================================
+   MAIN CONTENT STYLES
+   ============================================ */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  background-color: var(--bg-subtle);
+  padding: 2rem;
+}
+
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page h2 {
+  font-family: var(--font-heading);
+  color: var(--gray-900);
+  margin-bottom: 1.5rem;
+  font-size: 1.75rem;
+  font-weight: 600;
+}
+
+.page p {
+  font-family: var(--font-body);
+  color: var(--gray-600);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+.text-center {
+  text-align: center;
+}
+
+.mt-1 {
+  margin-top: 0.5rem;
+}
+
+.mt-2 {
+  margin-top: 1rem;
+}
+
+.mb-1 {
+  margin-bottom: 0.5rem;
+}
+
+.mb-2 {
+  margin-bottom: 1rem;
+}

@@ -1,0 +1,477 @@
+/* ============================================
+   VIEW MEMBER MODAL STYLES
+   ============================================ */
+
+.view-member-modal {
+    max-width: 600px;
+    max-height: 90vh;
+}
+
+.view-member-modal .modal-content {
+    padding: 0;
+}
+
+/* ============================================
+   MEMBER INFO CARD
+   ============================================ */
+
+.member-info-card {
+    display: flex;
+    gap: 1.25rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, white 0%, rgba(122, 71, 163, 0.05) 100%);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.member-avatar {
+    flex-shrink: 0;
+}
+
+.member-avatar img {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--purple-700);
+}
+
+.avatar-placeholder {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--purple-700), var(--purple-600));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: white;
+    font-weight: bold;
+}
+
+.member-info-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.member-name {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.member-email,
+.member-phone,
+.member-student-id,
+.member-join-date {
+    margin: 0.25rem 0 0 0;
+    font-size: 0.813rem;
+    color: var(--gray-500);
+}
+
+.member-student-id {
+    color: var(--purple-700);
+    font-weight: 500;
+}
+
+/* ============================================
+   TIMELINE SECTION
+   ============================================ */
+
+.timeline-section {
+    padding: 1.5rem;
+}
+
+.timeline-title {
+    margin: 0 0 1.5rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ============================================
+   VERTICAL TIMELINE
+   ============================================ */
+
+.vertical-timeline {
+    position: relative;
+}
+
+.timeline-item {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.75rem;
+    position: relative;
+}
+
+.timeline-marker {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    min-width: 50px;
+}
+
+.timeline-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--gray-50);
+    border: 3px solid var(--purple-700);
+    position: relative;
+    z-index: 2;
+    flex-shrink: 0;
+}
+
+.timeline-line {
+    width: 2px;
+    flex: 1;
+    background: linear-gradient(to bottom, var(--purple-700), var(--gray-200));
+    margin-top: 0.5rem;
+    min-height: 2.5rem;
+}
+
+/* Change Type Color Variations */
+.change-type-new .timeline-dot {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.change-type-promotion .timeline-dot {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.change-type-demotion .timeline-dot {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.change-type-transfer .timeline-dot {
+    border-color: #8b5cf6;
+    background: rgba(139, 92, 246, 0.1);
+}
+
+.change-type-resignation .timeline-dot {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.change-type-expelled .timeline-dot {
+    border-color: #dc2626;
+    background: rgba(220, 38, 38, 0.1);
+}
+
+.change-type-graduated .timeline-dot {
+    border-color: #06b6d4;
+    background: rgba(6, 182, 212, 0.1);
+}
+
+.change-type-default .timeline-dot {
+    border-color: var(--purple-700);
+}
+
+/* ============================================
+   TIMELINE CONTENT
+   ============================================ */
+
+.timeline-content {
+    flex: 1;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    transition: all 0.3s ease;
+}
+
+.timeline-content:hover {
+    border-color: var(--purple-700);
+    box-shadow: 0 4px 12px rgba(122, 71, 163, 0.1);
+    background: rgba(122, 71, 163, 0.02);
+}
+
+.timeline-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    justify-content: space-between;
+}
+
+.change-type-badge {
+    font-size: 0.688rem;
+    font-weight: 700;
+    padding: 0.25rem 0.625rem;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    width: fit-content;
+}
+
+.change-type-new {
+    background: rgba(59, 130, 246, 0.15);
+    color: #1e40af;
+}
+
+.change-type-promotion {
+    background: rgba(16, 185, 129, 0.15);
+    color: #065f46;
+}
+
+.change-type-demotion {
+    background: rgba(245, 158, 11, 0.15);
+    color: #92400e;
+}
+
+.change-type-transfer {
+    background: rgba(139, 92, 246, 0.15);
+    color: #5b21b6;
+}
+
+.change-type-resignation {
+    background: rgba(239, 68, 68, 0.15);
+    color: #7f1d1d;
+}
+
+.change-type-expelled {
+    background: rgba(220, 38, 38, 0.15);
+    color: #7f1d1d;
+}
+
+.change-type-graduated {
+    background: rgba(6, 182, 212, 0.15);
+    color: #164e63;
+}
+
+.change-type-default {
+    background: rgba(107, 114, 128, 0.15);
+    color: #374151;
+}
+
+.timeline-date {
+    font-size: 0.813rem;
+    color: var(--gray-500);
+    font-weight: 500;
+}
+
+/* ============================================
+   ROLE INFO
+   ============================================ */
+
+.role-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.role-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--gray-900);
+}
+
+.role-item svg {
+    color: var(--purple-700);
+    flex-shrink: 0;
+}
+
+.role-name {
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.team-name {
+    color: var(--gray-500);
+    font-size: 0.813rem;
+}
+
+/* ============================================
+   DURATION INFO
+   ============================================ */
+
+.duration-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--gray-200);
+    margin: 0.75rem 0;
+}
+
+.duration-info svg {
+    color: var(--purple-700);
+    flex-shrink: 0;
+}
+
+.duration-text {
+    line-height: 1.4;
+}
+
+/* ============================================
+   REASON & NOTES
+   ============================================ */
+
+.reason-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    background: rgba(122, 71, 163, 0.05);
+    border-radius: var(--radius-sm);
+}
+
+.reason-info svg {
+    color: var(--purple-700);
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.reason-text {
+    line-height: 1.4;
+    color: var(--gray-900);
+}
+
+.notes-info {
+    margin-top: 0.75rem;
+}
+
+.notes-label {
+    margin: 0 0 0.25rem 0;
+    font-size: 0.688rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.notes-text {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    line-height: 1.4;
+    padding: 0.5rem;
+    background: rgba(107, 114, 128, 0.05);
+    border-left: 3px solid var(--purple-700);
+    border-radius: 2px;
+}
+
+/* ============================================
+   EMPTY STATE
+   ============================================ */
+
+.empty-state {
+    text-align: center;
+    padding: 2.5rem 1.25rem;
+    color: var(--gray-500);
+}
+
+.empty-state p {
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+/* ============================================
+   LOADING STATE
+   ============================================ */
+
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3.75rem 1.25rem;
+    gap: 1rem;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--gray-200);
+    border-top-color: var(--purple-700);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-state p {
+    margin: 0;
+    color: var(--gray-500);
+    font-size: 0.875rem;
+}
+
+/* ============================================
+   ERROR STATE
+   ============================================ */
+
+.error-state {
+    padding: 2.5rem 1.25rem;
+    text-align: center;
+}
+
+.error-message {
+    margin: 0;
+    color: var(--error-text);
+    font-size: 0.875rem;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+@media (max-width: 640px) {
+    .view-member-modal {
+        max-width: 95%;
+        max-height: 95vh;
+    }
+
+    .member-info-card {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+
+    .member-info-details {
+        align-items: center;
+    }
+
+    .timeline-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .timeline-content {
+        padding: 0.75rem;
+    }
+
+    .role-item {
+        font-size: 0.813rem;
+    }
+
+    .duration-info {
+        font-size: 0.688rem;
+    }
+
+    .duration-text {
+        word-break: break-word;
+    }
+}
