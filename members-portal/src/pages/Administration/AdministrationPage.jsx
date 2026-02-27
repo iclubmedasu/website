@@ -6,7 +6,7 @@ import ViewMemberModal from '../Teams/modals/ViewMemberModal';
 import EditAdminMembersModal from './modals/EditAdminMembersModal';
 import AddOfficerModal, { officerPlaceholderStudentId } from './modals/AddOfficerModal';
 import OfficerHandoverModal from './modals/OfficerHandoverModal';
-import '../Teams/TeamsPage.css';
+
 import './AdministrationPage.css';
 
 // Administration team role names (hierarchy: Officer highest, then President, then Vice President lowest)

@@ -15,7 +15,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { projectsAPI, tasksAPI, teamsAPI, membersAPI } from '../../services/api';
 import './ProjectsPage.css';
-import '../Teams/TeamsPage.css';
+
 import CreateProjectModal from './modals/CreateProjectModal';
 import DeactivateProjectModal from './modals/DeactivateProjectModal';
 

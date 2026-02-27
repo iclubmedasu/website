@@ -58,3 +58,55 @@
     cursor: not-allowed;
     transform: none;
 }
+
+
+/* ============================================
+   ICON BUTTON (small action button with icon)
+   Centralised from ProjectsPage.css.
+   Used by: ProjectsPage (card + detail panel actions)
+   ============================================ */
+
+.icon-btn {
+    border-radius: var(--radius-sm);
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    background: white;
+    box-shadow: var(--shadow-sm);
+    color: var(--gray-600);
+}
+
+.icon-btn.icon-btn--text {
+    padding: 0.35rem 0.6rem;
+    gap: 0.3rem;
+    font-family: var(--font-heading);
+    font-size: 0.78rem;
+    font-weight: 500;
+}
+
+.icon-btn.edit-btn {
+    color: #2563eb;
+}
+
+.icon-btn.edit-btn:hover {
+    background: #2563eb;
+    color: white;
+    transform: scale(1.05);
+    box-shadow: var(--shadow-md);
+}
+
+.icon-btn.deactivate-btn,
+.icon-btn.danger {
+    color: var(--error-text);
+}
+
+.icon-btn.deactivate-btn:hover,
+.icon-btn.danger:hover {
+    background: var(--error-text);
+    color: white;
+    transform: scale(1.05);
+    box-shadow: var(--shadow-md);
+}

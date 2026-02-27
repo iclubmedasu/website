@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { ArrowRightLeft, LogOut, X } from "lucide-react";
-import "../../Teams/TeamsPage.css";
+
 
 const MODES = {
     RETIRE: 'retire',

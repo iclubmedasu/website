@@ -17,7 +17,7 @@ import EditMembersModal from './modals/EditMembersModal';
 import ViewMemberModal from './modals/ViewMemberModal';
 import { useAuth } from '../../context/AuthContext';
 import { teamsAPI, teamRolesAPI, teamSubteamsAPI, teamMembersAPI } from '../../services/api';
-import './TeamsPage.css';
+
 
 // Simple SVG Chevron Icon
 const ChevronDown = ({ className }) => (
@@ -1120,7 +1120,7 @@ function TeamsPage() {
             {error && <div className="error-message">{error}</div>}
             {loading && <div className="loading-message">Loading teams...</div>}
             {!loading && !error && teams.length === 0 && !canManage && (
-                <div className="empty-teams-message">
+                <div className="empty-message">
                     You are not assigned to any team. Contact your administrator for access.
                 </div>
             )}

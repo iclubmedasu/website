@@ -4,9 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { teamMembersAPI, membersAPI, teamsAPI, teamRolesAPI, teamSubteamsAPI } from '../../services/api';
 import ViewMemberModal from '../Teams/modals/ViewMemberModal';
 import EditMembersModal from '../Teams/modals/EditMembersModal';
-import AssignToTeamModal from './AssignToTeamModal';
-import '../Teams/TeamsPage.css';
-import './MembersPage.css';
+import AssignToTeamModal from './modals/AssignToTeamModal';
+
 
 // Filter dropdown that matches Manage Roles/Subteams squircle + list styling
 function FilterDropdown({ options, value, onChange, triggerLabel }) {

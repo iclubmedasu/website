@@ -2,8 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Eye, Users, ChevronDown } from 'lucide-react';
 import { alumniAPI, teamsAPI } from '../../services/api';
 import ViewMemberModal from '../Teams/modals/ViewMemberModal';
-import '../Teams/TeamsPage.css';
-import './AlumniPage.css';
+
 
 function FilterDropdown({ options, value, onChange, triggerLabel }) {
     const [isOpen, setIsOpen] = useState(false);

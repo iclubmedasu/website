@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Users, Shield, Pencil, Link as LinkIcon } from 'lucide-react';
 import { membersAPI } from '../../services/api';
 import { PhoneInput } from '../../components/PhoneInput/PhoneInput';
-import '../Teams/TeamsPage.css';
+
 import './UserPage.css';
 
 function UserPage() {

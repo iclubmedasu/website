@@ -76,3 +76,15 @@
 .toggle-slider:hover {
     opacity: 0.9;
 }
+
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+    .team-activation-container {
+        width: 100%;
+        justify-content: space-between;
+    }
+}

@@ -1,5 +1,5 @@
 import { ExternalLink } from 'lucide-react';
-import '../Teams/TeamsPage.css';
+
 import './HelpAndSupportPage.css';
 
 const INCIDENT_REPORT_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSevHhFwqy5STXtS077IrSkWVXXBfDvVFsf-z4V5fDT330X49w/viewform';

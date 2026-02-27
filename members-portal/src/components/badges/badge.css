@@ -1,0 +1,283 @@
+/* ============================================
+   BADGE COMPONENT — Status, priority, type & category pills
+   Centralised from ProjectsPage.css.
+   Used by: ProjectsPage (cards, detail panel, expanded cards)
+   ============================================ */
+
+
+/* ============================================
+   BADGE BASE
+   ============================================ */
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 99px;
+    font-family: var(--font-heading);
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+    line-height: 1;
+}
+
+
+/* ============================================
+   STATUS BADGES
+   ============================================ */
+
+.badge-status-NOT_STARTED {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.badge-status-IN_PROGRESS {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.badge-status-COMPLETED {
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+.badge-status-ON_HOLD {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.badge-status-CANCELLED {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.badge-status-DELAYED {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.badge-status-BLOCKED {
+    background: #fdf4ff;
+    color: #7e22ce;
+}
+
+
+/* ============================================
+   PRIORITY BADGES
+   ============================================ */
+
+.badge-priority-LOW {
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+.badge-priority-MEDIUM {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.badge-priority-HIGH {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.badge-priority-URGENT {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+
+/* ============================================
+   TYPE BADGE
+   ============================================ */
+
+.badge-type {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+
+/* ============================================
+   CATEGORY BADGES
+   ============================================ */
+
+.badge-category-events-activities {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.badge-category-marketing-communications {
+    background: #fff1f2;
+    color: #be123c;
+}
+
+.badge-category-technology-development {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.badge-category-research-academic {
+    background: #f0fdfa;
+    color: #0f766e;
+}
+
+.badge-category-business-operations {
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+.badge-category-creative-design {
+    background: #fdf4ff;
+    color: #7e22ce;
+}
+
+.badge-category-collaboration-partnerships {
+    background: #eef2ff;
+    color: #4338ca;
+}
+
+.badge-category-internal-operations {
+    background: #f8fafc;
+    color: #334155;
+}
+
+.badge-category-product-innovation {
+    background: #f0f9ff;
+    color: #0369a1;
+}
+
+.badge-category-maintenance-support {
+    background: #fefce8;
+    color: #854d0e;
+}
+
+.badge-category-other {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+
+/* ============================================
+   TEAM BADGE
+   ============================================ */
+
+.badge-team {
+    background: #f3ecfb;
+    color: var(--purple-800);
+    font-family: var(--font-heading);
+    font-size: 0.68rem;
+    font-weight: 500;
+    padding: 0.15rem 0.45rem;
+    border-radius: 99px;
+    white-space: nowrap;
+}
+
+
+/* ============================================
+   STATUS DOT (small colour indicator)
+   ============================================ */
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-dot-NOT_STARTED {
+    background: #94a3b8;
+}
+
+.status-dot-IN_PROGRESS {
+    background: #3b82f6;
+}
+
+.status-dot-COMPLETED {
+    background: #22c55e;
+}
+
+.status-dot-ON_HOLD {
+    background: #f59e0b;
+}
+
+.status-dot-CANCELLED {
+    background: #ef4444;
+}
+
+.status-dot-DELAYED {
+    background: #f97316;
+}
+
+.status-dot-BLOCKED {
+    background: #a855f7;
+}
+
+
+/* ============================================
+   STATUS SELECT INLINE (quick‑change dropdown)
+   ============================================ */
+
+.status-select-inline {
+    font-family: var(--font-heading);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.2rem 1.4rem 0.2rem 0.45rem;
+    border-radius: 99px;
+    border: 2px solid transparent;
+    background-repeat: no-repeat;
+    background-position: right 0.3rem center;
+    background-size: 10px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: opacity 0.15s;
+}
+
+.status-select-inline:focus {
+    outline: none;
+    opacity: 0.85;
+}
+
+.status-select-inline.s-NOT_STARTED {
+    background-color: #f1f5f9;
+    color: #475569;
+    border-color: #e2e8f0;
+}
+
+.status-select-inline.s-IN_PROGRESS {
+    background-color: #eff6ff;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+
+.status-select-inline.s-COMPLETED {
+    background-color: #f0fdf4;
+    color: #15803d;
+    border-color: #bbf7d0;
+}
+
+.status-select-inline.s-DELAYED {
+    background-color: #fff7ed;
+    color: #c2410c;
+    border-color: #fed7aa;
+}
+
+.status-select-inline.s-BLOCKED {
+    background-color: #fdf4ff;
+    color: #7e22ce;
+    border-color: #e9d5ff;
+}
+
+.status-select-inline.s-ON_HOLD {
+    background-color: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+}
+
+.status-select-inline.s-CANCELLED {
+    background-color: #fef2f2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}

@@ -957,11 +957,11 @@
     border-bottom: 1px solid var(--gray-200);
 }
 
-.member-avatar {
+.member-info-card .member-avatar {
     flex-shrink: 0;
 }
 
-.member-avatar img {
+.member-info-card .member-avatar img {
     width: 80px;
     height: 80px;
     border-radius: 50%;
@@ -969,7 +969,7 @@
     border: 3px solid var(--purple-700);
 }
 
-.avatar-placeholder {
+.member-info-card .avatar-placeholder {
     width: 80px;
     height: 80px;
     border-radius: 50%;
@@ -989,23 +989,23 @@
     justify-content: space-between;
 }
 
-.member-name {
+.member-info-card .member-name {
     margin: 0;
     font-size: 1.125rem;
     font-weight: 600;
     color: var(--gray-900);
 }
 
-.member-email,
-.member-phone,
-.member-student-id,
-.member-join-date {
+.member-info-card .member-email,
+.member-info-card .member-phone,
+.member-info-card .member-student-id,
+.member-info-card .member-join-date {
     margin: 0.25rem 0 0 0;
     font-size: 0.813rem;
     color: var(--gray-500);
 }
 
-.member-student-id {
+.member-info-card .member-student-id {
     color: var(--purple-700);
     font-weight: 500;
 }
@@ -1434,4 +1434,155 @@
     .duration-text {
         word-break: break-word;
     }
+}
+
+
+/* ============================================
+   MODAL‑PREFIXED FORM CONTROLS
+   Centralised from ProjectsPage.css (inline task‑add form).
+   These mirror the .form-* classes above but use a modal- prefix
+   in the ProjectsPage JSX.
+   ============================================ */
+
+.modal-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.modal-label {
+    font-family: var(--font-heading);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.modal-input,
+.modal-textarea,
+.modal-select {
+    font-family: var(--font-heading);
+    font-size: 0.875rem;
+    padding: 0.6rem 0.85rem;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    background: var(--bg-subtle);
+    color: var(--gray-800);
+    transition: border-color 0.15s, background 0.15s;
+    width: 100%;
+}
+
+.modal-input:focus,
+.modal-textarea:focus,
+.modal-select:focus {
+    outline: none;
+    border-color: var(--purple-600);
+    background: var(--bg-card);
+}
+
+.modal-textarea {
+    resize: vertical;
+    min-height: 80px;
+    line-height: 1.5;
+}
+
+.modal-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--gray-100);
+}
+
+.modal-btn-cancel {
+    font-family: var(--font-heading);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.55rem 1.25rem;
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--gray-600);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.modal-btn-cancel:hover {
+    background: var(--gray-100);
+    border-color: var(--gray-300);
+}
+
+.modal-btn-submit {
+    font-family: var(--font-heading);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.55rem 1.4rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--gradient-primary);
+    color: #fff;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.modal-btn-submit:hover:not(:disabled) {
+    opacity: 0.88;
+}
+
+.modal-btn-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+
+/* ============================================
+   TEAM CHECKBOX LIST (inside modals / forms)
+   Centralised from ProjectsPage.css.
+   ============================================ */
+
+.team-checkbox-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 180px;
+    overflow-y: auto;
+    padding: 0.25rem 0;
+}
+
+.team-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.team-checkbox-item:hover {
+    background: var(--gray-50);
+}
+
+.team-checkbox-item input[type='checkbox'] {
+    accent-color: var(--purple-700);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+}
+
+.team-checkbox-label {
+    font-family: var(--font-heading);
+    font-size: 0.83rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
 }

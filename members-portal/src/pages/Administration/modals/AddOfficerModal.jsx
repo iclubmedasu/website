@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import "../../Teams/TeamsPage.css";
+
 
 /** Unique placeholder studentId for faculty/officer (not a student). DB still requires studentId; we use a negative unique value. */
 export function officerPlaceholderStudentId() {

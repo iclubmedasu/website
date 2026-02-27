@@ -1,0 +1,527 @@
+/* ============================================
+   DROPDOWN COMPONENT — Title dropdown & manage combobox
+   Centralised from TeamsPage.css.
+   Used by: TeamsPage (title‑dropdown, manage roles/subteams)
+   ============================================ */
+
+
+/* ============================================
+   TITLE DROPDOWN
+   ============================================ */
+
+.title-dropdown-container {
+    position: relative;
+    display: inline-block;
+}
+
+/* page-title-dropdown base font: shared in page.css */
+.page-title-dropdown {
+    margin-bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.page-title-dropdown:hover {
+    color: var(--purple-900);
+}
+
+.dropdown-icon {
+    width: 32px;
+    height: 32px;
+    color: var(--purple-700);
+    transition: transform 0.3s ease;
+}
+
+.dropdown-icon.open {
+    transform: rotate(180deg);
+}
+
+
+/* ============================================
+   DROPDOWN MENU
+   ============================================ */
+
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 1rem);
+    left: 0;
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    border: 1px solid rgba(86, 23, 137, 0.1);
+    min-width: 320px;
+    z-index: 1000;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    overflow: hidden;
+}
+
+.dropdown-menu.open {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: all;
+}
+
+
+/* ============================================
+   DROPDOWN ITEMS
+   ============================================ */
+
+.dropdown-item-wrapper {
+    position: relative;
+}
+
+.dropdown-item-wrapper:hover .dropdown-item-actions {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+}
+
+.dropdown-item {
+    font-family: var(--font-heading);
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--gray-700);
+    position: relative;
+}
+
+.dropdown-item:hover {
+    background: var(--gradient-light);
+    color: white;
+}
+
+.dropdown-item.active {
+    background: var(--gradient-primary);
+    color: white;
+}
+
+.dropdown-item-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.dropdown-item-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.dropdown-badge {
+    background-color: rgba(255, 255, 255, 0.3);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-md);
+    min-width: 24px;
+    text-align: center;
+}
+
+.dropdown-item:not(.active) .dropdown-badge {
+    background-color: var(--purple-500);
+    color: white;
+}
+
+
+/* ============================================
+   DROPDOWN ACTION BUTTONS (hover‑reveal)
+   ============================================ */
+
+.dropdown-item-actions {
+    display: flex;
+    gap: 0.375rem;
+    opacity: 0;
+    transform: translateX(5px);
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+}
+
+.dropdown-action-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    background: white;
+    box-shadow: var(--shadow-sm);
+    padding: 0;
+}
+
+.dropdown-action-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.dropdown-action-btn.edit-btn {
+    color: #2563eb;
+}
+
+.dropdown-action-btn.edit-btn:hover {
+    background: #2563eb;
+    color: white;
+    transform: scale(1.15);
+    box-shadow: var(--shadow-md);
+}
+
+.dropdown-action-btn.toggle-active-btn {
+    color: var(--gray-600);
+}
+
+.dropdown-action-btn.toggle-active-btn.activate {
+    color: #16a34a;
+}
+
+.dropdown-action-btn.toggle-active-btn.activate:hover {
+    background: #16a34a;
+    color: white;
+    transform: scale(1.15);
+    box-shadow: var(--shadow-md);
+}
+
+.dropdown-action-btn.toggle-active-btn.deactivate {
+    color: var(--error-text);
+}
+
+.dropdown-action-btn.toggle-active-btn.deactivate:hover {
+    background: var(--error-text);
+    color: white;
+    transform: scale(1.15);
+    box-shadow: var(--shadow-md);
+}
+
+
+/* ============================================
+   ADD‑NEW DROPDOWN ITEM
+   ============================================ */
+
+.add-team-item {
+    border-top: 1px solid rgba(86, 23, 137, 0.1);
+    background: transparent;
+    color: #16a34a;
+    font-weight: 600;
+}
+
+.add-team-item:hover {
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+    color: white;
+}
+
+.add-team-item .dropdown-item-label {
+    justify-content: center;
+    width: 100%;
+}
+
+
+/* ============================================
+   DROPDOWN BACKDROP
+   ============================================ */
+
+.dropdown-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background: transparent;
+}
+
+
+/* ============================================
+   MANAGE COMBOBOX — bordered squircle w/ trigger + dropdown
+   Used by: manage‑roles, manage‑subteams sections
+   ============================================ */
+
+.manage-roles-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--purple-500);
+    border-radius: var(--radius-xl);
+    background: var(--bg-card);
+}
+
+.manage-roles-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.manage-roles-label {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--purple-700);
+    text-align: center;
+}
+
+/* Manage combobox trigger */
+.manage-combobox-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    min-width: 160px;
+    padding: 0.5rem 0.75rem;
+    font-family: var(--font-heading);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--purple-800);
+    background: white;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.manage-combobox-trigger:hover {
+    background: var(--gradient-light);
+    color: white;
+}
+
+.manage-combobox-trigger:hover .manage-combobox-chevron {
+    color: white;
+}
+
+.manage-combobox-label {
+    flex: 1;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.manage-combobox-chevron {
+    width: 20px;
+    height: 20px;
+    color: var(--purple-600);
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+}
+
+.manage-combobox-chevron.open {
+    transform: rotate(180deg);
+}
+
+
+/* ============================================
+   MANAGE DROPDOWN MENU
+   ============================================ */
+
+.manage-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    border: 1px solid rgba(86, 23, 137, 0.15);
+    min-width: 260px;
+    max-width: 320px;
+    width: calc(100% + 1rem);
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    overflow: hidden;
+}
+
+.manage-dropdown-menu.open {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: all;
+}
+
+.manage-dropdown-item-wrapper:hover .manage-dropdown-item-actions {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+}
+
+.manage-dropdown-item {
+    font-family: var(--font-heading);
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    font-size: 0.95rem;
+    color: var(--gray-800);
+}
+
+.manage-dropdown-item:hover {
+    background: var(--gradient-light);
+    color: white;
+}
+
+.manage-dropdown-item.active {
+    background: var(--gradient-primary);
+    color: white;
+}
+
+.manage-dropdown-item-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.manage-dropdown-item-actions {
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    transform: translateX(5px);
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+}
+
+.manage-dropdown-action-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-sm);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: white;
+    box-shadow: var(--shadow-sm);
+    padding: 0;
+}
+
+.manage-dropdown-action-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+.manage-dropdown-action-btn.edit-btn {
+    color: #2563eb;
+}
+
+.manage-dropdown-action-btn.edit-btn:hover {
+    background: #2563eb;
+    color: white;
+    transform: scale(1.1);
+}
+
+.manage-dropdown-action-btn.toggle-active-btn.deactivate {
+    color: var(--error-text);
+}
+
+.manage-dropdown-action-btn.toggle-active-btn.deactivate:hover {
+    background: var(--error-text);
+    color: white;
+    transform: scale(1.1);
+}
+
+.manage-dropdown-action-btn.toggle-active-btn.activate {
+    color: #16a34a;
+}
+
+.manage-dropdown-action-btn.toggle-active-btn.activate:hover {
+    background: #16a34a;
+    color: white;
+    transform: scale(1.1);
+}
+
+.manage-dropdown-item.add-new-item {
+    border-top: 1px solid rgba(86, 23, 137, 0.1);
+    background: transparent;
+    color: #16a34a;
+    font-weight: 600;
+}
+
+.manage-dropdown-item.add-new-item:hover {
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+    color: white;
+}
+
+.manage-dropdown-item.add-new-item .manage-dropdown-item-label {
+    justify-content: center;
+    width: 100%;
+}
+
+
+/* ============================================
+   MANAGE SUBTEAMS — same pattern as manage‑roles
+   ============================================ */
+
+.manage-subteams-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--purple-500);
+    border-radius: var(--radius-xl);
+    background: var(--bg-card);
+}
+
+.manage-subteams-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.manage-subteams-label {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--purple-700);
+    text-align: center;
+}
+
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+    .dropdown-icon {
+        width: 28px;
+        height: 28px;
+    }
+
+    .dropdown-menu {
+        min-width: 280px;
+    }
+
+    .dropdown-item {
+        padding: 0.875rem 1.25rem;
+        font-size: 0.95rem;
+    }
+}

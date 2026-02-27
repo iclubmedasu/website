@@ -171,6 +171,37 @@
 
 
 /* ============================================
+   TABLE CARD — shared margin resets
+   ============================================ */
+
+.members-table-card {
+    margin-top: 0;
+    margin-bottom: 2rem;
+}
+
+
+/* ============================================
+   PAGE-LEVEL LOADING & ERROR MESSAGES
+   Base .error-message is in errormsg.css.
+   These add page-scoped sizing overrides.
+   ============================================ */
+
+.members-page .error-message,
+.members-page .loading-message {
+    margin-bottom: 1rem;
+    font-size: 0.9375rem;
+}
+
+.members-page .loading-message {
+    color: var(--gray-500);
+}
+
+.members-page .error-message {
+    color: var(--error-text);
+}
+
+
+/* ============================================
    EMPTY STATE (no-data placeholder)
    ============================================ */
 
@@ -227,6 +258,13 @@
 .empty-state-btn svg {
     width: 18px;
     height: 18px;
+}
+
+/* Generic inline empty message (lightweight, no icon/button) */
+.empty-message {
+    padding: 1rem 0;
+    color: var(--gray-500);
+    font-size: 0.95rem;
 }
 
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { teamMembersAPI, teamRolesAPI } from '../../services/api';
+import { teamMembersAPI, teamRolesAPI } from '../../../services/api';
 
 const AssignToTeamModal = ({ isOpen, onClose, onSubmit, member, teams, roles: rolesProp }) => {
     const [formData, setFormData] = useState({ teamId: '', roleId: '', changeReason: '' });

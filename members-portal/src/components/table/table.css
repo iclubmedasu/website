@@ -1,0 +1,193 @@
+/* ============================================
+   TABLE COMPONENT — Data table, member cells, status badges, action buttons
+   Centralised from TeamsPage.css.
+   Used by: TeamsPage, MembersPage, AlumniPage, AdministrationPage
+   ============================================ */
+
+
+/* ============================================
+   TABLE LAYOUT
+   ============================================ */
+
+.table-container {
+    overflow-x: auto;
+}
+
+.members-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-body);
+}
+
+.members-table thead {
+    background-color: var(--gray-50);
+    border-bottom: 2px solid var(--gray-200);
+}
+
+.members-table th {
+    font-family: var(--font-heading);
+    text-align: left;
+    padding: 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.members-table td {
+    padding: 1rem;
+    font-size: 0.95rem;
+    color: var(--gray-800);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.members-table tbody tr {
+    transition: background-color 0.15s;
+}
+
+.members-table tbody tr:hover {
+    background-color: var(--gray-50);
+}
+
+.members-table tbody tr.odd-row {
+    background-color: var(--bg-card);
+}
+
+.members-table tbody tr.even-row {
+    background-color: rgba(86, 23, 137, 0.02);
+}
+
+
+/* ============================================
+   TABLE MEMBER CELL (avatar + name inline)
+   ============================================ */
+
+.table-member-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.member-avatar-sm {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    flex-shrink: 0;
+    background: var(--gradient-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.member-avatar-sm img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar-placeholder-sm {
+    font-family: var(--font-heading);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: white;
+}
+
+.member-name-text {
+    font-family: var(--font-heading);
+    font-weight: 500;
+    color: var(--gray-900);
+}
+
+.email-cell {
+    color: var(--gray-600);
+}
+
+
+/* ============================================
+   STATUS BADGE
+   ============================================ */
+
+.status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: var(--font-heading);
+}
+
+.status-badge.active {
+    background-color: var(--success-bg);
+    color: var(--success-text);
+}
+
+.status-badge.away {
+    background-color: var(--warning-bg);
+    color: var(--warning-text);
+}
+
+.status-badge.offline {
+    background-color: var(--gray-200);
+    color: var(--gray-700);
+}
+
+.status-badge.inactive {
+    background-color: var(--warning-bg);
+    color: var(--warning-text);
+}
+
+.status-badge.unassigned {
+    background-color: #e0e7ff;
+    color: #3730a3;
+}
+
+
+/* ============================================
+   TABLE ACTION BUTTONS
+   ============================================ */
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.table-action-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    background: transparent;
+}
+
+.table-action-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.table-action-btn.view-btn {
+    color: var(--purple-700);
+}
+
+.table-action-btn.view-btn:hover {
+    background: var(--purple-700);
+    color: white;
+    transform: scale(1.1);
+}
+
+.table-action-btn.edit-btn {
+    color: #2563eb;
+}
+
+.table-action-btn.edit-btn:hover {
+    background: #2563eb;
+    color: white;
+    transform: scale(1.1);
+}
