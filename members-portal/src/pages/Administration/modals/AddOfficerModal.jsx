@@ -2,58 +2,34 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
 
-/** Unique placeholder studentId for faculty/officer (not a student). DB still requires studentId; we use a negative unique value. */
-export function officerPlaceholderStudentId() {
-    return -Math.abs(Date.now() % 2147483647);
-}
-
 function AddOfficerModal({ isOpen, onClose, onSubmit }) {
-    const [fullName, setFullName] = useState('');
-    const [email, setEmail] = useState('');
-    const [phoneNumber, setPhoneNumber] = useState('');
-    const [profilePhotoUrl, setProfilePhotoUrl] = useState('');
-    const [linkedInUrl, setLinkedInUrl] = useState('');
+    const [identifier, setIdentifier] = useState('');
     const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
-            setFullName('');
-            setEmail('');
-            setPhoneNumber('');
-            setProfilePhotoUrl('');
-            setLinkedInUrl('');
+            setIdentifier('');
             setError('');
+            setSuccess('');
         }
     }, [isOpen]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const name = fullName.trim();
-        if (!name) {
-            setError('Full name is required.');
-            return;
-        }
-        if (!email.trim()) {
-            setError('Email is required.');
-            return;
-        }
-        if (!phoneNumber.trim()) {
-            setError('Phone number is required.');
+        const value = identifier.trim();
+        if (!value) {
+            setError('Please enter an email or phone number.');
             return;
         }
         setError('');
+        setSuccess('');
         setIsSubmitting(true);
         try {
-            await onSubmit({
-                fullName: name,
-                email: email.trim(),
-                phoneNumber: phoneNumber.trim(),
-                profilePhotoUrl: profilePhotoUrl.trim() || null,
-                linkedInUrl: linkedInUrl.trim() || null,
-                studentId: officerPlaceholderStudentId(),
-            });
-            onClose();
+            await onSubmit({ identifier: value });
+            setSuccess('Officer added. They can now sign in to complete their profile.');
+            setTimeout(() => onClose(), 1500);
         } catch (err) {
             setError(err.message || 'Failed to add officer');
         } finally {
@@ -75,6 +51,7 @@ function AddOfficerModal({ isOpen, onClose, onSubmit }) {
                 <form onSubmit={handleSubmit}>
                     <div className="modal-body">
                         {error && <div className="error-message">{error}</div>}
+                        {success && <div className="success-message">{success}</div>}
 
                         <div className="form-section info-section">
                             <h3 className="form-section-title">Assignment to Administration</h3>
@@ -91,66 +68,22 @@ function AddOfficerModal({ isOpen, onClose, onSubmit }) {
                         </div>
 
                         <div className="form-section">
-                            <h3 className="form-section-title">Personal Information</h3>
+                            <h3 className="form-section-title">Officer Identifier</h3>
                             <div className="form-group">
-                                <label htmlFor="officer-fullName" className="form-label">Full name *</label>
+                                <label htmlFor="officer-identifier" className="form-label">Officer Email or Phone Number *</label>
                                 <input
-                                    id="officer-fullName"
+                                    id="officer-identifier"
                                     type="text"
-                                    value={fullName}
-                                    onChange={(e) => setFullName(e.target.value)}
+                                    value={identifier}
+                                    onChange={(e) => setIdentifier(e.target.value)}
                                     className="form-input"
-                                    placeholder="e.g. Dr. Jane Smith"
+                                    placeholder="e.g. name.surname@med.asu.edu.eg or 01012345678"
                                     disabled={isSubmitting}
+                                    autoFocus
                                 />
-                            </div>
-                            <div className="form-group">
-                                <label htmlFor="officer-email" className="form-label">Email *</label>
-                                <input
-                                    id="officer-email"
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="form-input"
-                                    placeholder="e.g. jane.smith@university.edu"
-                                    disabled={isSubmitting}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label htmlFor="officer-phone" className="form-label">Phone number *</label>
-                                <input
-                                    id="officer-phone"
-                                    type="tel"
-                                    value={phoneNumber}
-                                    onChange={(e) => setPhoneNumber(e.target.value)}
-                                    className="form-input"
-                                    placeholder="e.g. +1 234 567 8900"
-                                    disabled={isSubmitting}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label htmlFor="officer-profilePhotoUrl" className="form-label">Profile Photo URL</label>
-                                <input
-                                    id="officer-profilePhotoUrl"
-                                    type="url"
-                                    value={profilePhotoUrl}
-                                    onChange={(e) => setProfilePhotoUrl(e.target.value)}
-                                    className="form-input"
-                                    placeholder="e.g., https://example.com/photo.jpg"
-                                    disabled={isSubmitting}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label htmlFor="officer-linkedInUrl" className="form-label">LinkedIn URL</label>
-                                <input
-                                    id="officer-linkedInUrl"
-                                    type="url"
-                                    value={linkedInUrl}
-                                    onChange={(e) => setLinkedInUrl(e.target.value)}
-                                    className="form-input"
-                                    placeholder="e.g., https://linkedin.com/in/johndoe"
-                                    disabled={isSubmitting}
-                                />
+                                <p className="form-hint-text">
+                                    Enter their official @med.asu.edu.eg email, or their primary phone number. They will complete their profile on first sign-in.
+                                </p>
                             </div>
                         </div>
                     </div>

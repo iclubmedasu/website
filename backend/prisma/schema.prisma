@@ -17,7 +17,7 @@ model Member {
   email3            String?   @unique   // Optional tertiary email (editable)
   phoneNumber       String    @unique   // Primary phone (with country code, e.g. +201234567890)
   phoneNumber2      String?   @unique   // Optional second phone (with country code)
-  studentId         Int       @unique
+  studentId         Int?      @unique   // Nullable for officers (they have no student ID)
   profilePhotoUrl   String?
   linkedInUrl       String?
   isActive          Boolean   @default(true)  // Overall active status

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { phasesAPI } from '../../../services/api';
+import { toTitleCase } from '../../../utils/titleCase';
 
 export default function AddPhaseModal({ projectId, existingPhasesCount = 0, onClose, onPhaseCreated }) {
     const [title, setTitle] = useState(`Phase ${existingPhasesCount + 1}`);
@@ -48,6 +49,7 @@ export default function AddPhaseModal({ projectId, existingPhasesCount = 0, onCl
                             placeholder="Phase title"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
+                            onBlur={(e) => setTitle(toTitleCase(e.target.value))}
                             autoFocus
                         />
                     </div>

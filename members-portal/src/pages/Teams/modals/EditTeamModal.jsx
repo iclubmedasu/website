@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { toTitleCase } from '../../../utils/titleCase';
 
 const EditTeamModal = ({ isOpen, onClose, onSubmit, team }) => {
     const [formData, setFormData] = useState({
@@ -114,6 +115,7 @@ const EditTeamModal = ({ isOpen, onClose, onSubmit, team }) => {
                                 className={`form-input ${errors.name ? 'error' : ''}`}
                                 value={formData.name}
                                 onChange={handleChange}
+                                onBlur={(e) => setFormData(prev => ({ ...prev, name: toTitleCase(e.target.value) }))}
                                 placeholder="e.g., Engineering Team"
                                 disabled={isSubmitting}
                             />

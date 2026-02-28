@@ -1,0 +1,61 @@
+.gate-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh;
+    padding: 2rem;
+}
+
+.gate-card {
+    background: var(--bg-card, #fff);
+    border-radius: var(--radius-xl, 16px);
+    box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
+    padding: 3rem 2.5rem;
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+}
+
+.gate-icon-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    margin-bottom: 1.5rem;
+}
+
+.gate-icon-warning {
+    background: var(--warning-bg, #fef3c7);
+    color: var(--warning-text, #92400e);
+}
+
+.gate-icon-info {
+    background: var(--info-bg, #ede9fe);
+    color: var(--purple-700, #6d28d9);
+}
+
+.gate-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-900, #1a202c);
+    margin: 0 0 0.75rem 0;
+}
+
+.gate-text {
+    font-size: 1rem;
+    color: var(--gray-600, #718096);
+    line-height: 1.6;
+    margin: 0 0 0.5rem 0;
+}
+
+.gate-text-secondary {
+    font-size: 0.875rem;
+    color: var(--gray-500, #a0aec0);
+    margin: 0 0 1.5rem 0;
+}
+
+.gate-sign-out-btn {
+    margin-top: 0.5rem;
+}

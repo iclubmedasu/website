@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { administrationAPI, membersAPI, teamsAPI, teamMembersAPI, teamRolesAPI, teamSubteamsAPI } from '../../services/api';
 import ViewMemberModal from '../Teams/modals/ViewMemberModal';
 import EditAdminMembersModal from './modals/EditAdminMembersModal';
-import AddOfficerModal, { officerPlaceholderStudentId } from './modals/AddOfficerModal';
+import AddOfficerModal from './modals/AddOfficerModal';
 import OfficerHandoverModal from './modals/OfficerHandoverModal';
 
 import './AdministrationPage.css';
@@ -471,8 +471,8 @@ function AdministrationPage() {
         if (!adminTeam) return;
         const officerRole = (adminTeam.roles || []).find((r) => r.roleName === 'Officer');
         if (!officerRole) throw new Error('Officer role not found');
-        // Same as Add Member: create member (with placeholder studentId for Officer) then assign to team/role
-        const newMember = await membersAPI.create(officerData);
+        // Create officer placeholder member via the new administration endpoint
+        const newMember = await administrationAPI.createOfficer(officerData);
         const currentOfficer = (adminTeam.members || []).find((m) => m.role?.roleName === 'Officer');
         if (currentOfficer) {
             await teamMembersAPI.remove(currentOfficer.id, { changeType: 'Resignation', changeReason: 'Replaced' });
@@ -529,11 +529,8 @@ function AdministrationPage() {
                 notes: null,
             });
         }
-        const officerData = {
-            ...newOfficerData,
-            studentId: officerPlaceholderStudentId(),
-        };
-        const newMember = await membersAPI.create(officerData);
+        // Create new officer placeholder member via administration endpoint
+        const newMember = await administrationAPI.createOfficer(newOfficerData);
         await teamMembersAPI.assign({
             teamId: adminTeam.id,
             memberId: newMember.id,

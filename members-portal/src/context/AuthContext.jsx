@@ -5,6 +5,7 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isAlumni, setIsAlumni] = useState(false);
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
@@ -24,6 +25,14 @@ export const AuthProvider = ({ children }) => {
                 if (response.ok) {
                     const data = await response.json();
                     setUser(data.user);
+                    setIsAlumni(false);
+                } else if (response.status === 403) {
+                    const data = await response.json().catch(() => ({}));
+                    if (data.code === 'ALUMNI_ACCESS') {
+                        setIsAlumni(true);
+                        setUser(null);
+                    }
+                    localStorage.removeItem('token');
                 } else {
                     localStorage.removeItem('token');
                 }
@@ -45,6 +54,14 @@ export const AuthProvider = ({ children }) => {
             if (response.ok) {
                 const data = await response.json();
                 setUser(data.user);
+                setIsAlumni(false);
+            } else if (response.status === 403) {
+                const data = await response.json().catch(() => ({}));
+                if (data.code === 'ALUMNI_ACCESS') {
+                    setIsAlumni(true);
+                    setUser(null);
+                    localStorage.removeItem('token');
+                }
             }
         } catch (error) {
             console.error('Refresh user failed:', error);
@@ -117,6 +134,38 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const completeOfficerProfile = async (identifier, fullName, phoneNumber, phoneNumber2, email2, email3, password, confirmPassword, officerEmail) => {
+        try {
+            const response = await fetch(`${API_URL}/auth/complete-officer-profile`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    identifier: identifier.trim(),
+                    fullName: fullName.trim(),
+                    phoneNumber: phoneNumber.trim(),
+                    phoneNumber2: phoneNumber2?.trim() || undefined,
+                    email2: email2?.trim() || undefined,
+                    email3: email3?.trim() || undefined,
+                    officerEmail: officerEmail?.trim() || undefined,
+                    password,
+                    confirmPassword
+                })
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to complete officer profile');
+            }
+            localStorage.setItem('token', data.token);
+            setUser(data.user);
+            await refreshUser();
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    };
+
     const updateInvitedProfile = async (email, fullName, phoneNumber, phoneNumber2, email2, email3) => {
         try {
             const response = await fetch(`${API_URL}/auth/update-invited-profile`, {
@@ -177,11 +226,16 @@ export const AuthProvider = ({ children }) => {
             const data = await response.json();
 
             if (!response.ok) {
+                if (response.status === 403 && data.code === 'ALUMNI_ACCESS') {
+                    setIsAlumni(true);
+                    return { success: false, error: data.error, code: 'ALUMNI_ACCESS' };
+                }
                 throw new Error(data.error || 'Login failed');
             }
 
             localStorage.setItem('token', data.token);
             setUser(data.user);
+            setIsAlumni(false);
             await refreshUser();
             return { success: true };
         } catch (error) {
@@ -192,10 +246,11 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         localStorage.removeItem('token');
         setUser(null);
+        setIsAlumni(false);
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, setupPassword, updateInvitedProfile, checkEmail, checkStudentId, completeProfile, logout, refreshUser, loading }}>
+        <AuthContext.Provider value={{ user, isAlumni, login, setupPassword, updateInvitedProfile, checkEmail, checkStudentId, completeProfile, completeOfficerProfile, logout, refreshUser, loading }}>
             {children}
         </AuthContext.Provider>
     );

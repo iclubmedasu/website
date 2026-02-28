@@ -9,6 +9,8 @@ import AlumniPage from './pages/Alumni/AlumniPage';
 import HelpAndSupportPage from './pages/HelpAndSupport/HelpAndSupportPage';
 import UserPage from './pages/User/UserPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import UnassignedGate from './components/UnassignedGate/UnassignedGate';
+import AlumniGate from './components/AlumniGate/AlumniGate';
 import { SidebarNavigationSlim } from './pages/SideBarNavigationSlim';
 import {
     Users01,
@@ -81,81 +83,95 @@ function AppLayout() {
     const isLoginPage = location.pathname === '/login';
 
     return (
-        <div className="app-container">
-            <div className="app-body">
-                {user && !isLoginPage && (
-                    <SidebarNavigationSlim
-                        items={navItems}
-                        footerItems={footerItems}
-                        user={user}
-                        onLogout={logout}
-                    />
-                )}
+        <AlumniGate>
+            <div className="app-container">
+                <div className="app-body">
+                    {user && !isLoginPage && (
+                        <SidebarNavigationSlim
+                            items={navItems}
+                            footerItems={footerItems}
+                            user={user}
+                            onLogout={logout}
+                        />
+                    )}
 
-                <main className="main-content">
-                    <Routes>
-                        <Route path="/login" element={<LoginPage />} />
-                        <Route
-                            path="/administration"
-                            element={
-                                <ProtectedRoute>
-                                    <AdministrationPage />
-                                </ProtectedRoute>
-                            }
-                        />
-                        <Route
-                            path="/projects"
-                            element={
-                                <ProtectedRoute>
-                                    <ProjectsPage />
-                                </ProtectedRoute>
-                            }
-                        />
-                        <Route
-                            path="/teams"
-                            element={
-                                <ProtectedRoute>
-                                    <TeamsPage />
-                                </ProtectedRoute>
-                            }
-                        />
-                        <Route
-                            path="/members"
-                            element={
-                                <ProtectedRoute>
-                                    <MembersPage />
-                                </ProtectedRoute>
-                            }
-                        />
-                        <Route
-                            path="/alumni"
-                            element={
-                                <ProtectedRoute>
-                                    <AlumniPage />
-                                </ProtectedRoute>
-                            }
-                        />
-                        <Route
-                            path="/support"
-                            element={
-                                <ProtectedRoute>
-                                    <HelpAndSupportPage />
-                                </ProtectedRoute>
-                            }
-                        />
-                        <Route
-                            path="/user"
-                            element={
-                                <ProtectedRoute>
-                                    <UserPage />
-                                </ProtectedRoute>
-                            }
-                        />
-                        <Route path="/" element={<Navigate to="/teams" replace />} />
-                    </Routes>
-                </main>
+                    <main className="main-content">
+                        <Routes>
+                            <Route path="/login" element={<LoginPage />} />
+                            <Route
+                                path="/administration"
+                                element={
+                                    <ProtectedRoute>
+                                        <UnassignedGate>
+                                            <AdministrationPage />
+                                        </UnassignedGate>
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="/projects"
+                                element={
+                                    <ProtectedRoute>
+                                        <UnassignedGate>
+                                            <ProjectsPage />
+                                        </UnassignedGate>
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="/teams"
+                                element={
+                                    <ProtectedRoute>
+                                        <UnassignedGate>
+                                            <TeamsPage />
+                                        </UnassignedGate>
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="/members"
+                                element={
+                                    <ProtectedRoute>
+                                        <UnassignedGate>
+                                            <MembersPage />
+                                        </UnassignedGate>
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="/alumni"
+                                element={
+                                    <ProtectedRoute>
+                                        <UnassignedGate>
+                                            <AlumniPage />
+                                        </UnassignedGate>
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="/support"
+                                element={
+                                    <ProtectedRoute>
+                                        <UnassignedGate>
+                                            <HelpAndSupportPage />
+                                        </UnassignedGate>
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="/user"
+                                element={
+                                    <ProtectedRoute>
+                                        <UserPage />
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route path="/" element={<Navigate to="/teams" replace />} />
+                        </Routes>
+                    </main>
+                </div>
             </div>
-        </div>
+        </AlumniGate>
     );
 }
 

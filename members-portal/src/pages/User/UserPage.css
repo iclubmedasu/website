@@ -1,21 +1,190 @@
+/* ═══════════════════════════════════════════════════════════
+   User Profile Page — tab-based layout
+   ═══════════════════════════════════════════════════════════ */
+
 .user-page {
-    max-width: 720px;
+    max-width: 860px;
 }
 
-.user-profile-card .card-body.user-profile-card-body {
-    padding: 1.5rem 2rem;
-    position: relative;
+/* ── Outer card wrapper (header + tabs + content) ── */
+.user-page-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--gray-200);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
 }
 
-/* Edit button top-right of card, same pattern as team page member row */
-.user-profile-actions {
-    position: absolute;
-    top: 0;
-    right: 0;
+/* ── Header band ── */
+.user-page-header {
+    background: linear-gradient(135deg, var(--purple-700) 0%, #4338ca 100%);
+    padding: 2rem 2rem 1.75rem;
+}
+
+.user-page-header-inner {
     display: flex;
-    gap: 0.25rem;
+    align-items: center;
+    gap: 1.25rem;
 }
 
+/* Avatar wrapper (relative for edit overlay) */
+.user-page-avatar-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.user-page-avatar {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.25rem;
+    font-weight: 700;
+    overflow: hidden;
+    border: 3px solid rgba(255, 255, 255, 0.35);
+}
+
+.user-page-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.user-page-avatar-edit-btn {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid white;
+    background: var(--purple-700);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.user-page-avatar-edit-btn:hover {
+    background: #4338ca;
+}
+
+/* Identity (name + badges) */
+.user-page-identity {
+    flex: 1;
+    min-width: 0;
+}
+
+.user-page-name {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    line-height: 1.3;
+}
+
+.user-page-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+}
+
+.user-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.user-badge-developer {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.user-badge-admin {
+    background: rgba(52, 211, 153, 0.2);
+    color: #6ee7b7;
+}
+
+/* ── Tab bar ── */
+.user-page-tabs {
+    display: flex;
+    gap: 0;
+    background: var(--bg-card);
+    border-bottom: 2px solid var(--gray-200);
+    overflow-x: auto;
+}
+
+.user-page-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.user-page-tab-btn {
+    flex-shrink: 0;
+    padding: 0.75rem 1.25rem;
+    border: none;
+    background: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-500);
+    cursor: pointer;
+    white-space: nowrap;
+    position: relative;
+    transition: color 0.15s;
+}
+
+.user-page-tab-btn:hover {
+    color: var(--gray-900);
+}
+
+.user-page-tab-btn.active {
+    color: var(--purple-700);
+    font-weight: 600;
+}
+
+.user-page-tab-btn.active::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -2px;
+    height: 2px;
+    background: var(--purple-700);
+    border-radius: 1px 1px 0 0;
+}
+
+/* ── Tab panel ── */
+.user-page-tab-panel {
+    padding: 1.5rem 2rem 2rem;
+}
+
+/* ── Section card (within tab) ── */
+.user-page-section-card {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 1.5rem 2rem;
+    margin-bottom: 1rem;
+}
+
+.user-page-section-card-actions {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+}
+
+/* ── Edit button ── */
 .user-profile-edit-btn {
     width: 32px;
     height: 32px;
@@ -28,107 +197,42 @@
     transition: all 0.2s ease;
     background: white;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    color: var(--purple-700);
+    color: #2563eb;
 }
 
 .user-profile-edit-btn:hover {
-    background: var(--purple-700);
+    background: #2563eb;
     color: white;
     transform: scale(1.1);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-.user-profile-header {
-    display: flex;
-    align-items: flex-start;
-    gap: 1.25rem;
-    margin-bottom: 1.5rem;
+/* ── Data grid (view mode) ── */
+.user-profile-data-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
 }
 
-.user-page .page-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.user-profile-avatar {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: var(--purple-700);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    font-weight: 600;
-    flex-shrink: 0;
-    overflow: hidden;
-}
-
-.user-profile-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.user-profile-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.user-profile-name {
-    margin: 0 0 0.25rem 0;
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--gray-900);
-}
-
-.user-profile-data-section-title {
-    margin: 0 0 0.5rem 0;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--gray-900);
-}
-
-.user-profile-data-section-title:not(:first-child) {
-    margin-top: 1.25rem;
-}
-
-.user-profile-data {
+.user-profile-data-item {
     display: flex;
     flex-direction: column;
-    gap: 0;
-    margin: 0 0 0.5rem 0;
-    padding: 0;
-    list-style: none;
-}
-
-.user-profile-data-row {
-    display: grid;
-    grid-template-columns: 140px 1fr;
-    gap: 0.75rem;
-    align-items: baseline;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--gray-200);
-}
-
-.user-profile-data-row:last-child {
-    border-bottom: none;
+    gap: 0.2rem;
+    padding: 0.75rem 0.5rem;
+    border-bottom: 1px solid var(--gray-100);
 }
 
 .user-profile-data-label {
-    margin: 0;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 500;
     color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 .user-profile-data-value {
-    margin: 0;
     font-size: 0.9rem;
+    font-weight: 500;
     color: var(--gray-900);
     word-break: break-word;
 }
@@ -139,7 +243,6 @@
     gap: 0.35rem;
     color: var(--purple-700);
     text-decoration: none;
-    word-break: break-all;
 }
 
 .user-profile-data-link:hover {
@@ -147,45 +250,25 @@
 }
 
 .user-profile-email-badge-inline {
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--gray-500);
-    margin-right: 0.35rem;
-}
-
-.user-profile-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-.user-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.25rem 0.5rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--purple-700);
+    background: rgba(109, 40, 217, 0.08);
+    padding: 0.1rem 0.4rem;
     border-radius: var(--radius-sm);
-    font-size: 0.8rem;
-    font-weight: 500;
+    margin-right: 0.4rem;
 }
 
-.user-badge-developer {
-    background: var(--gray-100);
-    color: var(--gray-500);
-}
-
-.user-badge-admin {
-    background: rgba(34, 197, 94, 0.12);
-    color: var(--success-accent);
-}
-
-.user-profile-section {
+/* ── Team access (bottom of personal tab) ── */
+.user-profile-team-access {
+    margin-top: 1.25rem;
     padding-top: 1rem;
     border-top: 1px solid var(--gray-200);
 }
 
-.user-profile-section-title {
+.user-profile-team-access-title {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -206,36 +289,7 @@
     color: var(--gray-900);
 }
 
-.user-profile-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-}
-
-.user-profile-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: 0.9rem;
-    color: var(--purple-700);
-    text-decoration: none;
-}
-
-.user-profile-link:hover {
-    text-decoration: underline;
-}
-
-.user-profile-form-section-title {
-    margin: 0 0 0.5rem 0;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--gray-900);
-}
-
-.user-profile-form-section-title:not(:first-child) {
-    margin-top: 1.25rem;
-}
-
+/* ── Edit form ── */
 .user-profile-form .form-group {
     margin-bottom: 1rem;
 }
@@ -262,7 +316,6 @@
     cursor: not-allowed;
 }
 
-/* Ensure readonly/disabled input text is visible (overrides browser defaults that can hide it) */
 .user-profile-form .form-input-readonly:disabled,
 .user-profile-form .form-input.form-input-readonly[readonly] {
     color: var(--gray-900);
@@ -285,7 +338,8 @@
     border-top: 1px solid var(--gray-200);
 }
 
-.user-profile-form .error-message {
+.user-profile-form .error-message,
+.user-page-section-card .error-message {
     margin-bottom: 1rem;
     padding: 0.5rem 0.75rem;
     background: var(--error-bg);
@@ -294,41 +348,177 @@
     font-size: 0.875rem;
 }
 
+.user-page-section-card .success-message {
+    margin-bottom: 1rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(16, 185, 129, 0.1);
+    color: #065f46;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+}
+
+/* ── Security tab ── */
+.user-security-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+/* Password toggle */
+.password-input-wrap {
+    position: relative;
+}
+
+.password-input-wrap .form-input {
+    padding-right: 2.5rem;
+}
+
+.password-toggle-btn {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    border: none;
+    background: none;
+    color: var(--gray-500);
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.password-toggle-btn:hover {
+    color: var(--gray-700);
+}
+
+/* Sign-in methods list */
+.user-signin-methods {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.user-signin-method-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.user-signin-method-row:last-child {
+    border-bottom: none;
+}
+
+.user-signin-method-icon {
+    color: var(--gray-400);
+    flex-shrink: 0;
+}
+
+.user-signin-method-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.user-signin-method-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--gray-500);
+}
+
+.user-signin-method-value {
+    font-size: 0.9rem;
+    color: var(--gray-900);
+    word-break: break-all;
+}
+
+.user-signin-method-badge {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #065f46;
+    background: rgba(16, 185, 129, 0.1);
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius-sm);
+}
+
+/* ── Empty state (stub tabs) ── */
+.user-tab-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--gray-400);
+}
+
+.user-tab-empty-title {
+    margin: 1rem 0 0.25rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.user-tab-empty-sub {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--gray-500);
+    max-width: 360px;
+    line-height: 1.5;
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
-    .user-profile-card .card-body.user-profile-card-body {
+    .user-page-header {
+        padding: 1.5rem 1.25rem 1.25rem;
+    }
+
+    .user-page-avatar {
+        width: 72px;
+        height: 72px;
+        font-size: 1.75rem;
+    }
+
+    .user-page-name {
+        font-size: 1.25rem;
+    }
+
+    .user-page-section-card {
         padding: 1.25rem 1rem;
     }
 
-    .user-profile-header {
-        gap: 1rem;
+    .user-profile-data-grid {
+        grid-template-columns: 1fr;
     }
 
-    .user-profile-avatar {
-        width: 48px;
-        height: 48px;
-        font-size: 1.2rem;
-    }
-
-    .user-profile-data-row {
-        grid-template-columns: 120px 1fr;
-        gap: 0.5rem;
+    .user-page-tab-btn {
+        padding: 0.65rem 1rem;
+        font-size: 0.8rem;
     }
 }
 
 @media (max-width: 480px) {
-    .user-profile-data-row {
-        grid-template-columns: 1fr;
-        gap: 0.25rem;
-    }
-
-    .user-profile-header {
+    .user-page-header-inner {
         flex-direction: column;
         align-items: center;
         text-align: center;
     }
 
-    .user-profile-links {
-        justify-content: center;
+    .user-page-avatar {
+        width: 64px;
+        height: 64px;
+        font-size: 1.5rem;
+    }
+
+    .user-page-name {
+        font-size: 1.1rem;
     }
 }

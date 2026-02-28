@@ -226,6 +226,27 @@ const EditMembersModal = ({
         ? subteams.find(s => s.id === currentTeamAssignment.subteamId)
         : null;
 
+    // Dynamic title based on mode
+    const getTitle = () => {
+        if (editMode === EDIT_MODES.ASSIGNMENT) return 'Edit Assignment';
+        if (editMode === EDIT_MODES.PROMOTION_DEMOTION) return 'Promotion / Demotion';
+        if (editMode === EDIT_MODES.TRANSFER) return 'Transfer Member';
+        if (editMode === EDIT_MODES.LEAVE) return 'Remove from Club';
+        return 'Edit Member';
+    };
+
+    // Dynamic submit button label
+    const getSubmitLabel = () => {
+        if (isSubmitting) return 'Updating...';
+        if (editMode === EDIT_MODES.ASSIGNMENT) return 'Update member';
+        if (editMode === EDIT_MODES.PROMOTION_DEMOTION) return 'Update member';
+        if (editMode === EDIT_MODES.TRANSFER) return 'Transfer';
+        if (editMode === EDIT_MODES.LEAVE) return 'Remove';
+        return 'Update member';
+    };
+
+    const isLeaveMode = editMode === EDIT_MODES.LEAVE;
+
     if (!isOpen || !member || !currentTeamAssignment) return null;
 
     return (
@@ -234,7 +255,7 @@ const EditMembersModal = ({
             <div className="modal-container modal-large">
                 <div className="modal-header">
                     <div>
-                        <h2 className="modal-title">Edit Member</h2>
+                        <h2 className="modal-title">{getTitle()}</h2>
                         <p className="modal-subtitle">
                             {member.fullName} • {currentTeam?.name} • {currentRole?.roleName}
                         </p>
@@ -524,8 +545,12 @@ const EditMembersModal = ({
                         <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={isSubmitting}>
                             Cancel
                         </button>
-                        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                            {isSubmitting ? 'Updating...' : 'Update member'}
+                        <button
+                            type="submit"
+                            className={`btn ${isLeaveMode ? 'btn-danger' : 'btn-primary'}`}
+                            disabled={isSubmitting}
+                        >
+                            {getSubmitLabel()}
                         </button>
                     </div>
                 </form>

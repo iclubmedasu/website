@@ -5,6 +5,25 @@ const { requireAdmin } = require('../middleware/auth');
 
 const ADMINISTRATION_TEAM_NAME = 'Administration';
 
+// Title-case utility for project titles
+function toTitleCase(str) {
+    if (!str || typeof str !== 'string') return str;
+    const SMALL = new Set(['a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'yet', 'so', 'at', 'by', 'in', 'of', 'on', 'to', 'up', 'as', 'is', 'it']);
+    const words = str.trim().split(/\s+/);
+    return words.map((word, i) => {
+        if (word.includes('-')) {
+            return word.split('-').map(p => {
+                if (p.length > 1 && p === p.toUpperCase()) return p;
+                return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+            }).join('-');
+        }
+        if (word.length > 1 && word === word.toUpperCase()) return word;
+        const lower = word.toLowerCase();
+        if (i !== 0 && i !== words.length - 1 && SMALL.has(lower)) return lower;
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+    }).join(' ');
+}
+
 // ── helpers ──────────────────────────────────────────────
 /** Return the member-IDs for every team the requesting user belongs to (active). */
 async function getUserTeamIds(memberId) {
@@ -253,7 +272,7 @@ router.post('/', async (req, res) => {
 
         const project = await prisma.project.create({
             data: {
-                title: title.trim(),
+                title: toTitleCase(title.trim()),
                 description: description?.trim() || null,
                 projectTypeId: parseInt(projectTypeId),
                 priority,
@@ -322,7 +341,7 @@ router.put('/:id', async (req, res) => {
         } = req.body;
 
         const data = {};
-        if (title !== undefined) data.title = title.trim();
+        if (title !== undefined) data.title = toTitleCase(title.trim());
         if (description !== undefined) data.description = description?.trim() || null;
         if (projectTypeId !== undefined) data.projectTypeId = parseInt(projectTypeId);
         if (priority !== undefined) data.priority = priority;

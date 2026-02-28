@@ -26,11 +26,7 @@ function OfficerHandoverModal({
         notes: '',
     });
     const [handoverData, setHandoverData] = useState({
-        fullName: '',
-        email: '',
-        phoneNumber: '',
-        profilePhotoUrl: '',
-        linkedInUrl: '',
+        identifier: '',
     });
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,11 +36,7 @@ function OfficerHandoverModal({
             setMode(MODES.RETIRE);
             setRetireData({ changeType: 'Retirement', changeReason: '', notes: '' });
             setHandoverData({
-                fullName: '',
-                email: '',
-                phoneNumber: '',
-                profilePhotoUrl: '',
-                linkedInUrl: '',
+                identifier: '',
             });
             setError('');
         }
@@ -70,28 +62,16 @@ function OfficerHandoverModal({
 
     const handleHandoverSubmit = async (e) => {
         e.preventDefault();
-        const name = handoverData.fullName.trim();
-        if (!name) {
-            setError('Full name is required for the new officer.');
-            return;
-        }
-        if (!handoverData.email.trim()) {
-            setError('Email is required for the new officer.');
-            return;
-        }
-        if (!handoverData.phoneNumber.trim()) {
-            setError('Phone number is required for the new officer.');
+        const value = handoverData.identifier.trim();
+        if (!value) {
+            setError('Email or phone number is required for the new officer.');
             return;
         }
         setError('');
         setIsSubmitting(true);
         try {
             await onHandover({
-                fullName: name,
-                email: handoverData.email.trim(),
-                phoneNumber: handoverData.phoneNumber.trim(),
-                profilePhotoUrl: handoverData.profilePhotoUrl.trim() || null,
-                linkedInUrl: handoverData.linkedInUrl.trim() || null,
+                identifier: value,
             });
             onClose();
         } catch (err) {
@@ -115,7 +95,7 @@ function OfficerHandoverModal({
             <div className="modal-container" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
                     <div>
-                        <h2 className="modal-title">Officer handover</h2>
+                        <h2 className="modal-title">{mode === MODES.RETIRE ? 'Retire Officer' : 'Officer Handover'}</h2>
                         <p className="modal-subtitle">{currentName}</p>
                     </div>
                     <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">
@@ -219,64 +199,19 @@ function OfficerHandoverModal({
                                 <div className="form-section">
                                     <h3 className="form-section-title">New officer details</h3>
                                     <div className="form-group">
-                                        <label htmlFor="handover-fullName" className="form-label">Full name *</label>
+                                        <label htmlFor="handover-identifier" className="form-label">New Officer Email or Phone Number *</label>
                                         <input
-                                            id="handover-fullName"
+                                            id="handover-identifier"
                                             type="text"
-                                            value={handoverData.fullName}
-                                            onChange={(e) => setHandoverData((prev) => ({ ...prev, fullName: e.target.value }))}
+                                            value={handoverData.identifier}
+                                            onChange={(e) => setHandoverData((prev) => ({ ...prev, identifier: e.target.value }))}
                                             className="form-input"
-                                            placeholder="e.g. Dr. Jane Smith"
+                                            placeholder="e.g. name.surname@med.asu.edu.eg or 01012345678"
                                             disabled={isSubmitting}
                                         />
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="handover-email" className="form-label">Email *</label>
-                                        <input
-                                            id="handover-email"
-                                            type="email"
-                                            value={handoverData.email}
-                                            onChange={(e) => setHandoverData((prev) => ({ ...prev, email: e.target.value }))}
-                                            className="form-input"
-                                            placeholder="e.g. jane.smith@university.edu"
-                                            disabled={isSubmitting}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="handover-phone" className="form-label">Phone number *</label>
-                                        <input
-                                            id="handover-phone"
-                                            type="tel"
-                                            value={handoverData.phoneNumber}
-                                            onChange={(e) => setHandoverData((prev) => ({ ...prev, phoneNumber: e.target.value }))}
-                                            className="form-input"
-                                            placeholder="e.g. +1 234 567 8900"
-                                            disabled={isSubmitting}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="handover-profilePhotoUrl" className="form-label">Profile Photo URL</label>
-                                        <input
-                                            id="handover-profilePhotoUrl"
-                                            type="url"
-                                            value={handoverData.profilePhotoUrl}
-                                            onChange={(e) => setHandoverData((prev) => ({ ...prev, profilePhotoUrl: e.target.value }))}
-                                            className="form-input"
-                                            placeholder="e.g., https://example.com/photo.jpg"
-                                            disabled={isSubmitting}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="handover-linkedInUrl" className="form-label">LinkedIn URL</label>
-                                        <input
-                                            id="handover-linkedInUrl"
-                                            type="url"
-                                            value={handoverData.linkedInUrl}
-                                            onChange={(e) => setHandoverData((prev) => ({ ...prev, linkedInUrl: e.target.value }))}
-                                            className="form-input"
-                                            placeholder="e.g., https://linkedin.com/in/johndoe"
-                                            disabled={isSubmitting}
-                                        />
+                                        <p className="form-hint-text">
+                                            Enter their official @med.asu.edu.eg email, or their primary phone number. They will complete their profile on first sign-in.
+                                        </p>
                                     </div>
                                 </div>
                             </>
@@ -293,7 +228,7 @@ function OfficerHandoverModal({
                         </button>
                         <button
                             type="submit"
-                            className="btn btn-primary"
+                            className={`btn ${mode === MODES.RETIRE ? 'btn-danger' : 'btn-primary'}`}
                             disabled={isSubmitting}
                         >
                             {isSubmitting ? (

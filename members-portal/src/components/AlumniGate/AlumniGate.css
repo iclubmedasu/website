@@ -1,0 +1,3 @@
+/* AlumniGate shares gate-container/gate-card/etc. styles from UnassignedGate.css */
+/* Import that CSS in the component that uses both, or rely on the shared styles already loaded. */
+/* No additional styles needed — gate-icon-info is defined in UnassignedGate.css */

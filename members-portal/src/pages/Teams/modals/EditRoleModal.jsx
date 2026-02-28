@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { teamRolesAPI } from '../../../services/api';
+import { toTitleCase } from '../../../utils/titleCase';
 
 const EditRoleModal = ({ isOpen, onClose, onSubmit, teamId, initialRoleId }) => {
     const [selectedRoleId, setSelectedRoleId] = useState('');
@@ -214,6 +215,7 @@ const EditRoleModal = ({ isOpen, onClose, onSubmit, teamId, initialRoleId }) => 
                                         className={`form-input ${errors.roleName ? 'error' : ''}`}
                                         value={formData.roleName}
                                         onChange={handleChange}
+                                        onBlur={(e) => setFormData(prev => ({ ...prev, roleName: toTitleCase(e.target.value) }))}
                                         placeholder="e.g., Lead Developer"
                                         disabled={isSubmitting}
                                     />

@@ -28,7 +28,7 @@
     background-color: var(--bg-card);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-xl);
-    max-width: 500px;
+    max-width: 560px;
     width: 90%;
     max-height: 90vh;
     overflow-y: auto;
@@ -37,12 +37,12 @@
 }
 
 .modal-large {
-    max-width: 700px;
+    max-width: 560px;
     max-height: 85vh;
 }
 
 .modal-sm {
-    max-width: 400px;
+    max-width: 560px;
 }
 
 @keyframes fadeIn {
@@ -296,6 +296,10 @@
     gap: 0.75rem;
     padding: 1.5rem;
     border-top: 1px solid var(--gray-200);
+}
+
+.modal-footer .btn {
+    flex: 1;
 }
 
 /* ============================================
@@ -1066,44 +1070,53 @@
     min-height: 2.5rem;
 }
 
-/* Change type dot color variations */
-.change-type-new .timeline-dot {
-    border-color: #3b82f6;
-    background: rgba(59, 130, 246, 0.1);
+/* Change type dot color variations — dot uses badge TEXT color for a bold fill */
+.timeline-dot.change-type-new {
+    background-color: #1e40af;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px #1e40af;
 }
 
-.change-type-promotion .timeline-dot {
-    border-color: #10b981;
-    background: rgba(16, 185, 129, 0.1);
+.timeline-dot.change-type-promotion {
+    background-color: #065f46;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px #065f46;
 }
 
-.change-type-demotion .timeline-dot {
-    border-color: #f59e0b;
-    background: rgba(245, 158, 11, 0.1);
+.timeline-dot.change-type-demotion {
+    background-color: #92400e;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px #92400e;
 }
 
-.change-type-transfer .timeline-dot {
-    border-color: #8b5cf6;
-    background: rgba(139, 92, 246, 0.1);
+.timeline-dot.change-type-transfer {
+    background-color: #5b21b6;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px #5b21b6;
 }
 
-.change-type-resignation .timeline-dot {
-    border-color: #ef4444;
-    background: rgba(239, 68, 68, 0.1);
+.timeline-dot.change-type-resignation {
+    background-color: #7f1d1d;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px #7f1d1d;
 }
 
-.change-type-expelled .timeline-dot {
-    border-color: #dc2626;
-    background: rgba(220, 38, 38, 0.1);
+.timeline-dot.change-type-expelled {
+    background-color: #7f1d1d;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px #7f1d1d;
 }
 
-.change-type-graduated .timeline-dot {
-    border-color: #06b6d4;
-    background: rgba(6, 182, 212, 0.1);
+.timeline-dot.change-type-graduated {
+    background-color: #164e63;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px #164e63;
 }
 
-.change-type-default .timeline-dot {
-    border-color: var(--purple-700);
+.timeline-dot.change-type-default {
+    background-color: #374151;
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px #374151;
 }
 
 /* Timeline content cards */
@@ -1355,21 +1368,21 @@
    ============================================ */
 
 .assign-to-team-modal.modal-container {
-    max-width: 500px;
+    max-width: 560px;
     width: 90%;
 }
 
 .add-officer-modal .modal-container {
-    max-width: 500px;
+    max-width: 560px;
     width: 90%;
 }
 
 .add-officer-modal .modal-container.modal-large {
-    max-width: 700px;
+    max-width: 560px;
 }
 
 .officer-handover-modal .modal-container {
-    max-width: 500px;
+    max-width: 560px;
     width: 90%;
     max-height: 90vh;
 }

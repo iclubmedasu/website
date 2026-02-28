@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { PhoneInput } from '../components/PhoneInput/PhoneInput';
+import StepProgressBar from '../components/StepProgressBar/StepProgressBar';
 import './LoginPage.css';
 import '../components/form/form.css';
 import logo from '../assets/iclub_full_colored_transparent_logo.png';
@@ -21,9 +22,38 @@ function isValidEmailFormat(value) {
     return !value || (typeof value === 'string' && EMAIL_FORMAT.test(value.trim()));
 }
 
+// Sign-up step labels
+const SIGNUP_STEPS = ['Identify', 'Your Info', 'Set Password', 'Done'];
+
+// Map step state to progress index (zero-based)
+function getProgressIndex(step) {
+    switch (step) {
+        case 'studentId':
+            return 0;
+        case 'setupProfile':
+        case 'completeProfileDetails':
+        case 'officerProfileDetails':
+            return 1;
+        case 'setup':
+        case 'completeProfilePassword':
+        case 'officerProfilePassword':
+            return 2;
+        default:
+            return -1; // hide progress bar
+    }
+}
+
+// Whether to show the progress bar for a given step
+function showProgressBar(step) {
+    return getProgressIndex(step) >= 0;
+}
+
 function LoginPage() {
-    const [step, setStep] = useState('email'); // 'email' | 'login' | 'setup' | 'setupProfile' | 'studentId' | 'completeProfileDetails' | 'completeProfilePassword'
+    const [step, setStep] = useState('email'); // 'email' | 'login' | 'setup' | 'setupProfile' | 'studentId' | 'completeProfileDetails' | 'completeProfilePassword' | 'officerProfileDetails' | 'officerProfilePassword'
     const [email, setEmail] = useState('');
+    const [identifierInput, setIdentifierInput] = useState(''); // raw input from user (may be email, studentId, or phone)
+    const [identifierMode, setIdentifierMode] = useState('text'); // 'text' | 'phone'
+    const [phoneIdentifier, setPhoneIdentifier] = useState(''); // phone value from PhoneInput
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [memberName, setMemberName] = useState('');
@@ -38,10 +68,18 @@ function LoginPage() {
     const [profilePhone2, setProfilePhone2] = useState('');
     const [profileEmail2, setProfileEmail2] = useState('');
     const [profileEmail3, setProfileEmail3] = useState('');
+    // Officer-specific state
+    const [officerIdentifier, setOfficerIdentifier] = useState('');
+    const [officerEmail, setOfficerEmail] = useState('');
+    const [officerPhone, setOfficerPhone] = useState('');
+    const [officerPhone2, setOfficerPhone2] = useState('');
+    const [officerFullName, setOfficerFullName] = useState('');
+    const [officerEmail2, setOfficerEmail2] = useState('');
+    const [officerEmail3, setOfficerEmail3] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const { login, setupPassword, updateInvitedProfile, checkEmail, checkStudentId, completeProfile } = useAuth();
+    const { login, setupPassword, updateInvitedProfile, checkEmail, checkStudentId, completeProfile, completeOfficerProfile } = useAuth();
     const navigate = useNavigate();
 
     const handleEmailSubmit = async (e) => {
@@ -49,29 +87,50 @@ function LoginPage() {
         setError('');
         setLoading(true);
 
-        const result = await checkEmail(email);
+        const input = identifierMode === 'phone' ? phoneIdentifier.trim() : identifierInput.trim();
+        if (!input) {
+            setError(identifierMode === 'phone' ? 'Please enter your phone number.' : 'Please enter your email or Student ID.');
+            setLoading(false);
+            return;
+        }
+
+        const result = await checkEmail(input);
 
         if (result.success) {
             if (!result.data.exists) {
-                setError(result.data.message || 'Email or Student ID not found. Please contact your administrator.');
+                setError('No account found. If you believe this is a mistake, contact your administrator.');
             } else {
                 if (result.data.email) {
                     setEmail(result.data.email);
                 }
                 if (result.data.needsSetup) {
-                    setMemberName(result.data.fullName || '');
-                    setSetupFullName(result.data.fullName || '');
-                    setSetupPhone(result.data.phoneNumber || '');
-                    setSetupPhone2(result.data.phoneNumber2 || '');
-                    setSetupEmail2(result.data.email2 || '');
-                    setSetupEmail3(result.data.email3 || '');
-                    setStep('setupProfile');
+                    // Check if this is an officer (no studentId)
+                    const isOfficer = result.data.studentId === null || result.data.studentId === undefined;
+                    if (isOfficer) {
+                        setOfficerIdentifier(input);
+                        // Filter out placeholder emails (pending-officer-*)
+                        const rawEmail = result.data.email || '';
+                        setOfficerEmail(rawEmail.startsWith('pending-officer-') ? '' : rawEmail);
+                        setOfficerPhone(result.data.phoneNumber || '');
+                        setOfficerFullName(result.data.fullName || '');
+                        setOfficerEmail2(result.data.email2 || '');
+                        setOfficerEmail3(result.data.email3 || '');
+                        setStep('officerProfileDetails');
+                    } else {
+                        setMemberName(result.data.fullName || '');
+                        setSetupFullName(result.data.fullName || '');
+                        setSetupPhone(result.data.phoneNumber || '');
+                        setSetupPhone2(result.data.phoneNumber2 || '');
+                        setSetupEmail2(result.data.email2 || '');
+                        setSetupEmail3(result.data.email3 || '');
+                        setStep('setupProfile');
+                    }
                 } else {
                     setStep('login');
                 }
             }
         } else {
-            setError(result.error || 'Failed to check email');
+            setError(result.error || 'Failed to check identifier');
         }
 
         setLoading(false);
@@ -86,6 +145,8 @@ function LoginPage() {
 
         if (result.success) {
             navigate('/teams');
+        } else if (result.code === 'ALUMNI_ACCESS') {
+            setError('Your account has been moved to alumni status. You no longer have access to the members portal.');
         } else {
             setError(result.error);
         }
@@ -146,6 +207,10 @@ function LoginPage() {
 
     const resetToEmail = () => {
         setStep('email');
+        setIdentifierInput('');
+        setIdentifierMode('text');
+        setPhoneIdentifier('');
+        setEmail('');
         setPassword('');
         setConfirmPassword('');
         setSetupFullName('');
@@ -153,6 +218,13 @@ function LoginPage() {
         setSetupPhone2('');
         setSetupEmail2('');
         setSetupEmail3('');
+        setOfficerIdentifier('');
+        setOfficerEmail('');
+        setOfficerPhone('');
+        setOfficerPhone2('');
+        setOfficerFullName('');
+        setOfficerEmail2('');
+        setOfficerEmail3('');
         setError('');
     };
 
@@ -213,8 +285,64 @@ function LoginPage() {
         }
     };
 
+    // Officer profile completion handlers
+    const handleOfficerProfileDetailsContinue = (e) => {
+        e.preventDefault();
+        setError('');
+        if (!officerFullName.trim()) {
+            setError('Full name is required');
+            return;
+        }
+        if (!officerPhone.trim()) {
+            setError('Phone number is required');
+            return;
+        }
+        if (!isValidEmailFormat(officerEmail2)) {
+            setError('Additional email 2 must be a valid email (e.g. name@domain.com)');
+            return;
+        }
+        if (!isValidEmailFormat(officerEmail3)) {
+            setError('Additional email 3 must be a valid email (e.g. name@domain.com)');
+            return;
+        }
+        setStep('officerProfilePassword');
+    };
+
+    const handleOfficerProfileSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        const pwdErr = validatePassword(password);
+        if (pwdErr) {
+            setError(pwdErr);
+            return;
+        }
+        if (password !== confirmPassword) {
+            setError('Passwords do not match');
+            return;
+        }
+        setLoading(true);
+        const result = await completeOfficerProfile(
+            officerIdentifier,
+            officerFullName,
+            officerPhone,
+            officerPhone2,
+            officerEmail2,
+            officerEmail3,
+            password,
+            confirmPassword,
+            officerEmail
+        );
+        setLoading(false);
+        if (result.success) {
+            navigate('/teams');
+        } else {
+            setError(result.error);
+        }
+    };
+
     const resetToEmailFromStudentFlow = () => {
         setStep('email');
+        setIdentifierInput('');
         setStudentId('');
         setProfileFullName('');
         setProfilePhone('');
@@ -231,26 +359,56 @@ function LoginPage() {
             <div className="login-content-wrapper">
                 <div className="login-form-section">
                     <div className="login-card">
+                        {showProgressBar(step) && (
+                            <StepProgressBar steps={SIGNUP_STEPS} currentStep={getProgressIndex(step)} />
+                        )}
+
                         {step === 'email' && (
                             <>
                                 <h1 className="login-title">Welcome</h1>
-                                <p className="login-subtitle">Enter your email or Student ID to continue</p>
+                                <p className="login-subtitle">
+                                    {identifierMode === 'phone'
+                                        ? 'Enter your phone number to continue'
+                                        : 'Enter your email or Student ID to continue'}
+                                </p>
 
                                 {error && <div className="error-message">{error}</div>}
 
                                 <form onSubmit={handleEmailSubmit}>
-                                    <div className="form-group">
-                                        <label className="form-label">Email or Student ID</label>
-                                        <input
-                                            type="text"
-                                            inputMode="text"
-                                            className="form-input"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            required
-                                            placeholder="e.g. 213256 or 213256@med.asu.edu.eg"
-                                            autoFocus
-                                        />
+                                    {identifierMode === 'text' ? (
+                                        <div className="form-group">
+                                            <label className="form-label">Email or Student ID</label>
+                                            <input
+                                                type="text"
+                                                inputMode="text"
+                                                className="form-input"
+                                                value={identifierInput}
+                                                onChange={(e) => setIdentifierInput(e.target.value)}
+                                                placeholder="e.g. 213256 or name@med.asu.edu.eg"
+                                                autoFocus
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="form-group">
+                                            <PhoneInput
+                                                label="Phone Number"
+                                                value={phoneIdentifier}
+                                                onChange={setPhoneIdentifier}
+                                                placeholder="Phone number"
+                                            />
+                                        </div>
+                                    )}
+
+                                    <div className="identifier-mode-toggle">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIdentifierMode(identifierMode === 'text' ? 'phone' : 'text');
+                                                setError('');
+                                            }}
+                                        >
+                                            {identifierMode === 'text' ? 'Use phone number instead' : 'Use email or Student ID instead'}
+                                        </button>
                                     </div>
 
                                     <button
@@ -326,7 +484,7 @@ function LoginPage() {
                                         Official email will be {studentId}@med.asu.edu.eg (cannot be changed).
                                     </p>
                                     <div className="form-group">
-                                        <label className="form-label">Full Name *</label>
+                                        <label className="form-label">Full Name<span className="required-star"> *</span></label>
                                         <input
                                             type="text"
                                             className="form-input"
@@ -335,23 +493,6 @@ function LoginPage() {
                                             required
                                             placeholder="Your full name"
                                             minLength={2}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <PhoneInput
-                                            label="Phone Number *"
-                                            value={profilePhone}
-                                            onChange={setProfilePhone}
-                                            placeholder="Phone number"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <PhoneInput
-                                            label="Phone 2 (optional)"
-                                            value={profilePhone2}
-                                            onChange={setProfilePhone2}
-                                            placeholder="Optional second number"
                                         />
                                     </div>
                                     <div className="form-group">
@@ -372,6 +513,23 @@ function LoginPage() {
                                             value={profileEmail3}
                                             onChange={(e) => setProfileEmail3(e.target.value)}
                                             placeholder="e.g. name@domain.com"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <PhoneInput
+                                            label="Phone Number"
+                                            value={profilePhone}
+                                            onChange={setProfilePhone}
+                                            placeholder="Phone number"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <PhoneInput
+                                            label="Phone 2 (optional)"
+                                            value={profilePhone2}
+                                            onChange={setProfilePhone2}
+                                            placeholder="Optional second number"
                                         />
                                     </div>
                                     <button type="submit" className="btn-primary">
@@ -396,7 +554,7 @@ function LoginPage() {
 
                                 <form onSubmit={handleCompleteProfileSubmit}>
                                     <div className="form-group">
-                                        <label className="form-label">Password *</label>
+                                        <label className="form-label">Password<span className="required-star"> *</span></label>
                                         <input
                                             type="password"
                                             className="form-input"
@@ -412,7 +570,7 @@ function LoginPage() {
                                         </p>
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">Confirm Password *</label>
+                                        <label className="form-label">Confirm Password<span className="required-star"> *</span></label>
                                         <input
                                             type="password"
                                             className="form-input"
@@ -436,6 +594,138 @@ function LoginPage() {
                             </>
                         )}
 
+                        {step === 'officerProfileDetails' && (
+                            <>
+                                <h1 className="login-title">Complete your profile</h1>
+                                <p className="login-subtitle">Enter your details to create your account</p>
+
+                                {error && <div className="error-message">{error}</div>}
+
+                                <form onSubmit={handleOfficerProfileDetailsContinue}>
+                                    <div className="form-group">
+                                        <label className="form-label">Full Name<span className="required-star"> *</span></label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            value={officerFullName}
+                                            onChange={(e) => setOfficerFullName(e.target.value)}
+                                            required
+                                            placeholder="Your full name"
+                                            minLength={2}
+
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Email</label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            value={officerEmail}
+                                            disabled={officerIdentifier.includes('@')}
+                                            onChange={officerIdentifier.includes('@') ? undefined : (e) => setOfficerEmail(e.target.value)}
+                                            placeholder="your.email@med.asu.edu.eg"
+
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Additional email 2 (optional)</label>
+                                        <input
+                                            type="email"
+                                            className="form-input"
+                                            value={officerEmail2}
+                                            onChange={(e) => setOfficerEmail2(e.target.value)}
+                                            placeholder="e.g. name@domain.com"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Additional email 3 (optional)</label>
+                                        <input
+                                            type="email"
+                                            className="form-input"
+                                            value={officerEmail3}
+                                            onChange={(e) => setOfficerEmail3(e.target.value)}
+                                            placeholder="e.g. name@domain.com"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <PhoneInput
+                                            label="Phone Number"
+                                            value={officerPhone}
+                                            onChange={setOfficerPhone}
+                                            placeholder="Phone number"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <PhoneInput
+                                            label="Phone 2 (optional)"
+                                            value={officerPhone2}
+                                            onChange={setOfficerPhone2}
+                                            placeholder="Optional second number"
+                                        />
+                                    </div>
+                                    <button type="submit" className="btn-primary">
+                                        Continue
+                                    </button>
+                                </form>
+
+                                <div className="toggle-form">
+                                    <button type="button" onClick={resetToEmail}>
+                                        Use different identifier
+                                    </button>
+                                </div>
+                            </>
+                        )}
+
+                        {step === 'officerProfilePassword' && (
+                            <>
+                                <h1 className="login-title">Set your password</h1>
+                                <p className="login-subtitle">Almost there! Choose a secure password.</p>
+
+                                {error && <div className="error-message">{error}</div>}
+
+                                <form onSubmit={handleOfficerProfileSubmit}>
+                                    <div className="form-group">
+                                        <label className="form-label">Password<span className="required-star"> *</span></label>
+                                        <input
+                                            type="password"
+                                            className="form-input"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            required
+                                            placeholder="At least 8 characters"
+                                            minLength={8}
+                                            autoFocus
+                                        />
+                                        <p className="password-requirements">
+                                            Use at least one uppercase letter, one lowercase letter, one number, and one symbol (e.g. !@#$%^&*).
+                                        </p>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Confirm Password<span className="required-star"> *</span></label>
+                                        <input
+                                            type="password"
+                                            className="form-input"
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            required
+                                            placeholder="Re-enter your password"
+                                            minLength={8}
+                                        />
+                                    </div>
+                                    <button type="submit" className="btn-primary" disabled={loading}>
+                                        {loading ? 'Creating account...' : 'Create account'}
+                                    </button>
+                                </form>
+
+                                <div className="toggle-form">
+                                    <button type="button" onClick={() => { setStep('officerProfileDetails'); setError(''); }}>
+                                        Back to profile details
+                                    </button>
+                                </div>
+                            </>
+                        )}
+
                         {step === 'login' && (
                             <>
                                 <h1 className="login-title">Welcome Back</h1>
@@ -447,7 +737,7 @@ function LoginPage() {
                                     <div className="form-group">
                                         <label className="form-label">Email</label>
                                         <input
-                                            type="email"
+                                            type="text"
                                             className="form-input"
                                             value={email}
                                             disabled
@@ -497,7 +787,7 @@ function LoginPage() {
                                         <input type="email" className="form-input" value={email} disabled />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">Full Name *</label>
+                                        <label className="form-label">Full Name<span className="required-star"> *</span></label>
                                         <input
                                             type="text"
                                             className="form-input"
@@ -506,23 +796,6 @@ function LoginPage() {
                                             required
                                             placeholder="Your full name"
                                             minLength={2}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <PhoneInput
-                                            label="Phone Number *"
-                                            value={setupPhone}
-                                            onChange={setSetupPhone}
-                                            placeholder="Phone number"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <PhoneInput
-                                            label="Phone 2 (optional)"
-                                            value={setupPhone2}
-                                            onChange={setSetupPhone2}
-                                            placeholder="Optional second number"
                                         />
                                     </div>
                                     <div className="form-group">
@@ -543,6 +816,23 @@ function LoginPage() {
                                             value={setupEmail3}
                                             onChange={(e) => setSetupEmail3(e.target.value)}
                                             placeholder="e.g. name@domain.com"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <PhoneInput
+                                            label="Phone Number *"
+                                            value={setupPhone}
+                                            onChange={setSetupPhone}
+                                            placeholder="Phone number"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <PhoneInput
+                                            label="Phone 2 (optional)"
+                                            value={setupPhone2}
+                                            onChange={setSetupPhone2}
+                                            placeholder="Optional second number"
                                         />
                                     </div>
                                     <button type="submit" className="btn-primary" disabled={loading}>
@@ -571,7 +861,7 @@ function LoginPage() {
                                         <input type="email" className="form-input" value={email} disabled />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">Password *</label>
+                                        <label className="form-label">Password<span className="required-star"> *</span></label>
                                         <input
                                             type="password"
                                             className="form-input"
@@ -587,7 +877,7 @@ function LoginPage() {
                                         </p>
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">Confirm Password *</label>
+                                        <label className="form-label">Confirm Password<span className="required-star"> *</span></label>
                                         <input
                                             type="password"
                                             className="form-input"

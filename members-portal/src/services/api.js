@@ -13,6 +13,14 @@ const getAuthHeaders = () => {
     return headers;
 };
 
+// Auth-only headers (no Content-Type — used for FormData uploads)
+const getAuthOnlyHeaders = () => {
+    const token = localStorage.getItem('token');
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
+};
+
 // Helper function to handle API responses
 const handleResponse = async (response) => {
     if (!response.ok) {
@@ -323,6 +331,16 @@ export const administrationAPI = {
         });
         return handleResponse(response);
     },
+
+    // Create a placeholder officer member (accepts { identifier })
+    createOfficer: async (data) => {
+        const response = await fetch(`${API_BASE_URL}/administration/officer`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+        return handleResponse(response);
+    },
 };
 
 // ============================================
@@ -386,6 +404,52 @@ export const membersAPI = {
         const response = await fetch(`${API_BASE_URL}/members/${id}/activate`, {
             method: 'PATCH',
             headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    // Upload profile photo (multipart/form-data)
+    uploadProfilePhoto: async (memberId, file) => {
+        const formData = new FormData();
+        formData.append('photo', file);
+        const response = await fetch(`${API_BASE_URL}/members/${memberId}/profile-photo`, {
+            method: 'POST',
+            headers: getAuthOnlyHeaders(),
+            body: formData,
+        });
+        return handleResponse(response);
+    },
+
+    // Delete profile photo
+    deleteProfilePhoto: async (memberId) => {
+        const response = await fetch(`${API_BASE_URL}/members/${memberId}/profile-photo`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    // Mark an unassigned member as alumni (leave: graduation, expulsion, resignation, retirement)
+    leave: async (memberId, { leaveType, changeReason, notes }) => {
+        const response = await fetch(`${API_BASE_URL}/members/${memberId}/leave`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ leaveType, changeReason, notes }),
+        });
+        return handleResponse(response);
+    },
+};
+
+// ============================================
+// AUTH API
+// ============================================
+
+export const authAPI = {
+    changePassword: async (currentPassword, newPassword, confirmPassword) => {
+        const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
         });
         return handleResponse(response);
     },

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { phasesAPI } from '../../../services/api';
+import { toTitleCase } from '../../../utils/titleCase';
 
 export default function EditPhaseModal({ phase, onClose, onPhaseUpdated }) {
     const [title, setTitle] = useState('');
@@ -54,6 +55,7 @@ export default function EditPhaseModal({ phase, onClose, onPhaseUpdated }) {
                             placeholder="Phase title"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
+                            onBlur={(e) => setTitle(toTitleCase(e.target.value))}
                             autoFocus
                         />
                     </div>

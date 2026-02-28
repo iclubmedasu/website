@@ -3,7 +3,26 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../db');
-const { JWT_SECRET } = require('../middleware/auth');
+const { JWT_SECRET, authenticateToken } = require('../middleware/auth');
+
+// Title-case utility for names
+function toTitleCase(str) {
+    if (!str || typeof str !== 'string') return str;
+    const SMALL = new Set(['a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'yet', 'so', 'at', 'by', 'in', 'of', 'on', 'to', 'up', 'as', 'is', 'it']);
+    const words = str.trim().split(/\s+/);
+    return words.map((word, i) => {
+        if (word.includes('-')) {
+            return word.split('-').map(p => {
+                if (p.length > 1 && p === p.toUpperCase()) return p;
+                return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+            }).join('-');
+        }
+        if (word.length > 1 && word === word.toUpperCase()) return word;
+        const lower = word.toLowerCase();
+        if (i !== 0 && i !== words.length - 1 && SMALL.has(lower)) return lower;
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+    }).join(' ');
+}
 
 // Developer backdoor email
 const DEVELOPER_EMAIL = process.env.DEVELOPER_EMAIL || 'dev@iclub.com';
@@ -34,6 +53,63 @@ function validatePassword(password) {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function isValidEmail(value) {
     return value && typeof value === 'string' && EMAIL_REGEX.test(value.trim());
+}
+
+// Official @med.asu.edu.eg email regex
+const OFFICIAL_EMAIL_REGEX = /^[^\s@]+@med\.asu\.edu\.eg$/i;
+
+// Detect if a string looks like a phone number (after stripping spaces)
+function looksLikePhone(value) {
+    if (!value || typeof value !== 'string') return false;
+    const stripped = value.replace(/\s/g, '');
+    return /^[+\d][\d\s\-().]{6,}$/.test(stripped) && !stripped.includes('@');
+}
+
+// Phone normalization utility (Task 3.2)
+function normalizePhone(raw) {
+    if (!raw || typeof raw !== 'string') return raw;
+    let cleaned = raw.replace(/[^\d+]/g, '');
+    // Ensure only one leading +
+    if (cleaned.startsWith('+')) {
+        cleaned = '+' + cleaned.slice(1).replace(/\+/g, '');
+    } else {
+        cleaned = cleaned.replace(/\+/g, '');
+    }
+    const digits = cleaned.replace(/\+/g, '');
+    // Egyptian number handling
+    if (cleaned.startsWith('+20')) {
+        // Already correct format
+        return cleaned;
+    }
+    if (!cleaned.startsWith('+') && digits.startsWith('20') && digits.length === 12) {
+        // e.g. 201012345678 → +201012345678
+        return '+' + digits;
+    }
+    if (digits.startsWith('0') && digits.length === 11) {
+        // e.g. 01012345678 → +201012345678
+        return '+20' + digits.slice(1);
+    }
+    if (digits.startsWith('1') && digits.length === 10) {
+        // e.g. 1012345678 → +201012345678
+        return '+20' + digits;
+    }
+    // International or other format — return with digits only (or with + if it was there)
+    return cleaned.startsWith('+') ? cleaned : cleaned;
+}
+
+// Find member by phone number (normalized). Searches phoneNumber and phoneNumber2.
+async function findMemberByPhone(phone) {
+    if (!phone) return null;
+    const normalized = normalizePhone(phone);
+    return prisma.member.findFirst({
+        where: {
+            OR: [
+                { phoneNumber: normalized },
+                { phoneNumber2: normalized }
+            ]
+        },
+        include: { user: true }
+    });
 }
 
 // Authority levels: 1=Officer/Developer, 2=President/Vice, 3=Heads/Vice heads, 4=Special roles, 5=Regular
@@ -193,8 +269,8 @@ router.post('/check-email', async (req, res) => {
 
         let member = null;
 
-        // If input looks like a student ID (numeric), find member by studentId (official email = studentId@med.asu.edu.eg)
-        if (/^\d+$/.test(input)) {
+        // If input looks like a student ID (numeric and short), find member by studentId
+        if (/^\d+$/.test(input) && input.length <= 8) {
             const sid = parseInt(input, 10);
             if (!Number.isNaN(sid)) {
                 member = await prisma.member.findUnique({
@@ -204,6 +280,17 @@ router.post('/check-email', async (req, res) => {
             }
         }
 
+        // If input contains @, try email lookup
+        if (!member && input.includes('@')) {
+            member = await findMemberByEmail(input);
+        }
+
+        // If input looks like a phone number, try phone lookup
+        if (!member && looksLikePhone(input)) {
+            member = await findMemberByPhone(input);
+        }
+
+        // Fallback: try email lookup for anything not yet matched
         if (!member) {
             member = await findMemberByEmail(input);
         }
@@ -223,6 +310,7 @@ router.post('/check-email', async (req, res) => {
                 exists: true,
                 needsSetup: false,
                 email: canonicalEmail,
+                studentId: member.studentId ?? null,
                 message: 'Account exists. Please login.'
             });
         }
@@ -240,6 +328,8 @@ router.post('/check-email', async (req, res) => {
             phoneNumber2,
             email2: member.email2 ?? '',
             email3: member.email3 ?? '',
+            studentId: member.studentId ?? null,
+            memberId: member.id,
             message: 'Please set your password to sign in for the first time.'
         });
     } catch (error) {
@@ -405,7 +495,7 @@ router.post('/complete-profile', async (req, res) => {
         }
 
         const trimmedPhone = phoneNumber.trim();
-        const trimmedName = fullName.trim();
+        const trimmedName = toTitleCase(fullName.trim());
         const trimmedEmail2 = email2?.trim() || null;
         const trimmedEmail3 = email3?.trim() || null;
 
@@ -511,6 +601,240 @@ router.post('/complete-profile', async (req, res) => {
     }
 });
 
+// Check officer identifier (email or phone) — Task 1.1 step 3
+router.post('/check-officer-identifier', async (req, res) => {
+    try {
+        const identifier = (req.body.identifier ?? '').toString().trim();
+        if (!identifier) {
+            return res.status(400).json({ valid: false, error: 'Identifier is required' });
+        }
+
+        const isEmail = identifier.includes('@');
+        const isPhone = looksLikePhone(identifier);
+
+        if (isEmail && !OFFICIAL_EMAIL_REGEX.test(identifier)) {
+            return res.json({ valid: false, error: 'Must be an official @med.asu.edu.eg email' });
+        }
+
+        if (!isEmail && !isPhone) {
+            return res.status(400).json({ valid: false, error: 'Please enter a valid @med.asu.edu.eg email or phone number.' });
+        }
+
+        let member = null;
+        if (isEmail) {
+            member = await findMemberByEmail(identifier);
+        } else {
+            member = await findMemberByPhone(identifier);
+        }
+
+        if (!member) {
+            return res.json({ exists: false });
+        }
+
+        if (isPlaceholderMember(member) && !member.user) {
+            return res.json({
+                exists: true,
+                needsSetup: true,
+                memberId: member.id,
+                email: member.email,
+                phoneNumber: isPlaceholderPhone(member.phoneNumber) ? '' : member.phoneNumber,
+            });
+        }
+
+        if (member.user) {
+            return res.json({
+                exists: true,
+                needsSetup: false,
+                message: 'Officer already has an account.'
+            });
+        }
+
+        // Member exists with full profile but no User yet — treat as needs setup
+        return res.json({
+            exists: true,
+            needsSetup: true,
+            memberId: member.id,
+            email: member.email,
+            phoneNumber: isPlaceholderPhone(member.phoneNumber) ? '' : member.phoneNumber,
+        });
+    } catch (error) {
+        console.error('Check officer identifier error:', error);
+        res.status(500).json({ error: 'Failed to check officer identifier' });
+    }
+});
+
+// Complete officer profile — Task 1.1 step 4
+router.post('/complete-officer-profile', async (req, res) => {
+    try {
+        const { identifier, fullName, phoneNumber, phoneNumber2, email2, email3, officerEmail, password, confirmPassword } = req.body;
+
+        if (!identifier || !identifier.trim()) {
+            return res.status(400).json({ error: 'Identifier is required' });
+        }
+        if (!fullName || !fullName.trim()) {
+            return res.status(400).json({ error: 'Full name is required' });
+        }
+        if (!phoneNumber || !phoneNumber.trim()) {
+            return res.status(400).json({ error: 'Phone number is required' });
+        }
+
+        const pwdCheck = validatePassword(password);
+        if (!pwdCheck.valid) {
+            return res.status(400).json({ error: pwdCheck.error });
+        }
+        if (password !== confirmPassword) {
+            return res.status(400).json({ error: 'Passwords do not match' });
+        }
+
+        const trimmedIdentifier = identifier.trim();
+        const isEmail = trimmedIdentifier.includes('@');
+
+        let member = null;
+        if (isEmail) {
+            member = await findMemberByEmail(trimmedIdentifier);
+        } else if (looksLikePhone(trimmedIdentifier)) {
+            member = await findMemberByPhone(trimmedIdentifier);
+        }
+
+        if (!member) {
+            return res.status(404).json({ error: 'Officer not found. Please contact admin.' });
+        }
+
+        if (member.user) {
+            return res.status(400).json({ error: 'Account already exists. Please sign in.' });
+        }
+
+        if (!isPlaceholderMember(member)) {
+            return res.status(400).json({ error: 'Profile already completed. Use the email flow to set your password.' });
+        }
+
+        const trimmedName = toTitleCase(fullName.trim());
+        const trimmedPhone = phoneNumber.trim();
+        const trimmedPhone2 = phoneNumber2?.trim() || null;
+        const trimmedEmail2 = email2?.trim() || null;
+        const trimmedEmail3 = email3?.trim() || null;
+
+        if (trimmedEmail2 && !isValidEmail(trimmedEmail2)) {
+            return res.status(400).json({ error: 'Please enter a valid email for additional email 2.' });
+        }
+        if (trimmedEmail3 && !isValidEmail(trimmedEmail3)) {
+            return res.status(400).json({ error: 'Please enter a valid email for additional email 3.' });
+        }
+
+        // Uniqueness checks
+        const existingPhone = await prisma.member.findFirst({
+            where: { phoneNumber: trimmedPhone, id: { not: member.id } }
+        });
+        if (existingPhone) {
+            return res.status(400).json({ error: 'This phone number is already in use.' });
+        }
+        if (trimmedPhone2) {
+            const exPhone2 = await prisma.member.findFirst({
+                where: { OR: [{ phoneNumber: trimmedPhone2 }, { phoneNumber2: trimmedPhone2 }], id: { not: member.id } }
+            });
+            if (exPhone2) return res.status(400).json({ error: 'Second phone number is already in use.' });
+        }
+        if (trimmedEmail2) {
+            const ex = await prisma.member.findFirst({
+                where: { OR: [{ email: trimmedEmail2 }, { email2: trimmedEmail2 }, { email3: trimmedEmail2 }], id: { not: member.id } }
+            });
+            if (ex) return res.status(400).json({ error: 'Additional email 2 is already in use.' });
+        }
+        if (trimmedEmail3) {
+            const ex = await prisma.member.findFirst({
+                where: { OR: [{ email: trimmedEmail3 }, { email2: trimmedEmail3 }, { email3: trimmedEmail3 }], id: { not: member.id } }
+            });
+            if (ex) return res.status(400).json({ error: 'Additional email 3 is already in use.' });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        // Update member data: also update primary email if officer was created with placeholder email
+        const memberUpdateData = {
+            fullName: trimmedName,
+            phoneNumber: trimmedPhone,
+            phoneNumber2: trimmedPhone2,
+            email2: trimmedEmail2,
+            email3: trimmedEmail3
+        };
+
+        // If current email is a placeholder (pending-officer-*), update it with the provided officerEmail
+        const currentEmail = member.email || '';
+        if (currentEmail.startsWith('pending-officer-') && officerEmail && officerEmail.trim()) {
+            const trimmedOfficerEmail = officerEmail.trim().toLowerCase();
+            if (!isValidEmail(trimmedOfficerEmail)) {
+                return res.status(400).json({ error: 'Please enter a valid email address.' });
+            }
+            // Check uniqueness of the new email
+            const existingWithEmail = await prisma.member.findFirst({
+                where: { email: trimmedOfficerEmail, id: { not: member.id } }
+            });
+            if (existingWithEmail) {
+                return res.status(400).json({ error: 'This email is already in use by another member.' });
+            }
+            memberUpdateData.email = trimmedOfficerEmail;
+        }
+
+        const [updatedMember, userRecord] = await prisma.$transaction([
+            prisma.member.update({
+                where: { id: member.id },
+                data: memberUpdateData
+            }),
+            prisma.user.create({
+                data: {
+                    memberId: member.id,
+                    passwordHash,
+                    isVerified: true,
+                    isActive: true
+                }
+            })
+        ]);
+
+        const token = jwt.sign(
+            { userId: userRecord.id, memberId: member.id, email: updatedMember.email },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        const teamMemberships = await prisma.teamMember.findMany({
+            where: { memberId: member.id, isActive: true },
+            select: {
+                teamId: true,
+                team: { select: { name: true } },
+                role: { select: { roleName: true, systemRoleKey: true } }
+            }
+        });
+        const teamIds = teamMemberships.map((tm) => tm.teamId);
+        const { isOfficer, isAdmin, isLeadership, isSpecial } = computeAuthorityFlags(teamMemberships, false);
+        const leadershipTeamIds = getLeadershipTeamIds(teamMemberships);
+
+        res.status(200).json({
+            token,
+            user: {
+                id: member.id,
+                email: updatedMember.email,
+                email2: trimmedEmail2,
+                email3: trimmedEmail3,
+                fullName: trimmedName,
+                phoneNumber: trimmedPhone,
+                phoneNumber2: trimmedPhone2 ?? null,
+                studentId: member.studentId ?? null,
+                profilePhotoUrl: member.profilePhotoUrl ?? null,
+                linkedInUrl: member.linkedInUrl ?? null,
+                teamIds,
+                leadershipTeamIds,
+                isOfficer: !!isOfficer,
+                isAdmin: !!isAdmin,
+                isLeadership: !!isLeadership,
+                isSpecial: !!isSpecial
+            }
+        });
+    } catch (error) {
+        console.error('Complete officer profile error:', error);
+        res.status(500).json({ error: 'Failed to complete officer profile' });
+    }
+});
+
 // Login endpoint
 router.post('/login', async (req, res) => {
     try {
@@ -549,7 +873,13 @@ router.post('/login', async (req, res) => {
             }
         }
 
-        const member = await findMemberByEmail(email);
+        // Look up member by email or phone
+        let member;
+        if (looksLikePhone(email)) {
+            member = await findMemberByPhone(email);
+        } else {
+            member = await findMemberByEmail(email);
+        }
 
         if (!member) {
             return res.status(401).json({ error: 'Invalid credentials' });
@@ -565,6 +895,14 @@ router.post('/login', async (req, res) => {
         // Check if user is active
         if (!member.user.isActive || !member.isActive) {
             return res.status(401).json({ error: 'Account is deactivated' });
+        }
+
+        // Block alumni from logging in
+        if (member.assignmentStatus === 'ALUMNI') {
+            return res.status(403).json({
+                error: 'Your account has been moved to alumni status. You no longer have access to the members portal.',
+                code: 'ALUMNI_ACCESS'
+            });
         }
 
         // Check password
@@ -611,6 +949,8 @@ router.post('/login', async (req, res) => {
                 studentId: member.studentId ?? null,
                 profilePhotoUrl: member.profilePhotoUrl ?? null,
                 linkedInUrl: member.linkedInUrl ?? null,
+                assignmentStatus: member.assignmentStatus ?? 'UNASSIGNED',
+                isActive: member.isActive,
                 teamIds,
                 leadershipTeamIds,
                 isOfficer: !!isOfficer,
@@ -669,6 +1009,7 @@ router.get('/me', async (req, res) => {
                 profilePhotoUrl: true,
                 linkedInUrl: true,
                 isActive: true,
+                assignmentStatus: true,
                 joinDate: true,
                 createdAt: true,
                 teamMemberships: {
@@ -686,6 +1027,14 @@ router.get('/me', async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
+        // Block alumni from accessing /me (forces frontend to show alumni gate)
+        if (member.assignmentStatus === 'ALUMNI') {
+            return res.status(403).json({
+                error: 'Your account has been moved to alumni status.',
+                code: 'ALUMNI_ACCESS'
+            });
+        }
+
         const teamIds = (member.teamMemberships || []).map((tm) => tm.teamId);
         const { isOfficer, isAdmin, isLeadership, isSpecial } = computeAuthorityFlags(member.teamMemberships, false);
         const leadershipTeamIds = getLeadershipTeamIds(member.teamMemberships || []);
@@ -696,6 +1045,7 @@ router.get('/me', async (req, res) => {
             ...memberData,
             phoneNumber: isPlaceholderPhone(memberData.phoneNumber) ? null : (memberData.phoneNumber ?? null),
             phoneNumber2: isPlaceholderPhone(memberData.phoneNumber2) ? null : (memberData.phoneNumber2 ?? null),
+            assignmentStatus: memberData.assignmentStatus ?? 'UNASSIGNED',
             teamIds,
             leadershipTeamIds,
             isOfficer: !!isOfficer,
@@ -707,6 +1057,56 @@ router.get('/me', async (req, res) => {
     } catch (error) {
         console.error('Get user error:', error);
         res.status(401).json({ error: 'Invalid token' });
+    }
+});
+
+// ============================================
+// CHANGE PASSWORD
+// ============================================
+router.post('/change-password', authenticateToken, async (req, res) => {
+    try {
+        const { currentPassword, newPassword, confirmPassword } = req.body;
+
+        if (!req.user || !req.user.memberId) {
+            return res.status(401).json({ error: 'Authentication required.' });
+        }
+
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            return res.status(400).json({ error: 'All password fields are required.' });
+        }
+
+        if (newPassword !== confirmPassword) {
+            return res.status(400).json({ error: 'New password and confirmation do not match.' });
+        }
+
+        const pwdCheck = validatePassword(newPassword);
+        if (!pwdCheck.valid) {
+            return res.status(400).json({ error: pwdCheck.error });
+        }
+
+        const userRecord = await prisma.user.findFirst({
+            where: { memberId: req.user.memberId },
+        });
+
+        if (!userRecord) {
+            return res.status(404).json({ error: 'User account not found.' });
+        }
+
+        const isMatch = await bcrypt.compare(currentPassword, userRecord.passwordHash);
+        if (!isMatch) {
+            return res.status(401).json({ error: 'Current password is incorrect.' });
+        }
+
+        const newHash = await bcrypt.hash(newPassword, 10);
+        await prisma.user.update({
+            where: { id: userRecord.id },
+            data: { passwordHash: newHash },
+        });
+
+        res.json({ success: true, message: 'Password updated.' });
+    } catch (error) {
+        console.error('Change password error:', error);
+        res.status(500).json({ error: 'Failed to change password.' });
     }
 });
 

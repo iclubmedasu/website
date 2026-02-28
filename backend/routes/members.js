@@ -1,6 +1,33 @@
 const express = require('express');
 const router = express.Router();
-const { prisma } = require('../db'); // Change from '../server' to '../prisma'
+const multer = require('multer');
+const { prisma } = require('../db');
+const { uploadProfilePhoto, deleteProfilePhoto } = require('../services/githubStorage');
+
+// Multer: memory storage, 5 MB limit
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// Title-case utility for names
+function toTitleCase(str) {
+    if (!str || typeof str !== 'string') return str;
+    const SMALL = new Set(['a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'yet', 'so', 'at', 'by', 'in', 'of', 'on', 'to', 'up', 'as', 'is', 'it']);
+    const words = str.trim().split(/\s+/);
+    return words.map((word, i) => {
+        if (word.includes('-')) {
+            return word.split('-').map(p => {
+                if (p.length > 1 && p === p.toUpperCase()) return p;
+                return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+            }).join('-');
+        }
+        if (word.length > 1 && word === word.toUpperCase()) return word;
+        const lower = word.toLowerCase();
+        if (i !== 0 && i !== words.length - 1 && SMALL.has(lower)) return lower;
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+    }).join(' ');
+}
 
 // ============================================
 // MEMBER ENDPOINTS
@@ -109,7 +136,7 @@ router.post('/', async (req, res) => {
         }
 
         const usePlaceholders = !fullName?.trim() || !phoneNumber?.trim();
-        const finalFullName = usePlaceholders ? PLACEHOLDER_FULLNAME : fullName.trim();
+        const finalFullName = usePlaceholders ? PLACEHOLDER_FULLNAME : toTitleCase(fullName.trim());
         const finalPhone = usePlaceholders ? placeholderPhone(sid) : phoneNumber.trim();
         const primaryEmail = officialEmail(sid);
 
@@ -259,7 +286,7 @@ router.put('/:id', async (req, res) => {
         }
 
         if (updateData.fullName !== undefined) {
-            updateData.fullName = typeof updateData.fullName === 'string' ? updateData.fullName.trim() : '';
+            updateData.fullName = typeof updateData.fullName === 'string' ? toTitleCase(updateData.fullName.trim()) : '';
             if (updateData.fullName.length < 2) {
                 return res.status(400).json({ error: 'Full name must be at least 2 characters' });
             }
@@ -331,6 +358,111 @@ router.patch('/:id/activate', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to activate member' });
+    }
+});
+
+// ============================================
+// PROFILE PHOTO ENDPOINTS
+// ============================================
+
+const ALLOWED_PHOTO_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
+
+// POST /api/members/:id/profile-photo — upload / replace profile photo
+router.post('/:id/profile-photo', upload.single('photo'), async (req, res) => {
+    try {
+        const memberId = parseInt(req.params.id, 10);
+        if (Number.isNaN(memberId)) return res.status(400).json({ error: 'Invalid member ID' });
+
+        // Auth: self or admin
+        const isSelf = req.user.memberId === memberId;
+        const isAdmin = await isAdminRequester(req);
+        if (!isSelf && !isAdmin) return res.status(403).json({ error: 'Not authorised to update this member\'s photo' });
+
+        if (!req.file) return res.status(400).json({ error: 'No photo file provided.' });
+        if (!ALLOWED_PHOTO_MIMES.includes(req.file.mimetype)) {
+            return res.status(400).json({ error: 'Only JPEG, PNG, or WebP images under 5 MB are allowed.' });
+        }
+
+        const photoUrl = await uploadProfilePhoto(memberId, req.file.buffer, req.file.mimetype);
+
+        await prisma.member.update({ where: { id: memberId }, data: { profilePhotoUrl: photoUrl } });
+
+        res.json({ profilePhotoUrl: photoUrl });
+    } catch (error) {
+        console.error('POST /:id/profile-photo', error);
+        if (error.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: 'Only JPEG, PNG, or WebP images under 5 MB are allowed.' });
+        }
+        res.status(500).json({ error: error.message || 'Failed to upload profile photo' });
+    }
+});
+
+// DELETE /api/members/:id/profile-photo — remove profile photo
+router.delete('/:id/profile-photo', async (req, res) => {
+    try {
+        const memberId = parseInt(req.params.id, 10);
+        if (Number.isNaN(memberId)) return res.status(400).json({ error: 'Invalid member ID' });
+
+        const isSelf = req.user.memberId === memberId;
+        const isAdmin = await isAdminRequester(req);
+        if (!isSelf && !isAdmin) return res.status(403).json({ error: 'Not authorised to delete this member\'s photo' });
+
+        await deleteProfilePhoto(memberId);
+        await prisma.member.update({ where: { id: memberId }, data: { profilePhotoUrl: null } });
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('DELETE /:id/profile-photo', error);
+        res.status(500).json({ error: error.message || 'Failed to delete profile photo' });
+    }
+});
+
+// POST /api/members/:id/leave — Mark an UNASSIGNED member as alumni (graduation, expulsion, resignation, retirement)
+// This is for members who have no active team assignment. Members who ARE assigned
+// should use the team-members status endpoint instead.
+router.post('/:id/leave', async (req, res) => {
+    try {
+        const memberId = parseInt(req.params.id, 10);
+        if (Number.isNaN(memberId)) return res.status(400).json({ error: 'Invalid member ID' });
+
+        const isAdmin = await isAdminRequester(req);
+        if (!isAdmin) return res.status(403).json({ error: 'Only admins can perform this action' });
+
+        const member = await prisma.member.findUnique({ where: { id: memberId } });
+        if (!member) return res.status(404).json({ error: 'Member not found' });
+        if (member.assignmentStatus !== 'UNASSIGNED') {
+            return res.status(400).json({ error: 'Member is not unassigned. Use the team-members endpoint for assigned members.' });
+        }
+
+        const { leaveType, changeReason, notes } = req.body;
+        const validTypes = ['Graduation', 'Resignation', 'Expulsion', 'Retirement'];
+        if (!leaveType || !validTypes.includes(leaveType)) {
+            return res.status(400).json({ error: `leaveType must be one of: ${validTypes.join(', ')}` });
+        }
+
+        await prisma.$transaction(async (tx) => {
+            await tx.alumni.create({
+                data: {
+                    memberId,
+                    teamId: null,
+                    roleId: null,
+                    subteamId: null,
+                    leaveType,
+                    leftDate: new Date(),
+                    changeReason: changeReason || null,
+                    notes: notes || null,
+                },
+            });
+            await tx.member.update({
+                where: { id: memberId },
+                data: { assignmentStatus: 'ALUMNI' },
+            });
+        });
+
+        res.json({ success: true, message: `Member marked as alumni (${leaveType})` });
+    } catch (error) {
+        console.error('POST /:id/leave', error);
+        res.status(500).json({ error: error.message || 'Failed to process member leave' });
     }
 });
 

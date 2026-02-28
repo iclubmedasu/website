@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { tasksAPI } from '../../../services/api';
+import { toTitleCase } from '../../../utils/titleCase';
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 const DIFFICULTIES = ['EASY', 'MEDIUM', 'HARD'];
@@ -98,6 +99,7 @@ export default function EditTaskModal({ task, allMembers = [], onClose, onTaskUp
                                 placeholder="Task title"
                                 value={form.title}
                                 onChange={setField('title')}
+                                onBlur={(e) => setForm(f => ({ ...f, title: toTitleCase(e.target.value) }))}
                                 autoFocus
                             />
                         </div>

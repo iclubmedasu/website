@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { toTitleCase } from '../../../utils/titleCase';
 
 const AddRoleModal = ({ isOpen, onClose, onSubmit, teamId }) => {
     const [formData, setFormData] = useState({
@@ -115,6 +116,7 @@ const AddRoleModal = ({ isOpen, onClose, onSubmit, teamId }) => {
                                 className={`form-input ${errors.roleName ? 'error' : ''}`}
                                 value={formData.roleName}
                                 onChange={handleChange}
+                                onBlur={(e) => setFormData(prev => ({ ...prev, roleName: toTitleCase(e.target.value) }))}
                                 placeholder="e.g., Lead Developer"
                                 disabled={isSubmitting}
                             />

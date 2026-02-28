@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { teamSubteamsAPI } from '../../../services/api';
+import { toTitleCase } from '../../../utils/titleCase';
 
 const EditSubteamModal = ({ isOpen, onClose, onSubmit, teamId, initialSubteamId }) => {
     const [selectedSubteamId, setSelectedSubteamId] = useState('');
@@ -152,6 +153,7 @@ const EditSubteamModal = ({ isOpen, onClose, onSubmit, teamId, initialSubteamId 
                                         className={`form-input ${errors.name ? 'error' : ''}`}
                                         value={formData.name}
                                         onChange={handleChange}
+                                        onBlur={(e) => setFormData(prev => ({ ...prev, name: toTitleCase(e.target.value) }))}
                                         placeholder="e.g., Technical, Marketing"
                                         disabled={isSubmitting}
                                     />

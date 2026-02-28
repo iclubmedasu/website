@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { projectsAPI, projectTypesAPI } from '../../../services/api';
+import { toTitleCase } from '../../../utils/titleCase';
 
 const PROJECT_STATUSES = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD', 'CANCELLED'];
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
@@ -133,6 +134,7 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                                 placeholder="Project title"
                                 value={form.title}
                                 onChange={setField('title')}
+                                onBlur={(e) => setForm(f => ({ ...f, title: toTitleCase(e.target.value) }))}
                                 autoFocus
                             />
                         </div>

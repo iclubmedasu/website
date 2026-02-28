@@ -82,12 +82,12 @@ function MembersPage() {
 
     // Modals
     const [showViewModal, setShowViewModal] = useState(false);
-    const [showEditModal, setShowEditModal] = useState(false);
     const [showAssignModal, setShowAssignModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
     const [viewingMemberId, setViewingMemberId] = useState(null);
+    const [assigningMember, setAssigningMember] = useState(null);
     const [editingMember, setEditingMember] = useState(null);
     const [editingMemberAssignment, setEditingMemberAssignment] = useState(null);
-    const [assigningMember, setAssigningMember] = useState(null);
 
     // Fetch initial data: teams, all roles, all subteams
     useEffect(() => {
@@ -203,12 +203,18 @@ function MembersPage() {
         setShowViewModal(true);
     };
 
-    const handleEditMember = (row) => {
-        if (row.isUnassigned || row.teamMemberId == null) return;
-        setEditingMember({
-            ...row,
+    const handleAssignToTeam = (row) => {
+        setAssigningMember({
+            memberId: row.memberId,
+            id: row.memberId,
             fullName: row.name,
+            name: row.name,
         });
+        setShowAssignModal(true);
+    };
+
+    const handleEditMember = (row) => {
+        setEditingMember({ fullName: row.name });
         setEditingMemberAssignment({
             id: row.teamMemberId,
             memberId: row.memberId,
@@ -220,77 +226,6 @@ function MembersPage() {
             leftDate: row.leftDate,
         });
         setShowEditModal(true);
-    };
-
-    const handleEditMemberSubmit = async () => {
-        if (!editingMemberAssignment) return;
-        setError(null);
-        try {
-            if (filterStatus === 'unassigned') {
-                const members = await membersAPI.getAll(undefined, true);
-                const list = Array.isArray(members) ? members : [];
-                setAssignments(
-                    list.map((m) => ({
-                        id: `member-${m.id}`,
-                        memberId: m.id,
-                        member: m,
-                        team: null,
-                        role: null,
-                        subteam: null,
-                        isActive: false,
-                        isUnassigned: true,
-                    }))
-                );
-            } else {
-                const teamId = filterTeamId ? parseInt(filterTeamId, 10) : undefined;
-                const isActive = filterStatus === 'inactive' ? false : filterStatus === 'active' ? true : undefined;
-                const data = await teamMembersAPI.getAll(teamId, undefined, isActive);
-                let list = Array.isArray(data) ? data : [];
-                const needUnassigned = filterStatus === 'inactive' || (!filterTeamId && filterStatus === '');
-                const unassigned = needUnassigned ? await membersAPI.getAll(undefined, true) : [];
-                const unassignedMemberIds = new Set((Array.isArray(unassigned) ? unassigned : []).map((m) => m.id));
-                if (filterStatus === 'inactive') list = list.filter((a) => !unassignedMemberIds.has(a.memberId));
-                if (!filterTeamId && filterStatus === '') {
-                    const unassignedList = Array.isArray(unassigned) ? unassigned : [];
-                    const assignmentRows = list.filter((a) => !unassignedMemberIds.has(a.memberId));
-                    const unassignedRows = unassignedList.map((m) => ({
-                        id: `member-${m.id}`,
-                        memberId: m.id,
-                        member: m,
-                        team: null,
-                        role: null,
-                        subteam: null,
-                        isActive: false,
-                        isUnassigned: true,
-                    }));
-                    const combined = [...assignmentRows, ...unassignedRows];
-                    const byMember = new Map();
-                    combined.forEach((row) => {
-                        const mid = row.memberId;
-                        const existing = byMember.get(mid);
-                        const rank = (r) => (r.isUnassigned ? 1 : r.isActive ? 3 : 2);
-                        if (!existing || rank(row) > rank(existing)) byMember.set(mid, row);
-                    });
-                    list = Array.from(byMember.values());
-                }
-                setAssignments(list);
-            }
-            setShowEditModal(false);
-            setEditingMember(null);
-            setEditingMemberAssignment(null);
-        } catch (err) {
-            setError(err.message || 'Failed to refresh');
-        }
-    };
-
-    const handleAssignToTeam = (row) => {
-        setAssigningMember({
-            memberId: row.memberId,
-            id: row.memberId,
-            fullName: row.name,
-            name: row.name,
-        });
-        setShowAssignModal(true);
     };
 
     const handleAssignSubmit = async () => {
@@ -454,7 +389,7 @@ function MembersPage() {
                                                     >
                                                         <Eye />
                                                     </button>
-                                                    {canEditMemberRow(row) && (row.isUnassigned ? (
+                                                    {canEditMemberRow(row) && row.isUnassigned && (
                                                         <button
                                                             type="button"
                                                             className="table-action-btn edit-btn"
@@ -463,16 +398,17 @@ function MembersPage() {
                                                         >
                                                             <UserPlus />
                                                         </button>
-                                                    ) : (
+                                                    )}
+                                                    {canEditMemberRow(row) && !row.isUnassigned && (
                                                         <button
                                                             type="button"
                                                             className="table-action-btn edit-btn"
                                                             onClick={() => handleEditMember(row)}
-                                                            title="Edit Assignment"
+                                                            title="Edit member"
                                                         >
                                                             <Pencil />
                                                         </button>
-                                                    ))}
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -489,20 +425,6 @@ function MembersPage() {
                 onClose={() => { setShowViewModal(false); setViewingMemberId(null); }}
                 memberId={viewingMemberId}
             />
-            <EditMembersModal
-                isOpen={showEditModal}
-                onClose={() => {
-                    setShowEditModal(false);
-                    setEditingMember(null);
-                    setEditingMemberAssignment(null);
-                }}
-                onSubmit={handleEditMemberSubmit}
-                member={editingMember}
-                currentTeamAssignment={editingMemberAssignment}
-                teams={teams}
-                roles={allRoles}
-                subteams={allSubteams}
-            />
             <AssignToTeamModal
                 isOpen={showAssignModal}
                 onClose={() => { setShowAssignModal(false); setAssigningMember(null); }}
@@ -510,6 +432,16 @@ function MembersPage() {
                 member={assigningMember}
                 teams={teams}
                 roles={allRoles}
+            />
+            <EditMembersModal
+                isOpen={showEditModal}
+                onClose={() => { setShowEditModal(false); setEditingMember(null); setEditingMemberAssignment(null); }}
+                onSubmit={handleAssignSubmit}
+                member={editingMember}
+                currentTeamAssignment={editingMemberAssignment}
+                teams={teams}
+                roles={allRoles}
+                subteams={allSubteams}
             />
         </div>
     );
