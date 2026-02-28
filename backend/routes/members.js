@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const { prisma } = require('../db');
-const { uploadProfilePhoto, deleteProfilePhoto } = require('../services/githubStorage');
+const { uploadProfilePhoto, deleteProfilePhoto, invalidatePhotoCache } = require('../services/githubStorage');
 
 // Multer: memory storage, 5 MB limit
 const upload = multer({
@@ -387,6 +387,8 @@ router.post('/:id/profile-photo', upload.single('photo'), async (req, res) => {
 
         await prisma.member.update({ where: { id: memberId }, data: { profilePhotoUrl: photoUrl } });
 
+        invalidatePhotoCache(memberId);
+
         res.json({ profilePhotoUrl: photoUrl });
     } catch (error) {
         console.error('POST /:id/profile-photo', error);
@@ -409,6 +411,8 @@ router.delete('/:id/profile-photo', async (req, res) => {
 
         await deleteProfilePhoto(memberId);
         await prisma.member.update({ where: { id: memberId }, data: { profilePhotoUrl: null } });
+
+        invalidatePhotoCache(memberId);
 
         res.json({ success: true });
     } catch (error) {

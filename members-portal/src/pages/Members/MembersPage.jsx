@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Eye, Pencil, Users, ChevronDown, UserPlus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { teamMembersAPI, membersAPI, teamsAPI, teamRolesAPI, teamSubteamsAPI } from '../../services/api';
+import { teamMembersAPI, membersAPI, teamsAPI, teamRolesAPI, teamSubteamsAPI, getProfilePhotoUrl } from '../../services/api';
 import ViewMemberModal from '../Teams/modals/ViewMemberModal';
 import EditMembersModal from '../Teams/modals/EditMembersModal';
 import AssignToTeamModal from './modals/AssignToTeamModal';
@@ -190,7 +190,7 @@ function MembersPage() {
             teamName: tm.isUnassigned ? '—' : (tm.team?.name || 'N/A'),
             subteamName: tm.isUnassigned ? null : (tm.subteam?.name ?? null),
             status: tm.isUnassigned ? 'Unassigned' : (tm.isActive ? 'Active' : 'Inactive'),
-            avatar: tm.member?.profilePhotoUrl || null,
+            avatar: tm.member?.profilePhotoUrl ? getProfilePhotoUrl(tm.memberId) : null,
             joinedDate: tm.joinedDate,
             isActive: tm.isActive,
             leftDate: tm.leftDate ?? null,

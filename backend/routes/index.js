@@ -17,8 +17,28 @@ const tasksRoutes = require('./tasks');
 const phasesRoutes = require('./phases');
 const projectFilesRoutes = require('./projectFiles');
 
+const { downloadProfilePhoto } = require('../services/githubStorage');
+
 // Auth routes (public)
 router.use('/auth', authRoutes);
+
+// Public: profile photo proxy (no auth — <img> tags cannot send headers)
+router.get('/members/:id/profile-photo', async (req, res) => {
+    try {
+        const memberId = parseInt(req.params.id, 10);
+        if (Number.isNaN(memberId)) return res.status(400).send();
+
+        const result = await downloadProfilePhoto(memberId);
+        if (!result) return res.status(404).send();
+
+        res.set('Content-Type', result.contentType);
+        res.set('Cache-Control', 'public, max-age=300');
+        res.send(result.buffer);
+    } catch (error) {
+        console.error('GET /members/:id/profile-photo proxy error:', error);
+        res.status(500).send();
+    }
+});
 
 // Protected routes (require authentication)
 router.use('/teams', authenticateToken, teamsRoutes);

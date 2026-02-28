@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { getProfilePhotoUrl } from '../services/api';
 import './SideBarNavigationSlim.css';
 import iclubLogo from '../assets/iclub_colored_transparent_icon.png';
 
@@ -205,7 +206,11 @@ export const SidebarNavigationSlim = ({ items, footerItems, user, onLogout }) =>
             <div className="sidebar-user-section">
               <Link to="/user" className="sidebar-user-info sidebar-user-info-link" onClick={handleSubItemClick}>
                 <div className="sidebar-user-avatar">
-                  {(user.fullName || user.email).charAt(0).toUpperCase()}
+                  {user.profilePhotoUrl ? (
+                    <img src={getProfilePhotoUrl(user.id)} alt="" className="sidebar-user-avatar-img" />
+                  ) : (
+                    (user.fullName || user.email).charAt(0).toUpperCase()
+                  )}
                 </div>
                 <div className="sidebar-user-details">
                   <span className="sidebar-user-name">{user.fullName || user.email}</span>

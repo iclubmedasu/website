@@ -34,6 +34,19 @@ const handleResponse = async (response) => {
 // TEAMS API
 // ============================================
 
+/**
+ * Build a public proxy URL for a member's profile photo.
+ * Uses the backend proxy (no auth needed) so private-repo images load in <img> tags.
+ * Returns null when no memberId is provided.
+ *
+ * @param {number|string|null} memberId
+ * @returns {string|null}
+ */
+export function getProfilePhotoUrl(memberId) {
+    if (!memberId) return null;
+    return `${API_BASE_URL}/members/${memberId}/profile-photo`;
+}
+
 export const teamsAPI = {
     // Get all teams. scope='all' returns every team (for Members/Alumni); no scope returns only user's teams for non-admins.
     getAll: async (isActive, scope) => {

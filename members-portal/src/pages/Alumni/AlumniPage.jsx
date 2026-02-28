@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Eye, Users, ChevronDown } from 'lucide-react';
-import { alumniAPI, teamsAPI } from '../../services/api';
+import { alumniAPI, teamsAPI, getProfilePhotoUrl } from '../../services/api';
 import ViewMemberModal from '../Teams/modals/ViewMemberModal';
 
 
@@ -107,7 +107,7 @@ function AlumniPage() {
             subteamName: a.subteam?.name ?? null,
             leaveType: a.leaveType,
             leftDate: a.leftDate,
-            avatar: a.member?.profilePhotoUrl || null,
+            avatar: a.member?.profilePhotoUrl ? getProfilePhotoUrl(a.memberId) : null,
         }));
     }, [alumniList]);
 

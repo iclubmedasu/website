@@ -1,19 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
     Users, Shield, Pencil, Link as LinkIcon, Camera,
     Lock, Mail, Phone, Settings2, Bell, Trophy,
-    Eye, EyeOff,
+    Eye, EyeOff, Calendar, Briefcase, MapPin, MessageCircle, RefreshCw,
 } from 'lucide-react';
-import { membersAPI, authAPI } from '../../services/api';
+import { membersAPI, authAPI, roleHistoryAPI, getProfilePhotoUrl } from '../../services/api';
 import { PhoneInput } from '../../components/PhoneInput/PhoneInput';
 import UploadPhotoModal from '../../components/UploadPhotoModal/UploadPhotoModal';
+import '../../components/modal/modal.css';
 
 import './UserPage.css';
 
 // ── Tab definitions ──────────────────────────────────────
 const TABS = [
     { key: 'personal', label: 'Personal Details' },
+    { key: 'history', label: 'History' },
     { key: 'security', label: 'Sign-in & Security' },
     // { key: 'settings', label: 'Profile Settings' },
     { key: 'notifications', label: 'Notifications' },
@@ -41,6 +43,13 @@ function UserPage() {
 
     // ── Photo modal state ──
     const [photoModalOpen, setPhotoModalOpen] = useState(false);
+    const [photoVersion, setPhotoVersion] = useState(0);
+
+    // ── History tab state ──
+    const [roleHistory, setRoleHistory] = useState([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyError, setHistoryError] = useState('');
+    const [historyFetched, setHistoryFetched] = useState(false);
 
     // ── Change password state ──
     const [pwdForm, setPwdForm] = useState({ current: '', newPwd: '', confirm: '' });
@@ -124,7 +133,50 @@ function UserPage() {
     // ── Photo upload success handler ──
     const handlePhotoSuccess = async () => {
         await refreshUser();
+        setPhotoVersion((v) => v + 1);
         setPhotoModalOpen(false);
+    };
+
+    // ── History tab helpers ──
+    const fetchHistory = async () => {
+        if (!user?.id) return;
+        setHistoryLoading(true);
+        setHistoryError('');
+        try {
+            const data = await roleHistoryAPI.getMemberTimeline(user.id);
+            setRoleHistory(data);
+            setHistoryFetched(true);
+        } catch (err) {
+            setHistoryError('Failed to load history.');
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'history' && !historyFetched && user?.id) {
+            fetchHistory();
+        }
+    }, [activeTab, historyFetched, user?.id]);
+
+    const getChangeTypeColor = (changeType) => {
+        const colors = {
+            'New': 'change-type-new',
+            'Promotion': 'change-type-promotion',
+            'Demotion': 'change-type-demotion',
+            'Transfer': 'change-type-transfer',
+            'Resignation': 'change-type-resignation',
+            'Expelled': 'change-type-expelled',
+            'Graduated': 'change-type-graduated'
+        };
+        return colors[changeType] || 'change-type-default';
+    };
+
+    const getDurationText = (duration) => {
+        if (duration === 'Ongoing') return 'Ongoing';
+        if (duration === 0) return 'Less than a day';
+        if (duration === 1) return '1 day';
+        return `${duration} days`;
     };
 
     // ── Format date ──
@@ -143,7 +195,7 @@ function UserPage() {
                         <div className="user-page-avatar-wrap">
                             <div className="user-page-avatar">
                                 {user.profilePhotoUrl ? (
-                                    <img src={user.profilePhotoUrl} alt="" />
+                                    <img src={`${getProfilePhotoUrl(user.id)}?v=${photoVersion}`} alt="" />
                                 ) : (
                                     (user.fullName || user.email || 'U').charAt(0).toUpperCase()
                                 )}
@@ -338,6 +390,105 @@ function UserPage() {
                         </>
                     )}
 
+                    {/* ═══ HISTORY ═══ */}
+                    {activeTab === 'history' && (
+                        <div className="user-page-section-card">
+                            <h3 className="user-history-section-title">
+                                <Calendar size={18} aria-hidden />
+                                Role History
+                            </h3>
+
+                            {historyLoading ? (
+                                <div className="loading-state">
+                                    <div className="spinner" />
+                                    <p>Loading history…</p>
+                                </div>
+                            ) : historyError ? (
+                                <div className="user-history-error">
+                                    <p className="error-message">{historyError}</p>
+                                    <button type="button" className="btn btn-secondary" onClick={fetchHistory}>
+                                        <RefreshCw size={14} aria-hidden />
+                                        Retry
+                                    </button>
+                                </div>
+                            ) : roleHistory.length === 0 ? (
+                                <div className="user-tab-empty-state">
+                                    <Briefcase size={40} strokeWidth={1.5} />
+                                    <h3 className="user-tab-empty-title">No Role History Yet</h3>
+                                    <p className="user-tab-empty-sub">Your role changes and team assignments will appear here over time.</p>
+                                </div>
+                            ) : (
+                                <div className="vertical-timeline">
+                                    {roleHistory.map((entry, index) => (
+                                        <div key={entry.id} className="timeline-item">
+                                            <div className="timeline-marker">
+                                                <div className={`timeline-dot ${getChangeTypeColor(entry.changeType)}`} />
+                                                {index < roleHistory.length - 1 && (
+                                                    <div className="timeline-line" />
+                                                )}
+                                            </div>
+
+                                            <div className="timeline-content">
+                                                <div className="timeline-header">
+                                                    <span className={`change-type-badge ${getChangeTypeColor(entry.changeType)}`}>
+                                                        {entry.changeType}
+                                                    </span>
+                                                    <span className="timeline-date">
+                                                        {formatDate(entry.period?.start)}
+                                                    </span>
+                                                </div>
+
+                                                <div className="role-info">
+                                                    <div className="role-item">
+                                                        <Briefcase size={14} />
+                                                        <span className="role-item-label">Role:</span>
+                                                        <span className="role-name">{entry.roleName}</span>
+                                                    </div>
+                                                    <div className="role-item">
+                                                        <MapPin size={14} />
+                                                        <span className="role-item-label">Team:</span>
+                                                        <span className="team-name">{entry.teamName}</span>
+                                                    </div>
+                                                    {entry.subteamName && (
+                                                        <div className="role-item">
+                                                            <Briefcase size={14} />
+                                                            <span className="role-item-label">Subteam:</span>
+                                                            <span className="subteam-name">{entry.subteamName}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="duration-info">
+                                                    <Calendar size={14} />
+                                                    <span className="duration-text">
+                                                        {entry.period?.end
+                                                            ? `${formatDate(entry.period.start)} – ${formatDate(entry.period.end)} (${getDurationText(entry.period.duration)})`
+                                                            : `${formatDate(entry.period?.start)} – Ongoing`
+                                                        }
+                                                    </span>
+                                                </div>
+
+                                                {entry.changeReason && (
+                                                    <div className="reason-info">
+                                                        <MessageCircle size={14} />
+                                                        <span className="reason-text">{entry.changeReason}</span>
+                                                    </div>
+                                                )}
+
+                                                {entry.notes && (
+                                                    <div className="notes-info">
+                                                        <p className="notes-label">Notes:</p>
+                                                        <p className="notes-text">{entry.notes}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* ═══ SIGN-IN & SECURITY ═══ */}
                     {activeTab === 'security' && (
                         <>
@@ -516,7 +667,7 @@ function UserPage() {
                 isOpen={photoModalOpen}
                 onClose={() => setPhotoModalOpen(false)}
                 memberId={user.id}
-                currentPhotoUrl={user.profilePhotoUrl}
+                currentPhotoUrl={user.profilePhotoUrl ? `${getProfilePhotoUrl(user.id)}?v=${photoVersion}` : null}
                 onSuccess={handlePhotoSuccess}
             />
         </div>

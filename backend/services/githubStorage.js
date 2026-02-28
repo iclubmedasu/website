@@ -131,4 +131,56 @@ async function deleteProfilePhoto(memberId) {
     }
 }
 
-module.exports = { uploadProfilePhoto, deleteProfilePhoto };
+// ── In-memory cache for profile photo proxy ──
+const _photoCache = new Map();
+const PHOTO_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Download a member's profile photo via the GitHub API (works for private repos).
+ * Returns { buffer, contentType } or null if no photo exists.
+ *
+ * @param {number} memberId
+ * @returns {Promise<{ buffer: Buffer, contentType: string } | null>}
+ */
+async function downloadProfilePhoto(memberId) {
+    // Check in-memory cache first
+    const cached = _photoCache.get(memberId);
+    if (cached && Date.now() - cached.ts < PHOTO_CACHE_TTL) {
+        return { buffer: cached.buffer, contentType: cached.contentType };
+    }
+
+    const existing = await findExistingPhoto(memberId);
+    if (!existing) return null;
+
+    const res = await fetch(`${API_BASE}/${existing.path}`, {
+        headers: {
+            Authorization: `Bearer ${GITHUB_TOKEN}`,
+            Accept: 'application/vnd.github.raw+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+        },
+    });
+
+    if (!res.ok) return null;
+
+    const arrayBuf = await res.arrayBuffer();
+    const buffer = Buffer.from(arrayBuf);
+    const contentType =
+        existing.ext === '.jpg' ? 'image/jpeg'
+            : existing.ext === '.png' ? 'image/png'
+                : 'image/webp';
+
+    // Store in cache
+    _photoCache.set(memberId, { buffer, contentType, ts: Date.now() });
+
+    return { buffer, contentType };
+}
+
+/**
+ * Invalidate the in-memory photo cache for a member (call after upload/delete).
+ * @param {number} memberId
+ */
+function invalidatePhotoCache(memberId) {
+    _photoCache.delete(memberId);
+}
+
+module.exports = { uploadProfilePhoto, deleteProfilePhoto, downloadProfilePhoto, invalidatePhotoCache };

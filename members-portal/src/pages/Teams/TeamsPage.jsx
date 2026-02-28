@@ -16,7 +16,7 @@ import AddMembersModal from './modals/AddMembersModal';
 import EditMembersModal from './modals/EditMembersModal';
 import ViewMemberModal from './modals/ViewMemberModal';
 import { useAuth } from '../../context/AuthContext';
-import { teamsAPI, teamRolesAPI, teamSubteamsAPI, teamMembersAPI } from '../../services/api';
+import { teamsAPI, teamRolesAPI, teamSubteamsAPI, teamMembersAPI, getProfilePhotoUrl } from '../../services/api';
 
 
 // Simple SVG Chevron Icon
@@ -734,7 +734,7 @@ function TeamsPage() {
                     email: tm.member?.email || 'N/A',
                     role: tm.role?.roleName || 'N/A',
                     status: tm.isActive ? 'Active' : 'Inactive',
-                    avatar: tm.member?.profilePhotoUrl || null,
+                    avatar: tm.member?.profilePhotoUrl ? getProfilePhotoUrl(tm.memberId) : null,
                     teamMemberId: tm.id,
                     memberId: tm.memberId,
                     roleId: tm.roleId,

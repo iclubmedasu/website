@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Calendar, Briefcase, MapPin, MessageCircle } from 'lucide-react';
-import { roleHistoryAPI, membersAPI } from '../../../services/api';
+import { roleHistoryAPI, membersAPI, getProfilePhotoUrl } from '../../../services/api';
 
 const ViewMemberModal = ({ isOpen, onClose, memberId }) => {
     const [member, setMember] = useState(null);
@@ -93,7 +93,7 @@ const ViewMemberModal = ({ isOpen, onClose, memberId }) => {
                             <div className="member-info-card">
                                 <div className="member-avatar">
                                     {member.profilePhotoUrl ? (
-                                        <img src={member.profilePhotoUrl} alt={member.fullName} />
+                                        <img src={getProfilePhotoUrl(member.id)} alt={member.fullName} />
                                     ) : (
                                         <div className="avatar-placeholder">
                                             {member.fullName.charAt(0).toUpperCase()}

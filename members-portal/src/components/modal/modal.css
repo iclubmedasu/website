@@ -1052,11 +1052,13 @@
 }
 
 .timeline-dot {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
-    background: var(--gray-50);
-    border: 2px solid var(--purple-700);
+    background: var(--purple-700);
+    border: 2px solid rgba(139, 92, 246, 0.4);
+    outline: 3px solid white;
+    outline-offset: 1px;
     position: relative;
     z-index: 2;
     flex-shrink: 0;
@@ -1073,50 +1075,58 @@
 /* Change type dot color variations — dot uses badge TEXT color for a bold fill */
 .timeline-dot.change-type-new {
     background-color: #1e40af;
-    border: 2px solid white;
-    box-shadow: 0 0 0 1px #1e40af;
+    border: 2px solid rgba(30, 64, 175, 0.35);
+    outline: 3px solid white;
+    box-shadow: none;
 }
 
 .timeline-dot.change-type-promotion {
     background-color: #065f46;
-    border: 2px solid white;
-    box-shadow: 0 0 0 1px #065f46;
+    border: 2px solid rgba(6, 95, 70, 0.35);
+    outline: 3px solid white;
+    box-shadow: none;
 }
 
 .timeline-dot.change-type-demotion {
     background-color: #92400e;
-    border: 2px solid white;
-    box-shadow: 0 0 0 1px #92400e;
+    border: 2px solid rgba(146, 64, 14, 0.35);
+    outline: 3px solid white;
+    box-shadow: none;
 }
 
 .timeline-dot.change-type-transfer {
     background-color: #5b21b6;
-    border: 2px solid white;
-    box-shadow: 0 0 0 1px #5b21b6;
+    border: 2px solid rgba(91, 33, 182, 0.35);
+    outline: 3px solid white;
+    box-shadow: none;
 }
 
 .timeline-dot.change-type-resignation {
     background-color: #7f1d1d;
-    border: 2px solid white;
-    box-shadow: 0 0 0 1px #7f1d1d;
+    border: 2px solid rgba(127, 29, 29, 0.35);
+    outline: 3px solid white;
+    box-shadow: none;
 }
 
 .timeline-dot.change-type-expelled {
     background-color: #7f1d1d;
-    border: 2px solid white;
-    box-shadow: 0 0 0 1px #7f1d1d;
+    border: 2px solid rgba(127, 29, 29, 0.35);
+    outline: 3px solid white;
+    box-shadow: none;
 }
 
 .timeline-dot.change-type-graduated {
     background-color: #164e63;
-    border: 2px solid white;
-    box-shadow: 0 0 0 1px #164e63;
+    border: 2px solid rgba(22, 78, 99, 0.35);
+    outline: 3px solid white;
+    box-shadow: none;
 }
 
 .timeline-dot.change-type-default {
     background-color: #374151;
-    border: 2px solid white;
-    box-shadow: 0 0 0 1px #374151;
+    border: 2px solid rgba(55, 65, 81, 0.35);
+    outline: 3px solid white;
+    box-shadow: none;
 }
 
 /* Timeline content cards */

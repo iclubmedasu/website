@@ -6,7 +6,7 @@ const SMALL_WORDS = new Set([
     'a', 'an', 'the',
     'and', 'but', 'or', 'nor', 'for', 'yet', 'so',
     'at', 'by', 'in', 'of', 'on', 'to', 'up', 'as',
-    'is', 'it',
+    'is',
 ]);
 
 /**

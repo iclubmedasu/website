@@ -13,7 +13,7 @@ import {
     Paperclip,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { projectsAPI, tasksAPI, teamsAPI, membersAPI, phasesAPI, projectTypesAPI, projectFilesAPI } from '../../services/api';
+import { projectsAPI, tasksAPI, teamsAPI, membersAPI, phasesAPI, projectTypesAPI, projectFilesAPI, getProfilePhotoUrl } from '../../services/api';
 import FileUploadZone from '../../components/FileUpload/FileUploadZone';
 import './ProjectsPage.css';
 
@@ -270,7 +270,14 @@ function TaskItem({ task, canEdit, onStatusChange, onAddSubtask }) {
             {task.assignments?.length > 0 && (
                 <div className="task-item-assignees">
                     {task.assignments.map((a) => (
-                        <span key={a.id} className="assignee-chip">{a.member?.fullName ?? '—'}</span>
+                        <span key={a.id} className="assignee-chip">
+                            {a.member?.profilePhotoUrl ? (
+                                <img src={getProfilePhotoUrl(a.member.id)} alt="" className="assignee-chip-avatar" />
+                            ) : (
+                                <span className="assignee-chip-initial">{(a.member?.fullName ?? '?').charAt(0).toUpperCase()}</span>
+                            )}
+                            {a.member?.fullName ?? '—'}
+                        </span>
                     ))}
                 </div>
             )}

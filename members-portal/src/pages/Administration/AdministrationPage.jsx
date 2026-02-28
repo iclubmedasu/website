@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Eye, Pencil, Shield, UserCog, UserPlus, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { administrationAPI, membersAPI, teamsAPI, teamMembersAPI, teamRolesAPI, teamSubteamsAPI } from '../../services/api';
+import { administrationAPI, membersAPI, teamsAPI, teamMembersAPI, teamRolesAPI, teamSubteamsAPI, getProfilePhotoUrl } from '../../services/api';
 import ViewMemberModal from '../Teams/modals/ViewMemberModal';
 import EditAdminMembersModal from './modals/EditAdminMembersModal';
 import AddOfficerModal from './modals/AddOfficerModal';
@@ -311,7 +311,7 @@ function RoleSection({ roleName, roleLabel, assignee, isOfficer, canEdit, onAssi
                         <div className="table-member-cell">
                             <div className="member-avatar-sm">
                                 {assignee.member?.profilePhotoUrl ? (
-                                    <img src={assignee.member.profilePhotoUrl} alt={assignee.member.fullName} />
+                                    <img src={getProfilePhotoUrl(assignee.member?.id)} alt={assignee.member.fullName} />
                                 ) : (
                                     <div className="avatar-placeholder-sm">
                                         {(assignee.member?.fullName || 'U').split(' ').map((n) => n[0]).join('')}

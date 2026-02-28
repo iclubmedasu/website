@@ -6,7 +6,7 @@ import {
     Pencil,
     Trash2,
 } from 'lucide-react';
-import { tasksAPI, phasesAPI } from '../../../services/api';
+import { tasksAPI, phasesAPI, getProfilePhotoUrl } from '../../../services/api';
 import ConfirmModal from '../modals/ConfirmModal';
 import './PhaseRow.css';
 
@@ -101,7 +101,11 @@ function AvatarStack({ assignments }) {
                     className="phase-row-avatar"
                     title={a.member?.fullName}
                 >
-                    {(a.member?.fullName ?? '?').charAt(0).toUpperCase()}
+                    {a.member?.profilePhotoUrl ? (
+                        <img src={getProfilePhotoUrl(a.member.id)} alt="" className="phase-row-avatar-img" />
+                    ) : (
+                        (a.member?.fullName ?? '?').charAt(0).toUpperCase()
+                    )}
                 </span>
             ))}
             {extra > 0 && <span className="phase-row-avatar phase-row-avatar--extra">+{extra}</span>}

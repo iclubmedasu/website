@@ -229,8 +229,6 @@
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    scrollbar-width: none;
-    /* Firefox */
     -ms-overflow-style: none;
     /* IE / Edge */
 }
@@ -669,6 +667,31 @@
     border-radius: 99px;
     font-family: var(--font-heading);
     font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.assignee-chip-avatar {
+    width: 1.15rem;
+    height: 1.15rem;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.assignee-chip-initial {
+    width: 1.15rem;
+    height: 1.15rem;
+    border-radius: 50%;
+    background: var(--purple-600);
+    color: white;
+    font-size: 0.6rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
 
 /* ── subtasks indent ── */
