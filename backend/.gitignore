@@ -1,18 +1,28 @@
+# Environment
 .env
 .env.local
 .env.*.local
 
+# Dependencies
 node_modules/
-/.react-router/
+
+# Build outputs
 /build/
+build/
 
+# Custom ignores
+config/google-service-account.json
+google-service-account.json
+*.json.key
+/.react-router/
+.react-router/
+
+# Logs & Security
 *.log
+*.pem
 
+# OS & IDE
 .DS_Store
-
-# IDE
 .vscode/
 .idea/
-
-# OS
 Thumbs.db

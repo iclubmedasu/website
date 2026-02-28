@@ -6,7 +6,12 @@ const ADMINISTRATION_TEAM_NAME = 'Administration';
 
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    let token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+    // Fallback: accept token from query string (for browser-opened download links)
+    if (!token && req.query.token) {
+        token = req.query.token;
+    }
 
     if (!token) {
         return res.status(401).json({ error: 'Access token required' });

@@ -60,22 +60,41 @@
     box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12), var(--shadow-md);
 }
 
-/* Expanded state - occupies 2 columns x 3 rows (6 card spaces) */
+/* Expanded state - fullscreen card overlay */
 .project-card--expanded {
-    grid-column: span 2;
-    grid-row: span 3;
-    z-index: 10;
-    /*  box-shadow: 0 20px 60px rgba(124, 58, 237, 0.25),
-        0 10px 30px rgba(0, 0, 0, 0.15); */
-    /* border-color: var(--purple-600); */
-    transform: scale(1.01);
+    position: fixed;
+    top: 1.5rem;
+    left: 1.5rem;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    z-index: 100;
+    border-radius: var(--radius-lg);
+    border: 2px solid var(--gray-200);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    transform: none;
     cursor: default;
-    max-height: none;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 2.5rem 3.5rem;
+    animation: expandIn 0.25s ease;
+}
+
+@keyframes expandIn {
+    from {
+        opacity: 0;
+        transform: scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 @media (max-width: 900px) {
     .project-card--expanded {
-        grid-column: span 1;
+        padding: 1.25rem;
     }
 }
 
@@ -107,6 +126,10 @@
     height: auto;
     overflow: visible;
     pointer-events: auto;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 .project-card-header {
@@ -202,29 +225,22 @@
     flex-direction: column;
     gap: 0;
     padding-top: 1rem;
-    max-height: 900px;
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE / Edge */
 }
 
-/* Custom scrollbar for expanded content */
 .expanded-content-wrapper::-webkit-scrollbar {
-    width: 6px;
+    display: none;
+    /* Chrome / Safari */
 }
 
-.expanded-content-wrapper::-webkit-scrollbar-track {
-    background: var(--gray-100);
-    border-radius: 10px;
-}
 
-.expanded-content-wrapper::-webkit-scrollbar-thumb {
-    background: var(--purple-400);
-    border-radius: 10px;
-}
-
-.expanded-content-wrapper::-webkit-scrollbar-thumb:hover {
-    background: var(--purple-600);
-}
 
 .expanded-section {
     display: flex;
@@ -278,23 +294,7 @@
     padding-right: 0.25rem;
 }
 
-/* Custom scrollbar for tasks list */
-.expanded-tasks-list::-webkit-scrollbar {
-    width: 5px;
-}
 
-.expanded-tasks-list::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.expanded-tasks-list::-webkit-scrollbar-thumb {
-    background: var(--gray-300);
-    border-radius: 10px;
-}
-
-.expanded-tasks-list::-webkit-scrollbar-thumb:hover {
-    background: var(--gray-400);
-}
 
 .expanded-task-item {
     display: flex;
@@ -321,21 +321,22 @@
 }
 
 .expanded-close-btn {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
+    position: fixed;
+    top: 1.25rem;
+    right: 1.5rem;
     background: var(--bg-card);
     border: 2px solid var(--gray-300);
     border-radius: 50%;
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     color: var(--gray-500);
     transition: all 0.2s ease;
-    z-index: 20;
+    z-index: 110;
+    box-shadow: var(--shadow-sm);
 }
 
 .expanded-close-btn:hover {
@@ -345,12 +346,18 @@
     transform: rotate(90deg);
 }
 
-.expanded-actions {
+/* Title row with inline actions */
+.expanded-title-row {
     display: flex;
-    gap: 0.75rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--gray-100);
-    margin: 0.75rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.expanded-title-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
 }
 
 /* ── Expanded card task rows ── */
@@ -899,4 +906,111 @@
     text-align: center;
     padding: 1rem 0;
     font-style: italic;
+}
+
+/* ── Expanded card: Phase grouping ── */
+.exp-phase-group {
+    margin-bottom: 0.75rem;
+}
+
+.exp-phase-group:last-child {
+    margin-bottom: 0;
+}
+
+.exp-phase-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.4rem 0.5rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-sm);
+    margin-bottom: 0.35rem;
+}
+
+.exp-phase-title {
+    font-family: var(--font-heading);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--gray-800);
+}
+
+.exp-phase-task-count {
+    font-family: var(--font-heading);
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--gray-400);
+}
+
+/* ── Phase list in detail panel ── */
+.phase-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* ── Add Phase row (bottom of phase list) ── */
+.phase-add-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.75rem 1rem;
+    border: 1px dashed var(--gray-300);
+    border-radius: var(--radius-lg);
+    font-family: var(--font-heading);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--purple-600);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: transparent;
+}
+
+.phase-add-row:hover {
+    border-color: var(--purple-500);
+    background: var(--gray-50);
+    color: var(--purple-800);
+}
+
+/* ── Add Project Card ── */
+.project-add-card {
+    border: 2px dashed var(--gray-300);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 2rem 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 10rem;
+}
+
+.project-add-card:hover {
+    border-color: var(--purple-400);
+    background: rgba(139, 92, 246, 0.04);
+}
+
+.project-add-card-icon {
+    width: 2rem;
+    height: 2rem;
+    color: var(--gray-300);
+    transition: color 0.2s ease;
+}
+
+.project-add-card:hover .project-add-card-icon {
+    color: var(--purple-500);
+}
+
+.project-add-card-text {
+    font-family: var(--font-heading);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    transition: color 0.2s ease;
+}
+
+.project-add-card:hover .project-add-card-text {
+    color: var(--purple-700);
 }

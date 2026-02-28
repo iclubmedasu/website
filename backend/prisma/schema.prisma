@@ -35,6 +35,7 @@ model Member {
   taskAssignments     TaskAssignment[]        // Tasks assigned to this member
   taskComments        TaskComment[]           // Comments on tasks
   taskActivityLog     TaskActivityLog[]       // Activity log entries
+  uploadedFiles       ProjectFile[]           // Files uploaded by this member
 }
 
 // ============================================
@@ -237,6 +238,8 @@ model Project {
   projectTeams    ProjectTeam[]    // Teams assigned to this project
   tasks           Task[]           // Tasks under this project
   tags            ProjectTag[]     // Tags for categorization
+  phases          ProjectPhase[]   // Phases within this project
+  files           ProjectFile[]    // Files attached to this project
   projectType     ProjectType      @relation(fields: [projectTypeId], references: [id], onDelete: Restrict)
   
   @@index([createdByMemberId])
@@ -308,12 +311,34 @@ model ProjectType {
 }
 
 // ============================================
+// PROJECT PHASES - Phases within a project
+// ============================================
+model ProjectPhase {
+  id          Int       @id @default(autoincrement())
+  projectId   Int
+  title       String
+  description String?
+  order       Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+
+  @@index([projectId])
+  @@index([order])
+}
+
+// ============================================
 // TASKS - Tasks within a project
 // ============================================
 model Task {
   id              Int       @id @default(autoincrement())
   projectId       Int
   parentTaskId    Int?      // For subtasks - null if top-level task
+  phaseId         Int?      // Optional: which phase this task belongs to
   type            String
   title           String
   description     String?
@@ -333,6 +358,7 @@ model Task {
   project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   parentTask      Task?              @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
   subtasks        Task[]             @relation("TaskSubtasks")
+  phase           ProjectPhase?      @relation(fields: [phaseId], references: [id], onDelete: Cascade)
   taskTeams       TaskTeam[]         // Teams assigned to this task
   assignments     TaskAssignment[]   // Individual members assigned
   comments        TaskComment[]      // Comments/discussion
@@ -477,4 +503,28 @@ model TaskActivityLog {
   @@index([memberId])
   @@index([taskId, createdAt])
   @@index([actionType])
+}
+
+// ============================================
+// PROJECT FILES - Files attached to projects
+// ============================================
+model ProjectFile {
+  id                  Int       @id @default(autoincrement())
+  projectId           Int
+  uploadedByMemberId  Int
+  fileName            String    // Original file name shown to users
+  githubPath          String    // File path in GitHub storage repo, e.g. "projects/42/uuid-originalname.pdf"
+  githubSha           String    // Blob SHA returned by GitHub (required to delete)
+  fileSize            Int       // Size in bytes
+  mimeType            String    // e.g. "application/pdf", "image/jpeg"
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Relations
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy  Member    @relation(fields: [uploadedByMemberId], references: [id])
+
+  @@index([projectId])
+  @@index([uploadedByMemberId])
 }

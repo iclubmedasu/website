@@ -41,6 +41,10 @@
     max-height: 85vh;
 }
 
+.modal-sm {
+    max-width: 400px;
+}
+
 @keyframes fadeIn {
     from {
         opacity: 0;

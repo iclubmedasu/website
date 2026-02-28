@@ -554,9 +554,9 @@ export const tasksAPI = {
         return handleResponse(response);
     },
 
-    deactivate: async (id) => {
-        const response = await fetch(`${API_BASE_URL}/tasks/${id}/deactivate`, {
-            method: 'PATCH',
+    remove: async (id) => {
+        const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
+            method: 'DELETE',
             headers: getAuthHeaders(),
         });
         return handleResponse(response);
@@ -720,5 +720,123 @@ export const roleHistoryAPI = {
             headers: getAuthHeaders(),
         });
         return handleResponse(response);
+    },
+};
+
+// ============================================
+// PHASES API
+// ============================================
+
+export const phasesAPI = {
+    getAll: async (projectId) => {
+        const response = await fetch(`${API_BASE_URL}/phases?projectId=${projectId}`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    create: async (data) => {
+        const response = await fetch(`${API_BASE_URL}/phases`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+        return handleResponse(response);
+    },
+
+    update: async (id, data) => {
+        const response = await fetch(`${API_BASE_URL}/phases/${id}`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+        return handleResponse(response);
+    },
+
+    remove: async (id) => {
+        const response = await fetch(`${API_BASE_URL}/phases/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+};
+
+// ============================================
+// PROJECT FILES API
+// ============================================
+
+export const projectFilesAPI = {
+    getAll: async (projectId) => {
+        const response = await fetch(`${API_BASE_URL}/project-files?projectId=${projectId}`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    /** Build a download URL that works for browser-opened links (token in query). */
+    getDownloadUrl: (fileId) => {
+        const token = localStorage.getItem('token');
+        return `${API_BASE_URL}/project-files/${fileId}/download?token=${token}`;
+    },
+
+    upload: (projectId, uploadedByMemberId, file, onProgress) => {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('projectId', projectId);
+            formData.append('uploadedByMemberId', uploadedByMemberId);
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable && onProgress) {
+                    onProgress(Math.round((e.loaded / e.total) * 100));
+                }
+            };
+
+            xhr.onload = () => {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve(data);
+                    } else {
+                        reject(new Error(data.error || `Upload failed (${xhr.status})`));
+                    }
+                } catch {
+                    reject(new Error('Failed to parse upload response'));
+                }
+            };
+
+            xhr.onerror = () => reject(new Error('Network error during upload'));
+
+            xhr.open('POST', `${API_BASE_URL}/project-files/upload`);
+            const token = localStorage.getItem('token');
+            if (token) {
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            }
+            xhr.send(formData);
+        });
+    },
+
+    remove: async (fileId) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/${fileId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    /** Fetch the commit history for a file (newest first). */
+    getHistory: async (fileId) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/${fileId}/history`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    /** Build a URL to download a specific version of a file. */
+    getVersionDownloadUrl: (fileId, commitSha) => {
+        const token = localStorage.getItem('token');
+        return `${API_BASE_URL}/project-files/${fileId}/version/${commitSha}?token=${token}`;
     },
 };

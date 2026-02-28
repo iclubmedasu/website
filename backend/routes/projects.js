@@ -92,7 +92,12 @@ router.get('/', async (req, res) => {
                 },
                 projectType: { select: { id: true, name: true, category: true } },
                 tags: true,
-                _count: { select: { tasks: { where: { isActive: true, parentTaskId: null } } } },
+                _count: {
+                    select: {
+                        tasks: { where: { isActive: true, parentTaskId: null } },
+                        phases: { where: { isActive: true } },
+                    },
+                },
             },
             orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
         });
@@ -151,6 +156,35 @@ router.get('/:id', async (req, res) => {
                 },
                 projectType: { select: { id: true, name: true, category: true } },
                 tags: true,
+                phases: {
+                    where: { isActive: true },
+                    orderBy: { order: 'asc' },
+                    include: {
+                        tasks: {
+                            where: { isActive: true, parentTaskId: null },
+                            include: {
+                                subtasks: {
+                                    where: { isActive: true },
+                                    include: {
+                                        assignments: {
+                                            include: {
+                                                member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+                                            },
+                                        },
+                                        tags: true,
+                                    },
+                                },
+                                assignments: {
+                                    include: {
+                                        member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+                                    },
+                                },
+                                tags: true,
+                            },
+                            orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+                        },
+                    },
+                },
                 tasks: {
                     where: { isActive: true, parentTaskId: null },
                     include: {
@@ -243,6 +277,19 @@ router.post('/', async (req, res) => {
                 tags: true,
             },
         });
+
+        // Auto-create default Phase 1
+        try {
+            await prisma.projectPhase.create({
+                data: {
+                    projectId: project.id,
+                    title: 'Phase 1',
+                    order: 1,
+                },
+            });
+        } catch (phaseErr) {
+            console.error('Failed to create default phase for project', project.id, phaseErr);
+        }
 
         res.status(201).json(project);
     } catch (error) {

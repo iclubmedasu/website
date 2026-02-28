@@ -1,0 +1,562 @@
+/* ============================================
+   PHASE ROW — Collapsible phase with Notion-like task table
+   Page-specific styles for ProjectsPage phases UI.
+   ============================================ */
+
+/* ── Phase row container ── */
+.phase-row {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    overflow: hidden;
+    transition: border-color 0.2s ease;
+}
+
+.phase-row:hover {
+    border-color: var(--gray-300);
+}
+
+.phase-row+.phase-row {
+    margin-top: 0.75rem;
+}
+
+/* ── Phase header ── */
+.phase-row-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+    transition: background 0.2s ease;
+    gap: 1rem;
+}
+
+.phase-row-header:hover {
+    background: var(--gray-100);
+}
+
+.phase-row-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Progress is centered — no longer inside header-right */
+.phase-row-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+/* Phase header action buttons (edit / delete) */
+.phase-row-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.phase-row:hover .phase-row-header-actions,
+.phase-row-header:hover .phase-row-header-actions {
+    opacity: 1;
+}
+
+.phase-row-header-btn {
+    width: 1.6rem;
+    height: 1.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--gray-400);
+}
+
+.phase-row-header-btn--edit:hover {
+    background: rgba(37, 99, 235, 0.1);
+    color: #2563eb;
+}
+
+.phase-row-header-btn--danger:hover {
+    background: var(--error-bg);
+    color: var(--error-text);
+}
+
+.phase-row-chevron {
+    display: flex;
+    align-items: center;
+    color: var(--gray-400);
+    flex-shrink: 0;
+    transition: color 0.2s ease;
+}
+
+.phase-row-header:hover .phase-row-chevron {
+    color: var(--purple-700);
+}
+
+.phase-row-title {
+    font-family: var(--font-heading);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.phase-row-task-count {
+    font-family: var(--font-heading);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    background: var(--gray-100);
+    padding: 0.15rem 0.5rem;
+    border-radius: 99px;
+    white-space: nowrap;
+}
+
+/* ── Progress bar (phase header) ── */
+/* (now standalone in header flow, not inside header-right) */
+.phase-row-progress-bar {
+    width: 5rem;
+    height: 0.375rem;
+    background: var(--gray-100);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.phase-row-progress-fill {
+    height: 100%;
+    background: var(--gradient-primary);
+    border-radius: 99px;
+    transition: width 0.3s ease;
+}
+
+.phase-row-progress-text {
+    font-family: var(--font-heading);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    min-width: 2rem;
+    text-align: right;
+}
+
+/* ── Add Task row (last row in table) ── */
+.phase-row-add-task-tr {
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.phase-row-add-task-tr:hover {
+    background: var(--gray-50);
+}
+
+.phase-row-add-task-td {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.55rem 0.75rem;
+    font-family: var(--font-heading);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--purple-600);
+    border-top: 1px dashed var(--gray-200);
+}
+
+.phase-row-add-task-tr:hover .phase-row-add-task-td {
+    color: var(--purple-800);
+}
+
+/* ── Table wrapper ── */
+.phase-row-table-wrapper {
+    overflow-x: auto;
+}
+
+/* ── Tasks table ── */
+.phase-row-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+}
+
+.phase-row-th {
+    font-family: var(--font-heading);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-500);
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--gray-50);
+    white-space: nowrap;
+}
+
+/* ── Table cells ── */
+.phase-row-td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--gray-100);
+    vertical-align: middle;
+    color: var(--gray-700);
+}
+
+.phase-row-td--title {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 12rem;
+}
+
+.phase-row-task-expand {
+    display: flex;
+    align-items: center;
+    color: var(--gray-400);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.phase-row-task-title-text {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    color: var(--gray-800);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.phase-row-td--date {
+    font-size: 0.8rem;
+    color: var(--gray-500);
+    white-space: nowrap;
+}
+
+.phase-row-td--actions {
+    width: 4.5rem;
+    text-align: right;
+}
+
+/* ── Task row hover ── */
+.phase-row-task-tr {
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.phase-row-task-tr:hover {
+    background: var(--gray-50);
+}
+
+/* ── Subtask row ── */
+.phase-row-subtask-tr {
+    background: var(--gray-50);
+}
+
+.phase-row-subtask-tr:hover {
+    background: var(--gray-100);
+}
+
+.phase-row-td--subtask-title {
+    padding-left: 2.25rem;
+}
+
+.phase-row-subtask-indent {
+    display: inline-block;
+    width: 1rem;
+    border-left: 2px solid var(--gray-300);
+    height: 0.75rem;
+    margin-right: 0.35rem;
+    flex-shrink: 0;
+}
+
+/* ── Inline select dropdowns ── */
+.phase-row-select {
+    font-family: var(--font-heading);
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.2rem 0.4rem;
+    border-radius: 99px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    background-repeat: no-repeat;
+    background-position: right 0.3rem center;
+    background-size: 0.5rem;
+    padding-right: 1rem;
+    transition: all 0.2s ease;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+.phase-row-select:focus {
+    box-shadow: var(--shadow-focus);
+}
+
+/* Status colors */
+.phase-row-select--NOT_STARTED,
+.phase-row-badge--NOT_STARTED {
+    background-color: #f1f5f9;
+    color: #475569;
+}
+
+.phase-row-select--IN_PROGRESS,
+.phase-row-badge--IN_PROGRESS {
+    background-color: #eff6ff;
+    color: #1d4ed8;
+}
+
+.phase-row-select--COMPLETED,
+.phase-row-badge--COMPLETED {
+    background-color: #f0fdf4;
+    color: #15803d;
+}
+
+.phase-row-select--DELAYED,
+.phase-row-badge--DELAYED {
+    background-color: #fff7ed;
+    color: #c2410c;
+}
+
+.phase-row-select--BLOCKED,
+.phase-row-badge--BLOCKED {
+    background-color: #fdf4ff;
+    color: #7e22ce;
+}
+
+/* Priority colors */
+.phase-row-select--LOW,
+.phase-row-badge--LOW {
+    background-color: #f0fdf4;
+    color: #15803d;
+}
+
+.phase-row-select--MEDIUM,
+.phase-row-badge--MEDIUM {
+    background-color: #eff6ff;
+    color: #1d4ed8;
+}
+
+.phase-row-select--HIGH,
+.phase-row-badge--HIGH {
+    background-color: #fff7ed;
+    color: #c2410c;
+}
+
+.phase-row-select--URGENT,
+.phase-row-badge--URGENT {
+    background-color: #fef2f2;
+    color: #b91c1c;
+}
+
+/* Difficulty colors */
+.phase-row-select--EASY,
+.phase-row-badge--EASY {
+    background-color: #f0fdf4;
+    color: #15803d;
+}
+
+.phase-row-select--HARD,
+.phase-row-badge--HARD {
+    background-color: #fff7ed;
+    color: #c2410c;
+}
+
+/* ── Badge (read-only) ── */
+.phase-row-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: 99px;
+    font-family: var(--font-heading);
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* ── Avatar stack ── */
+.phase-row-avatar-stack {
+    display: flex;
+    align-items: center;
+}
+
+.phase-row-avatar {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--gradient-secondary);
+    color: #fff;
+    font-family: var(--font-heading);
+    font-size: 0.6rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--bg-card);
+    margin-left: -0.35rem;
+    flex-shrink: 0;
+}
+
+.phase-row-avatar:first-child {
+    margin-left: 0;
+}
+
+.phase-row-avatar--extra {
+    background: var(--gray-300);
+    color: var(--gray-700);
+    font-size: 0.55rem;
+}
+
+.phase-row-no-assignee {
+    font-size: 0.8rem;
+    color: var(--gray-300);
+}
+
+/* ── Mini progress bar (per task) ── */
+.phase-row-mini-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.phase-row-mini-progress-bar {
+    width: 3rem;
+    height: 0.25rem;
+    background: var(--gray-100);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.phase-row-mini-progress-fill {
+    height: 100%;
+    background: var(--gradient-primary);
+    border-radius: 99px;
+    transition: width 0.3s ease;
+}
+
+.phase-row-mini-progress-text {
+    font-family: var(--font-heading);
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--gray-500);
+}
+
+/* ── Action buttons ── */
+.phase-row-actions {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+    justify-content: flex-end;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.phase-row-task-tr:hover .phase-row-actions,
+.phase-row-subtask-tr:hover .phase-row-actions {
+    opacity: 1;
+}
+
+.phase-row-action-btn {
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--gray-400);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.phase-row-action-btn:hover {
+    background: var(--gray-100);
+    color: var(--gray-600);
+}
+
+.phase-row-action-btn--purple:hover {
+    background: rgba(122, 71, 163, 0.1);
+    color: var(--purple-700);
+}
+
+.phase-row-action-btn--edit:hover {
+    background: rgba(37, 99, 235, 0.1);
+    color: #2563eb;
+}
+
+.phase-row-action-btn--danger:hover {
+    background: var(--error-bg);
+    color: var(--error-text);
+}
+
+/* ── Empty state ── */
+.phase-row-empty {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--gray-400);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.phase-row-empty-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.3rem 0.75rem;
+    border: 1px dashed var(--purple-500);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--purple-700);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.phase-row-empty-btn:hover {
+    background: var(--purple-700);
+    color: #fff;
+    border-style: solid;
+    border-color: var(--purple-700);
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .phase-row-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .phase-row-header-right {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .phase-row-table {
+        font-size: 0.78rem;
+    }
+
+    .phase-row-th,
+    .phase-row-td {
+        padding: 0.35rem 0.5rem;
+    }
+}

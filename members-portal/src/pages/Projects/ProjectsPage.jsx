@@ -5,19 +5,26 @@ import {
     ChevronDown,
     ChevronRight,
     Calendar,
-    Users,
     CheckSquare,
     AlertCircle,
     Pencil,
     PauseCircle,
     SquareCheckBig,
+    Paperclip,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { projectsAPI, tasksAPI, teamsAPI, membersAPI } from '../../services/api';
+import { projectsAPI, tasksAPI, teamsAPI, membersAPI, phasesAPI, projectTypesAPI, projectFilesAPI } from '../../services/api';
+import FileUploadZone from '../../components/FileUpload/FileUploadZone';
 import './ProjectsPage.css';
 
 import CreateProjectModal from './modals/CreateProjectModal';
 import DeactivateProjectModal from './modals/DeactivateProjectModal';
+import AddPhaseModal from './modals/AddPhaseModal';
+import AddTaskModal from './modals/AddTaskModal';
+import EditTaskModal from './modals/EditTaskModal';
+import EditPhaseModal from './modals/EditPhaseModal';
+import ConfirmModal from './modals/ConfirmModal';
+import PhaseRow from './components/PhaseRow';
 
 // ─────────────────────────────────────────────────────────
 //  Filter Dropdown (matches Members / Teams page style)
@@ -288,384 +295,72 @@ function TaskItem({ task, canEdit, onStatusChange, onAddSubtask }) {
     );
 }
 
-// ─────────────────────────────────────────────────────────
-//  Project Detail Panel (right-side drawer)
-// ─────────────────────────────────────────────────────────
-function ProjectDetailPanel({ project: initProject, allMembers, onClose, onProjectUpdated, canEdit }) {
-    const [project, setProject] = useState(initProject);
-    const [addingTask, setAddingTask] = useState(false);
-    const [addingSubtaskFor, setAddingSubtaskFor] = useState(null); // task object
-    const [newTask, setNewTask] = useState({ title: '', priority: 'MEDIUM', status: 'NOT_STARTED', dueDate: '', assigneeIds: [] });
-    const [taskLoading, setTaskLoading] = useState(false);
-    const [taskError, setTaskError] = useState('');
 
-    // Refresh tasks when project changed from outside
-    useEffect(() => { setProject(initProject); }, [initProject]);
-
-    // Update a task status in local state
-    const handleTaskStatusChange = useCallback((taskId, newStatus) => {
-        setProject((prev) => ({
-            ...prev,
-            tasks: prev.tasks.map((t) => {
-                if (t.id === taskId) return { ...t, status: newStatus };
-                // also check subtasks
-                return {
-                    ...t,
-                    subtasks: (t.subtasks || []).map((s) =>
-                        s.id === taskId ? { ...s, status: newStatus } : s
-                    ),
-                };
-            }),
-        }));
-        onProjectUpdated?.();
-    }, [onProjectUpdated]);
-
-    const handleAddTask = async () => {
-        if (!newTask.title.trim()) { setTaskError('Title is required'); return; }
-        setTaskLoading(true); setTaskError('');
-        try {
-            const created = await tasksAPI.create({
-                projectId: project.id,
-                parentTaskId: addingSubtaskFor ? addingSubtaskFor.id : null,
-                title: newTask.title.trim(),
-                priority: newTask.priority,
-                status: newTask.status,
-                dueDate: newTask.dueDate || undefined,
-                assigneeIds: newTask.assigneeIds,
-            });
-
-            // Merge into local state
-            setProject((prev) => {
-                if (!addingSubtaskFor) {
-                    return { ...prev, tasks: [...(prev.tasks || []), { ...created, subtasks: [], assignments: created.assignments || [] }] };
-                }
-                return {
-                    ...prev,
-                    tasks: prev.tasks.map((t) =>
-                        t.id === addingSubtaskFor.id
-                            ? { ...t, subtasks: [...(t.subtasks || []), { ...created, subtasks: [] }] }
-                            : t
-                    ),
-                };
-            });
-
-            setNewTask({ title: '', priority: 'MEDIUM', status: 'NOT_STARTED', dueDate: '', assigneeIds: [] });
-            setAddingTask(false);
-            setAddingSubtaskFor(null);
-            onProjectUpdated?.();
-        } catch (err) {
-            setTaskError(err.message || 'Failed to create task');
-        } finally {
-            setTaskLoading(false);
-        }
-    };
-
-    const openAddTask = () => {
-        setAddingSubtaskFor(null);
-        setAddingTask(true);
-    };
-
-    const openAddSubtask = (parentTask) => {
-        setAddingSubtaskFor(parentTask);
-        setAddingTask(true);
-    };
-
-    const cancelAddTask = () => {
-        setAddingTask(false);
-        setAddingSubtaskFor(null);
-        setNewTask({ title: '', priority: 'MEDIUM', status: 'NOT_STARTED', dueDate: '', assigneeIds: [] });
-        setTaskError('');
-    };
-
-    const over = isOverdue(project.dueDate, project.status);
-
-    return (
-        <div className="project-detail-overlay" onClick={onClose}>
-            <div className="project-detail-panel" onClick={(e) => e.stopPropagation()}>
-                {/* Header */}
-                <div className="project-detail-header">
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
-                            <StatusBadge status={project.status} />
-                            <PriorityBadge priority={project.priority} />
-                            {over && <span className="badge badge-status-DELAYED"><AlertCircle size={11} /> Overdue</span>}
-                        </div>
-                        <div className="project-detail-title">{project.title}</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--gray-400)', marginTop: '0.25rem' }}>
-                            {project.projectType?.name} · Created by {project.createdBy?.fullName ?? '—'}
-                        </div>
-                    </div>
-                    <button className="project-detail-close" onClick={onClose}>
-                        <X size={18} />
-                    </button>
-                </div>
-
-                {/* Body */}
-                <div className="project-detail-body">
-
-                    {/* Info row */}
-                    <div className="detail-info-row">
-                        <div className="detail-info-item">
-                            <span className="detail-info-label">Start Date</span>
-                            <span className="detail-info-value">{fmtDate(project.startDate)}</span>
-                        </div>
-                        <div className="detail-info-item">
-                            <span className="detail-info-label">Due Date</span>
-                            <span className={`detail-info-value${over ? ' overdue' : ''}`}
-                                style={over ? { color: '#dc2626' } : {}}>
-                                {fmtDate(project.dueDate)}
-                            </span>
-                        </div>
-                        {project.completedDate && (
-                            <div className="detail-info-item">
-                                <span className="detail-info-label">Completed</span>
-                                <span className="detail-info-value">{fmtDate(project.completedDate)}</span>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Description */}
-                    {project.description && (
-                        <div>
-                            <div className="detail-section-title">Description</div>
-                            <div className="detail-description">{project.description}</div>
-                        </div>
-                    )}
-
-                    {/* Teams */}
-                    <div>
-                        <div className="detail-section-title">Teams</div>
-                        <div className="detail-teams-list">
-                            {project.projectTeams?.length ? (
-                                project.projectTeams.map((pt) => (
-                                    <span key={pt.id} className="badge-team">
-                                        {pt.team?.name ?? '—'}
-                                        {pt.isOwner ? ' ★' : ''}
-                                        {!pt.canEdit ? ' (view)' : ''}
-                                    </span>
-                                ))
-                            ) : (
-                                <span style={{ fontSize: '0.82rem', color: 'var(--gray-400)' }}>No teams assigned</span>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Tags */}
-                    {project.tags?.length > 0 && (
-                        <div>
-                            <div className="detail-section-title">Tags</div>
-                            <div className="detail-teams-list">
-                                {project.tags.map((t) => (
-                                    <span key={t.id} className="badge-team" style={{ background: '#f1f5f9', color: '#475569' }}>
-                                        #{t.tagName}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Tasks */}
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
-                            <div className="detail-section-title" style={{ marginBottom: 0 }}>
-                                Tasks ({project.tasks?.length ?? 0})
-                            </div>
-                            {canEdit && (
-                                <button className="icon-btn" onClick={openAddTask}>
-                                    <Plus size={13} /> Add Task
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Add task inline form */}
-                        {addingTask && (
-                            <div className="task-detail-section" style={{ marginBottom: '0.75rem' }}>
-                                <div className="task-detail-title" style={{ fontSize: '0.85rem' }}>
-                                    {addingSubtaskFor ? `Subtask of: "${addingSubtaskFor.title}"` : 'New Task'}
-                                </div>
-                                <input
-                                    className="modal-input"
-                                    placeholder="Task title *"
-                                    value={newTask.title}
-                                    onChange={(e) => setNewTask((n) => ({ ...n, title: e.target.value }))}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
-                                    autoFocus
-                                />
-                                <div className="modal-row">
-                                    <div className="modal-form-group">
-                                        <label className="modal-label">Priority</label>
-                                        <select
-                                            className="modal-select"
-                                            value={newTask.priority}
-                                            onChange={(e) => setNewTask((n) => ({ ...n, priority: e.target.value }))}
-                                        >
-                                            {PRIORITIES.map((p) => <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="modal-form-group">
-                                        <label className="modal-label">Due Date</label>
-                                        <input
-                                            type="date"
-                                            className="modal-input"
-                                            value={newTask.dueDate}
-                                            onChange={(e) => setNewTask((n) => ({ ...n, dueDate: e.target.value }))}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Assignee picker */}
-                                {allMembers.length > 0 && (
-                                    <div className="modal-form-group">
-                                        <label className="modal-label">Assign members</label>
-                                        <div className="team-checkbox-list">
-                                            {allMembers.map((m) => (
-                                                <label key={m.id} className="team-checkbox-item">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={newTask.assigneeIds.includes(m.id)}
-                                                        onChange={(e) => {
-                                                            setNewTask((n) => ({
-                                                                ...n,
-                                                                assigneeIds: e.target.checked
-                                                                    ? [...n.assigneeIds, m.id]
-                                                                    : n.assigneeIds.filter((id) => id !== m.id),
-                                                            }));
-                                                        }}
-                                                    />
-                                                    <span className="team-checkbox-label">{m.fullName}</span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {taskError && <div style={{ color: '#dc2626', fontSize: '0.8rem' }}>{taskError}</div>}
-                                <div className="modal-actions" style={{ paddingTop: 0, borderTop: 'none' }}>
-                                    <button className="modal-btn-cancel" onClick={cancelAddTask}>Cancel</button>
-                                    <button className="modal-btn-submit" onClick={handleAddTask} disabled={taskLoading}>
-                                        {taskLoading ? 'Saving…' : 'Add Task'}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {project.tasks?.length ? (
-                            <div className="task-list">
-                                {project.tasks.map((t) => (
-                                    <TaskItem
-                                        key={t.id}
-                                        task={t}
-                                        canEdit={canEdit}
-                                        onStatusChange={handleTaskStatusChange}
-                                        onAddSubtask={openAddSubtask}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <div style={{ fontSize: '0.82rem', color: 'var(--gray-400)', textAlign: 'center', padding: '1.5rem 0' }}>
-                                No tasks yet.
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ─────────────────────────────────────────────────────────
-//  Expanded card: collapsible subtask row (recursive)
-// ─────────────────────────────────────────────────────────
-function ExpandedSubtaskRow({ task, depth = 0 }) {
-    const [open, setOpen] = useState(false);
-    const hasSubs = task.subtasks?.length > 0;
-    const over = isOverdue(task.dueDate, task.status);
-
-    return (
-        <div style={depth > 0 ? { paddingLeft: '1rem' } : undefined}>
-            <div
-                className="exp-subtask-row"
-                style={hasSubs ? { cursor: 'pointer' } : undefined}
-                onClick={() => hasSubs && setOpen((o) => !o)}
-            >
-                <div className="exp-task-left">
-                    {hasSubs
-                        ? <span className="task-expand-btn">{open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</span>
-                        : <span style={{ width: 12, flexShrink: 0, display: 'inline-block' }} />}
-                    <span className="exp-subtask-title">{task.title}</span>
-                </div>
-                <div className="exp-task-meta">
-                    <StatusBadge status={task.status} />
-                    {over && <span style={{ color: '#dc2626', display: 'flex' }}><AlertCircle size={10} /></span>}
-                </div>
-            </div>
-            {open && hasSubs && task.subtasks.map((s) => (
-                <ExpandedSubtaskRow key={s.id} task={s} depth={depth + 1} />
-            ))}
-        </div>
-    );
-}
-
-// ─────────────────────────────────────────────────────────
-//  Expanded card: full task row with collapsible subtasks
-// ─────────────────────────────────────────────────────────
-function ExpandedTaskRow({ task }) {
-    const [open, setOpen] = useState(false);
-    const hasSubs = task.subtasks?.length > 0;
-    const over = isOverdue(task.dueDate, task.status);
-
-    return (
-        <div className="exp-task">
-            <div
-                className="exp-task-header"
-                style={hasSubs ? { cursor: 'pointer' } : undefined}
-                onClick={() => hasSubs && setOpen((o) => !o)}
-            >
-                <div className="exp-task-left">
-                    {hasSubs
-                        ? <span className="task-expand-btn">{open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}</span>
-                        : <span style={{ width: 13, flexShrink: 0, display: 'inline-block' }} />}
-                    <span className="exp-task-title">{task.title}</span>
-                </div>
-                <div className="exp-task-meta">
-                    <StatusBadge status={task.status} />
-                    <PriorityBadge priority={task.priority} />
-                    {over && <span title="Overdue" style={{ color: '#dc2626', display: 'flex' }}><AlertCircle size={11} /></span>}
-                </div>
-            </div>
-            {(task.assignments?.length > 0 || task.dueDate) && (
-                <div className="exp-task-sub">
-                    {task.assignments?.length > 0 && (
-                        <div className="exp-task-assignees">
-                            {task.assignments.map((a) => (
-                                <span key={a.id} className="assignee-chip">{a.member?.fullName ?? '—'}</span>
-                            ))}
-                        </div>
-                    )}
-                    {task.dueDate && (
-                        <div className={`project-card-due${over ? ' overdue' : ''}`} style={{ fontSize: '0.72rem' }}>
-                            <Calendar size={10} />
-                            {fmtDate(task.dueDate)}
-                        </div>
-                    )}
-                </div>
-            )}
-            {open && hasSubs && (
-                <div className="exp-subtask-list">
-                    {task.subtasks.map((s) => <ExpandedSubtaskRow key={s.id} task={s} />)}
-                </div>
-            )}
-        </div>
-    );
-}
 
 // ─────────────────────────────────────────────────────────
 //  Project Card with Expandable Detail
 // ─────────────────────────────────────────────────────────
-function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeactivate, canEdit }) {
+function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeactivate, onRefreshDetail, allMembers, canEdit }) {
+    const { user } = useAuth();
     const over = isOverdue(project.dueDate, project.status);
     const ownerTeam = fullDetail?.projectTeams?.find((pt) => pt.isOwner) ?? null;
     const otherTeams = fullDetail?.projectTeams?.filter((pt) => !pt.isOwner) ?? [];
+
+    // Local copy of detail for optimistic inline updates (avoids full refresh & scroll reset)
+    const [localDetail, setLocalDetail] = useState(fullDetail);
+    useEffect(() => { setLocalDetail(fullDetail); }, [fullDetail]);
+
+    // Optimistic in-place update for inline field changes (status/priority/difficulty)
+    const handleTaskFieldUpdate = useCallback((phaseId, taskId, field, value) => {
+        if (field === '__delete') {
+            // Structural change — need real refresh
+            onRefreshDetail(localDetail?.id);
+            return;
+        }
+        setLocalDetail((prev) => {
+            if (!prev?.phases) return prev;
+            return {
+                ...prev,
+                phases: prev.phases.map((phase) => {
+                    if (phase.id !== phaseId) return phase;
+                    return {
+                        ...phase,
+                        tasks: (phase.tasks || []).map((task) => {
+                            if (task.id === taskId) return { ...task, [field]: value };
+                            // Check subtasks
+                            if (task.subtasks?.length) {
+                                return {
+                                    ...task,
+                                    subtasks: task.subtasks.map((s) =>
+                                        s.id === taskId ? { ...s, [field]: value } : s
+                                    ),
+                                };
+                            }
+                            return task;
+                        }),
+                    };
+                }),
+            };
+        });
+    }, [localDetail?.id, onRefreshDetail]);
+
+    // Project files state
+    const [projectFiles, setProjectFiles] = useState([]);
+    useEffect(() => {
+        if (expanded && localDetail?.id) {
+            projectFilesAPI.getAll(localDetail.id).then(setProjectFiles).catch(() => setProjectFiles([]));
+        }
+    }, [expanded, localDetail?.id]);
+
+    // Phase/task management state (inline in card)
+    const [showAddPhase, setShowAddPhase] = useState(false);
+    const [addTaskTarget, setAddTaskTarget] = useState(null); // { phaseId, parentTask? }
+    const [editTaskTarget, setEditTaskTarget] = useState(null); // task object to edit
+    const [editPhaseTarget, setEditPhaseTarget] = useState(null); // phase object to edit
+    const [confirmDeletePhase, setConfirmDeletePhase] = useState(null); // phase object to delete
+
+    // Use localDetail for rendering instead of fullDetail
+    const detail = localDetail;
 
     return (
         <div
@@ -738,24 +433,46 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                         <div className="project-card-task-count">
                             <SquareCheckBig size={11} />
                             {project._count?.tasks ?? 0} task{project._count?.tasks !== 1 ? 's' : ''}
+                            {' · '}
+                            {project._count?.phases ?? 0} phase{project._count?.phases !== 1 ? 's' : ''}
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Expanded content - only visible when card is expanded */}
-            {expanded && fullDetail && (
+            {expanded && detail && (
                 <div className="project-card-expanded-content">
                     <div className="expanded-content-wrapper">
 
-                        {/* Title + description */}
+                        {/* Title row + action buttons */}
                         <div style={{ marginBottom: '0.25rem' }}>
-                            <h2 className="project-card-title" style={{ marginBottom: '0.35rem' }}>
-                                {fullDetail.title}
-                            </h2>
-                            {fullDetail.description && (
+                            <div className="expanded-title-row">
+                                <h2 className="project-card-title" style={{ marginBottom: 0 }}>
+                                    {detail.title}
+                                </h2>
+                                {canEdit && (
+                                    <div className="expanded-title-actions">
+                                        <button
+                                            className="icon-btn edit-btn icon-btn--text"
+                                            onClick={(e) => { e.stopPropagation(); onEdit(detail); }}
+                                        >
+                                            <Pencil size={13} />
+                                            Edit Project
+                                        </button>
+                                        <button
+                                            className="icon-btn deactivate-btn icon-btn--text"
+                                            onClick={(e) => { e.stopPropagation(); onDeactivate(detail); }}
+                                        >
+                                            <PauseCircle size={13} />
+                                            Deactivate
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            {detail.description && (
                                 <div className="expanded-description" style={{ marginTop: '0.4rem' }}>
-                                    {fullDetail.description}
+                                    {detail.description}
                                 </div>
                             )}
                         </div>
@@ -768,44 +485,44 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                                 <div className="exp-badges-item">
                                     <span className="exp-badges-label">Category</span>
                                     <span className="exp-badges-value">
-                                        {fullDetail.projectType?.category ? (
-                                            <span className={`badge ${getCategoryClass(fullDetail.projectType.category)}`}>
-                                                {fullDetail.projectType.category}
+                                        {detail.projectType?.category ? (
+                                            <span className={`badge ${getCategoryClass(detail.projectType.category)}`}>
+                                                {detail.projectType.category}
                                             </span>
                                         ) : '—'}
                                     </span>
                                 </div>
                                 <div className="exp-badges-item">
                                     <span className="exp-badges-label">Type</span>
-                                    <span className="exp-badges-value">{fullDetail.projectType ? (
+                                    <span className="exp-badges-value">{detail.projectType ? (
                                         <span className="badge badge-type">
-                                            {fullDetail.projectType.name}
+                                            {detail.projectType.name}
                                         </span>
                                     ) : '—'}</span>
                                 </div>
                                 <div className="exp-badges-item">
                                     <span className="exp-badges-label">Status</span>
-                                    <span className="exp-badges-value"><StatusBadge status={fullDetail.status} /></span>
+                                    <span className="exp-badges-value"><StatusBadge status={detail.status} /></span>
                                 </div>
                                 <div className="exp-badges-item">
                                     <span className="exp-badges-label">Priority</span>
-                                    <span className="exp-badges-value"><PriorityBadge priority={fullDetail.priority} /></span>
+                                    <span className="exp-badges-value"><PriorityBadge priority={detail.priority} /></span>
                                 </div>
                             </div>
                             {/* Row 2: created · start · due dates */}
                             <div className="exp-dates-row">
                                 <div className="exp-date-item">
                                     <span className="exp-date-label">Created</span>
-                                    <span className="exp-date-value">{fmtDate(fullDetail.createdAt) || '—'}</span>
+                                    <span className="exp-date-value">{fmtDate(detail.createdAt) || '—'}</span>
                                 </div>
                                 <div className="exp-date-item">
                                     <span className="exp-date-label">Start</span>
-                                    <span className="exp-date-value">{fmtDate(fullDetail.startDate) || '—'}</span>
+                                    <span className="exp-date-value">{fmtDate(detail.startDate) || '—'}</span>
                                 </div>
                                 <div className="exp-date-item">
                                     <span className="exp-date-label">Due</span>
                                     <span className={`exp-date-value${over ? ' overdue' : ''}`}>
-                                        {fmtDate(fullDetail.dueDate) || '—'}
+                                        {fmtDate(detail.dueDate) || '—'}
                                     </span>
                                 </div>
                             </div>
@@ -818,18 +535,18 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                             <div className="exp-teams-block">
                                 <span className="exp-creator-label">Created by</span>
                                 <div className="exp-teams-pills">
-                                    <span className="exp-creator-name">{fullDetail.createdBy?.fullName ?? '—'}</span>
+                                    <span className="exp-creator-name">{detail.createdBy?.fullName ?? '—'}</span>
                                     {ownerTeam && (
                                         <span className="badge-team">{ownerTeam.team?.name}</span>
                                     )}
                                 </div>
                             </div>
                             {/* All assigned teams */}
-                            {(fullDetail.projectTeams?.length ?? 0) > 0 ? (
+                            {(detail.projectTeams?.length ?? 0) > 0 ? (
                                 <div className="exp-teams-block">
                                     <span className="exp-creator-label">Assigned Teams</span>
                                     <div className="exp-teams-pills">
-                                        {fullDetail.projectTeams.map((pt) => (
+                                        {detail.projectTeams.map((pt) => (
                                             <span key={pt.id} className="badge-team">
                                                 {pt.team?.name}
                                                 {pt.isOwner ? ' ★' : ''}
@@ -843,40 +560,119 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                             )}
                         </div>
 
-                        {/* ── Section 3: Tasks ── */}
+                        {/* ── Section 3: Phases & Tasks (interactive) ── */}
                         <div className="exp-card-section">
                             <div className="exp-card-section-header">
-                                Tasks ({fullDetail.tasks?.length ?? 0})
+                                Phases ({detail.phases?.length ?? 0})
                             </div>
-                            {fullDetail.tasks?.length ? (
-                                <div className="expanded-tasks-list">
-                                    {fullDetail.tasks.map((task) => (
-                                        <ExpandedTaskRow key={task.id} task={task} />
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="exp-tasks-placeholder">No tasks yet</div>
-                            )}
+
+                            <div className="phase-list" style={{ marginTop: '0.5rem' }}>
+                                {detail.phases?.map((phase) => (
+                                    <PhaseRow
+                                        key={phase.id}
+                                        phase={phase}
+                                        canEdit={canEdit}
+                                        allMembers={allMembers}
+                                        onPhaseUpdated={() => onRefreshDetail(detail.id)}
+                                        onTaskUpdated={handleTaskFieldUpdate}
+                                        onAddTask={(p) => setAddTaskTarget({ phaseId: p.id })}
+                                        onAddSubtask={(p, parentTask) => setAddTaskTarget({ phaseId: p.id, parentTask })}
+                                        onEditTask={(task) => setEditTaskTarget(task)}
+                                        onEditPhase={(p) => setEditPhaseTarget(p)}
+                                        onDeletePhase={(p) => setConfirmDeletePhase(p)}
+                                    />
+                                ))}
+                                {canEdit && (
+                                    <div
+                                        className="phase-add-row"
+                                        onClick={(e) => { e.stopPropagation(); setShowAddPhase(true); }}
+                                        role="button"
+                                        tabIndex={0}
+                                        onKeyDown={(e) => e.key === 'Enter' && setShowAddPhase(true)}
+                                    >
+                                        <Plus size={15} />
+                                        <span>Add Phase</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
-                        {/* Actions */}
-                        {canEdit && (
-                            <div className="expanded-actions">
-                                <button
-                                    className="icon-btn edit-btn icon-btn--text"
-                                    onClick={(e) => { e.stopPropagation(); onEdit(fullDetail); }}
-                                >
-                                    <Pencil size={13} />
-                                    Edit Project
-                                </button>
-                                <button
-                                    className="icon-btn deactivate-btn icon-btn--text"
-                                    onClick={(e) => { e.stopPropagation(); onDeactivate(fullDetail); }}
-                                >
-                                    <PauseCircle size={13} />
-                                    Deactivate
-                                </button>
+                        {/* ── Section 4: Project Files ── */}
+                        <div className="exp-card-section">
+                            <div className="exp-card-section-header">
+                                <Paperclip size={14} style={{ marginRight: '0.35rem' }} />
+                                Project Files
                             </div>
+                            <FileUploadZone
+                                projectId={detail.id}
+                                memberId={user?.id}
+                                existingFiles={projectFiles}
+                                onFileUploaded={(newFile, replaced) => setProjectFiles((prev) =>
+                                    replaced
+                                        ? prev.map((f) => f.id === newFile.id ? newFile : f)
+                                        : [newFile, ...prev]
+                                )}
+                                onFileRemoved={(fileId) => setProjectFiles((prev) => prev.filter((f) => f.id !== fileId))}
+                                disabled={!canEdit}
+                            />
+                        </div>
+
+
+
+                        {/* Edit Phase Modal */}
+                        {editPhaseTarget && (
+                            <EditPhaseModal
+                                phase={editPhaseTarget}
+                                onClose={() => setEditPhaseTarget(null)}
+                                onPhaseUpdated={() => { setEditPhaseTarget(null); onRefreshDetail(detail.id); }}
+                            />
+                        )}
+
+                        {/* Confirm Delete Phase Modal */}
+                        {confirmDeletePhase && (
+                            <ConfirmModal
+                                title="Delete Phase"
+                                itemName={confirmDeletePhase.title}
+                                message="All tasks, subtasks, and assignees in this phase will be permanently removed. This action cannot be undone."
+                                confirmLabel="Delete Phase"
+                                onConfirm={async () => {
+                                    await phasesAPI.remove(confirmDeletePhase.id);
+                                    onRefreshDetail(detail.id);
+                                }}
+                                onClose={() => setConfirmDeletePhase(null)}
+                            />
+                        )}
+
+                        {/* Add Phase Modal */}
+                        {showAddPhase && (
+                            <AddPhaseModal
+                                projectId={detail.id}
+                                existingPhasesCount={detail.phases?.length ?? 0}
+                                onClose={() => setShowAddPhase(false)}
+                                onPhaseCreated={() => { setShowAddPhase(false); onRefreshDetail(detail.id); }}
+                            />
+                        )}
+
+                        {/* Add Task / Subtask Modal */}
+                        {addTaskTarget && (
+                            <AddTaskModal
+                                projectId={detail.id}
+                                phaseId={addTaskTarget.phaseId}
+                                parentTask={addTaskTarget.parentTask || null}
+                                allMembers={allMembers}
+                                onClose={() => setAddTaskTarget(null)}
+                                onTaskCreated={() => { setAddTaskTarget(null); onRefreshDetail(detail.id); }}
+                            />
+                        )}
+
+                        {/* Edit Task / Subtask Modal */}
+                        {editTaskTarget && (
+                            <EditTaskModal
+                                task={editTaskTarget}
+                                allMembers={allMembers}
+                                onClose={() => setEditTaskTarget(null)}
+                                onTaskUpdated={() => { setEditTaskTarget(null); onRefreshDetail(detail.id); }}
+                            />
                         )}
                     </div>
                 </div>
@@ -897,9 +693,11 @@ export default function ProjectsPage() {
 
     const [allTeams, setAllTeams] = useState([]);
     const [allMembers, setAllMembers] = useState([]);
+    const [allCategories, setAllCategories] = useState([]);
 
     // Filters
-    const [filterStatus, setFilterStatus] = useState('');
+    const [filterTeam, setFilterTeam] = useState('');
+    const [filterCategory, setFilterCategory] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
 
     // Expanded card state
@@ -917,9 +715,12 @@ export default function ProjectsPage() {
         Promise.all([
             teamsAPI.getAll(undefined, 'all').catch(() => []),
             membersAPI.getAll(true).catch(() => []),
-        ]).then(([teams, members]) => {
+            projectTypesAPI.getAll().catch(() => []),
+        ]).then(([teams, members, types]) => {
             setAllTeams(Array.isArray(teams) ? teams : []);
             setAllMembers(Array.isArray(members) ? members : []);
+            const cats = [...new Set((Array.isArray(types) ? types : []).map((t) => t.category).filter(Boolean))];
+            setAllCategories(cats);
         });
     }, []);
 
@@ -928,21 +729,26 @@ export default function ProjectsPage() {
         setLoading(true); setError('');
         try {
             const data = await projectsAPI.getAll({
-                status: filterStatus || undefined,
+                teamId: filterTeam || undefined,
                 priority: filterPriority || undefined,
             });
+            // Client-side filter by category
+            let filtered = data;
+            if (filterCategory) {
+                filtered = data.filter((p) => p.projectType?.category === filterCategory);
+            }
             // Sort by priority then createdAt
-            data.sort((a, b) =>
+            filtered.sort((a, b) =>
                 (PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99) ||
                 new Date(b.createdAt) - new Date(a.createdAt)
             );
-            setProjects(data);
+            setProjects(filtered);
         } catch (err) {
             setError(err.message || 'Failed to load projects');
         } finally {
             setLoading(false);
         }
-    }, [filterStatus, filterPriority]);
+    }, [filterTeam, filterCategory, filterPriority]);
 
     useEffect(() => { loadProjects(); }, [loadProjects]);
 
@@ -1000,11 +806,19 @@ export default function ProjectsPage() {
         }
     };
 
+    // ── Refresh expanded detail (after phase/task changes) ──
+    const handleRefreshDetail = async (projectId) => {
+        try {
+            const detail = await projectsAPI.getById(projectId);
+            setExpandedProjectDetail(detail);
+        } catch { /* swallow */ }
+    };
+
     // ── Permission helpers ──
-    const isAdminUser = user?.isDeveloper || user?.isAdmin;
+    const canCreateProject = user?.isDeveloper || user?.isAdmin || user?.isOfficer || user?.isLeadership || user?.isSpecial;
 
     const canEditProject = (project) => {
-        if (isAdminUser) return true;
+        if (canCreateProject) return true;
         if (!user?.id) return false;
         if (project.createdByMemberId === user.id) return true;
         return (project.projectTeams ?? []).some(
@@ -1019,13 +833,22 @@ export default function ProjectsPage() {
                 <h1 className="projects-title">Projects</h1>
                 <div className="page-header-actions">
                     <FilterDropdown
-                        triggerLabel="Status"
+                        triggerLabel="Team"
                         options={[
-                            { value: '', label: 'All Statuses' },
-                            ...PROJECT_STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] })),
+                            { value: '', label: 'All Teams' },
+                            ...allTeams.map((t) => ({ value: String(t.id), label: t.name })),
                         ]}
-                        value={filterStatus}
-                        onChange={setFilterStatus}
+                        value={filterTeam}
+                        onChange={setFilterTeam}
+                    />
+                    <FilterDropdown
+                        triggerLabel="Category"
+                        options={[
+                            { value: '', label: 'All Categories' },
+                            ...allCategories.map((c) => ({ value: c, label: c })),
+                        ]}
+                        value={filterCategory}
+                        onChange={setFilterCategory}
                     />
                     <FilterDropdown
                         triggerLabel="Priority"
@@ -1066,9 +889,23 @@ export default function ProjectsPage() {
                             onToggle={handleToggleExpand}
                             onEdit={(proj) => setEditingProject(proj)}
                             onDeactivate={(proj) => setDeactivatingProject(proj)}
+                            onRefreshDetail={handleRefreshDetail}
+                            allMembers={allMembers}
                             canEdit={canEditProject(p)}
                         />
                     ))}
+                    {canCreateProject && (
+                        <div
+                            className="project-add-card"
+                            onClick={() => setShowCreateModal(true)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => e.key === 'Enter' && setShowCreateModal(true)}
+                        >
+                            <Plus className="project-add-card-icon" />
+                            <span className="project-add-card-text">New Project</span>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -1119,6 +956,7 @@ export default function ProjectsPage() {
                     onConfirmed={handleProjectDeactivated}
                 />
             )}
+
         </div>
     );
 }

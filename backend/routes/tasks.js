@@ -67,6 +67,52 @@ async function canUserEditTask(req, taskId) {
 }
 
 /**
+ * Auto-sync parent task status based on subtask states.
+ * - All subtasks COMPLETED → parent becomes COMPLETED
+ * - Otherwise if parent was COMPLETED → parent becomes IN_PROGRESS
+ */
+async function syncParentTaskStatus(taskId, memberId) {
+    const task = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: { parentTaskId: true },
+    });
+    if (!task?.parentTaskId) return;
+
+    const siblings = await prisma.task.findMany({
+        where: { parentTaskId: task.parentTaskId, isActive: true },
+        select: { status: true },
+    });
+    if (siblings.length === 0) return;
+
+    const allCompleted = siblings.every((s) => s.status === 'COMPLETED');
+    const parent = await prisma.task.findUnique({
+        where: { id: task.parentTaskId },
+        select: { status: true },
+    });
+    if (!parent) return;
+
+    let newStatus = null;
+    if (allCompleted && parent.status !== 'COMPLETED') {
+        newStatus = 'COMPLETED';
+    } else if (!allCompleted && parent.status === 'COMPLETED') {
+        newStatus = 'IN_PROGRESS';
+    }
+
+    if (newStatus) {
+        const data = { status: newStatus };
+        if (newStatus === 'COMPLETED') data.completedDate = new Date();
+        await prisma.task.update({ where: { id: task.parentTaskId }, data });
+        if (memberId) {
+            await logActivity(task.parentTaskId, memberId, 'STATUS_CHANGED', {
+                oldValue: parent.status,
+                newValue: newStatus,
+                description: `Status auto-changed from ${parent.status} to ${newStatus} based on subtasks`,
+            });
+        }
+    }
+}
+
+/**
  * Log a task activity event in the TaskActivityLog.
  */
 async function logActivity(taskId, memberId, actionType, { oldValue, newValue, description } = {}) {
@@ -165,6 +211,7 @@ router.get('/:id', async (req, res) => {
             include: {
                 project: { select: { id: true, title: true } },
                 parentTask: { select: { id: true, title: true } },
+                phase: { select: { id: true, title: true } },
                 subtasks: {
                     where: { isActive: true },
                     include: {
@@ -228,6 +275,7 @@ router.post('/', async (req, res) => {
         const {
             projectId,
             parentTaskId = null,
+            phaseId = null,
             title,
             description,
             type = 'General',
@@ -249,6 +297,7 @@ router.post('/', async (req, res) => {
             data: {
                 projectId: parseInt(projectId),
                 parentTaskId: parentTaskId ? parseInt(parentTaskId) : null,
+                phaseId: phaseId ? parseInt(phaseId) : null,
                 title: title.trim(),
                 description: description?.trim() || null,
                 type,
@@ -290,6 +339,11 @@ router.post('/', async (req, res) => {
             description: `Task "${task.title}" created`,
         });
 
+        // If this is a subtask, sync parent status (new subtask → parent can't stay COMPLETED)
+        if (parentTaskId) {
+            await syncParentTaskStatus(task.id, req.user.memberId);
+        }
+
         res.status(201).json(task);
     } catch (error) {
         console.error('POST /tasks', error);
@@ -330,6 +384,7 @@ router.put('/:id', async (req, res) => {
         if (type !== undefined) data.type = type;
         if (priority !== undefined) data.priority = priority;
         if (difficulty !== undefined) data.difficulty = difficulty;
+        if (req.body.phaseId !== undefined) data.phaseId = req.body.phaseId ? parseInt(req.body.phaseId) : null;
         if (status !== undefined) {
             data.status = status;
             if (status === 'COMPLETED' && !completedDate) data.completedDate = new Date();
@@ -339,6 +394,24 @@ router.put('/:id', async (req, res) => {
         if (completedDate !== undefined) data.completedDate = completedDate ? new Date(completedDate) : null;
         if (estimatedHours !== undefined) data.estimatedHours = estimatedHours ? parseFloat(estimatedHours) : null;
         if (actualHours !== undefined) data.actualHours = actualHours ? parseFloat(actualHours) : null;
+
+        // Sync assignees if provided
+        const { assigneeIds } = req.body;
+        if (assigneeIds !== undefined) {
+            // Remove existing assignments and re-create
+            await prisma.taskAssignment.deleteMany({ where: { taskId: id } });
+            if (assigneeIds.length > 0) {
+                await prisma.taskAssignment.createMany({
+                    data: assigneeIds.map((mid) => ({
+                        taskId: id,
+                        memberId: parseInt(mid),
+                        isSelfAssigned: false,
+                        assignedBy: req.user.memberId,
+                        status: 'ASSIGNED',
+                    })),
+                });
+            }
+        }
 
         const task = await prisma.task.update({
             where: { id },
@@ -362,6 +435,9 @@ router.put('/:id', async (req, res) => {
                 description: `Status changed from ${old.status} to ${status}`,
             });
         }
+
+        // Sync parent task status if this is a subtask
+        await syncParentTaskStatus(id, req.user.memberId);
 
         res.json(task);
     } catch (error) {
@@ -399,6 +475,9 @@ router.patch('/:id/status', async (req, res) => {
             description: `Status changed from ${old?.status} to ${status}`,
         });
 
+        // Sync parent task status if this is a subtask
+        await syncParentTaskStatus(id, req.user.memberId);
+
         res.json(task);
     } catch (error) {
         console.error('PATCH /tasks/:id/status', error);
@@ -407,19 +486,19 @@ router.patch('/:id/status', async (req, res) => {
 });
 
 // ============================================
-// PATCH /api/tasks/:id/deactivate  –  soft-delete
+// DELETE /api/tasks/:id  –  hard-delete (cascades to subtasks, assignments, comments, tags, deps, logs)
 // ============================================
-router.patch('/:id/deactivate', async (req, res) => {
+router.delete('/:id', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         if (!(await canUserEditTask(req, id))) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
-        const task = await prisma.task.update({ where: { id }, data: { isActive: false } });
-        res.json({ message: 'Task deactivated', task });
+        await prisma.task.delete({ where: { id } });
+        res.json({ message: 'Task deleted' });
     } catch (error) {
-        console.error('PATCH /tasks/:id/deactivate', error);
-        res.status(500).json({ error: 'Failed to deactivate task' });
+        console.error('DELETE /tasks/:id', error);
+        res.status(500).json({ error: 'Failed to delete task' });
     }
 });
 

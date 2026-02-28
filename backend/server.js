@@ -6,6 +6,8 @@ const cors = require('cors');
 console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'loaded' : 'NOT LOADED');
 console.log('JWT_SECRET:', process.env.JWT_SECRET ? 'loaded' : 'NOT LOADED');
 console.log('DEVELOPER_EMAIL:', process.env.DEVELOPER_EMAIL || 'dev@iclub.com');
+console.log('GITHUB_STORAGE_REPO:', process.env.GITHUB_STORAGE_REPO ? 'loaded' : 'NOT SET');
+console.log('GITHUB_STORAGE_TOKEN:', process.env.GITHUB_STORAGE_TOKEN ? 'loaded' : 'NOT SET');
 
 const app = express();
 
@@ -50,7 +52,16 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`CORS enabled for http://localhost:5173`);
+});
+
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use. Kill the other process or use a different port.`);
+    } else {
+        console.error('Server error:', err);
+    }
+    process.exit(1);
 });

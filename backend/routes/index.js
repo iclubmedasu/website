@@ -14,6 +14,8 @@ const alumniRoutes = require('./alumni');
 const administrationRoutes = require('./administration');
 const projectsRoutes = require('./projects');
 const tasksRoutes = require('./tasks');
+const phasesRoutes = require('./phases');
+const projectFilesRoutes = require('./projectFiles');
 
 // Auth routes (public)
 router.use('/auth', authRoutes);
@@ -30,6 +32,8 @@ router.use('/alumni', authenticateToken, alumniRoutes);
 router.use('/administration', authenticateToken, administrationRoutes);
 router.use('/projects', authenticateToken, projectsRoutes);
 router.use('/tasks', authenticateToken, tasksRoutes);
+router.use('/phases', authenticateToken, phasesRoutes);
+router.use('/project-files', authenticateToken, projectFilesRoutes);
 
 // API documentation endpoint
 router.get('/', (req, res) => {
@@ -48,6 +52,8 @@ router.get('/', (req, res) => {
             administration: '/api/administration',
             projects: '/api/projects',
             tasks: '/api/tasks',
+            phases: '/api/phases',
+            projectFiles: '/api/project-files',
         }
     });
 });
