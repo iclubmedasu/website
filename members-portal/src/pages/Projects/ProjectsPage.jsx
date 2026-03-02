@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
     Plus,
     X,
@@ -11,6 +11,8 @@ import {
     PauseCircle,
     SquareCheckBig,
     Paperclip,
+    CheckCircle,
+    Archive,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { projectsAPI, tasksAPI, teamsAPI, membersAPI, phasesAPI, projectTypesAPI, projectFilesAPI, getProfilePhotoUrl } from '../../services/api';
@@ -19,6 +21,8 @@ import './ProjectsPage.css';
 
 import CreateProjectModal from './modals/CreateProjectModal';
 import DeactivateProjectModal from './modals/DeactivateProjectModal';
+import FinalizeProjectModal from './modals/FinalizeProjectModal';
+import ArchiveProjectModal from './modals/ArchiveProjectModal';
 import AddPhaseModal from './modals/AddPhaseModal';
 import AddTaskModal from './modals/AddTaskModal';
 import EditTaskModal from './modals/EditTaskModal';
@@ -307,7 +311,7 @@ function TaskItem({ task, canEdit, onStatusChange, onAddSubtask }) {
 // ─────────────────────────────────────────────────────────
 //  Project Card with Expandable Detail
 // ─────────────────────────────────────────────────────────
-function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeactivate, onRefreshDetail, allMembers, canEdit }) {
+function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeactivate, onFinalize, onArchive, onRefreshDetail, allMembers, canEdit }) {
     const { user } = useAuth();
     const over = isOverdue(project.dueDate, project.status);
     const ownerTeam = fullDetail?.projectTeams?.find((pt) => pt.isOwner) ?? null;
@@ -390,7 +394,22 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                 <div className="project-card-header">
                     <span className="project-card-title">{project.title}</span>
                     <div className="project-card-meta">
-                        {canEdit && (
+                        {project.isFinalized && (
+                            <>
+                                <span className="badge badge-finalized" title="Finalized">
+                                    <CheckCircle size={12} />
+                                    Finalized
+                                </span>
+                                <button
+                                    className="icon-btn archive-btn"
+                                    title="Archive project"
+                                    onClick={(e) => { e.stopPropagation(); onArchive(project); }}
+                                >
+                                    <Archive size={14} />
+                                </button>
+                            </>
+                        )}
+                        {canEdit && !project.isFinalized && (
                             <>
                                 <button
                                     className="icon-btn edit-btn"
@@ -398,6 +417,20 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                                     onClick={(e) => { e.stopPropagation(); onEdit(project); }}
                                 >
                                     <Pencil size={14} />
+                                </button>
+                                <button
+                                    className="icon-btn finalize-btn"
+                                    title="Finalize project"
+                                    onClick={(e) => { e.stopPropagation(); onFinalize(project); }}
+                                >
+                                    <CheckCircle size={14} />
+                                </button>
+                                <button
+                                    className="icon-btn archive-btn"
+                                    title="Archive project"
+                                    onClick={(e) => { e.stopPropagation(); onArchive(project); }}
+                                >
+                                    <Archive size={14} />
                                 </button>
                                 <button
                                     className="icon-btn deactivate-btn"
@@ -458,7 +491,22 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                                 <h2 className="project-card-title" style={{ marginBottom: 0 }}>
                                     {detail.title}
                                 </h2>
-                                {canEdit && (
+                                {detail.isFinalized && (
+                                    <div className="expanded-title-actions">
+                                        <span className="badge badge-finalized" style={{ fontSize: '0.82rem' }}>
+                                            <CheckCircle size={14} />
+                                            Finalized
+                                        </span>
+                                        <button
+                                            className="icon-btn archive-btn icon-btn--text"
+                                            onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
+                                        >
+                                            <Archive size={13} />
+                                            Archive
+                                        </button>
+                                    </div>
+                                )}
+                                {canEdit && !detail.isFinalized && (
                                     <div className="expanded-title-actions">
                                         <button
                                             className="icon-btn edit-btn icon-btn--text"
@@ -466,6 +514,20 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                                         >
                                             <Pencil size={13} />
                                             Edit Project
+                                        </button>
+                                        <button
+                                            className="icon-btn finalize-btn icon-btn--text"
+                                            onClick={(e) => { e.stopPropagation(); onFinalize(detail); }}
+                                        >
+                                            <CheckCircle size={13} />
+                                            Finalize
+                                        </button>
+                                        <button
+                                            className="icon-btn archive-btn icon-btn--text"
+                                            onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
+                                        >
+                                            <Archive size={13} />
+                                            Archive
                                         </button>
                                         <button
                                             className="icon-btn deactivate-btn icon-btn--text"
@@ -620,6 +682,9 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                                         : [newFile, ...prev]
                                 )}
                                 onFileRemoved={(fileId) => setProjectFiles((prev) => prev.filter((f) => f.id !== fileId))}
+                                onFileRenamed={(updated) => setProjectFiles((prev) =>
+                                    prev.map((f) => f.id === updated.id ? { ...f, fileName: updated.fileName } : f)
+                                )}
                                 disabled={!canEdit}
                             />
                         </div>
@@ -689,6 +754,22 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
 }
 
 // ─────────────────────────────────────────────────────────
+//  Pagination helper – produces [1, 2, '...', 5, 6, 7, '...', 10] style array
+// ─────────────────────────────────────────────────────────
+function getPageNumbers(current, total) {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages = [];
+    pages.push(1);
+    if (current > 3) pages.push('...');
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (current < total - 2) pages.push('...');
+    pages.push(total);
+    return pages;
+}
+
+// ─────────────────────────────────────────────────────────
 //  Main Page
 // ─────────────────────────────────────────────────────────
 export default function ProjectsPage() {
@@ -707,6 +788,10 @@ export default function ProjectsPage() {
     const [filterCategory, setFilterCategory] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
 
+    // Pagination
+    const PROJECTS_PER_PAGE = 10;
+    const [currentPage, setCurrentPage] = useState(1);
+
     // Expanded card state
     const [expandedProjectId, setExpandedProjectId] = useState(null);
     const [expandedProjectDetail, setExpandedProjectDetail] = useState(null);
@@ -716,6 +801,8 @@ export default function ProjectsPage() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
     const [deactivatingProject, setDeactivatingProject] = useState(null);
+    const [finalizingProject, setFinalizingProject] = useState(null);
+    const [archivingProject, setArchivingProject] = useState(null);
 
     // ── Load all supporting data ──
     useEffect(() => {
@@ -759,6 +846,16 @@ export default function ProjectsPage() {
 
     useEffect(() => { loadProjects(); }, [loadProjects]);
 
+    // Reset to page 1 when filters change
+    useEffect(() => { setCurrentPage(1); }, [filterTeam, filterCategory, filterPriority]);
+
+    // Pagination derived values
+    const totalPages = Math.max(1, Math.ceil(projects.length / PROJECTS_PER_PAGE));
+    const paginatedProjects = useMemo(() => {
+        const start = (currentPage - 1) * PROJECTS_PER_PAGE;
+        return projects.slice(start, start + PROJECTS_PER_PAGE);
+    }, [projects, currentPage]);
+
     // ── Handle card expansion ──
     const handleToggleExpand = async (project) => {
         if (!project) {
@@ -790,6 +887,7 @@ export default function ProjectsPage() {
 
     // ── After saving ──
     const handleProjectSaved = (saved) => {
+        // Optimistic local update
         setProjects((prev) => {
             const idx = prev.findIndex((p) => p.id === saved.id);
             if (idx >= 0) {
@@ -803,6 +901,8 @@ export default function ProjectsPage() {
         if (expandedProjectId === saved.id) {
             projectsAPI.getById(saved.id).then(setExpandedProjectDetail).catch(() => { });
         }
+        // Re-fetch from server so state stays in sync across navigations
+        loadProjects();
     };
 
     const handleProjectDeactivated = (id) => {
@@ -813,11 +913,42 @@ export default function ProjectsPage() {
         }
     };
 
+    const handleProjectFinalized = () => {
+        loadProjects();
+        if (expandedProjectId) {
+            projectsAPI.getById(expandedProjectId).then(setExpandedProjectDetail).catch(() => { });
+        }
+    };
+
+    const handleProjectArchived = () => {
+        loadProjects();
+        if (expandedProjectId) {
+            setExpandedProjectId(null);
+            setExpandedProjectDetail(null);
+        }
+    };
+
     // ── Refresh expanded detail (after phase/task changes) ──
+    // Preserves task order within each phase to fix the bug where
+    // editing a task causes it to jump to the top of the list.
     const handleRefreshDetail = async (projectId) => {
         try {
             const detail = await projectsAPI.getById(projectId);
-            setExpandedProjectDetail(detail);
+            setExpandedProjectDetail((prev) => {
+                if (!prev || prev.id !== detail.id) return detail;
+                return {
+                    ...detail,
+                    phases: detail.phases?.map((newPhase) => {
+                        const oldPhase = prev.phases?.find((p) => p.id === newPhase.id);
+                        if (!oldPhase?.tasks?.length) return newPhase;
+                        const taskMap = new Map((newPhase.tasks || []).map((t) => [t.id, t]));
+                        const ordered = oldPhase.tasks.map((t) => taskMap.get(t.id)).filter(Boolean);
+                        const existingIds = new Set(oldPhase.tasks.map((t) => t.id));
+                        const added = (newPhase.tasks || []).filter((t) => !existingIds.has(t.id));
+                        return { ...newPhase, tasks: [...ordered, ...added] };
+                    }),
+                };
+            });
         } catch { /* swallow */ }
     };
 
@@ -825,6 +956,7 @@ export default function ProjectsPage() {
     const canCreateProject = user?.isDeveloper || user?.isAdmin || user?.isOfficer || user?.isLeadership || user?.isSpecial;
 
     const canEditProject = (project) => {
+        if (project.isFinalized) return false;
         if (canCreateProject) return true;
         if (!user?.id) return false;
         if (project.createdByMemberId === user.id) return true;
@@ -886,34 +1018,71 @@ export default function ProjectsPage() {
                     </button>
                 </div>
             ) : (
-                <div className="projects-grid">
-                    {projects.map((p) => (
-                        <ProjectCard
-                            key={p.id}
-                            project={p}
-                            expanded={expandedProjectId === p.id}
-                            fullDetail={expandedProjectId === p.id ? expandedProjectDetail : null}
-                            onToggle={handleToggleExpand}
-                            onEdit={(proj) => setEditingProject(proj)}
-                            onDeactivate={(proj) => setDeactivatingProject(proj)}
-                            onRefreshDetail={handleRefreshDetail}
-                            allMembers={allMembers}
-                            canEdit={canEditProject(p)}
-                        />
-                    ))}
-                    {canCreateProject && (
-                        <div
-                            className="project-add-card"
-                            onClick={() => setShowCreateModal(true)}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => e.key === 'Enter' && setShowCreateModal(true)}
-                        >
-                            <Plus className="project-add-card-icon" />
-                            <span className="project-add-card-text">New Project</span>
+                <>
+                    <div className="projects-grid">
+                        {paginatedProjects.map((p) => (
+                            <ProjectCard
+                                key={p.id}
+                                project={p}
+                                expanded={expandedProjectId === p.id}
+                                fullDetail={expandedProjectId === p.id ? expandedProjectDetail : null}
+                                onToggle={handleToggleExpand}
+                                onEdit={(proj) => setEditingProject(proj)}
+                                onDeactivate={(proj) => setDeactivatingProject(proj)}
+                                onFinalize={(proj) => setFinalizingProject(proj)}
+                                onArchive={(proj) => setArchivingProject(proj)}
+                                onRefreshDetail={handleRefreshDetail}
+                                allMembers={allMembers}
+                                canEdit={canEditProject(p)}
+                            />
+                        ))}
+                        {canCreateProject && currentPage === 1 && (
+                            <div
+                                className="project-add-card"
+                                onClick={() => setShowCreateModal(true)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => e.key === 'Enter' && setShowCreateModal(true)}
+                            >
+                                <Plus className="project-add-card-icon" />
+                                <span className="project-add-card-text">New Project</span>
+                            </div>
+                        )}
+                    </div>
+                    {totalPages > 1 && (
+                        <div className="pagination-controls">
+                            <button
+                                className="pagination-btn"
+                                disabled={currentPage <= 1}
+                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            >
+                                Previous
+                            </button>
+                            <div className="pagination-pages">
+                                {getPageNumbers(currentPage, totalPages).map((p, i) =>
+                                    p === '...' ? (
+                                        <span key={`ellipsis-${i}`} className="pagination-ellipsis">…</span>
+                                    ) : (
+                                        <button
+                                            key={p}
+                                            className={`pagination-page-btn${p === currentPage ? ' pagination-page-btn--active' : ''}`}
+                                            onClick={() => setCurrentPage(p)}
+                                        >
+                                            {p}
+                                        </button>
+                                    )
+                                )}
+                            </div>
+                            <button
+                                className="pagination-btn"
+                                disabled={currentPage >= totalPages}
+                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                            >
+                                Next
+                            </button>
                         </div>
                     )}
-                </div>
+                </>
             )}
 
             {/* ─── Loading indicator for expanded card ─── */}
@@ -939,6 +1108,7 @@ export default function ProjectsPage() {
                 <CreateProjectModal
                     mode="create"
                     allTeams={allTeams}
+                    userTeamIds={user.teamIds ?? []}
                     onClose={() => setShowCreateModal(false)}
                     onSaved={handleProjectSaved}
                 />
@@ -950,6 +1120,7 @@ export default function ProjectsPage() {
                     mode="edit"
                     initial={editingProject}
                     allTeams={allTeams}
+                    userTeamIds={user.teamIds ?? []}
                     onClose={() => setEditingProject(null)}
                     onSaved={handleProjectSaved}
                 />
@@ -961,6 +1132,24 @@ export default function ProjectsPage() {
                     project={deactivatingProject}
                     onClose={() => setDeactivatingProject(null)}
                     onConfirmed={handleProjectDeactivated}
+                />
+            )}
+
+            {/* ─── Finalize Confirm ─── */}
+            {finalizingProject && (
+                <FinalizeProjectModal
+                    project={finalizingProject}
+                    onClose={() => setFinalizingProject(null)}
+                    onFinalized={handleProjectFinalized}
+                />
+            )}
+
+            {/* ─── Archive Confirm ─── */}
+            {archivingProject && (
+                <ArchiveProjectModal
+                    project={archivingProject}
+                    onClose={() => setArchivingProject(null)}
+                    onArchived={handleProjectArchived}
                 />
             )}
 

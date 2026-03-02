@@ -191,6 +191,45 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 });
 
 // ============================================
+// GET /api/project-files/deleted?projectId=X
+// Returns all soft-deleted files for a project
+// ============================================
+router.get('/deleted', async (req, res) => {
+    try {
+        const { projectId } = req.query;
+        if (!projectId) return res.status(400).json({ error: 'projectId is required' });
+
+        const parsedId = parseInt(projectId);
+
+        // Get active file names to exclude deleted files that share a name
+        // with a currently active file (those are version replacements, not true deletions)
+        const activeFiles = await prisma.projectFile.findMany({
+            where: { projectId: parsedId, isActive: true },
+            select: { fileName: true },
+        });
+        const activeNames = new Set(activeFiles.map((f) => f.fileName));
+
+        const files = await prisma.projectFile.findMany({
+            where: { projectId: parsedId, isActive: false },
+            orderBy: { updatedAt: 'desc' },
+            include: {
+                uploadedBy: {
+                    select: { id: true, fullName: true, profilePhotoUrl: true },
+                },
+            },
+        });
+
+        // Only return truly deleted files (no active file with the same name)
+        const filtered = files.filter((f) => !activeNames.has(f.fileName));
+
+        res.json(filtered);
+    } catch (error) {
+        console.error('GET /project-files/deleted', error);
+        res.status(500).json({ error: 'Failed to fetch deleted files' });
+    }
+});
+
+// ============================================
 // GET /api/project-files/:id/download
 // Proxy the file from GitHub so the browser can view/download it.
 // Accepts auth via Authorization header OR ?token= query param
@@ -321,6 +360,100 @@ router.delete('/:id', async (req, res) => {
     } catch (error) {
         console.error('DELETE /project-files/:id', error);
         res.status(500).json({ error: 'Failed to delete file' });
+    }
+});
+
+// ============================================
+// PATCH /api/project-files/:id/rename
+// Rename a file (display name only — GitHub path unchanged)
+// ============================================
+router.patch('/:id/rename', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'Invalid file ID' });
+
+        const { fileName } = req.body;
+        if (!fileName || !fileName.trim()) {
+            return res.status(400).json({ error: 'fileName is required' });
+        }
+
+        const file = await prisma.projectFile.findUnique({ where: { id } });
+        if (!file || !file.isActive) return res.status(404).json({ error: 'File not found' });
+
+        // Permission check
+        if (!(await canUserEditProject(req, file.projectId))) {
+            return res.status(403).json({ error: 'You do not have permission to rename files in this project' });
+        }
+
+        // Check for duplicate name in the same project
+        const duplicate = await prisma.projectFile.findFirst({
+            where: {
+                projectId: file.projectId,
+                fileName: fileName.trim(),
+                isActive: true,
+                id: { not: id },
+            },
+        });
+        if (duplicate) {
+            return res.status(409).json({ error: 'A file with this name already exists in this project' });
+        }
+
+        const updated = await prisma.projectFile.update({
+            where: { id },
+            data: { fileName: fileName.trim() },
+            include: {
+                uploadedBy: {
+                    select: { id: true, fullName: true, profilePhotoUrl: true },
+                },
+            },
+        });
+
+        res.json(updated);
+    } catch (error) {
+        console.error('PATCH /project-files/:id/rename', error);
+        res.status(500).json({ error: 'Failed to rename file' });
+    }
+});
+
+// ============================================
+// POST /api/project-files/:id/restore
+// Restore a soft-deleted file from GitHub history
+// ============================================
+router.post('/:id/restore', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'Invalid file ID' });
+
+        const file = await prisma.projectFile.findUnique({ where: { id } });
+        if (!file) return res.status(404).json({ error: 'File not found' });
+        if (file.isActive) return res.status(400).json({ error: 'File is not deleted' });
+
+        // Permission check
+        if (!(await canUserEditProject(req, file.projectId))) {
+            return res.status(403).json({ error: 'You do not have permission to restore files in this project' });
+        }
+
+        // Restore the file on GitHub from commit history
+        const ghResult = await githubStorage.restoreDeletedFile(file.githubPath);
+
+        // Re-activate in DB with new SHA
+        const restored = await prisma.projectFile.update({
+            where: { id },
+            data: {
+                isActive: true,
+                githubSha: ghResult.githubSha,
+            },
+            include: {
+                uploadedBy: {
+                    select: { id: true, fullName: true, profilePhotoUrl: true },
+                },
+            },
+        });
+
+        res.json(restored);
+    } catch (error) {
+        console.error('POST /project-files/:id/restore', error);
+        res.status(500).json({ error: error.message || 'Failed to restore file' });
     }
 });
 

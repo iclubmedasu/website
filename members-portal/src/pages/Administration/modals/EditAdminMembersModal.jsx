@@ -52,6 +52,8 @@ const EditAdminMembersModal = ({
     const [successMessage, setSuccessMessage] = useState('');
     const [availableRoles, setAvailableRoles] = useState([]);
     const [availableSubteams, setAvailableSubteams] = useState([]);
+    // Active team members (for maxCount validation)
+    const [teamMembersForTeam, setTeamMembersForTeam] = useState([]);
 
     const currentTeamId = currentTeamAssignment?.teamId;
 
@@ -60,6 +62,23 @@ const EditAdminMembersModal = ({
         setAvailableRoles(roles.filter(r => r.teamId === currentTeamId));
         setAvailableSubteams(subteams.filter(s => s.teamId === currentTeamId));
     }, [currentTeamId, roles, subteams]);
+
+    // Fetch active team members for maxCount validation
+    useEffect(() => {
+        if (!isOpen || !currentTeamId) {
+            setTeamMembersForTeam([]);
+            return;
+        }
+        let cancelled = false;
+        teamMembersAPI.getAll(currentTeamId, undefined, true)
+            .then((data) => {
+                if (!cancelled) setTeamMembersForTeam(Array.isArray(data) ? data : []);
+            })
+            .catch(() => {
+                if (!cancelled) setTeamMembersForTeam([]);
+            });
+        return () => { cancelled = true; };
+    }, [isOpen, currentTeamId]);
 
     useEffect(() => {
         if (isOpen && member && currentTeamAssignment) {
@@ -103,6 +122,22 @@ const EditAdminMembersModal = ({
 
     const validate = () => {
         const newErrors = {};
+
+        if (editMode === EDIT_MODES.PROMOTION_DEMOTION) {
+            // Check maxCount if changing to a different role
+            if (formData.newRoleId && formData.newRoleId !== currentTeamAssignment?.roleId?.toString()) {
+                const newRoleId = parseInt(formData.newRoleId, 10);
+                const selectedRole = availableRoles.find((r) => r.id === newRoleId);
+                if (selectedRole && selectedRole.maxCount != null) {
+                    const currentCount = teamMembersForTeam.filter(
+                        (tm) => tm.roleId === selectedRole.id && tm.isActive
+                    ).length;
+                    if (currentCount >= selectedRole.maxCount) {
+                        newErrors.newRoleId = `This role already has ${currentCount}/${selectedRole.maxCount} member${selectedRole.maxCount !== 1 ? 's' : ''}`;
+                    }
+                }
+            }
+        }
 
         if (editMode === EDIT_MODES.TRANSFER) {
             if (!formData.newTeamId) newErrors.newTeamId = 'Target team is required';
@@ -353,19 +388,27 @@ const EditAdminMembersModal = ({
                                     <select
                                         id="newRoleId"
                                         name="newRoleId"
-                                        className="form-input"
+                                        className={`form-input ${errors.newRoleId ? 'error' : ''}`}
                                         value={formData.newRoleId}
                                         onChange={handleChange}
                                         disabled={isSubmitting}
                                     >
                                         <option value="">Keep current role</option>
                                         {availableRoles
-                                            .filter((r) => r.roleName !== 'Officer' && !occupiedRoleIds.includes(r.id))
-                                            .map((role) => (
-                                                <option key={role.id} value={role.id}>{role.roleName}</option>
-                                            ))}
+                                            .filter((r) => r.roleName !== 'Officer')
+                                            .map((role) => {
+                                                const isOwnRole = role.id === currentTeamAssignment?.roleId;
+                                                const count = teamMembersForTeam.filter(tm => tm.roleId === role.id && tm.isActive).length;
+                                                const effectiveCount = isOwnRole ? Math.max(0, count - 1) : count;
+                                                const isFull = role.maxCount != null && effectiveCount >= role.maxCount;
+                                                const label = role.maxCount != null
+                                                    ? `${role.roleName} (${effectiveCount}/${role.maxCount})${isFull ? ' — Full' : ''}`
+                                                    : role.roleName;
+                                                return <option key={role.id} value={role.id} disabled={isFull}>{label}</option>;
+                                            })}
                                     </select>
-                                    <p className="form-hint-inline">Officer is assigned separately. Only roles that are not already filled by someone else are listed.</p>
+                                    {errors.newRoleId && <span className="field-error">{errors.newRoleId}</span>}
+                                    <p className="form-hint-inline">Officer is assigned separately.</p>
                                 </div>
                             </div>
                         )}

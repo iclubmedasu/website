@@ -357,6 +357,26 @@
     box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.3);
 }
 
+.btn-success {
+    background: var(--gradient-success);
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(22, 163, 74, 0.3);
+}
+
+.btn-neutral {
+    background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+    color: white;
+}
+
+.btn-neutral:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(107, 114, 128, 0.3);
+}
+
 /* ============================================
    MODAL VARIANT: DANGER
    ============================================ */
@@ -438,7 +458,8 @@
     height: 24px;
 }
 
-.activate-info-box {
+.activate-info-box,
+.success-info-box {
     padding: 1.25rem;
     background: rgba(22, 163, 74, 0.08);
     border: 1px solid rgba(22, 163, 74, 0.3);
@@ -456,6 +477,62 @@
 
 .info-text:last-child {
     margin-bottom: 0;
+}
+
+/* ── Focus overrides for success variant ── */
+.modal-success .form-input:focus {
+    border-color: var(--success-accent);
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+}
+
+/* ============================================
+   MODAL VARIANT: NEUTRAL (archive)
+   ============================================ */
+
+.modal-neutral {
+    border: 2px solid var(--gray-400);
+}
+
+.modal-icon-neutral {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(107, 114, 128, 0.12);
+    color: var(--gray-600);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.modal-icon-neutral svg {
+    width: 24px;
+    height: 24px;
+}
+
+.neutral-info-box {
+    padding: 1.25rem;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    margin-bottom: 1.5rem;
+}
+
+.neutral-highlight {
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--gray-700);
+    padding: 0.75rem;
+    background: white;
+    border-radius: var(--radius-sm);
+    margin: 0.75rem 0;
+    text-align: center;
+}
+
+.modal-neutral .form-input:focus {
+    border-color: var(--gray-500);
+    box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.12);
 }
 
 /* ============================================
@@ -486,7 +563,8 @@
     text-align: center;
 }
 
-.activate-highlight {
+.activate-highlight,
+.success-highlight {
     font-family: var(--font-heading);
     font-size: 1.125rem;
     font-weight: 700;
@@ -940,6 +1018,19 @@
     background: rgba(122, 71, 163, 0.1);
     border-color: var(--purple-600);
     color: var(--purple-800);
+}
+
+.team-badge-option--locked {
+    cursor: default;
+    opacity: 0.85;
+    pointer-events: none;
+    position: relative;
+}
+
+.team-badge-option--locked::after {
+    content: '\1F512';
+    font-size: 0.65rem;
+    margin-left: 0.3rem;
 }
 
 

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { FileText, Image, File, Upload, Check, X, RotateCcw, Trash2, Loader, Download, AlertTriangle, History } from 'lucide-react';
+import { FileText, Image, File, Upload, Check, X, RotateCcw, Trash2, Loader, Download, AlertTriangle, History, ArchiveRestore, Pencil } from 'lucide-react';
 import { projectFilesAPI } from '../../services/api';
 import '../../components/modal/modal.css';
 import './FileUploadZone.css';
@@ -21,16 +21,27 @@ function FileIcon({ mimeType }) {
 let _uid = 0;
 function uid() { return `upload_${Date.now()}_${++_uid}`; }
 
-export default function FileUploadZone({ projectId, memberId, onFileUploaded, onFileRemoved, existingFiles = [], disabled }) {
+export default function FileUploadZone({ projectId, memberId, onFileUploaded, onFileRemoved, onFileRenamed, existingFiles = [], disabled }) {
     const [uploadingFiles, setUploadingFiles] = useState([]);
     const fileInputRef = useRef(null);
     const [dragOver, setDragOver] = useState(false);
-    const [confirmDelete, setConfirmDelete] = useState(null); // file entry pending deletion
+    const [confirmDelete, setConfirmDelete] = useState(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
     const [deleteError, setDeleteError] = useState('');
-    const [historyTarget, setHistoryTarget] = useState(null); // file entry whose history is shown
+    const [historyTarget, setHistoryTarget] = useState(null);
     const [historyData, setHistoryData] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
+    const [showDeleted, setShowDeleted] = useState(false);
+    const [deletedFiles, setDeletedFiles] = useState([]);
+    const [deletedLoading, setDeletedLoading] = useState(false);
+    const [restoringId, setRestoringId] = useState(null);
+    // Rename state
+    const [renameTarget, setRenameTarget] = useState(null);
+    const [renameValue, setRenameValue] = useState('');
+    const [renameLoading, setRenameLoading] = useState(false);
+    const [renameError, setRenameError] = useState('');
+    // Duplicate-name upload confirmation state
+    const [duplicateConfirm, setDuplicateConfirm] = useState(null); // { file, existingEntry }
 
     // Sync existing files on mount / when existingFiles changes
     useEffect(() => {
@@ -104,6 +115,15 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         if (disabled) return;
         const files = Array.from(fileList);
         files.forEach((file) => {
+            // Check for duplicate name among existing (completed) files
+            const existingMatch = uploadingFiles.find(
+                (f) => f.done && f.name.toLowerCase() === file.name.toLowerCase()
+            );
+            if (existingMatch) {
+                // Show confirmation dialog instead of uploading immediately
+                setDuplicateConfirm({ file, existingEntry: existingMatch });
+                return;
+            }
             const id = uid();
             const entry = {
                 id,
@@ -119,7 +139,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
             setUploadingFiles((prev) => [...prev, entry]);
             doUpload(entry);
         });
-    }, [disabled, doUpload]);
+    }, [disabled, doUpload, uploadingFiles]);
 
     const handleDrop = (e) => {
         e.preventDefault();
@@ -206,6 +226,103 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         const d = new Date(iso);
         return d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
             + ' ' + d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+    };
+
+    const toggleDeleted = async () => {
+        if (showDeleted) {
+            setShowDeleted(false);
+            return;
+        }
+        setShowDeleted(true);
+        setDeletedLoading(true);
+        try {
+            const files = await projectFilesAPI.getDeleted(projectId);
+            setDeletedFiles(files);
+        } catch (err) {
+            console.error('Fetch deleted files failed:', err);
+            setDeletedFiles([]);
+        } finally {
+            setDeletedLoading(false);
+        }
+    };
+
+    // ── Rename handlers ──
+    const openRename = (fileEntry) => {
+        setRenameTarget(fileEntry);
+        setRenameValue(fileEntry.name);
+        setRenameError('');
+    };
+
+    const closeRename = () => {
+        setRenameTarget(null);
+        setRenameValue('');
+        setRenameError('');
+        setRenameLoading(false);
+    };
+
+    const handleRename = async () => {
+        if (!renameTarget) return;
+        const trimmed = renameValue.trim();
+        if (!trimmed) { setRenameError('File name cannot be empty.'); return; }
+        if (trimmed === renameTarget.name) { closeRename(); return; } // no change
+        setRenameLoading(true);
+        setRenameError('');
+        try {
+            const updated = await projectFilesAPI.rename(renameTarget.id, trimmed);
+            // Update local list
+            setUploadingFiles((prev) =>
+                prev.map((f) => (f.id === renameTarget.id ? { ...f, name: updated.fileName } : f))
+            );
+            if (onFileRenamed) onFileRenamed(updated);
+            closeRename();
+        } catch (err) {
+            console.error('Rename failed:', err);
+            if (err.message?.includes('already exists')) {
+                setRenameError('A file with this name already exists in this project.');
+            } else {
+                setRenameError(err.message || 'Failed to rename file.');
+            }
+            setRenameLoading(false);
+        }
+    };
+
+    // ── Duplicate upload confirmation handlers ──
+    const closeDuplicateConfirm = () => setDuplicateConfirm(null);
+
+    const confirmDuplicateReplace = () => {
+        if (!duplicateConfirm) return;
+        const { file } = duplicateConfirm;
+        const id = uid();
+        const entry = {
+            id,
+            name: file.name,
+            size: file.size,
+            mimeType: file.type,
+            progress: 0,
+            processing: false,
+            failed: false,
+            done: false,
+            fileObj: file,
+        };
+        setUploadingFiles((prev) => [...prev, entry]);
+        doUpload(entry);
+        setDuplicateConfirm(null);
+    };
+
+    const handleRestore = async (file) => {
+        setRestoringId(file.id);
+        try {
+            const restored = await projectFilesAPI.restore(file.id);
+            // Remove from deleted list
+            setDeletedFiles((prev) => prev.filter((f) => f.id !== file.id));
+            // Add to active files
+            if (onFileUploaded) onFileUploaded(restored, false);
+        } catch (err) {
+            console.error('Restore failed:', err);
+            alert(err.message || 'Failed to restore file');
+        } finally {
+            setRestoringId(null);
+        }
     };
 
     return (
@@ -296,6 +413,15 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                                             <History size={14} />
                                         </button>
                                     )}
+                                    {!disabled && f.done && (
+                                        <button
+                                            className="file-rename-btn"
+                                            title="Rename"
+                                            onClick={() => openRename(f)}
+                                        >
+                                            <Pencil size={14} />
+                                        </button>
+                                    )}
                                     {f.done && downloadUrl && (
                                         <a
                                             href={downloadUrl}
@@ -319,6 +445,65 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {/* Deleted files toggle + list */}
+            {!disabled && (
+                <button
+                    type="button"
+                    className={`deleted-files-toggle${showDeleted ? ' deleted-files-toggle--active' : ''}`}
+                    onClick={toggleDeleted}
+                >
+                    <ArchiveRestore size={14} />
+                    {showDeleted ? 'Hide deleted files' : 'Show deleted files'}
+                </button>
+            )}
+
+            {showDeleted && (
+                <div className="deleted-files-section">
+                    {deletedLoading ? (
+                        <div className="deleted-files-loading">
+                            <Loader size={16} className="file-status-processing" />
+                            <span>Loading deleted files…</span>
+                        </div>
+                    ) : deletedFiles.length === 0 ? (
+                        <p className="deleted-files-empty">No deleted files found.</p>
+                    ) : (
+                        <div className="file-list file-list--deleted">
+                            {deletedFiles.map((f) => (
+                                <div key={f.id} className="file-item file-item--deleted">
+                                    <div className="file-icon file-icon--deleted">
+                                        <FileIcon mimeType={f.mimeType} />
+                                    </div>
+                                    <div className="file-info">
+                                        <div className="file-name-row">
+                                            <span className="file-name file-name--deleted">{f.fileName}</span>
+                                            <span className="file-size">{formatSize(f.fileSize)}</span>
+                                        </div>
+                                        <span className="deleted-file-date">
+                                            Deleted {formatHistoryDate(f.updatedAt)}
+                                        </span>
+                                    </div>
+                                    <div className="file-actions">
+                                        <button
+                                            className="file-restore-btn"
+                                            title="Restore file"
+                                            onClick={() => handleRestore(f)}
+                                            disabled={restoringId === f.id}
+                                        >
+                                            {restoringId === f.id ? (
+                                                <Loader size={14} className="file-status-processing" />
+                                            ) : (
+                                                <ArchiveRestore size={14} />
+                                            )}
+                                            {restoringId === f.id ? 'Restoring…' : 'Restore'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -422,6 +607,81 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                         <div className="modal-footer">
                             <button type="button" className="btn btn-secondary" onClick={closeHistory}>
                                 Close
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Rename modal */}
+            {renameTarget && (
+                <>
+                    <div className="modal-backdrop" onClick={closeRename} />
+                    <div className="modal-container">
+                        <div className="modal-header">
+                            <div className="modal-header-content">
+                                <Pencil size={18} style={{ color: 'var(--purple-600)' }} />
+                                <h2 className="modal-title">Rename File</h2>
+                            </div>
+                            <button className="modal-close-btn" type="button" onClick={closeRename} disabled={renameLoading}>
+                                <X />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            {renameError && <div className="error-message">{renameError}</div>}
+                            <label className="form-label" htmlFor="rename-input">New file name</label>
+                            <input
+                                id="rename-input"
+                                type="text"
+                                className="form-input"
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && !renameLoading && handleRename()}
+                                disabled={renameLoading}
+                                autoFocus
+                            />
+                        </div>
+                        <div className="modal-footer">
+                            <button type="button" className="btn btn-secondary" onClick={closeRename} disabled={renameLoading}>
+                                Cancel
+                            </button>
+                            <button type="button" className="btn btn-success" onClick={handleRename} disabled={renameLoading || !renameValue.trim()}>
+                                {renameLoading ? 'Saving…' : 'Save'}
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Duplicate upload confirmation modal */}
+            {duplicateConfirm && (
+                <>
+                    <div className="modal-backdrop" onClick={closeDuplicateConfirm} />
+                    <div className="modal-container modal-danger">
+                        <div className="modal-header">
+                            <div className="modal-header-content">
+                                <div className="modal-icon-danger">
+                                    <AlertTriangle />
+                                </div>
+                                <h2 className="modal-title">File Already Exists</h2>
+                            </div>
+                            <button className="modal-close-btn" type="button" onClick={closeDuplicateConfirm}>
+                                <X />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="warning-box">
+                                <p className="warning-text">A file named</p>
+                                <p className="project-name-highlight">{duplicateConfirm.file.name}</p>
+                                <p className="warning-text">already exists in this project. Uploading will replace the existing file.</p>
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button type="button" className="btn btn-secondary" onClick={closeDuplicateConfirm}>
+                                Cancel
+                            </button>
+                            <button type="button" className="btn btn-danger" onClick={confirmDuplicateReplace}>
+                                Replace
                             </button>
                         </div>
                     </div>

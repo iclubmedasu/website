@@ -115,7 +115,7 @@ async function downloadFile(githubPath) {
     return res;
 }
 
-module.exports = { uploadFile, deleteFile, downloadFile, getFileHistory, downloadFileAtVersion };
+module.exports = { uploadFile, deleteFile, downloadFile, getFileHistory, downloadFileAtVersion, restoreDeletedFile };
 
 /**
  * Get the commit history for a specific file.
@@ -160,4 +160,49 @@ async function downloadFileAtVersion(githubPath, commitSha) {
     }
 
     return res;
+}
+
+/**
+ * Restore a deleted file from GitHub repository history.
+ * Finds the last version before deletion and re-creates the file at the same path.
+ * @param {string} githubPath  e.g. "projects/42/uuid-filename.pdf"
+ * @returns {{ githubSha: string }}
+ */
+async function restoreDeletedFile(githubPath) {
+    // 1. Get commit history — includes all commits that touched this path, even after deletion
+    const commits = await getFileHistory(githubPath);
+    if (!commits || commits.length === 0) {
+        throw new Error('No history found for this file — cannot restore');
+    }
+
+    // The most recent commit is the deletion; pick the one right after it for the last good version.
+    // If there is only one commit (unlikely — that would be the deletion itself), we still try it.
+    const restoreCommit = commits.length >= 2 ? commits[1] : commits[0];
+
+    // 2. Fetch the file content at that commit (JSON mode to get base64 content)
+    const contentUrl = `${BASE}/${githubPath}?ref=${restoreCommit.sha}`;
+    const contentRes = await fetch(contentUrl, { headers: headers() });
+    if (!contentRes.ok) {
+        const err = await contentRes.text();
+        throw new Error(`Failed to fetch file at commit ${restoreCommit.sha}: ${err}`);
+    }
+    const contentData = await contentRes.json();
+
+    // 3. Re-create the file on GitHub (PUT without sha = create new file)
+    const createRes = await fetch(`${BASE}/${githubPath}`, {
+        method: 'PUT',
+        headers: { ...headers(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            message: `Restore ${githubPath}`,
+            content: contentData.content.replace(/\n/g, ''), // strip line-breaks from base64
+        }),
+    });
+
+    if (!createRes.ok) {
+        const err = await createRes.text();
+        throw new Error(`GitHub restore failed (${createRes.status}): ${err}`);
+    }
+
+    const result = await createRes.json();
+    return { githubSha: result.content.sha };
 }

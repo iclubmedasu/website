@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import AdministrationPage from './pages/Administration/AdministrationPage';
 import ProjectsPage from './pages/Projects/ProjectsPage';
+import PastProjectsPage from './pages/Projects/PastProjectsPage';
 import TeamsPage from './pages/Teams/TeamsPage';
 import MembersPage from './pages/Members/MembersPage';
 import AlumniPage from './pages/Alumni/AlumniPage';
@@ -19,7 +20,7 @@ import {
     LifeBuoy01,
     Settings01,
 } from "@untitledui/icons";
-import { GraduationCap, Shield, UsersRound, FolderKanban } from "lucide-react";
+import { GraduationCap, Shield, UsersRound, FolderKanban, FolderOpen, FolderCheck } from "lucide-react";
 import './app.css';
 
 function AppLayout() {
@@ -35,8 +36,19 @@ function AppLayout() {
         },
         {
             label: 'Projects',
-            href: '/projects',
             icon: FolderKanban,
+            items: [
+                {
+                    label: 'Ongoing Projects',
+                    href: '/projects',
+                    icon: FolderOpen,
+                },
+                {
+                    label: 'Past Projects',
+                    href: '/past-projects',
+                    icon: FolderCheck,
+                },
+            ],
         },
         {
             label: 'Personnel',
@@ -114,6 +126,16 @@ function AppLayout() {
                                     <ProtectedRoute>
                                         <UnassignedGate>
                                             <ProjectsPage />
+                                        </UnassignedGate>
+                                    </ProtectedRoute>
+                                }
+                            />
+                            <Route
+                                path="/past-projects"
+                                element={
+                                    <ProtectedRoute>
+                                        <UnassignedGate>
+                                            <PastProjectsPage />
                                         </UnassignedGate>
                                     </ProtectedRoute>
                                 }

@@ -23,7 +23,19 @@ const PRIORITY_LABELS = {
     URGENT: 'Urgent',
 };
 
-export default function ProjectModal({ mode = 'create', initial = null, allTeams, onClose, onSaved }) {
+export default function ProjectModal({ mode = 'create', initial = null, allTeams, userTeamIds = [], onClose, onSaved }) {
+    // Build initial teamIds: auto-include the creator's teams
+    const buildInitialTeamIds = () => {
+        if (initial?.projectTeams) {
+            const existing = initial.projectTeams.map((pt) => ({ teamId: pt.team.id, canEdit: pt.canEdit, isOwner: pt.isOwner }));
+            // Ensure user's teams are always present (even for older projects)
+            const existingIds = new Set(existing.map((t) => t.teamId));
+            const missing = userTeamIds.filter((tid) => !existingIds.has(tid));
+            return [...existing, ...missing.map((tid) => ({ teamId: tid, canEdit: true, isOwner: false }))];
+        }
+        return userTeamIds.map((tid) => ({ teamId: tid, canEdit: true, isOwner: false }));
+    };
+
     const [form, setForm] = useState({
         title: initial?.title ?? '',
         description: initial?.description ?? '',
@@ -32,7 +44,7 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
         status: initial?.status ?? 'NOT_STARTED',
         startDate: initial?.startDate ? initial.startDate.split('T')[0] : '',
         dueDate: initial?.dueDate ? initial.dueDate.split('T')[0] : '',
-        teamIds: initial?.projectTeams?.map((pt) => ({ teamId: pt.team.id, canEdit: pt.canEdit, isOwner: pt.isOwner })) ?? [],
+        teamIds: buildInitialTeamIds(),
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -71,6 +83,8 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
     const setField = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
     const toggleTeam = (teamId) => {
+        // Don't allow removing the creator's own teams
+        if (userTeamIds.includes(teamId)) return;
         setForm((f) => {
             const exists = f.teamIds.find((t) => t.teamId === teamId);
             if (exists) return { ...f, teamIds: f.teamIds.filter((t) => t.teamId !== teamId) };
@@ -218,15 +232,20 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                     {allTeams.length > 0 && (
                         <div className="form-section">
                             <h3 className="form-section-title">Teams</h3>
+                            {userTeamIds.length > 0 && (
+                                <p className="form-hint-text">Your team{userTeamIds.length > 1 ? 's are' : ' is'} automatically included and cannot be removed.</p>
+                            )}
                             <div className="team-badge-picker">
                                 {allTeams.map((t) => {
                                     const selected = form.teamIds.some((x) => x.teamId === t.id);
+                                    const locked = userTeamIds.includes(t.id);
                                     return (
                                         <button
                                             key={t.id}
                                             type="button"
-                                            className={`team-badge-option${selected ? ' team-badge-option--selected' : ''}`}
+                                            className={`team-badge-option${selected ? ' team-badge-option--selected' : ''}${locked ? ' team-badge-option--locked' : ''}`}
                                             onClick={() => toggleTeam(t.id)}
+                                            title={locked ? 'Your team — required' : undefined}
                                         >
                                             {t.name}
                                         </button>

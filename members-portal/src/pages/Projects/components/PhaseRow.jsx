@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import {
     ChevronRight,
     ChevronDown,
     Plus,
     Pencil,
     Trash2,
+    GripVertical,
 } from 'lucide-react';
 import { tasksAPI, phasesAPI, getProfilePhotoUrl } from '../../../services/api';
 import ConfirmModal from '../modals/ConfirmModal';
@@ -128,9 +129,33 @@ function MiniProgress({ completed, total }) {
 }
 
 /* ── Subtask row (indented, inside expanded task) ── */
-function SubtaskRow({ task, canEdit, onFieldChange, onEditTask, onDeleteTask }) {
+function SubtaskRow({ task, canEdit, onFieldChange, onEditTask, onDeleteTask,
+    onSubDragStart, onSubDragOver, onSubDrop, onSubDragEnd, isDragging }) {
     return (
-        <tr className="phase-row-subtask-tr">
+        <tr
+            className={`phase-row-subtask-tr${isDragging ? ' phase-row-dragging' : ''}`}
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onSubDragOver && onSubDragOver(e); }}
+            onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onSubDrop && onSubDrop(task.id); }}
+        >
+            {canEdit && (
+                <td className="phase-row-td phase-row-td--drag">
+                    <span
+                        className="drag-handle"
+                        draggable
+                        onDragStart={(e) => {
+                            e.stopPropagation();
+                            const tr = e.target.closest('tr');
+                            if (tr) e.dataTransfer.setDragImage(tr, 0, 0);
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.dataTransfer.setData('text/plain', String(task.id));
+                            onSubDragStart && onSubDragStart(task.id);
+                        }}
+                        onDragEnd={() => onSubDragEnd && onSubDragEnd()}
+                    >
+                        <GripVertical size={12} />
+                    </span>
+                </td>
+            )}
             <td className="phase-row-td phase-row-td--title phase-row-td--subtask-title">
                 <span className="phase-row-subtask-indent" />
                 {task.title}
@@ -184,15 +209,75 @@ function SubtaskRow({ task, canEdit, onFieldChange, onEditTask, onDeleteTask }) 
 }
 
 /* ── Task row (top-level inside the table) ── */
-function TaskRow({ task, canEdit, onFieldChange, onAddSubtask, onEditTask, onDeleteTask }) {
+function TaskRow({ task, canEdit, onFieldChange, onAddSubtask, onEditTask, onDeleteTask,
+    dragTaskId, onTaskDragStart, onTaskDragEnd, onTaskDrop }) {
     const [expanded, setExpanded] = useState(false);
     const hasSubs = task.subtasks?.length > 0;
     const completedSubs = (task.subtasks || []).filter((s) => s.status === 'COMPLETED').length;
     const totalSubs = (task.subtasks || []).length;
 
+    // Subtask drag-and-drop reorder (local state)
+    const [subDragOrder, setSubDragOrder] = useState(null);
+    const [dragSubId, setDragSubId] = useState(null);
+    const dragSubIdRef = useRef(null);
+    const propSubtasks = task.subtasks || [];
+    const orderedSubtasks = useMemo(() => {
+        if (!subDragOrder) return propSubtasks;
+        const subMap = new Map(propSubtasks.map((s) => [s.id, s]));
+        const ordered = subDragOrder.map((id) => subMap.get(id)).filter(Boolean);
+        const orderedIds = new Set(subDragOrder);
+        const newSubs = propSubtasks.filter((s) => !orderedIds.has(s.id));
+        return [...ordered, ...newSubs];
+    }, [subDragOrder, propSubtasks]);
+
+    const handleSubDragStart = useCallback((subtaskId) => { setDragSubId(subtaskId); dragSubIdRef.current = subtaskId; }, []);
+    const handleSubDragEnd = useCallback(() => { setDragSubId(null); dragSubIdRef.current = null; }, []);
+    const handleSubDrop = useCallback((targetId) => {
+        const currentDragId = dragSubIdRef.current;
+        if (currentDragId == null || currentDragId === targetId) return;
+        setSubDragOrder((prev) => {
+            const currentOrder = (prev || propSubtasks.map((s) => s.id));
+            const fromIdx = currentOrder.indexOf(currentDragId);
+            const toIdx = currentOrder.indexOf(targetId);
+            if (fromIdx < 0 || toIdx < 0) return prev;
+            const newOrder = [...currentOrder];
+            const [moved] = newOrder.splice(fromIdx, 1);
+            newOrder.splice(toIdx, 0, moved);
+            return newOrder;
+        });
+        setDragSubId(null);
+        dragSubIdRef.current = null;
+    }, [propSubtasks]);
+
+    const isDragging = dragTaskId === task.id;
+
     return (
         <>
-            <tr className="phase-row-task-tr" onClick={() => hasSubs && setExpanded((o) => !o)}>
+            <tr
+                className={`phase-row-task-tr${isDragging ? ' phase-row-dragging' : ''}`}
+                onClick={() => hasSubs && setExpanded((o) => !o)}
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onTaskDrop && onTaskDrop(task.id); }}
+            >
+                {canEdit && (
+                    <td className="phase-row-td phase-row-td--drag">
+                        <span
+                            className="drag-handle"
+                            draggable
+                            onDragStart={(e) => {
+                                e.stopPropagation();
+                                const tr = e.target.closest('tr');
+                                if (tr) e.dataTransfer.setDragImage(tr, 0, 0);
+                                e.dataTransfer.effectAllowed = 'move';
+                                e.dataTransfer.setData('text/plain', String(task.id));
+                                onTaskDragStart && onTaskDragStart(task.id);
+                            }}
+                            onDragEnd={() => onTaskDragEnd && onTaskDragEnd()}
+                        >
+                            <GripVertical size={12} />
+                        </span>
+                    </td>
+                )}
                 <td className="phase-row-td phase-row-td--title">
                     <span className="phase-row-task-expand">
                         {hasSubs
@@ -255,8 +340,20 @@ function TaskRow({ task, canEdit, onFieldChange, onAddSubtask, onEditTask, onDel
                     )}
                 </td>
             </tr>
-            {expanded && hasSubs && task.subtasks.map((s) => (
-                <SubtaskRow key={s.id} task={s} canEdit={canEdit} onFieldChange={onFieldChange} onEditTask={onEditTask} onDeleteTask={(t) => onDeleteTask(t)} />
+            {expanded && hasSubs && orderedSubtasks.map((s) => (
+                <SubtaskRow
+                    key={s.id}
+                    task={s}
+                    canEdit={canEdit}
+                    onFieldChange={onFieldChange}
+                    onEditTask={onEditTask}
+                    onDeleteTask={(t) => onDeleteTask(t)}
+                    onSubDragStart={handleSubDragStart}
+                    onSubDragOver={() => { }}
+                    onSubDrop={handleSubDrop}
+                    onSubDragEnd={handleSubDragEnd}
+                    isDragging={dragSubId === s.id}
+                />
             ))}
         </>
     );
@@ -275,6 +372,38 @@ export default function PhaseRow({ phase, canEdit, allMembers, onPhaseUpdated, o
     const totalTasks = tasks.length;
     const completedTasks = tasks.filter((t) => t.status === 'COMPLETED').length;
     const progressPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    // Task drag-and-drop reorder (local state)
+    const [taskDragOrder, setTaskDragOrder] = useState(null);
+    const [dragTaskId, setDragTaskId] = useState(null);
+    const dragTaskIdRef = useRef(null);
+    const orderedTasks = useMemo(() => {
+        if (!taskDragOrder) return tasks;
+        const taskMap = new Map(tasks.map((t) => [t.id, t]));
+        const ordered = taskDragOrder.map((id) => taskMap.get(id)).filter(Boolean);
+        const orderedIds = new Set(taskDragOrder);
+        const newTasks = tasks.filter((t) => !orderedIds.has(t.id));
+        return [...ordered, ...newTasks];
+    }, [taskDragOrder, tasks]);
+
+    const handleTaskDragStart = useCallback((taskId) => { setDragTaskId(taskId); dragTaskIdRef.current = taskId; }, []);
+    const handleTaskDragEnd = useCallback(() => { setDragTaskId(null); dragTaskIdRef.current = null; }, []);
+    const handleTaskDrop = useCallback((targetId) => {
+        const currentDragId = dragTaskIdRef.current;
+        if (currentDragId == null || currentDragId === targetId) return;
+        setTaskDragOrder((prev) => {
+            const currentOrder = (prev || tasks.map((t) => t.id));
+            const fromIdx = currentOrder.indexOf(currentDragId);
+            const toIdx = currentOrder.indexOf(targetId);
+            if (fromIdx < 0 || toIdx < 0) return prev;
+            const newOrder = [...currentOrder];
+            const [moved] = newOrder.splice(fromIdx, 1);
+            newOrder.splice(toIdx, 0, moved);
+            return newOrder;
+        });
+        setDragTaskId(null);
+        dragTaskIdRef.current = null;
+    }, [tasks]);
 
     /* Update a field on a task or subtask in local state */
     const handleFieldChange = useCallback((taskId, field, value) => {
@@ -366,6 +495,7 @@ export default function PhaseRow({ phase, canEdit, allMembers, onPhaseUpdated, o
                         <table className="phase-row-table">
                             <thead>
                                 <tr>
+                                    {canEdit && <th className="phase-row-th phase-row-th--drag" />}
                                     <th className="phase-row-th">Task</th>
                                     <th className="phase-row-th">Status</th>
                                     <th className="phase-row-th">Priority</th>
@@ -377,7 +507,7 @@ export default function PhaseRow({ phase, canEdit, allMembers, onPhaseUpdated, o
                                 </tr>
                             </thead>
                             <tbody>
-                                {tasks.map((t) => (
+                                {orderedTasks.map((t) => (
                                     <TaskRow
                                         key={t.id}
                                         task={t}
@@ -386,6 +516,10 @@ export default function PhaseRow({ phase, canEdit, allMembers, onPhaseUpdated, o
                                         onAddSubtask={(parentTask) => onAddSubtask(phase, parentTask)}
                                         onEditTask={onEditTask}
                                         onDeleteTask={requestDeleteTask}
+                                        dragTaskId={dragTaskId}
+                                        onTaskDragStart={handleTaskDragStart}
+                                        onTaskDragEnd={handleTaskDragEnd}
+                                        onTaskDrop={handleTaskDrop}
                                     />
                                 ))}
                                 {canEdit && (
@@ -393,7 +527,7 @@ export default function PhaseRow({ phase, canEdit, allMembers, onPhaseUpdated, o
                                         className="phase-row-add-task-tr"
                                         onClick={() => onAddTask(phase)}
                                     >
-                                        <td colSpan="8" className="phase-row-add-task-td">
+                                        <td colSpan="9" className="phase-row-add-task-td">
                                             <Plus size={13} />
                                             <span>Add Task</span>
                                         </td>

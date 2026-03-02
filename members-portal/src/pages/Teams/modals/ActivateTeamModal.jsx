@@ -101,7 +101,7 @@ const ActivateTeamModal = ({ isOpen, onClose, onConfirm, team }) => {
                     </button>
                     <button
                         type="button"
-                        className="btn btn-primary"
+                        className="btn btn-success"
                         onClick={handleConfirm}
                         disabled={!isConfirmed || isActivating}
                     >

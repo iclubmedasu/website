@@ -568,3 +568,47 @@
         padding: 0.35rem 0.5rem;
     }
 }
+
+/* ── Drag handle ── */
+.phase-row-td--drag {
+    width: 1px;
+    padding: 0.5rem 0.15rem 0.5rem 0.35rem;
+    vertical-align: middle;
+    box-sizing: border-box;
+}
+
+.phase-row-th--drag {
+    width: 1px;
+    padding: 0.5rem 0.15rem 0.5rem 0.35rem;
+    box-sizing: border-box;
+}
+
+.drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    color: var(--gray-300);
+    transition: color 0.15s ease;
+    border-radius: 4px;
+    padding: 0.1rem;
+}
+
+.drag-handle:hover {
+    color: var(--gray-500);
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+/* Dragging state */
+.phase-row-dragging {
+    opacity: 0.4;
+    background: var(--purple-50) !important;
+}
+
+.phase-row-task-tr[draggable="true"]:not(.phase-row-dragging) .drag-handle:active,
+.phase-row-subtask-tr[draggable="true"]:not(.phase-row-dragging) .drag-handle:active {
+    cursor: grabbing;
+}

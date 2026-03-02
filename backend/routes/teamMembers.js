@@ -81,6 +81,18 @@ router.post('/assign', async (req, res) => {
             return res.status(400).json({ error: 'Role does not belong to this team' });
         }
 
+        // Check maxCount for the role
+        if (role.maxCount != null) {
+            const activeCount = await prisma.teamMember.count({
+                where: { teamId: parseInt(teamId), roleId: parseInt(roleId), isActive: true }
+            });
+            if (activeCount >= role.maxCount) {
+                return res.status(400).json({
+                    error: `Role "${role.roleName}" already has ${activeCount}/${role.maxCount} member(s). Cannot exceed the maximum.`
+                });
+            }
+        }
+
         const memberIdInt = parseInt(memberId);
         const teamIdInt = parseInt(teamId);
         const roleIdInt = parseInt(roleId);
@@ -208,6 +220,18 @@ router.patch('/:id/change-role', async (req, res) => {
             });
         }
 
+        // Check maxCount for the new role (only if actually changing roles)
+        if (parseInt(newRoleId) !== currentAssignment.roleId && newRole.maxCount != null) {
+            const activeCount = await prisma.teamMember.count({
+                where: { teamId: currentAssignment.teamId, roleId: parseInt(newRoleId), isActive: true }
+            });
+            if (activeCount >= newRole.maxCount) {
+                return res.status(400).json({
+                    error: `Role "${newRole.roleName}" already has ${activeCount}/${newRole.maxCount} member(s). Cannot exceed the maximum.`
+                });
+            }
+        }
+
         // Validate new subteam if provided (must belong to same team)
         let subteamIdValue = null;
         if (newSubteamId != null && newSubteamId !== '') {
@@ -309,6 +333,18 @@ router.patch('/:id/transfer', async (req, res) => {
             return res.status(400).json({
                 error: 'Role does not belong to the new team'
             });
+        }
+
+        // Check maxCount for the new role on the target team
+        if (newRole.maxCount != null) {
+            const activeCount = await prisma.teamMember.count({
+                where: { teamId: parseInt(newTeamId), roleId: parseInt(newRoleId), isActive: true }
+            });
+            if (activeCount >= newRole.maxCount) {
+                return res.status(400).json({
+                    error: `Role "${newRole.roleName}" already has ${activeCount}/${newRole.maxCount} member(s). Cannot exceed the maximum.`
+                });
+            }
         }
 
         // Validate new subteam if provided (must belong to new team)

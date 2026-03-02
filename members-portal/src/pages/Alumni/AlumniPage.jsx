@@ -2,6 +2,21 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Eye, Users, ChevronDown } from 'lucide-react';
 import { alumniAPI, teamsAPI, getProfilePhotoUrl } from '../../services/api';
 import ViewMemberModal from '../Teams/modals/ViewMemberModal';
+import '../../pages/Projects/ProjectsPage.css';
+
+// Pagination helper – produces [1, 2, '...', 5, 6, 7, '...', 10] style array
+function getPageNumbers(current, total) {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages = [];
+    pages.push(1);
+    if (current > 3) pages.push('...');
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (current < total - 2) pages.push('...');
+    pages.push(total);
+    return pages;
+}
 
 
 function FilterDropdown({ options, value, onChange, triggerLabel }) {
@@ -66,6 +81,10 @@ function AlumniPage() {
     const [showViewModal, setShowViewModal] = useState(false);
     const [viewingMemberId, setViewingMemberId] = useState(null);
 
+    // Pagination
+    const ROWS_PER_PAGE = 20;
+    const [currentPage, setCurrentPage] = useState(1);
+
     useEffect(() => {
         const loadTeams = async () => {
             try {
@@ -110,6 +129,16 @@ function AlumniPage() {
             avatar: a.member?.profilePhotoUrl ? getProfilePhotoUrl(a.memberId) : null,
         }));
     }, [alumniList]);
+
+    // Reset to page 1 when filters change
+    useEffect(() => { setCurrentPage(1); }, [filterTeamId]);
+
+    // Pagination derived values
+    const totalPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
+    const paginatedRows = useMemo(() => {
+        const start = (currentPage - 1) * ROWS_PER_PAGE;
+        return rows.slice(start, start + ROWS_PER_PAGE);
+    }, [rows, currentPage]);
 
     const formatDate = (d) => {
         if (!d || Number.isNaN(new Date(d).getTime())) return '—';
@@ -167,7 +196,7 @@ function AlumniPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {rows.map((row, index) => (
+                                    {paginatedRows.map((row, index) => (
                                         <tr key={row.id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
                                             <td>
                                                 <div className="table-member-cell">
@@ -211,6 +240,39 @@ function AlumniPage() {
                         </div>
                     )}
                 </div>
+                {totalPages > 1 && (
+                    <div className="pagination-controls">
+                        <button
+                            className="pagination-btn"
+                            disabled={currentPage <= 1}
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        >
+                            Previous
+                        </button>
+                        <div className="pagination-pages">
+                            {getPageNumbers(currentPage, totalPages).map((p, i) =>
+                                p === '...' ? (
+                                    <span key={`ellipsis-${i}`} className="pagination-ellipsis">…</span>
+                                ) : (
+                                    <button
+                                        key={p}
+                                        className={`pagination-page-btn${p === currentPage ? ' pagination-page-btn--active' : ''}`}
+                                        onClick={() => setCurrentPage(p)}
+                                    >
+                                        {p}
+                                    </button>
+                                )
+                            )}
+                        </div>
+                        <button
+                            className="pagination-btn"
+                            disabled={currentPage >= totalPages}
+                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        >
+                            Next
+                        </button>
+                    </div>
+                )}
             </div>
 
             <ViewMemberModal

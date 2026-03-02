@@ -230,6 +230,8 @@ model Project {
   dueDate         DateTime?
   completedDate   DateTime?
   isActive        Boolean   @default(true)
+  isFinalized     Boolean   @default(false)
+  isArchived      Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
@@ -247,6 +249,8 @@ model Project {
   @@index([dueDate])
   @@index([priority])
   @@index([projectTypeId])
+  @@index([isFinalized])
+  @@index([isArchived])
 }
 
 // ============================================

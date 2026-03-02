@@ -5,6 +5,21 @@ import { teamMembersAPI, membersAPI, teamsAPI, teamRolesAPI, teamSubteamsAPI, ge
 import ViewMemberModal from '../Teams/modals/ViewMemberModal';
 import EditMembersModal from '../Teams/modals/EditMembersModal';
 import AssignToTeamModal from './modals/AssignToTeamModal';
+import '../Projects/ProjectsPage.css';
+
+// Pagination helper – produces [1, 2, '...', 5, 6, 7, '...', 10] style array
+function getPageNumbers(current, total) {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages = [];
+    pages.push(1);
+    if (current > 3) pages.push('...');
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (current < total - 2) pages.push('...');
+    pages.push(total);
+    return pages;
+}
 
 
 // Filter dropdown that matches Manage Roles/Subteams squircle + list styling
@@ -79,6 +94,10 @@ function MembersPage() {
     // Filters
     const [filterTeamId, setFilterTeamId] = useState('');
     const [filterStatus, setFilterStatus] = useState(''); // '' = all, 'active' | 'inactive' | 'unassigned'
+
+    // Pagination
+    const ROWS_PER_PAGE = 20;
+    const [currentPage, setCurrentPage] = useState(1);
 
     // Modals
     const [showViewModal, setShowViewModal] = useState(false);
@@ -197,6 +216,16 @@ function MembersPage() {
             isUnassigned: !!tm.isUnassigned,
         }));
     }, [assignments]);
+
+    // Reset to page 1 when filters change
+    useEffect(() => { setCurrentPage(1); }, [filterTeamId, filterStatus]);
+
+    // Pagination derived values
+    const totalPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
+    const paginatedRows = useMemo(() => {
+        const start = (currentPage - 1) * ROWS_PER_PAGE;
+        return rows.slice(start, start + ROWS_PER_PAGE);
+    }, [rows, currentPage]);
 
     const handleViewMember = (row) => {
         setViewingMemberId(row.memberId);
@@ -354,7 +383,7 @@ function MembersPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {rows.map((row, index) => (
+                                    {paginatedRows.map((row, index) => (
                                         <tr key={row.id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
                                             <td>
                                                 <div className="table-member-cell">
@@ -418,6 +447,39 @@ function MembersPage() {
                         </div>
                     )}
                 </div>
+                {totalPages > 1 && (
+                    <div className="pagination-controls">
+                        <button
+                            className="pagination-btn"
+                            disabled={currentPage <= 1}
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        >
+                            Previous
+                        </button>
+                        <div className="pagination-pages">
+                            {getPageNumbers(currentPage, totalPages).map((p, i) =>
+                                p === '...' ? (
+                                    <span key={`ellipsis-${i}`} className="pagination-ellipsis">…</span>
+                                ) : (
+                                    <button
+                                        key={p}
+                                        className={`pagination-page-btn${p === currentPage ? ' pagination-page-btn--active' : ''}`}
+                                        onClick={() => setCurrentPage(p)}
+                                    >
+                                        {p}
+                                    </button>
+                                )
+                            )}
+                        </div>
+                        <button
+                            className="pagination-btn"
+                            disabled={currentPage >= totalPages}
+                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        >
+                            Next
+                        </button>
+                    </div>
+                )}
             </div>
 
             <ViewMemberModal

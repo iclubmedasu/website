@@ -484,13 +484,14 @@ export const projectTypesAPI = {
 // ============================================
 
 export const projectsAPI = {
-    getAll: async ({ status, priority, teamId, createdByMe, isActive } = {}) => {
+    getAll: async ({ status, priority, teamId, createdByMe, isActive, archived } = {}) => {
         const params = new URLSearchParams();
         if (status) params.append('status', status);
         if (priority) params.append('priority', priority);
         if (teamId) params.append('teamId', teamId);
         if (createdByMe) params.append('createdByMe', 'true');
         if (isActive !== undefined) params.append('isActive', isActive);
+        if (archived) params.append('archived', 'true');
         const qs = params.toString();
         const url = qs ? `${API_BASE_URL}/projects?${qs}` : `${API_BASE_URL}/projects`;
         const response = await fetch(url, { headers: getAuthHeaders() });
@@ -530,6 +531,22 @@ export const projectsAPI = {
 
     activate: async (id) => {
         const response = await fetch(`${API_BASE_URL}/projects/${id}/activate`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    finalize: async (id) => {
+        const response = await fetch(`${API_BASE_URL}/projects/${id}/finalize`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    archive: async (id) => {
+        const response = await fetch(`${API_BASE_URL}/projects/${id}/archive`, {
             method: 'PATCH',
             headers: getAuthHeaders(),
         });
@@ -915,5 +932,32 @@ export const projectFilesAPI = {
     getVersionDownloadUrl: (fileId, commitSha) => {
         const token = localStorage.getItem('token');
         return `${API_BASE_URL}/project-files/${fileId}/version/${commitSha}?token=${token}`;
+    },
+
+    /** Rename a file (display name only). */
+    rename: async (fileId, fileName) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/${fileId}/rename`, {
+            method: 'PATCH',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileName }),
+        });
+        return handleResponse(response);
+    },
+
+    /** Fetch soft-deleted files for a project. */
+    getDeleted: async (projectId) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/deleted?projectId=${projectId}`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    /** Restore a soft-deleted file from GitHub history. */
+    restore: async (fileId) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/${fileId}/restore`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
     },
 };

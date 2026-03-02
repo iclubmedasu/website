@@ -53,13 +53,15 @@ async function isAdmin(req) {
  * True if: admin/dev, OR the creator, OR a member of a team with canEdit=true for the project.
  */
 async function canUserEditProject(req, projectId) {
-    if (await isAdmin(req)) return true;
     if (!req.user.memberId) return false;
 
     const project = await prisma.project.findUnique({
         where: { id: projectId },
-        select: { createdByMemberId: true },
+        select: { createdByMemberId: true, isFinalized: true },
     });
+    if (project?.isFinalized) return false;
+
+    if (await isAdmin(req)) return true;
     if (project?.createdByMemberId === req.user.memberId) return true;
 
     const teamIds = await getUserTeamIds(req.user.memberId);
@@ -77,12 +79,21 @@ async function canUserEditProject(req, projectId) {
 // ============================================
 router.get('/', async (req, res) => {
     try {
-        const { status, priority, teamId, createdByMe, isActive } = req.query;
+        const { status, priority, teamId, createdByMe, isActive, archived } = req.query;
         const admin = await isAdmin(req);
 
         const where = {};
         if (isActive !== undefined) where.isActive = isActive === 'true';
         else where.isActive = true;
+
+        // archived=true → show only archived; default → exclude archived
+        if (archived === 'true') {
+            where.isArchived = true;
+            // Archived projects are inactive, so override isActive filter
+            delete where.isActive;
+        } else {
+            where.isArchived = false;
+        }
 
         if (status) where.status = status;
         if (priority) where.priority = priority;
@@ -390,6 +401,70 @@ router.put('/:id', async (req, res) => {
     } catch (error) {
         console.error('PUT /projects/:id', error);
         res.status(500).json({ error: 'Failed to update project' });
+    }
+});
+
+// ============================================
+// PATCH /api/projects/:id/finalize  –  mark project as completed (read-only)
+// ============================================
+router.patch('/:id/finalize', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'Invalid project ID' });
+        if (!(await canUserEditProject(req, id))) {
+            return res.status(403).json({ error: 'Edit access denied' });
+        }
+        const project = await prisma.project.update({
+            where: { id },
+            data: {
+                isFinalized: true,
+                status: 'COMPLETED',
+                completedDate: new Date(),
+            },
+            include: {
+                createdBy: { select: { id: true, fullName: true } },
+                projectTeams: { include: { team: { select: { id: true, name: true } } } },
+                projectType: { select: { id: true, name: true, category: true } },
+                tags: true,
+            },
+        });
+        res.json(project);
+    } catch (error) {
+        console.error('PATCH /projects/:id/finalize', error);
+        res.status(500).json({ error: 'Failed to finalize project' });
+    }
+});
+
+// ============================================
+// PATCH /api/projects/:id/archive  –  finalize + archive (move to past projects)
+// ============================================
+router.patch('/:id/archive', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'Invalid project ID' });
+        if (!(await canUserEditProject(req, id))) {
+            return res.status(403).json({ error: 'Edit access denied' });
+        }
+        const project = await prisma.project.update({
+            where: { id },
+            data: {
+                isArchived: true,
+                isFinalized: true,
+                isActive: false,
+                status: 'COMPLETED',
+                completedDate: new Date(),
+            },
+            include: {
+                createdBy: { select: { id: true, fullName: true } },
+                projectTeams: { include: { team: { select: { id: true, name: true } } } },
+                projectType: { select: { id: true, name: true, category: true } },
+                tags: true,
+            },
+        });
+        res.json(project);
+    } catch (error) {
+        console.error('PATCH /projects/:id/archive', error);
+        res.status(500).json({ error: 'Failed to archive project' });
     }
 });
 

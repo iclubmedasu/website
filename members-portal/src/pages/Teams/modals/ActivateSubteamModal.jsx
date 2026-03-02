@@ -179,7 +179,7 @@ const ActivateSubteamModal = ({ isOpen, onClose, onSubmit, teamId, initialSubtea
                     </button>
                     <button
                         type="button"
-                        className="btn btn-primary"
+                        className="btn btn-success"
                         onClick={handleConfirm}
                         disabled={!isConfirmed || isSubmitting}
                     >

@@ -36,6 +36,8 @@ const AssignToTeamModal = ({
 
     // Roles fetched for the selected team
     const [rolesForTeam, setRolesForTeam] = useState([]);
+    // Active team members (for maxCount validation)
+    const [teamMembersForTeam, setTeamMembersForTeam] = useState([]);
 
     // Reset state when modal opens
     useEffect(() => {
@@ -51,6 +53,7 @@ const AssignToTeamModal = ({
             setErrors({});
             setSuccessMessage('');
             setRolesForTeam([]);
+            setTeamMembersForTeam([]);
         }
     }, [isOpen, member]);
 
@@ -68,6 +71,23 @@ const AssignToTeamModal = ({
             })
             .catch(() => {
                 if (!cancelled) setRolesForTeam([]);
+            });
+        return () => { cancelled = true; };
+    }, [isOpen, teamIdNum]);
+
+    // Fetch active team members for maxCount validation
+    useEffect(() => {
+        if (!isOpen || !teamIdNum) {
+            setTeamMembersForTeam([]);
+            return;
+        }
+        let cancelled = false;
+        teamMembersAPI.getAll(teamIdNum, undefined, true)
+            .then((data) => {
+                if (!cancelled) setTeamMembersForTeam(Array.isArray(data) ? data : []);
+            })
+            .catch(() => {
+                if (!cancelled) setTeamMembersForTeam([]);
             });
         return () => { cancelled = true; };
     }, [isOpen, teamIdNum]);
@@ -98,7 +118,20 @@ const AssignToTeamModal = ({
 
         if (mode === MODES.ASSIGN) {
             if (!formData.teamId) newErrors.teamId = 'Team is required';
-            if (!formData.roleId) newErrors.roleId = 'Role is required';
+            if (!formData.roleId) {
+                newErrors.roleId = 'Role is required';
+            } else {
+                // Check role maxCount
+                const selectedRole = rolesForTeam.find((r) => r.id === parseInt(formData.roleId, 10));
+                if (selectedRole && selectedRole.maxCount != null) {
+                    const currentCount = teamMembersForTeam.filter(
+                        (tm) => tm.roleId === selectedRole.id && tm.isActive
+                    ).length;
+                    if (currentCount >= selectedRole.maxCount) {
+                        newErrors.roleId = `This role already has ${currentCount}/${selectedRole.maxCount} member${selectedRole.maxCount !== 1 ? 's' : ''}`;
+                    }
+                }
+            }
         }
 
         if (mode === MODES.LEAVE) {
@@ -302,9 +335,18 @@ const AssignToTeamModal = ({
                                         disabled={isSubmitting || !formData.teamId}
                                     >
                                         <option value="">— Select role —</option>
-                                        {rolesForTeam.map(r => (
-                                            <option key={r.id} value={String(r.id)}>{r.roleName}</option>
-                                        ))}
+                                        {rolesForTeam.map(r => {
+                                            const currentCount = teamMembersForTeam.filter(
+                                                (tm) => tm.roleId === r.id && tm.isActive
+                                            ).length;
+                                            const isFull = r.maxCount != null && currentCount >= r.maxCount;
+                                            const suffix = r.maxCount != null ? ` (${currentCount}/${r.maxCount})` : '';
+                                            return (
+                                                <option key={r.id} value={String(r.id)} disabled={isFull}>
+                                                    {r.roleName}{suffix}{isFull ? ' — Full' : ''}
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                     {errors.roleId && <span className="field-error">{errors.roleId}</span>}
                                 </div>

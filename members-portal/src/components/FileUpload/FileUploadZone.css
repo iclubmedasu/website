@@ -215,7 +215,8 @@
 .file-download-btn,
 .file-retry-btn,
 .file-delete-btn,
-.file-history-btn {
+.file-history-btn,
+.file-rename-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -236,6 +237,11 @@
 }
 
 .file-history-btn:hover {
+    color: var(--purple-700);
+    background: var(--purple-50);
+}
+
+.file-rename-btn:hover {
     color: var(--purple-700);
     background: var(--purple-50);
 }
@@ -327,4 +333,109 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* ─── Deleted files toggle + section ─── */
+
+.deleted-files-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    background: white;
+    color: var(--gray-500);
+    font-family: var(--font-heading);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    align-self: flex-start;
+}
+
+.deleted-files-toggle:hover {
+    border-color: var(--gray-400);
+    color: var(--gray-700);
+    background: var(--gray-50);
+}
+
+.deleted-files-toggle--active {
+    border-color: var(--purple-300);
+    color: var(--purple-600);
+    background: var(--purple-50);
+}
+
+.deleted-files-section {
+    margin-top: 0.25rem;
+}
+
+.deleted-files-loading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    color: var(--gray-500);
+}
+
+.deleted-files-empty {
+    padding: 0.75rem;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    color: var(--gray-400);
+    font-style: italic;
+}
+
+.file-list--deleted {
+    border: 1px dashed var(--gray-300);
+    border-radius: var(--radius-sm);
+    background: var(--gray-50);
+}
+
+.file-item--deleted {
+    opacity: 0.75;
+}
+
+.file-icon--deleted {
+    color: var(--gray-400);
+}
+
+.file-name--deleted {
+    text-decoration: line-through;
+    color: var(--gray-500);
+}
+
+.deleted-file-date {
+    font-family: var(--font-body);
+    font-size: 0.72rem;
+    color: var(--gray-400);
+}
+
+.file-restore-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--success-border);
+    border-radius: var(--radius-sm);
+    background: var(--success-bg);
+    color: var(--success-text);
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.file-restore-btn:hover:not(:disabled) {
+    background: var(--success-accent);
+    color: white;
+    border-color: var(--success-accent);
+}
+
+.file-restore-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }

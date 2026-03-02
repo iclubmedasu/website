@@ -23,6 +23,8 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [availableRoles, setAvailableRoles] = useState([]);
+    // Active team members (for maxCount validation)
+    const [teamMembersForTeam, setTeamMembersForTeam] = useState([]);
 
     // Initialize form with selectedTeamId when modal opens
     useEffect(() => {
@@ -47,6 +49,24 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
             setAvailableRoles([]);
         }
     }, [formData.selectedTeamId, roles]);
+
+    // Fetch active team members for maxCount validation
+    useEffect(() => {
+        const teamIdNum = formData.selectedTeamId ? parseInt(formData.selectedTeamId, 10) : null;
+        if (!isOpen || !teamIdNum) {
+            setTeamMembersForTeam([]);
+            return;
+        }
+        let cancelled = false;
+        teamMembersAPI.getAll(teamIdNum, undefined, true)
+            .then((data) => {
+                if (!cancelled) setTeamMembersForTeam(Array.isArray(data) ? data : []);
+            })
+            .catch(() => {
+                if (!cancelled) setTeamMembersForTeam([]);
+            });
+        return () => { cancelled = true; };
+    }, [isOpen, formData.selectedTeamId]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -87,6 +107,17 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
 
         if (!formData.selectedRoleId) {
             newErrors.selectedRoleId = 'Role selection is required';
+        } else {
+            // Check role maxCount
+            const selectedRole = availableRoles.find((r) => r.id === parseInt(formData.selectedRoleId, 10));
+            if (selectedRole && selectedRole.maxCount != null) {
+                const currentCount = teamMembersForTeam.filter(
+                    (tm) => tm.roleId === selectedRole.id && tm.isActive
+                ).length;
+                if (currentCount >= selectedRole.maxCount) {
+                    newErrors.selectedRoleId = `This role already has ${currentCount}/${selectedRole.maxCount} member${selectedRole.maxCount !== 1 ? 's' : ''}`;
+                }
+            }
         }
 
         // Optional fields: if provided, validate format
@@ -440,11 +471,18 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
                                         disabled={!formData.selectedTeamId || isSubmitting}
                                     >
                                         <option value="">-- Select a Role --</option>
-                                        {availableRoles.map(role => (
-                                            <option key={role.id} value={role.id}>
-                                                {role.roleName}
-                                            </option>
-                                        ))}
+                                        {availableRoles.map(role => {
+                                            const currentCount = teamMembersForTeam.filter(
+                                                (tm) => tm.roleId === role.id && tm.isActive
+                                            ).length;
+                                            const isFull = role.maxCount != null && currentCount >= role.maxCount;
+                                            const suffix = role.maxCount != null ? ` (${currentCount}/${role.maxCount})` : '';
+                                            return (
+                                                <option key={role.id} value={role.id} disabled={isFull}>
+                                                    {role.roleName}{suffix}{isFull ? ' — Full' : ''}
+                                                </option>
+                                            );
+                                        })}
                                     </select>
                                     {errors.selectedRoleId && (
                                         <span className="field-error">{errors.selectedRoleId}</span>
