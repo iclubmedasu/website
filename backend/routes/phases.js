@@ -2,6 +2,22 @@ const express = require('express');
 const router = express.Router();
 const { prisma } = require('../db');
 
+/**
+ * Is the user privileged (developer, officer, administration, leadership)?
+ */
+function isPrivilegedUser(req) {
+    return !!(req.user.isDeveloper || req.user.isOfficer || req.user.isAdmin || req.user.isLeadership);
+}
+
+/**
+ * Can the user modify phases (add/edit/delete)?
+ * Privileged + special roles only.
+ */
+function canUserEditPhase(req) {
+    if (!req.user.memberId) return false;
+    return isPrivilegedUser(req) || !!req.user.isSpecial;
+}
+
 // ============================================
 // GET /api/phases?projectId=X  –  list active phases for a project
 // ============================================
@@ -38,6 +54,11 @@ router.post('/', async (req, res) => {
 
         if (!projectId) return res.status(400).json({ error: 'projectId is required' });
         if (!title?.trim()) return res.status(400).json({ error: 'title is required' });
+
+        // Only privileged + special roles can create phases
+        if (!canUserEditPhase(req)) {
+            return res.status(403).json({ error: 'Only privileged and special roles can create phases' });
+        }
 
         // Auto-set order to max existing order + 1 if not provided
         let phaseOrder = order;
@@ -78,6 +99,11 @@ router.patch('/:id', async (req, res) => {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid phase ID' });
 
+        // Only privileged + special roles can edit phases
+        if (!canUserEditPhase(req)) {
+            return res.status(403).json({ error: 'Only privileged and special roles can edit phases' });
+        }
+
         const { title, description, order, isActive } = req.body;
 
         const data = {};
@@ -108,6 +134,11 @@ router.delete('/:id', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid phase ID' });
+
+        // Only privileged + special roles can delete phases
+        if (!canUserEditPhase(req)) {
+            return res.status(403).json({ error: 'Only privileged and special roles can delete phases' });
+        }
 
         await prisma.projectPhase.delete({ where: { id } });
 

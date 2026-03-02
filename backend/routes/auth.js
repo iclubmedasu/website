@@ -204,13 +204,7 @@ router.post('/setup-password', async (req, res) => {
             }
         });
 
-        // Generate token
-        const token = jwt.sign(
-            { userId: user.id, memberId: member.id, email: member.email },
-            JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
+        // Compute authority flags before generating token
         const teamMemberships = await prisma.teamMember.findMany({
             where: { memberId: member.id, isActive: true },
             select: {
@@ -222,6 +216,13 @@ router.post('/setup-password', async (req, res) => {
         const teamIds = teamMemberships.map((tm) => tm.teamId);
         const { isOfficer, isAdmin, isLeadership, isSpecial } = computeAuthorityFlags(teamMemberships, false);
         const leadershipTeamIds = getLeadershipTeamIds(teamMemberships);
+
+        // Generate token with authority flags
+        const token = jwt.sign(
+            { userId: user.id, memberId: member.id, email: member.email, isOfficer: !!isOfficer, isAdmin: !!isAdmin, isLeadership: !!isLeadership, isSpecial: !!isSpecial, teamIds, leadershipTeamIds },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
 
         res.status(201).json({
             token,
@@ -556,12 +557,6 @@ router.post('/complete-profile', async (req, res) => {
             })
         ]);
 
-        const token = jwt.sign(
-            { userId: userRecord.id, memberId: member.id, email: primaryEmail },
-            JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
         const teamMemberships = await prisma.teamMember.findMany({
             where: { memberId: member.id, isActive: true },
             select: {
@@ -573,6 +568,12 @@ router.post('/complete-profile', async (req, res) => {
         const teamIds = teamMemberships.map((tm) => tm.teamId);
         const { isOfficer, isAdmin, isLeadership, isSpecial } = computeAuthorityFlags(teamMemberships, false);
         const leadershipTeamIds = getLeadershipTeamIds(teamMemberships);
+
+        const token = jwt.sign(
+            { userId: userRecord.id, memberId: member.id, email: primaryEmail, isOfficer: !!isOfficer, isAdmin: !!isAdmin, isLeadership: !!isLeadership, isSpecial: !!isSpecial, teamIds, leadershipTeamIds },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
 
         res.status(200).json({
             token,
@@ -790,12 +791,6 @@ router.post('/complete-officer-profile', async (req, res) => {
             })
         ]);
 
-        const token = jwt.sign(
-            { userId: userRecord.id, memberId: member.id, email: updatedMember.email },
-            JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
         const teamMemberships = await prisma.teamMember.findMany({
             where: { memberId: member.id, isActive: true },
             select: {
@@ -807,6 +802,12 @@ router.post('/complete-officer-profile', async (req, res) => {
         const teamIds = teamMemberships.map((tm) => tm.teamId);
         const { isOfficer, isAdmin, isLeadership, isSpecial } = computeAuthorityFlags(teamMemberships, false);
         const leadershipTeamIds = getLeadershipTeamIds(teamMemberships);
+
+        const token = jwt.sign(
+            { userId: userRecord.id, memberId: member.id, email: updatedMember.email, isOfficer: !!isOfficer, isAdmin: !!isAdmin, isLeadership: !!isLeadership, isSpecial: !!isSpecial, teamIds, leadershipTeamIds },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
 
         res.status(200).json({
             token,
@@ -917,13 +918,7 @@ router.post('/login', async (req, res) => {
             data: { lastLogin: new Date() }
         });
 
-        // Generate token
-        const token = jwt.sign(
-            { userId: member.user.id, memberId: member.id, email: member.email },
-            JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
+        // Compute authority flags before generating token
         const teamMemberships = await prisma.teamMember.findMany({
             where: { memberId: member.id, isActive: true },
             select: {
@@ -935,6 +930,13 @@ router.post('/login', async (req, res) => {
         const teamIds = teamMemberships.map((tm) => tm.teamId);
         const { isOfficer, isAdmin, isLeadership, isSpecial } = computeAuthorityFlags(teamMemberships, false);
         const leadershipTeamIds = getLeadershipTeamIds(teamMemberships);
+
+        // Generate token with authority flags
+        const token = jwt.sign(
+            { userId: member.user.id, memberId: member.id, email: member.email, isOfficer: !!isOfficer, isAdmin: !!isAdmin, isLeadership: !!isLeadership, isSpecial: !!isSpecial, teamIds, leadershipTeamIds },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
 
         res.json({
             token,

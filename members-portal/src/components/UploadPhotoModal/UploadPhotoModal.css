@@ -3,7 +3,7 @@
    ============================================ */
 
 .upload-photo-modal {
-    max-width: 480px;
+    max-width: 30rem;
 }
 
 /* Preview area */
@@ -111,7 +111,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 280px;
+    max-width: 17.5rem;
 }
 
 .upload-photo-file-size {

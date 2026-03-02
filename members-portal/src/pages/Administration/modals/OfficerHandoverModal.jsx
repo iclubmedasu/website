@@ -107,6 +107,38 @@ function OfficerHandoverModal({
                     <div className="modal-body">
                         {error && <div className="error-message">{error}</div>}
 
+                        <div className="form-section info-section">
+                            <h3 className="form-section-title">Current Officer</h3>
+                            <div className="info-grid">
+                                <div className="info-item">
+                                    <label className="info-label">Name</label>
+                                    <p className="info-value">{currentName}</p>
+                                </div>
+                                <div className="info-item">
+                                    <label className="info-label">Team</label>
+                                    <p className="info-value">Administration</p>
+                                </div>
+                                <div className="info-item">
+                                    <label className="info-label">Role</label>
+                                    <p className="info-value">{currentOfficerAssignee.role?.roleName || 'Officer'}</p>
+                                </div>
+                                <div className="info-item">
+                                    <label className="info-label">Status</label>
+                                    <p className="info-value">{currentOfficerAssignee.isActive !== false ? 'Active' : 'Inactive'}</p>
+                                </div>
+                                {currentOfficerAssignee.joinedDate && (
+                                    <div className="info-item">
+                                        <label className="info-label">Since</label>
+                                        <p className="info-value">
+                                            {!Number.isNaN(new Date(currentOfficerAssignee.joinedDate).getTime())
+                                                ? new Date(currentOfficerAssignee.joinedDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                                                : '—'}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         <div className="form-section">
                             <h3 className="form-section-title">What do you want to do?</h3>
                             <div className="radio-group-list">

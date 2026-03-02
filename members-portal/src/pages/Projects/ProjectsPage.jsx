@@ -311,7 +311,7 @@ function TaskItem({ task, canEdit, onStatusChange, onAddSubtask }) {
 // ─────────────────────────────────────────────────────────
 //  Project Card with Expandable Detail
 // ─────────────────────────────────────────────────────────
-function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeactivate, onFinalize, onArchive, onRefreshDetail, allMembers, canEdit }) {
+function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeactivate, onFinalize, onArchive, onRefreshDetail, allMembers, canEdit, canManage, canUpload, canEditStructure, canEditStatus }) {
     const { user } = useAuth();
     const over = isOverdue(project.dueDate, project.status);
     const ownerTeam = fullDetail?.projectTeams?.find((pt) => pt.isOwner) ?? null;
@@ -394,7 +394,7 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                 <div className="project-card-header">
                     <span className="project-card-title">{project.title}</span>
                     <div className="project-card-meta">
-                        {project.isFinalized && (
+                        {project.isFinalized && canManage && (
                             <>
                                 <span className="badge badge-finalized" title="Finalized">
                                     <CheckCircle size={12} />
@@ -408,6 +408,12 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                                     <Archive size={14} />
                                 </button>
                             </>
+                        )}
+                        {project.isFinalized && !canManage && (
+                            <span className="badge badge-finalized" title="Finalized">
+                                <CheckCircle size={12} />
+                                Finalized
+                            </span>
                         )}
                         {canEdit && !project.isFinalized && (
                             <>
@@ -491,7 +497,7 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                                 <h2 className="project-card-title" style={{ marginBottom: 0 }}>
                                     {detail.title}
                                 </h2>
-                                {detail.isFinalized && (
+                                {detail.isFinalized && canManage && (
                                     <div className="expanded-title-actions">
                                         <span className="badge badge-finalized" style={{ fontSize: '0.82rem' }}>
                                             <CheckCircle size={14} />
@@ -505,6 +511,12 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                                             Archive
                                         </button>
                                     </div>
+                                )}
+                                {detail.isFinalized && !canManage && (
+                                    <span className="badge badge-finalized" style={{ fontSize: '0.82rem' }}>
+                                        <CheckCircle size={14} />
+                                        Finalized
+                                    </span>
                                 )}
                                 {canEdit && !detail.isFinalized && (
                                     <div className="expanded-title-actions">
@@ -640,7 +652,8 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                                     <PhaseRow
                                         key={phase.id}
                                         phase={phase}
-                                        canEdit={canEdit}
+                                        canEdit={canEditStructure}
+                                        canEditStatus={canEditStatus}
                                         allMembers={allMembers}
                                         onPhaseUpdated={() => onRefreshDetail(detail.id)}
                                         onTaskUpdated={handleTaskFieldUpdate}
@@ -651,7 +664,7 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                                         onDeletePhase={(p) => setConfirmDeletePhase(p)}
                                     />
                                 ))}
-                                {canEdit && (
+                                {canEditStructure && (
                                     <div
                                         className="phase-add-row"
                                         onClick={(e) => { e.stopPropagation(); setShowAddPhase(true); }}
@@ -685,7 +698,7 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                                 onFileRenamed={(updated) => setProjectFiles((prev) =>
                                     prev.map((f) => f.id === updated.id ? { ...f, fileName: updated.fileName } : f)
                                 )}
-                                disabled={!canEdit}
+                                disabled={!canUpload}
                             />
                         </div>
 
@@ -953,15 +966,36 @@ export default function ProjectsPage() {
     };
 
     // ── Permission helpers ──
-    const canCreateProject = user?.isDeveloper || user?.isAdmin || user?.isOfficer || user?.isLeadership || user?.isSpecial;
+    // Privileged roles: developer, officer, admin, leadership
+    const isPrivileged = user?.isDeveloper || user?.isAdmin || user?.isOfficer || user?.isLeadership;
+    // Privileged + special roles can manage phases/tasks
+    const isPrivilegedOrSpecial = isPrivileged || user?.isSpecial;
+    // Only privileged roles can create/edit/manage projects
+    const canCreateProject = isPrivileged;
 
     const canEditProject = (project) => {
         if (project.isFinalized) return false;
-        if (canCreateProject) return true;
+        return isPrivileged;
+    };
+
+    // canManageProject: finalize, archive, deactivate (NOT blocked by finalized)
+    const canManageProject = () => isPrivileged;
+
+    // Can the user upload files? Any team member or privileged user
+    const canUploadToProject = (project) => {
+        if (isPrivileged) return true;
         if (!user?.id) return false;
-        if (project.createdByMemberId === user.id) return true;
         return (project.projectTeams ?? []).some(
-            (pt) => pt.canEdit && (user.teamIds ?? []).includes(pt.teamId)
+            (pt) => (user.teamIds ?? []).includes(pt.teamId)
+        );
+    };
+
+    // Filter allMembers to only those in the project's teams
+    const getProjectMembers = (project) => {
+        if (!project?.projectTeams?.length) return allMembers;
+        const projectTeamIds = new Set(project.projectTeams.map((pt) => pt.teamId));
+        return allMembers.filter((m) =>
+            m.teamMemberships?.some((tm) => tm.isActive && projectTeamIds.has(tm.teamId))
         );
     };
 
@@ -1032,8 +1066,12 @@ export default function ProjectsPage() {
                                 onFinalize={(proj) => setFinalizingProject(proj)}
                                 onArchive={(proj) => setArchivingProject(proj)}
                                 onRefreshDetail={handleRefreshDetail}
-                                allMembers={allMembers}
+                                allMembers={getProjectMembers(p)}
                                 canEdit={canEditProject(p)}
+                                canManage={canManageProject()}
+                                canUpload={canUploadToProject(p)}
+                                canEditStructure={isPrivilegedOrSpecial && !p.isFinalized}
+                                canEditStatus={isPrivilegedOrSpecial}
                             />
                         ))}
                         {canCreateProject && currentPage === 1 && (

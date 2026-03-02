@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const { prisma } = require('../db');
 
@@ -23,7 +23,7 @@ function toTitleCase(str) {
     }).join(' ');
 }
 
-// ── helpers ──────────────────────────────────────────────
+// â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function getUserTeamIds(memberId) {
     const rows = await prisma.teamMember.findMany({
         where: { memberId, isActive: true },
@@ -46,49 +46,49 @@ async function isAdmin(req) {
 }
 
 /**
- * Can the requesting user edit a task?
- * True if: admin/dev, OR a member of a team with TaskTeam.canEdit=true,
- * OR assigned to task, OR can edit the parent project.
+ * Is the user a privileged role (developer, officer, administration, leadership)?
  */
-async function canUserEditTask(req, taskId) {
-    if (await isAdmin(req)) return true;
+function isPrivilegedUser(req) {
+    return !!(req.user.isDeveloper || req.user.isOfficer || req.user.isAdmin || req.user.isLeadership);
+}
+
+/**
+ * Is the user privileged OR has a special role?
+ * Privileged + special roles can add/remove/edit phases/tasks/subtasks.
+ */
+function isPrivilegedOrSpecialUser(req) {
+    return isPrivilegedUser(req) || !!req.user.isSpecial;
+}
+
+/**
+ * Can the requesting user fully edit a task (create, update fields, delete, assign, etc.)?
+ * Only privileged + special roles.
+ */
+function canUserEditTask(req) {
     if (!req.user.memberId) return false;
+    return isPrivilegedOrSpecialUser(req);
+}
 
-    const task = await prisma.task.findUnique({
-        where: { id: taskId },
-        select: {
-            projectId: true,
-            taskTeams: { select: { teamId: true, canEdit: true } },
-            assignments: { select: { memberId: true } },
-        },
+/**
+ * Can the requesting user change a task's status?
+ * Privileged + special roles can always change status.
+ * Regular members can only change status if they are assigned to the task.
+ */
+async function canUserEditTaskStatus(req, taskId) {
+    if (!req.user.memberId) return false;
+    if (isPrivilegedOrSpecialUser(req)) return true;
+
+    // Check if the user is assigned to this specific task
+    const assignment = await prisma.taskAssignment.findFirst({
+        where: { taskId, memberId: req.user.memberId },
     });
-    if (!task) return false;
-
-    // Assigned to task
-    if (task.assignments.some((a) => a.memberId === req.user.memberId)) return true;
-
-    const myTeamIds = await getUserTeamIds(req.user.memberId);
-
-    // Team with canEdit on task
-    if (task.taskTeams.some((tt) => tt.canEdit && myTeamIds.includes(tt.teamId))) return true;
-
-    // Can edit parent project
-    const project = await prisma.project.findUnique({
-        where: { id: task.projectId },
-        select: { createdByMemberId: true },
-    });
-    if (project?.createdByMemberId === req.user.memberId) return true;
-
-    const editAccess = await prisma.projectTeam.findFirst({
-        where: { projectId: task.projectId, teamId: { in: myTeamIds }, canEdit: true },
-    });
-    return editAccess !== null;
+    return assignment !== null;
 }
 
 /**
  * Auto-sync parent task status based on subtask states.
- * - All subtasks COMPLETED → parent becomes COMPLETED
- * - Otherwise if parent was COMPLETED → parent becomes IN_PROGRESS
+ * - All subtasks COMPLETED â†’ parent becomes COMPLETED
+ * - Otherwise if parent was COMPLETED â†’ parent becomes IN_PROGRESS
  */
 async function syncParentTaskStatus(taskId, memberId) {
     const task = await prisma.task.findUnique({
@@ -148,7 +148,7 @@ async function logActivity(taskId, memberId, actionType, { oldValue, newValue, d
 }
 
 // ============================================
-// GET /api/tasks  –  list tasks (filters)
+// GET /api/tasks  â€“  list tasks (filters)
 // Query: projectId, memberId (assigned), status, priority, overdue, parentTaskId
 // ============================================
 router.get('/', async (req, res) => {
@@ -218,7 +218,7 @@ router.get('/', async (req, res) => {
 });
 
 // ============================================
-// GET /api/tasks/:id  –  single task (full detail + subtasks + comments)
+// GET /api/tasks/:id  â€“  single task (full detail + subtasks + comments)
 // ============================================
 router.get('/:id', async (req, res) => {
     try {
@@ -276,7 +276,7 @@ router.get('/:id', async (req, res) => {
 
         if (!task || !task.isActive) return res.status(404).json({ error: 'Task not found' });
 
-        const canEdit = await canUserEditTask(req, id);
+        const canEdit = canUserEditTask(req);
         res.json({ ...task, canEdit });
     } catch (error) {
         console.error('GET /tasks/:id', error);
@@ -285,7 +285,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // ============================================
-// POST /api/tasks  –  create task (or subtask)
+// POST /api/tasks  â€“  create task (or subtask)
 // Body: { projectId, parentTaskId?, title, description, type, priority, status,
 //          startDate, dueDate, estimatedHours, teamIds, assigneeIds }
 // ============================================
@@ -311,6 +311,11 @@ router.post('/', async (req, res) => {
         if (!projectId) return res.status(400).json({ error: 'projectId is required' });
         if (!title?.trim()) return res.status(400).json({ error: 'title is required' });
         if (!req.user.memberId) return res.status(400).json({ error: 'memberId required' });
+
+        // Only privileged + special roles can create tasks
+        if (!canUserEditTask(req)) {
+            return res.status(403).json({ error: 'Only privileged and special roles can create tasks' });
+        }
 
         const task = await prisma.task.create({
             data: {
@@ -358,7 +363,7 @@ router.post('/', async (req, res) => {
             description: `Task "${task.title}" created`,
         });
 
-        // If this is a subtask, sync parent status (new subtask → parent can't stay COMPLETED)
+        // If this is a subtask, sync parent status (new subtask â†’ parent can't stay COMPLETED)
         if (parentTaskId) {
             await syncParentTaskStatus(task.id, req.user.memberId);
         }
@@ -371,13 +376,13 @@ router.post('/', async (req, res) => {
 });
 
 // ============================================
-// PUT /api/tasks/:id  –  update task
+// PUT /api/tasks/:id  â€“  update task
 // ============================================
 router.put('/:id', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid task ID' });
-        if (!(await canUserEditTask(req, id))) {
+        if (!canUserEditTask(req)) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
 
@@ -466,14 +471,14 @@ router.put('/:id', async (req, res) => {
 });
 
 // ============================================
-// PATCH /api/tasks/:id/status  –  quick status update
+// PATCH /api/tasks/:id/status  â€“  quick status update
 // Body: { status }
 // ============================================
 router.patch('/:id/status', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        if (!(await canUserEditTask(req, id))) {
-            return res.status(403).json({ error: 'Edit access denied' });
+        if (!(await canUserEditTaskStatus(req, id))) {
+            return res.status(403).json({ error: 'Only assigned members and privileged roles can change task status' });
         }
 
         const { status } = req.body;
@@ -505,12 +510,12 @@ router.patch('/:id/status', async (req, res) => {
 });
 
 // ============================================
-// DELETE /api/tasks/:id  –  hard-delete (cascades to subtasks, assignments, comments, tags, deps, logs)
+// DELETE /api/tasks/:id  â€“  hard-delete (cascades to subtasks, assignments, comments, tags, deps, logs)
 // ============================================
 router.delete('/:id', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        if (!(await canUserEditTask(req, id))) {
+        if (!canUserEditTask(req)) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
         await prisma.task.delete({ where: { id } });
@@ -522,13 +527,13 @@ router.delete('/:id', async (req, res) => {
 });
 
 // ============================================
-// POST /api/tasks/:id/teams  –  assign team to task
+// POST /api/tasks/:id/teams  â€“  assign team to task
 // Body: { teamId, canEdit }
 // ============================================
 router.post('/:id/teams', async (req, res) => {
     try {
         const taskId = parseInt(req.params.id);
-        if (!(await canUserEditTask(req, taskId))) {
+        if (!canUserEditTask(req)) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
 
@@ -550,13 +555,13 @@ router.post('/:id/teams', async (req, res) => {
 });
 
 // ============================================
-// DELETE /api/tasks/:id/teams/:teamId  –  remove team from task
+// DELETE /api/tasks/:id/teams/:teamId  â€“  remove team from task
 // ============================================
 router.delete('/:id/teams/:teamId', async (req, res) => {
     try {
         const taskId = parseInt(req.params.id);
         const teamId = parseInt(req.params.teamId);
-        if (!(await canUserEditTask(req, taskId))) {
+        if (!canUserEditTask(req)) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
 
@@ -572,13 +577,13 @@ router.delete('/:id/teams/:teamId', async (req, res) => {
 });
 
 // ============================================
-// POST /api/tasks/:id/assign  –  assign member to task (by another member/admin)
+// POST /api/tasks/:id/assign  â€“  assign member to task (by another member/admin)
 // Body: { memberId }
 // ============================================
 router.post('/:id/assign', async (req, res) => {
     try {
         const taskId = parseInt(req.params.id);
-        if (!(await canUserEditTask(req, taskId))) {
+        if (!canUserEditTask(req)) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
 
@@ -617,7 +622,7 @@ router.post('/:id/assign', async (req, res) => {
 });
 
 // ============================================
-// POST /api/tasks/:id/self-assign  –  member self-assigns
+// POST /api/tasks/:id/self-assign  â€“  member self-assigns
 // ============================================
 router.post('/:id/self-assign', async (req, res) => {
     try {
@@ -654,7 +659,7 @@ router.post('/:id/self-assign', async (req, res) => {
 });
 
 // ============================================
-// PATCH /api/tasks/:id/assign/:memberId  –  update assignment status
+// PATCH /api/tasks/:id/assign/:memberId  â€“  update assignment status
 // Body: { status }  (ASSIGNED | ACCEPTED | IN_PROGRESS | COMPLETED)
 // ============================================
 router.patch('/:id/assign/:memberId', async (req, res) => {
@@ -665,7 +670,7 @@ router.patch('/:id/assign/:memberId', async (req, res) => {
 
         // Only the assignee themselves (or an admin) can update it
         const isOwnAssignment = req.user.memberId === memberId;
-        if (!isOwnAssignment && !(await canUserEditTask(req, taskId))) {
+        if (!isOwnAssignment && !canUserEditTask(req)) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
 
@@ -689,13 +694,13 @@ router.patch('/:id/assign/:memberId', async (req, res) => {
 });
 
 // ============================================
-// DELETE /api/tasks/:id/assign/:memberId  –  unassign member
+// DELETE /api/tasks/:id/assign/:memberId  â€“  unassign member
 // ============================================
 router.delete('/:id/assign/:memberId', async (req, res) => {
     try {
         const taskId = parseInt(req.params.id);
         const memberId = parseInt(req.params.memberId);
-        if (!(await canUserEditTask(req, taskId))) {
+        if (!canUserEditTask(req)) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
 
@@ -715,7 +720,7 @@ router.delete('/:id/assign/:memberId', async (req, res) => {
 });
 
 // ============================================
-// GET /api/tasks/:id/comments  –  get comments
+// GET /api/tasks/:id/comments  â€“  get comments
 // ============================================
 router.get('/:id/comments', async (req, res) => {
     try {
@@ -735,7 +740,7 @@ router.get('/:id/comments', async (req, res) => {
 });
 
 // ============================================
-// POST /api/tasks/:id/comments  –  add comment
+// POST /api/tasks/:id/comments  â€“  add comment
 // Body: { comment }
 // ============================================
 router.post('/:id/comments', async (req, res) => {
@@ -769,7 +774,7 @@ router.post('/:id/comments', async (req, res) => {
 });
 
 // ============================================
-// PUT /api/tasks/:id/comments/:commentId  –  edit comment (own only)
+// PUT /api/tasks/:id/comments/:commentId  â€“  edit comment (own only)
 // Body: { comment }
 // ============================================
 router.put('/:id/comments/:commentId', async (req, res) => {
@@ -804,7 +809,7 @@ router.put('/:id/comments/:commentId', async (req, res) => {
 });
 
 // ============================================
-// DELETE /api/tasks/:id/comments/:commentId  –  delete comment
+// DELETE /api/tasks/:id/comments/:commentId  â€“  delete comment
 // ============================================
 router.delete('/:id/comments/:commentId', async (req, res) => {
     try {
@@ -826,7 +831,7 @@ router.delete('/:id/comments/:commentId', async (req, res) => {
 });
 
 // ============================================
-// GET /api/tasks/:id/activity  –  activity log
+// GET /api/tasks/:id/activity  â€“  activity log
 // ============================================
 router.get('/:id/activity', async (req, res) => {
     try {
@@ -846,13 +851,13 @@ router.get('/:id/activity', async (req, res) => {
 });
 
 // ============================================
-// POST /api/tasks/:id/tags  –  add tag to task
+// POST /api/tasks/:id/tags  â€“  add tag to task
 // Body: { tagType, tagName }
 // ============================================
 router.post('/:id/tags', async (req, res) => {
     try {
         const taskId = parseInt(req.params.id);
-        if (!(await canUserEditTask(req, taskId))) {
+        if (!canUserEditTask(req)) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
 
@@ -873,13 +878,13 @@ router.post('/:id/tags', async (req, res) => {
 });
 
 // ============================================
-// DELETE /api/tasks/:id/tags/:tagId  –  remove tag
+// DELETE /api/tasks/:id/tags/:tagId  â€“  remove tag
 // ============================================
 router.delete('/:id/tags/:tagId', async (req, res) => {
     try {
         const taskId = parseInt(req.params.id);
         const tagId = parseInt(req.params.tagId);
-        if (!(await canUserEditTask(req, taskId))) {
+        if (!canUserEditTask(req)) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
 
@@ -892,13 +897,13 @@ router.delete('/:id/tags/:tagId', async (req, res) => {
 });
 
 // ============================================
-// POST /api/tasks/:id/dependencies  –  add dependency
+// POST /api/tasks/:id/dependencies  â€“  add dependency
 // Body: { dependsOnTaskId, dependencyType }
 // ============================================
 router.post('/:id/dependencies', async (req, res) => {
     try {
         const taskId = parseInt(req.params.id);
-        if (!(await canUserEditTask(req, taskId))) {
+        if (!canUserEditTask(req)) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
 
@@ -927,13 +932,13 @@ router.post('/:id/dependencies', async (req, res) => {
 });
 
 // ============================================
-// DELETE /api/tasks/:id/dependencies/:dependsOnTaskId  –  remove dependency
+// DELETE /api/tasks/:id/dependencies/:dependsOnTaskId  â€“  remove dependency
 // ============================================
 router.delete('/:id/dependencies/:dependsOnTaskId', async (req, res) => {
     try {
         const taskId = parseInt(req.params.id);
         const dependsOnTaskId = parseInt(req.params.dependsOnTaskId);
-        if (!(await canUserEditTask(req, taskId))) {
+        if (!canUserEditTask(req)) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
 

@@ -29,7 +29,7 @@ const ALLOWED_TYPES = [
     'text/csv',
 ];
 
-// ── Permission helpers (same pattern as projects.js) ──────────────
+// ── Permission helpers ──────────────
 async function getUserTeamIds(memberId) {
     const rows = await prisma.teamMember.findMany({
         where: { memberId, isActive: true },
@@ -38,36 +38,39 @@ async function getUserTeamIds(memberId) {
     return rows.map((r) => r.teamId);
 }
 
-async function isAdmin(req) {
-    if (req.user.isDeveloper) return true;
-    if (!req.user.memberId) return false;
-    const adminMembership = await prisma.teamMember.findFirst({
-        where: {
-            memberId: req.user.memberId,
-            isActive: true,
-            team: { name: ADMINISTRATION_TEAM_NAME },
-        },
-    });
-    return adminMembership !== null;
+/**
+ * Is the user a privileged role (developer, officer, administration, leadership)?
+ */
+function isPrivilegedUser(req) {
+    return !!(req.user.isDeveloper || req.user.isOfficer || req.user.isAdmin || req.user.isLeadership);
 }
 
-async function canUserEditProject(req, projectId) {
-    if (await isAdmin(req)) return true;
+/**
+ * Can the user upload files to a project?
+ * ALL member types whose team is linked to the project can upload.
+ * Privileged users can always upload.
+ */
+async function canUserUploadToProject(req, projectId) {
     if (!req.user.memberId) return false;
+    if (isPrivilegedUser(req)) return true;
 
-    const project = await prisma.project.findUnique({
-        where: { id: projectId },
-        select: { createdByMemberId: true },
-    });
-    if (project?.createdByMemberId === req.user.memberId) return true;
-
+    // Check if user is in one of the project's teams (any role, doesn't need canEdit)
     const teamIds = await getUserTeamIds(req.user.memberId);
     if (teamIds.length === 0) return false;
 
-    const editAccess = await prisma.projectTeam.findFirst({
-        where: { projectId, teamId: { in: teamIds }, canEdit: true },
+    const access = await prisma.projectTeam.findFirst({
+        where: { projectId, teamId: { in: teamIds } },
     });
-    return editAccess !== null;
+    return access !== null;
+}
+
+/**
+ * Can the user manage files (delete/rename/restore)?
+ * Only privileged users.
+ */
+function canUserManageFiles(req) {
+    if (!req.user.memberId) return false;
+    return isPrivilegedUser(req);
 }
 
 // ============================================
@@ -116,9 +119,9 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             return res.status(400).json({ error: 'File type not allowed' });
         }
 
-        // Permission check
+        // Permission check — all project team members can upload
         const parsedProjectId = parseInt(projectId);
-        if (!(await canUserEditProject(req, parsedProjectId))) {
+        if (!(await canUserUploadToProject(req, parsedProjectId))) {
             return res.status(403).json({ error: 'You do not have permission to upload files to this project' });
         }
 
@@ -338,8 +341,8 @@ router.delete('/:id', async (req, res) => {
         const file = await prisma.projectFile.findUnique({ where: { id } });
         if (!file) return res.status(404).json({ error: 'File not found' });
 
-        // Permission check
-        if (!(await canUserEditProject(req, file.projectId))) {
+        // Permission check — only privileged users can delete files
+        if (!canUserManageFiles(req)) {
             return res.status(403).json({ error: 'You do not have permission to delete files from this project' });
         }
 
@@ -380,8 +383,8 @@ router.patch('/:id/rename', async (req, res) => {
         const file = await prisma.projectFile.findUnique({ where: { id } });
         if (!file || !file.isActive) return res.status(404).json({ error: 'File not found' });
 
-        // Permission check
-        if (!(await canUserEditProject(req, file.projectId))) {
+        // Permission check — only privileged users can rename files
+        if (!canUserManageFiles(req)) {
             return res.status(403).json({ error: 'You do not have permission to rename files in this project' });
         }
 
@@ -428,8 +431,8 @@ router.post('/:id/restore', async (req, res) => {
         if (!file) return res.status(404).json({ error: 'File not found' });
         if (file.isActive) return res.status(400).json({ error: 'File is not deleted' });
 
-        // Permission check
-        if (!(await canUserEditProject(req, file.projectId))) {
+        // Permission check — only privileged users can restore files
+        if (!canUserManageFiles(req)) {
             return res.status(403).json({ error: 'You do not have permission to restore files in this project' });
         }
 

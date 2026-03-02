@@ -25,7 +25,7 @@ function toTitleCase(str) {
 }
 
 // ── helpers ──────────────────────────────────────────────
-/** Return the member-IDs for every team the requesting user belongs to (active). */
+/** Return the team-IDs for every team the requesting user belongs to (active). */
 async function getUserTeamIds(memberId) {
     const rows = await prisma.teamMember.findMany({
         where: { memberId, isActive: true },
@@ -34,7 +34,15 @@ async function getUserTeamIds(memberId) {
     return rows.map((r) => r.teamId);
 }
 
-/** Is the requesting user a developer or Administration-team member? */
+/**
+ * Is the user a privileged role (developer, officer, administration, leadership)?
+ * Uses JWT flags set by computeAuthorityFlags in auth.
+ */
+function isPrivilegedUser(req) {
+    return !!(req.user.isDeveloper || req.user.isOfficer || req.user.isAdmin || req.user.isLeadership);
+}
+
+/** Legacy isAdmin kept for backward-compat on list queries (non-admin visibility filter). */
 async function isAdmin(req) {
     if (req.user.isDeveloper) return true;
     if (!req.user.memberId) return false;
@@ -50,27 +58,28 @@ async function isAdmin(req) {
 
 /**
  * Can the requesting user edit a specific project?
- * True if: admin/dev, OR the creator, OR a member of a team with canEdit=true for the project.
+ * Only privileged roles (developer, officer, administration, leadership) can edit.
+ * Blocked if the project is finalized.
  */
 async function canUserEditProject(req, projectId) {
     if (!req.user.memberId) return false;
 
     const project = await prisma.project.findUnique({
         where: { id: projectId },
-        select: { createdByMemberId: true, isFinalized: true },
+        select: { isFinalized: true },
     });
     if (project?.isFinalized) return false;
 
-    if (await isAdmin(req)) return true;
-    if (project?.createdByMemberId === req.user.memberId) return true;
+    return isPrivilegedUser(req);
+}
 
-    const teamIds = await getUserTeamIds(req.user.memberId);
-    if (teamIds.length === 0) return false;
-
-    const editAccess = await prisma.projectTeam.findFirst({
-        where: { projectId, teamId: { in: teamIds }, canEdit: true },
-    });
-    return editAccess !== null;
+/**
+ * Can the requesting user manage (finalize / archive / deactivate) a project?
+ * Same privileged-role check but NOT blocked by isFinalized.
+ */
+function canUserManageProject(req) {
+    if (!req.user.memberId) return false;
+    return isPrivilegedUser(req);
 }
 
 // ============================================
@@ -249,7 +258,8 @@ router.get('/:id', async (req, res) => {
         });
 
         if (!project) return res.status(404).json({ error: 'Project not found' });
-        if (!project.isActive && !admin) return res.status(404).json({ error: 'Project not found' });
+        // Allow viewing archived projects (isArchived=true), block only deactivated ones for non-admins
+        if (!project.isActive && !project.isArchived && !admin) return res.status(404).json({ error: 'Project not found' });
 
         // Attach edit permission flag for the requesting user
         const canEdit = await canUserEditProject(req, id);
@@ -280,6 +290,11 @@ router.post('/', async (req, res) => {
         if (!title?.trim()) return res.status(400).json({ error: 'Title is required' });
         if (!req.user.memberId) return res.status(400).json({ error: 'memberId required' });
         if (!projectTypeId) return res.status(400).json({ error: 'projectTypeId is required' });
+
+        // Only privileged roles can create projects
+        if (!isPrivilegedUser(req)) {
+            return res.status(403).json({ error: 'Only developer, officer, administration and leadership can create projects' });
+        }
 
         const project = await prisma.project.create({
             data: {
@@ -411,8 +426,8 @@ router.patch('/:id/finalize', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid project ID' });
-        if (!(await canUserEditProject(req, id))) {
-            return res.status(403).json({ error: 'Edit access denied' });
+        if (!canUserManageProject(req)) {
+            return res.status(403).json({ error: 'Only developer, officer, administration and leadership can finalize projects' });
         }
         const project = await prisma.project.update({
             where: { id },
@@ -442,8 +457,8 @@ router.patch('/:id/archive', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid project ID' });
-        if (!(await canUserEditProject(req, id))) {
-            return res.status(403).json({ error: 'Edit access denied' });
+        if (!canUserManageProject(req)) {
+            return res.status(403).json({ error: 'Only developer, officer, administration and leadership can archive projects' });
         }
         const project = await prisma.project.update({
             where: { id },
@@ -474,8 +489,8 @@ router.patch('/:id/archive', async (req, res) => {
 router.patch('/:id/deactivate', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        if (!(await canUserEditProject(req, id))) {
-            return res.status(403).json({ error: 'Edit access denied' });
+        if (!canUserManageProject(req)) {
+            return res.status(403).json({ error: 'Only developer, officer, administration and leadership can deactivate projects' });
         }
         const project = await prisma.project.update({ where: { id }, data: { isActive: false } });
         res.json({ message: 'Project deactivated', project });

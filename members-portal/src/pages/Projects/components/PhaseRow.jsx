@@ -57,7 +57,12 @@ function InlineSelect({ taskId, field, current, options, labels, canEdit, onChan
         onChanged(taskId, field, next);
         setBusy(true);
         try {
-            await tasksAPI.update(taskId, { [field]: next });
+            // Use updateStatus for status field (allows assigned members)
+            if (field === 'status') {
+                await tasksAPI.updateStatus(taskId, next);
+            } else {
+                await tasksAPI.update(taskId, { [field]: next });
+            }
         } catch {
             // revert on error
             onChanged(taskId, field, current);
@@ -129,7 +134,7 @@ function MiniProgress({ completed, total }) {
 }
 
 /* ── Subtask row (indented, inside expanded task) ── */
-function SubtaskRow({ task, canEdit, onFieldChange, onEditTask, onDeleteTask,
+function SubtaskRow({ task, canEdit, canEditStatus, onFieldChange, onEditTask, onDeleteTask,
     onSubDragStart, onSubDragOver, onSubDrop, onSubDragEnd, isDragging }) {
     return (
         <tr
@@ -138,7 +143,7 @@ function SubtaskRow({ task, canEdit, onFieldChange, onEditTask, onDeleteTask,
             onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onSubDrop && onSubDrop(task.id); }}
         >
             {canEdit && (
-                <td className="phase-row-td phase-row-td--drag">
+                <td className="phase-row-td phase-row-td--drag" style={{ padding: 0 }}>
                     <span
                         className="drag-handle"
                         draggable
@@ -164,7 +169,7 @@ function SubtaskRow({ task, canEdit, onFieldChange, onEditTask, onDeleteTask,
                 <InlineSelect
                     taskId={task.id} field="status" current={task.status}
                     options={TASK_STATUSES} labels={STATUS_LABELS}
-                    canEdit={canEdit} onChanged={onFieldChange}
+                    canEdit={canEditStatus || canEdit} onChanged={onFieldChange}
                 />
             </td>
             <td className="phase-row-td">
@@ -209,7 +214,7 @@ function SubtaskRow({ task, canEdit, onFieldChange, onEditTask, onDeleteTask,
 }
 
 /* ── Task row (top-level inside the table) ── */
-function TaskRow({ task, canEdit, onFieldChange, onAddSubtask, onEditTask, onDeleteTask,
+function TaskRow({ task, canEdit, canEditStatus, onFieldChange, onAddSubtask, onEditTask, onDeleteTask,
     dragTaskId, onTaskDragStart, onTaskDragEnd, onTaskDrop }) {
     const [expanded, setExpanded] = useState(false);
     const hasSubs = task.subtasks?.length > 0;
@@ -260,7 +265,7 @@ function TaskRow({ task, canEdit, onFieldChange, onAddSubtask, onEditTask, onDel
                 onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onTaskDrop && onTaskDrop(task.id); }}
             >
                 {canEdit && (
-                    <td className="phase-row-td phase-row-td--drag">
+                    <td className="phase-row-td phase-row-td--drag" style={{ padding: 0 }}>
                         <span
                             className="drag-handle"
                             draggable
@@ -290,7 +295,7 @@ function TaskRow({ task, canEdit, onFieldChange, onAddSubtask, onEditTask, onDel
                     <InlineSelect
                         taskId={task.id} field="status" current={task.status}
                         options={TASK_STATUSES} labels={STATUS_LABELS}
-                        canEdit={canEdit} onChanged={onFieldChange}
+                        canEdit={canEditStatus || canEdit} onChanged={onFieldChange}
                     />
                 </td>
                 <td className="phase-row-td">
@@ -345,6 +350,7 @@ function TaskRow({ task, canEdit, onFieldChange, onAddSubtask, onEditTask, onDel
                     key={s.id}
                     task={s}
                     canEdit={canEdit}
+                    canEditStatus={canEditStatus}
                     onFieldChange={onFieldChange}
                     onEditTask={onEditTask}
                     onDeleteTask={(t) => onDeleteTask(t)}
@@ -363,7 +369,7 @@ function TaskRow({ task, canEdit, onFieldChange, onAddSubtask, onEditTask, onDel
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    PhaseRow — main export
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-export default function PhaseRow({ phase, canEdit, allMembers, onPhaseUpdated, onTaskUpdated, onAddTask, onAddSubtask, onEditTask, onEditPhase, onDeletePhase }) {
+export default function PhaseRow({ phase, canEdit, canEditStatus, allMembers, onPhaseUpdated, onTaskUpdated, onAddTask, onAddSubtask, onEditTask, onEditPhase, onDeletePhase }) {
     const [expanded, setExpanded] = useState(false);
     // Confirm modal state: { type: 'task'|'subtask', id, title } | null
     const [confirmDelete, setConfirmDelete] = useState(null);
@@ -512,6 +518,7 @@ export default function PhaseRow({ phase, canEdit, allMembers, onPhaseUpdated, o
                                         key={t.id}
                                         task={t}
                                         canEdit={canEdit}
+                                        canEditStatus={canEditStatus}
                                         onFieldChange={handleFieldChange}
                                         onAddSubtask={(parentTask) => onAddSubtask(phase, parentTask)}
                                         onEditTask={onEditTask}
