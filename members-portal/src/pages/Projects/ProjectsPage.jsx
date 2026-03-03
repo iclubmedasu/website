@@ -29,6 +29,7 @@ import EditTaskModal from './modals/EditTaskModal';
 import EditPhaseModal from './modals/EditPhaseModal';
 import ConfirmModal from './modals/ConfirmModal';
 import PhaseRow from './components/PhaseRow';
+import GanttChart from './components/GanttChart';
 
 // ─────────────────────────────────────────────────────────
 //  Filter Dropdown (matches Members / Teams page style)
@@ -641,42 +642,23 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
                             )}
                         </div>
 
-                        {/* ── Section 3: Phases & Tasks (interactive) ── */}
-                        <div className="exp-card-section">
-                            <div className="exp-card-section-header">
-                                Phases ({detail.phases?.length ?? 0})
-                            </div>
-
-                            <div className="phase-list" style={{ marginTop: '0.5rem' }}>
-                                {detail.phases?.map((phase) => (
-                                    <PhaseRow
-                                        key={phase.id}
-                                        phase={phase}
-                                        canEdit={canEditStructure}
-                                        canEditStatus={canEditStatus}
-                                        allMembers={allMembers}
-                                        onPhaseUpdated={() => onRefreshDetail(detail.id)}
-                                        onTaskUpdated={handleTaskFieldUpdate}
-                                        onAddTask={(p) => setAddTaskTarget({ phaseId: p.id })}
-                                        onAddSubtask={(p, parentTask) => setAddTaskTarget({ phaseId: p.id, parentTask })}
-                                        onEditTask={(task) => setEditTaskTarget(task)}
-                                        onEditPhase={(p) => setEditPhaseTarget(p)}
-                                        onDeletePhase={(p) => setConfirmDeletePhase(p)}
-                                    />
-                                ))}
-                                {canEditStructure && (
-                                    <div
-                                        className="phase-add-row"
-                                        onClick={(e) => { e.stopPropagation(); setShowAddPhase(true); }}
-                                        role="button"
-                                        tabIndex={0}
-                                        onKeyDown={(e) => e.key === 'Enter' && setShowAddPhase(true)}
-                                    >
-                                        <Plus size={15} />
-                                        <span>Add Phase</span>
-                                    </div>
-                                )}
-                            </div>
+                        {/* ── Section 3: Gantt Chart ── */}
+                        <div className="exp-card-section" style={{ padding: 0 }}>
+                            <GanttChart
+                                phases={detail.phases || []}
+                                projectId={detail.id}
+                                projectStartDate={detail.startDate}
+                                projectDueDate={detail.dueDate}
+                                canEdit={canEditStructure}
+                                canEditStatus={canEditStatus}
+                                onAddPhase={() => setShowAddPhase(true)}
+                                onAddTask={(phase) => setAddTaskTarget({ phaseId: phase.id })}
+                                onAddSubtask={(phase, parentTask) => setAddTaskTarget({ phaseId: phase.id, parentTask })}
+                                onEditPhase={(phase) => setEditPhaseTarget(phase)}
+                                onEditTask={(task) => setEditTaskTarget(task)}
+                                onDeletePhase={(phase) => setConfirmDeletePhase(phase)}
+                                onRefresh={() => onRefreshDetail(detail.id)}
+                            />
                         </div>
 
                         {/* ── Section 4: Project Files ── */}
@@ -947,21 +929,7 @@ export default function ProjectsPage() {
     const handleRefreshDetail = async (projectId) => {
         try {
             const detail = await projectsAPI.getById(projectId);
-            setExpandedProjectDetail((prev) => {
-                if (!prev || prev.id !== detail.id) return detail;
-                return {
-                    ...detail,
-                    phases: detail.phases?.map((newPhase) => {
-                        const oldPhase = prev.phases?.find((p) => p.id === newPhase.id);
-                        if (!oldPhase?.tasks?.length) return newPhase;
-                        const taskMap = new Map((newPhase.tasks || []).map((t) => [t.id, t]));
-                        const ordered = oldPhase.tasks.map((t) => taskMap.get(t.id)).filter(Boolean);
-                        const existingIds = new Set(oldPhase.tasks.map((t) => t.id));
-                        const added = (newPhase.tasks || []).filter((t) => !existingIds.has(t.id));
-                        return { ...newPhase, tasks: [...ordered, ...added] };
-                    }),
-                };
-            });
+            setExpandedProjectDetail(detail);
         } catch { /* swallow */ }
     };
 

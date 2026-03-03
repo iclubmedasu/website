@@ -1,6 +1,7 @@
 ﻿const express = require('express');
 const router = express.Router();
 const { prisma } = require('../db');
+const { recomputeProjectWbs } = require('../services/wbsService');
 
 const ADMINISTRATION_TEAM_NAME = 'Administration';
 
@@ -207,7 +208,7 @@ router.get('/', async (req, res) => {
                 tags: true,
                 _count: { select: { subtasks: { where: { isActive: true } } } },
             },
-            orderBy: [{ priority: 'desc' }, { dueDate: 'asc' }, { createdAt: 'asc' }],
+            orderBy: [{ order: 'asc' }, { priority: 'desc' }, { dueDate: 'asc' }, { createdAt: 'asc' }],
         });
 
         res.json(tasks);
@@ -233,8 +234,9 @@ router.get('/:id', async (req, res) => {
                 phase: { select: { id: true, title: true } },
                 subtasks: {
                     where: { isActive: true },
+                    orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
                     include: {
-                        subtasks: { where: { isActive: true } },
+                        subtasks: { where: { isActive: true }, orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] },
                         assignments: {
                             include: {
                                 member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
@@ -317,11 +319,27 @@ router.post('/', async (req, res) => {
             return res.status(403).json({ error: 'Only privileged and special roles can create tasks' });
         }
 
+        // Auto-assign next order value among siblings
+        const siblingWhere = { isActive: true, projectId: parseInt(projectId) };
+        if (parentTaskId) {
+            siblingWhere.parentTaskId = parseInt(parentTaskId);
+        } else {
+            siblingWhere.parentTaskId = null;
+            if (phaseId) siblingWhere.phaseId = parseInt(phaseId);
+        }
+        const lastSibling = await prisma.task.findFirst({
+            where: siblingWhere,
+            orderBy: { order: 'desc' },
+            select: { order: true },
+        });
+        const nextOrder = (lastSibling?.order ?? -1) + 1;
+
         const task = await prisma.task.create({
             data: {
                 projectId: parseInt(projectId),
                 parentTaskId: parentTaskId ? parseInt(parentTaskId) : null,
                 phaseId: phaseId ? parseInt(phaseId) : null,
+                order: nextOrder,
                 title: toTitleCase(title.trim()),
                 description: description?.trim() || null,
                 type,
@@ -409,9 +427,12 @@ router.put('/:id', async (req, res) => {
         if (priority !== undefined) data.priority = priority;
         if (difficulty !== undefined) data.difficulty = difficulty;
         if (req.body.phaseId !== undefined) data.phaseId = req.body.phaseId ? parseInt(req.body.phaseId) : null;
+        if (req.body.parentTaskId !== undefined) data.parentTaskId = req.body.parentTaskId ? parseInt(req.body.parentTaskId) : null;
+        if (req.body.order !== undefined) data.order = parseInt(req.body.order);
         if (status !== undefined) {
             data.status = status;
             if (status === 'COMPLETED' && !completedDate) data.completedDate = new Date();
+            else if (status !== 'COMPLETED') data.completedDate = null;
         }
         if (startDate !== undefined) data.startDate = startDate ? new Date(startDate) : null;
         if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
@@ -463,6 +484,9 @@ router.put('/:id', async (req, res) => {
         // Sync parent task status if this is a subtask
         await syncParentTaskStatus(id, req.user.memberId);
 
+        // Recompute WBS codes for the project
+        await recomputeProjectWbs(task.project.id);
+
         res.json(task);
     } catch (error) {
         console.error('PUT /tasks/:id', error);
@@ -482,7 +506,7 @@ router.patch('/:id/status', async (req, res) => {
         }
 
         const { status } = req.body;
-        const VALID_STATUSES = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'DELAYED', 'BLOCKED'];
+        const VALID_STATUSES = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'DELAYED', 'BLOCKED', 'ON_HOLD', 'CANCELLED'];
         if (!VALID_STATUSES.includes(status)) {
             return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` });
         }
@@ -490,6 +514,7 @@ router.patch('/:id/status', async (req, res) => {
         const old = await prisma.task.findUnique({ where: { id }, select: { status: true } });
         const data = { status };
         if (status === 'COMPLETED') data.completedDate = new Date();
+        else data.completedDate = null;
 
         const task = await prisma.task.update({ where: { id }, data });
 
@@ -518,7 +543,13 @@ router.delete('/:id', async (req, res) => {
         if (!canUserEditTask(req)) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
+        // Fetch projectId before deleting
+        const taskToDelete = await prisma.task.findUnique({ where: { id }, select: { projectId: true } });
         await prisma.task.delete({ where: { id } });
+
+        // Recompute WBS codes for the project
+        if (taskToDelete) await recomputeProjectWbs(taskToDelete.projectId);
+
         res.json({ message: 'Task deleted' });
     } catch (error) {
         console.error('DELETE /tasks/:id', error);
@@ -526,8 +557,118 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// ============================================// POST /api/tasks/:id/duplicate  –  deep-copy task (and its subtasks)
+// Body: { phaseId?, parentTaskId?, insertAfterOrder? }
 // ============================================
-// POST /api/tasks/:id/teams  â€“  assign team to task
+router.post('/:id/duplicate', async (req, res) => {
+    try {
+        const sourceId = parseInt(req.params.id);
+        if (isNaN(sourceId)) return res.status(400).json({ error: 'Invalid task ID' });
+        if (!canUserEditTask(req)) {
+            return res.status(403).json({ error: 'Edit access denied' });
+        }
+
+        const source = await prisma.task.findUnique({
+            where: { id: sourceId },
+            include: {
+                subtasks: true,
+                taskTeams: true,
+            },
+        });
+        if (!source) return res.status(404).json({ error: 'Task not found' });
+
+        const { phaseId, parentTaskId } = req.body;
+        const targetPhaseId = phaseId !== undefined ? (phaseId ? parseInt(phaseId) : null) : source.phaseId;
+        const targetParentId = parentTaskId !== undefined ? (parentTaskId ? parseInt(parentTaskId) : null) : source.parentTaskId;
+
+        // Auto-assign next order value among target siblings
+        const dupSiblingWhere = { isActive: true, projectId: source.projectId };
+        if (targetParentId) {
+            dupSiblingWhere.parentTaskId = targetParentId;
+        } else {
+            dupSiblingWhere.parentTaskId = null;
+            if (targetPhaseId) dupSiblingWhere.phaseId = targetPhaseId;
+        }
+        const dupLastSibling = await prisma.task.findFirst({
+            where: dupSiblingWhere,
+            orderBy: { order: 'desc' },
+            select: { order: true },
+        });
+        const dupNextOrder = (dupLastSibling?.order ?? -1) + 1;
+
+        const newTask = await prisma.task.create({
+            data: {
+                projectId: source.projectId,
+                parentTaskId: targetParentId,
+                phaseId: targetPhaseId,
+                order: dupNextOrder,
+                title: source.title + ' (Copy)',
+                description: source.description,
+                type: source.type,
+                status: 'NOT_STARTED',
+                difficulty: source.difficulty,
+                priority: source.priority,
+                startDate: source.startDate,
+                dueDate: source.dueDate,
+                estimatedHours: source.estimatedHours,
+            },
+        });
+
+        // Copy subtasks
+        for (const sub of source.subtasks) {
+            await prisma.task.create({
+                data: {
+                    projectId: sub.projectId,
+                    parentTaskId: newTask.id,
+                    phaseId: targetPhaseId,
+                    title: sub.title,
+                    description: sub.description,
+                    type: sub.type,
+                    status: 'NOT_STARTED',
+                    difficulty: sub.difficulty,
+                    priority: sub.priority,
+                    startDate: sub.startDate,
+                    dueDate: sub.dueDate,
+                    estimatedHours: sub.estimatedHours,
+                },
+            });
+        }
+
+        // Copy team assignments
+        for (const tt of source.taskTeams) {
+            await prisma.taskTeam.create({
+                data: {
+                    taskId: newTask.id,
+                    teamId: tt.teamId,
+                    canEdit: tt.canEdit,
+                },
+            }).catch(() => { }); // ignore unique conflicts
+        }
+
+        await logActivity(newTask.id, req.user.memberId, 'CREATED', {
+            description: `Task "${newTask.title}" duplicated from task #${sourceId}`,
+        });
+
+        // Recompute WBS codes for the project
+        await recomputeProjectWbs(source.projectId);
+
+        const result = await prisma.task.findUnique({
+            where: { id: newTask.id },
+            include: {
+                subtasks: true,
+                taskTeams: { include: { team: { select: { id: true, name: true } } } },
+                assignments: { include: { member: { select: { id: true, fullName: true } } } },
+            },
+        });
+
+        res.status(201).json(result);
+    } catch (error) {
+        console.error('POST /tasks/:id/duplicate', error);
+        res.status(500).json({ error: 'Failed to duplicate task' });
+    }
+});
+
+// ============================================// POST /api/tasks/:id/teams  â€“  assign team to task
 // Body: { teamId, canEdit }
 // ============================================
 router.post('/:id/teams', async (req, res) => {

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { prisma } = require('../db');
+const { recomputeProjectWbs } = require('../services/wbsService');
 
 /**
  * Is the user privileged (developer, officer, administration, leadership)?
@@ -83,6 +84,9 @@ router.post('/', async (req, res) => {
             },
         });
 
+        // Recompute WBS codes for the project
+        await recomputeProjectWbs(parseInt(projectId));
+
         res.status(201).json(phase);
     } catch (error) {
         console.error('POST /phases', error);
@@ -120,6 +124,9 @@ router.patch('/:id', async (req, res) => {
             },
         });
 
+        // Recompute WBS codes for the project
+        await recomputeProjectWbs(phase.projectId);
+
         res.json(phase);
     } catch (error) {
         console.error('PATCH /phases/:id', error);
@@ -140,12 +147,126 @@ router.delete('/:id', async (req, res) => {
             return res.status(403).json({ error: 'Only privileged and special roles can delete phases' });
         }
 
+        // Fetch projectId before deleting
+        const phaseToDelete = await prisma.projectPhase.findUnique({ where: { id }, select: { projectId: true } });
         await prisma.projectPhase.delete({ where: { id } });
+
+        // Recompute WBS codes for the project
+        if (phaseToDelete) await recomputeProjectWbs(phaseToDelete.projectId);
 
         res.json({ message: 'Phase deleted' });
     } catch (error) {
         console.error('DELETE /phases/:id', error);
         res.status(500).json({ error: 'Failed to delete phase' });
+    }
+});
+
+// ============================================
+// POST /api/phases/:id/duplicate  –  deep-copy phase with all tasks + subtasks
+// Body: { afterOrder? }
+// ============================================
+router.post('/:id/duplicate', async (req, res) => {
+    try {
+        const sourceId = parseInt(req.params.id);
+        if (isNaN(sourceId)) return res.status(400).json({ error: 'Invalid phase ID' });
+        if (!canUserEditPhase(req)) {
+            return res.status(403).json({ error: 'Only privileged and special roles can duplicate phases' });
+        }
+
+        const source = await prisma.projectPhase.findUnique({
+            where: { id: sourceId },
+            include: {
+                tasks: {
+                    where: { parentTaskId: null, isActive: true },
+                    include: {
+                        subtasks: { where: { isActive: true } },
+                        taskTeams: true,
+                    },
+                },
+            },
+        });
+        if (!source) return res.status(404).json({ error: 'Phase not found' });
+
+        // Determine order for new phase
+        const maxPhase = await prisma.projectPhase.findFirst({
+            where: { projectId: source.projectId },
+            orderBy: { order: 'desc' },
+            select: { order: true },
+        });
+        const newOrder = (maxPhase?.order ?? 0) + 1;
+
+        const newPhase = await prisma.projectPhase.create({
+            data: {
+                projectId: source.projectId,
+                title: source.title + ' (Copy)',
+                description: source.description,
+                order: newOrder,
+            },
+        });
+
+        // Deep-copy tasks and subtasks
+        for (const task of source.tasks) {
+            const newTask = await prisma.task.create({
+                data: {
+                    projectId: task.projectId,
+                    phaseId: newPhase.id,
+                    parentTaskId: null,
+                    title: task.title,
+                    description: task.description,
+                    type: task.type,
+                    status: 'NOT_STARTED',
+                    difficulty: task.difficulty,
+                    priority: task.priority,
+                    startDate: task.startDate,
+                    dueDate: task.dueDate,
+                    estimatedHours: task.estimatedHours,
+                },
+            });
+
+            // Copy subtasks
+            for (const sub of (task.subtasks || [])) {
+                await prisma.task.create({
+                    data: {
+                        projectId: sub.projectId,
+                        phaseId: newPhase.id,
+                        parentTaskId: newTask.id,
+                        title: sub.title,
+                        description: sub.description,
+                        type: sub.type,
+                        status: 'NOT_STARTED',
+                        difficulty: sub.difficulty,
+                        priority: sub.priority,
+                        startDate: sub.startDate,
+                        dueDate: sub.dueDate,
+                        estimatedHours: sub.estimatedHours,
+                    },
+                });
+            }
+
+            // Copy team assignments
+            for (const tt of (task.taskTeams || [])) {
+                await prisma.taskTeam.create({
+                    data: {
+                        taskId: newTask.id,
+                        teamId: tt.teamId,
+                        canEdit: tt.canEdit,
+                    },
+                }).catch(() => {});
+            }
+        }
+
+        const result = await prisma.projectPhase.findUnique({
+            where: { id: newPhase.id },
+            include: { _count: { select: { tasks: true } } },
+        });
+
+        // Recompute WBS codes for the project
+        await recomputeProjectWbs(source.projectId);
+
+        res.status(201).json(result);
+    } catch (error) {
+        console.error('POST /phases/:id/duplicate', error);
+        res.status(500).json({ error: 'Failed to duplicate phase' });
     }
 });
 

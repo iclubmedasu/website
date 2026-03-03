@@ -5,17 +5,23 @@ import { toTitleCase } from '../../../utils/titleCase';
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 const DIFFICULTIES = ['EASY', 'MEDIUM', 'HARD'];
+const STATUSES = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'DELAYED', 'BLOCKED', 'ON_HOLD', 'CANCELLED'];
 
 const PRIORITY_LABELS = { LOW: 'Low', MEDIUM: 'Medium', HIGH: 'High', URGENT: 'Urgent' };
 const DIFFICULTY_LABELS = { EASY: 'Easy', MEDIUM: 'Medium', HARD: 'Hard' };
+const STATUS_LABELS = { NOT_STARTED: 'Not Started', IN_PROGRESS: 'In Progress', COMPLETED: 'Completed', DELAYED: 'Delayed', BLOCKED: 'Blocked', ON_HOLD: 'On Hold', CANCELLED: 'Cancelled' };
 
 export default function AddTaskModal({ projectId, phaseId, parentTask = null, allMembers = [], onClose, onTaskCreated }) {
     const [form, setForm] = useState({
         title: '',
         description: '',
+        status: 'NOT_STARTED',
         priority: 'MEDIUM',
         difficulty: 'MEDIUM',
+        startDate: '',
         dueDate: '',
+        estimatedHours: '',
+        actualHours: '',
         assigneeIds: [],
     });
     const [loading, setLoading] = useState(false);
@@ -46,9 +52,13 @@ export default function AddTaskModal({ projectId, phaseId, parentTask = null, al
                 parentTaskId: parentTask?.id || null,
                 title: form.title.trim(),
                 description: form.description.trim() || null,
+                status: form.status,
                 priority: form.priority,
                 difficulty: form.difficulty,
+                startDate: form.startDate || null,
                 dueDate: form.dueDate || null,
+                estimatedHours: form.estimatedHours ? parseFloat(form.estimatedHours) : null,
+                actualHours: form.actualHours ? parseFloat(form.actualHours) : null,
                 assigneeIds: form.assigneeIds,
             };
 
@@ -108,6 +118,14 @@ export default function AddTaskModal({ projectId, phaseId, parentTask = null, al
                         <h3 className="form-section-title">Details</h3>
                         <div className="form-row">
                             <div className="form-group">
+                                <label className="form-label">Status</label>
+                                <select className="form-input" value={form.status} onChange={setField('status')}>
+                                    {STATUSES.map((s) => (
+                                        <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="form-group">
                                 <label className="form-label">Priority</label>
                                 <select className="form-input" value={form.priority} onChange={setField('priority')}>
                                     {PRIORITIES.map((p) => (
@@ -125,14 +143,52 @@ export default function AddTaskModal({ projectId, phaseId, parentTask = null, al
                             </div>
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Due Date</label>
-                            <input
-                                type="date"
-                                className="form-input"
-                                value={form.dueDate}
-                                onChange={setField('dueDate')}
-                            />
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label className="form-label">Start Date</label>
+                                <input
+                                    type="date"
+                                    className="form-input"
+                                    value={form.startDate}
+                                    onChange={setField('startDate')}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Due Date</label>
+                                <input
+                                    type="date"
+                                    className="form-input"
+                                    value={form.dueDate}
+                                    onChange={setField('dueDate')}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label className="form-label">Estimated Hours</label>
+                                <input
+                                    type="number"
+                                    className="form-input"
+                                    placeholder="0"
+                                    min="0"
+                                    step="0.5"
+                                    value={form.estimatedHours}
+                                    onChange={setField('estimatedHours')}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Actual Hours</label>
+                                <input
+                                    type="number"
+                                    className="form-input"
+                                    placeholder="0"
+                                    min="0"
+                                    step="0.5"
+                                    value={form.actualHours}
+                                    onChange={setField('actualHours')}
+                                />
+                            </div>
                         </div>
                     </div>
 

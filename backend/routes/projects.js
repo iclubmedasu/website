@@ -204,6 +204,7 @@ router.get('/:id', async (req, res) => {
                             include: {
                                 subtasks: {
                                     where: { isActive: true },
+                                    orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
                                     include: {
                                         assignments: {
                                             include: {
@@ -220,7 +221,7 @@ router.get('/:id', async (req, res) => {
                                 },
                                 tags: true,
                             },
-                            orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+                            orderBy: [{ order: 'asc' }, { priority: 'desc' }, { createdAt: 'asc' }],
                         },
                     },
                 },
@@ -229,8 +230,9 @@ router.get('/:id', async (req, res) => {
                     include: {
                         subtasks: {
                             where: { isActive: true },
+                            orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
                             include: {
-                                subtasks: { where: { isActive: true } },
+                                subtasks: { where: { isActive: true }, orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] },
                                 assignments: {
                                     include: {
                                         member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
@@ -252,7 +254,7 @@ router.get('/:id', async (req, res) => {
                         },
                         tags: true,
                     },
-                    orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+                    orderBy: [{ order: 'asc' }, { priority: 'desc' }, { createdAt: 'asc' }],
                 },
             },
         });
@@ -638,6 +640,55 @@ router.delete('/:id/tags/:tagId', async (req, res) => {
     } catch (error) {
         console.error('DELETE /projects/:id/tags/:tagId', error);
         res.status(500).json({ error: 'Failed to remove tag' });
+    }
+});
+
+// ──────────────────────────────────────────────────────────
+//  POST /projects/:id/set-baseline
+//  Copy current startDate/dueDate → baselineStartDate/baselineDueDate
+//  for all active tasks in the project.
+// ──────────────────────────────────────────────────────────
+router.post('/:id/set-baseline', requireAdmin, async (req, res) => {
+    try {
+        const projectId = Number(req.params.id);
+        const tasks = await prisma.task.findMany({
+            where: { projectId, isActive: true },
+            select: { id: true, startDate: true, dueDate: true },
+        });
+
+        const ops = tasks.map((t) =>
+            prisma.task.update({
+                where: { id: t.id },
+                data: {
+                    baselineStartDate: t.startDate,
+                    baselineDueDate: t.dueDate,
+                },
+            })
+        );
+        await prisma.$transaction(ops);
+
+        res.json({ message: 'Baseline set', updated: tasks.length });
+    } catch (error) {
+        console.error('POST /projects/:id/set-baseline', error);
+        res.status(500).json({ error: 'Failed to set baseline' });
+    }
+});
+
+// ──────────────────────────────────────────────────────────
+//  POST /projects/:id/clear-baseline
+//  Clear baseline dates for all active tasks in the project.
+// ──────────────────────────────────────────────────────────
+router.post('/:id/clear-baseline', requireAdmin, async (req, res) => {
+    try {
+        const projectId = Number(req.params.id);
+        await prisma.task.updateMany({
+            where: { projectId, isActive: true },
+            data: { baselineStartDate: null, baselineDueDate: null },
+        });
+        res.json({ message: 'Baseline cleared' });
+    } catch (error) {
+        console.error('POST /projects/:id/clear-baseline', error);
+        res.status(500).json({ error: 'Failed to clear baseline' });
     }
 });
 

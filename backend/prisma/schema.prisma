@@ -323,6 +323,7 @@ model ProjectPhase {
   title       String
   description String?
   order       Int       @default(0)
+  wbs         String    @default("")
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -349,9 +350,13 @@ model Task {
   status          String    @default("NOT_STARTED")  // NOT_STARTED, IN_PROGRESS, COMPLETED, DELAYED, BLOCKED
   difficulty      String    @default("MEDIUM")
   priority        String    @default("MEDIUM")       // LOW, MEDIUM, HIGH, URGENT
+  order           Int       @default(0)              // Manual sort order within phase/parent
+  wbs             String    @default("")              // Work Breakdown Structure code (e.g. 1.2.3)
   startDate       DateTime?
   dueDate         DateTime?
   completedDate   DateTime?
+  baselineStartDate DateTime?   // Baseline: planned start date snapshot
+  baselineDueDate   DateTime?   // Baseline: planned due date snapshot
   estimatedHours  Float?
   actualHours     Float?
   isActive        Boolean   @default(true)

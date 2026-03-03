@@ -595,6 +595,22 @@ export const projectsAPI = {
         });
         return handleResponse(response);
     },
+
+    setBaseline: async (projectId) => {
+        const response = await fetch(`${API_BASE_URL}/projects/${projectId}/set-baseline`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    clearBaseline: async (projectId) => {
+        const response = await fetch(`${API_BASE_URL}/projects/${projectId}/clear-baseline`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
 };
 
 // ============================================
@@ -652,6 +668,15 @@ export const tasksAPI = {
         const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
             method: 'DELETE',
             headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    duplicate: async (id, data = {}) => {
+        const response = await fetch(`${API_BASE_URL}/tasks/${id}/duplicate`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
         });
         return handleResponse(response);
     },
@@ -851,6 +876,15 @@ export const phasesAPI = {
         const response = await fetch(`${API_BASE_URL}/phases/${id}`, {
             method: 'DELETE',
             headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    duplicate: async (id, data = {}) => {
+        const response = await fetch(`${API_BASE_URL}/phases/${id}/duplicate`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
         });
         return handleResponse(response);
     },
