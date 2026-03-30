@@ -14,20 +14,51 @@ const upload = multer({
     limits: { fileSize: 25 * 1024 * 1024 },
 });
 
-// Allowed MIME types
-const ALLOWED_TYPES = [
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'image/webp',
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'text/plain',
-    'text/csv',
-];
+function sanitizePathSegment(value) {
+    return String(value || '')
+        .trim()
+        .replace(/[^a-zA-Z0-9._-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .toLowerCase() || 'folder';
+}
+
+function buildFolderGithubPath(projectId, folderName) {
+    const safeName = sanitizePathSegment(folderName);
+    return `projects/${projectId}/folders/${safeName}-${Date.now()}`;
+}
+
+function buildFileGithubPath(projectId, folderGithubPath, originalFileName) {
+    const safeName = originalFileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const uniqueName = `${Date.now()}-${safeName}`;
+    if (folderGithubPath) {
+        return `${folderGithubPath}/${uniqueName}`;
+    }
+    return `projects/${projectId}/${uniqueName}`;
+}
+
+async function getFolderById(id) {
+    return prisma.projectFolder.findUnique({
+        where: { id },
+        include: {
+            project: { select: { id: true, isActive: true, isFinalized: true, isArchived: true, status: true } },
+        },
+    });
+}
+
+async function restoreFolderGitkeep(folder) {
+    const markerPath = `${folder.githubPath}/.gitkeep`;
+    const result = await githubStorage.uploadContent(Buffer.from(''), markerPath, `Restore folder ${folder.folderName}`);
+    return result.githubSha;
+}
+
+async function deleteFolderGitkeep(folder) {
+    try {
+        await githubStorage.deleteFile(`${folder.githubPath}/.gitkeep`, folder.githubSha);
+    } catch (error) {
+        console.error('GitHub folder delete failed:', error.message);
+    }
+}
 
 // ── Permission helpers ──────────────
 async function getUserTeamIds(memberId) {
@@ -86,6 +117,9 @@ router.get('/', async (req, res) => {
             where: { projectId: parseInt(projectId), isActive: true },
             orderBy: { createdAt: 'desc' },
             include: {
+                folder: {
+                    select: { id: true, folderName: true, githubPath: true, isActive: true },
+                },
                 uploadedBy: {
                     select: { id: true, fullName: true, profilePhotoUrl: true },
                 },
@@ -100,12 +134,244 @@ router.get('/', async (req, res) => {
 });
 
 // ============================================
+// GET /api/project-files/folders?projectId=X[&includeDeleted=true]
+// Returns folders for a project
+// ============================================
+router.get('/folders', async (req, res) => {
+    try {
+        const { projectId, includeDeleted } = req.query;
+        if (!projectId) return res.status(400).json({ error: 'projectId is required' });
+
+        const folders = await prisma.projectFolder.findMany({
+            where: {
+                projectId: parseInt(projectId),
+                ...(String(includeDeleted).toLowerCase() === 'true' ? {} : { isActive: true }),
+            },
+            orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
+            include: {
+                files: {
+                    where: { isActive: true },
+                    select: { id: true },
+                },
+                createdBy: {
+                    select: { id: true, fullName: true, profilePhotoUrl: true },
+                },
+            },
+        });
+
+        res.json(folders);
+    } catch (error) {
+        console.error('GET /project-files/folders', error);
+        res.status(500).json({ error: 'Failed to fetch folders' });
+    }
+});
+
+// ============================================
+// POST /api/project-files/folders
+// Create a folder marker (.gitkeep) and persist folder metadata
+// Body: { projectId, folderName, createdByMemberId }
+// ============================================
+router.post('/folders', async (req, res) => {
+    try {
+        const { projectId, folderName, createdByMemberId } = req.body;
+        if (!projectId || !folderName || !createdByMemberId) {
+            return res.status(400).json({ error: 'projectId, folderName and createdByMemberId are required' });
+        }
+
+        const parsedProjectId = parseInt(projectId);
+        if (Number.isNaN(parsedProjectId)) return res.status(400).json({ error: 'Invalid project ID' });
+
+        if (!(await canUserUploadToProject(req, parsedProjectId))) {
+            return res.status(403).json({ error: 'You do not have permission to create folders in this project' });
+        }
+
+        const normalizedName = folderName.trim();
+        if (!normalizedName) return res.status(400).json({ error: 'folderName is required' });
+
+        const duplicate = await prisma.projectFolder.findFirst({
+            where: {
+                projectId: parsedProjectId,
+                isActive: true,
+                folderName: normalizedName,
+            },
+        });
+        if (duplicate) {
+            return res.status(409).json({ error: 'A folder with this name already exists in this project' });
+        }
+
+        const githubPath = buildFolderGithubPath(parsedProjectId, normalizedName);
+        const markerPath = `${githubPath}/.gitkeep`;
+
+        const ghResult = await githubStorage.uploadContent(Buffer.from(''), markerPath, `Create folder ${normalizedName}`);
+
+        const folder = await prisma.projectFolder.create({
+            data: {
+                projectId: parsedProjectId,
+                createdByMemberId: parseInt(createdByMemberId),
+                folderName: normalizedName,
+                githubPath,
+                githubSha: ghResult.githubSha,
+            },
+            include: {
+                files: { where: { isActive: true }, select: { id: true } },
+                createdBy: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+            },
+        });
+
+        res.status(201).json(folder);
+    } catch (error) {
+        console.error('POST /project-files/folders', error);
+        res.status(500).json({ error: 'Failed to create folder' });
+    }
+});
+
+// ============================================
+// GET /api/project-files/folders/:id/history
+// Returns commit history for a folder marker (.gitkeep)
+// ============================================
+router.get('/folders/:id/history', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid folder ID' });
+
+        const folder = await getFolderById(id);
+        if (!folder) return res.status(404).json({ error: 'Folder not found' });
+
+        const history = await githubStorage.getFileHistory(`${folder.githubPath}/.gitkeep`);
+        res.json(history);
+    } catch (error) {
+        console.error('GET /project-files/folders/:id/history', error);
+        res.status(500).json({ error: 'Failed to fetch folder history' });
+    }
+});
+
+// ============================================
+// DELETE /api/project-files/folders/:id
+// Soft-delete folder and remove .gitkeep from GitHub
+// ============================================
+router.delete('/folders/:id', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid folder ID' });
+
+        if (!canUserManageFiles(req)) {
+            return res.status(403).json({ error: 'You do not have permission to delete folders in this project' });
+        }
+
+        const folder = await getFolderById(id);
+        if (!folder) return res.status(404).json({ error: 'Folder not found' });
+        if (!folder.isActive) return res.status(400).json({ error: 'Folder is already deleted' });
+
+        const updated = await prisma.projectFolder.update({
+            where: { id },
+            data: { isActive: false, deletedAt: new Date() },
+            include: {
+                files: { where: { isActive: true }, select: { id: true } },
+                createdBy: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+            },
+        });
+
+        await deleteFolderGitkeep(folder);
+
+        res.json({ success: true, folder: updated });
+    } catch (error) {
+        console.error('DELETE /project-files/folders/:id', error);
+        res.status(500).json({ error: 'Failed to delete folder' });
+    }
+});
+
+// ============================================
+// POST /api/project-files/folders/:id/restore
+// Restore a deleted folder and recreate its .gitkeep marker
+// ============================================
+router.post('/folders/:id/restore', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid folder ID' });
+
+        if (!canUserManageFiles(req)) {
+            return res.status(403).json({ error: 'You do not have permission to restore folders in this project' });
+        }
+
+        const folder = await getFolderById(id);
+        if (!folder) return res.status(404).json({ error: 'Folder not found' });
+        if (folder.isActive) return res.status(400).json({ error: 'Folder is not deleted' });
+
+        const githubSha = await restoreFolderGitkeep(folder);
+
+        const restored = await prisma.projectFolder.update({
+            where: { id },
+            data: { isActive: true, deletedAt: null, githubSha },
+            include: {
+                files: { where: { isActive: true }, select: { id: true } },
+                createdBy: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+            },
+        });
+
+        res.json(restored);
+    } catch (error) {
+        console.error('POST /project-files/folders/:id/restore', error);
+        res.status(500).json({ error: error.message || 'Failed to restore folder' });
+    }
+});
+
+// ============================================
+// PATCH /api/project-files/folders/:id/rename
+// Rename a folder (display name only — GitHub path unchanged)
+// ============================================
+router.patch('/folders/:id/rename', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid folder ID' });
+
+        const { folderName } = req.body;
+        if (!folderName || !folderName.trim()) {
+            return res.status(400).json({ error: 'folderName is required' });
+        }
+
+        const folder = await getFolderById(id);
+        if (!folder) return res.status(404).json({ error: 'Folder not found' });
+
+        if (!canUserManageFiles(req)) {
+            return res.status(403).json({ error: 'You do not have permission to rename folders in this project' });
+        }
+
+        const normalizedName = folderName.trim();
+        const duplicate = await prisma.projectFolder.findFirst({
+            where: {
+                projectId: folder.projectId,
+                isActive: true,
+                folderName: normalizedName,
+                id: { not: id },
+            },
+        });
+        if (duplicate) {
+            return res.status(409).json({ error: 'A folder with this name already exists in this project' });
+        }
+
+        const updated = await prisma.projectFolder.update({
+            where: { id },
+            data: { folderName: normalizedName },
+            include: {
+                files: { where: { isActive: true }, select: { id: true } },
+                createdBy: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+            },
+        });
+
+        res.json(updated);
+    } catch (error) {
+        console.error('PATCH /project-files/folders/:id/rename', error);
+        res.status(500).json({ error: 'Failed to rename folder' });
+    }
+});
+
+// ============================================
 // POST /api/project-files/upload
 // Upload a file to GitHub and store metadata
 // ============================================
 router.post('/upload', upload.single('file'), async (req, res) => {
     try {
-        const { projectId, uploadedByMemberId } = req.body;
+        const { projectId, uploadedByMemberId, folderId } = req.body;
 
         if (!projectId || !uploadedByMemberId) {
             return res.status(400).json({ error: 'projectId and uploadedByMemberId are required' });
@@ -114,15 +380,22 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             return res.status(400).json({ error: 'No file provided' });
         }
 
-        // Validate file type
-        if (!ALLOWED_TYPES.includes(req.file.mimetype)) {
-            return res.status(400).json({ error: 'File type not allowed' });
-        }
-
         // Permission check — all project team members can upload
         const parsedProjectId = parseInt(projectId);
         if (!(await canUserUploadToProject(req, parsedProjectId))) {
             return res.status(403).json({ error: 'You do not have permission to upload files to this project' });
+        }
+
+        let folder = null;
+        if (folderId) {
+            const parsedFolderId = parseInt(folderId);
+            folder = await prisma.projectFolder.findUnique({ where: { id: parsedFolderId } });
+            if (!folder || folder.projectId !== parsedProjectId) {
+                return res.status(404).json({ error: 'Folder not found' });
+            }
+            if (!folder.isActive) {
+                return res.status(400).json({ error: 'Cannot upload to a deleted folder' });
+            }
         }
 
         // Check if a file with the same name already exists for this project
@@ -130,6 +403,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             where: {
                 projectId: parsedProjectId,
                 fileName: req.file.originalname,
+                folderId: folder ? folder.id : null,
                 isActive: true,
             },
         });
@@ -140,13 +414,10 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         }
 
         // Upload (or update) on GitHub
-        const ghResult = await githubStorage.uploadFile(
-            req.file.buffer,
-            req.file.originalname,
-            req.file.mimetype,
-            parsedProjectId,
-            replaceOpts
-        );
+        const targetPath = replaceOpts.existingPath || buildFileGithubPath(parsedProjectId, folder?.githubPath, req.file.originalname);
+        const ghResult = replaceOpts.existingPath
+            ? await githubStorage.uploadContent(req.file.buffer, targetPath, `Update ${req.file.originalname}`, replaceOpts.existingSha)
+            : await githubStorage.uploadContent(req.file.buffer, targetPath, `Upload ${req.file.originalname}`);
 
         let projectFile;
         if (existing) {
@@ -158,8 +429,12 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                     fileSize: req.file.size,
                     mimeType: req.file.mimetype,
                     uploadedByMemberId: parseInt(uploadedByMemberId),
+                    folderId: folder ? folder.id : null,
                 },
                 include: {
+                    folder: {
+                        select: { id: true, folderName: true, githubPath: true, isActive: true },
+                    },
                     uploadedBy: {
                         select: { id: true, fullName: true, profilePhotoUrl: true },
                     },
@@ -173,12 +448,16 @@ router.post('/upload', upload.single('file'), async (req, res) => {
                     projectId: parsedProjectId,
                     uploadedByMemberId: parseInt(uploadedByMemberId),
                     fileName: req.file.originalname,
+                    folderId: folder ? folder.id : null,
                     fileSize: req.file.size,
                     mimeType: req.file.mimetype,
                     githubPath: ghResult.githubPath,
                     githubSha: ghResult.githubSha,
                 },
                 include: {
+                    folder: {
+                        select: { id: true, folderName: true, githubPath: true, isActive: true },
+                    },
                     uploadedBy: {
                         select: { id: true, fullName: true, profilePhotoUrl: true },
                     },
@@ -208,14 +487,17 @@ router.get('/deleted', async (req, res) => {
         // with a currently active file (those are version replacements, not true deletions)
         const activeFiles = await prisma.projectFile.findMany({
             where: { projectId: parsedId, isActive: true },
-            select: { fileName: true },
+            select: { fileName: true, folderId: true },
         });
-        const activeNames = new Set(activeFiles.map((f) => f.fileName));
+        const activeNames = new Set(activeFiles.map((f) => `${f.folderId ?? 'root'}::${f.fileName}`));
 
         const files = await prisma.projectFile.findMany({
             where: { projectId: parsedId, isActive: false },
             orderBy: { updatedAt: 'desc' },
             include: {
+                folder: {
+                    select: { id: true, folderName: true, githubPath: true, isActive: true },
+                },
                 uploadedBy: {
                     select: { id: true, fullName: true, profilePhotoUrl: true },
                 },
@@ -223,7 +505,7 @@ router.get('/deleted', async (req, res) => {
         });
 
         // Only return truly deleted files (no active file with the same name)
-        const filtered = files.filter((f) => !activeNames.has(f.fileName));
+        const filtered = files.filter((f) => !activeNames.has(`${f.folderId ?? 'root'}::${f.fileName}`));
 
         res.json(filtered);
     } catch (error) {
@@ -281,8 +563,11 @@ router.get('/:id/history', async (req, res) => {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid file ID' });
 
-        const file = await prisma.projectFile.findUnique({ where: { id } });
-        if (!file || !file.isActive) return res.status(404).json({ error: 'File not found' });
+        const file = await prisma.projectFile.findUnique({
+            where: { id },
+            include: { folder: { select: { id: true, folderName: true, githubPath: true, isActive: true } } },
+        });
+        if (!file) return res.status(404).json({ error: 'File not found' });
 
         const history = await githubStorage.getFileHistory(file.githubPath);
         res.json(history);
@@ -314,8 +599,11 @@ router.get('/:id/version/:commitSha', async (req, res) => {
         }
         if (!user) return res.status(401).json({ error: 'Authentication required' });
 
-        const file = await prisma.projectFile.findUnique({ where: { id } });
-        if (!file || !file.isActive) return res.status(404).json({ error: 'File not found' });
+        const file = await prisma.projectFile.findUnique({
+            where: { id },
+            include: { folder: { select: { id: true, folderName: true, githubPath: true, isActive: true } } },
+        });
+        if (!file) return res.status(404).json({ error: 'File not found' });
 
         const ghResponse = await githubStorage.downloadFileAtVersion(file.githubPath, commitSha);
 
@@ -338,7 +626,10 @@ router.delete('/:id', async (req, res) => {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid file ID' });
 
-        const file = await prisma.projectFile.findUnique({ where: { id } });
+        const file = await prisma.projectFile.findUnique({
+            where: { id },
+            include: { folder: { select: { id: true, folderName: true, githubPath: true, isActive: true } } },
+        });
         if (!file) return res.status(404).json({ error: 'File not found' });
 
         // Permission check — only privileged users can delete files
@@ -380,8 +671,11 @@ router.patch('/:id/rename', async (req, res) => {
             return res.status(400).json({ error: 'fileName is required' });
         }
 
-        const file = await prisma.projectFile.findUnique({ where: { id } });
-        if (!file || !file.isActive) return res.status(404).json({ error: 'File not found' });
+        const file = await prisma.projectFile.findUnique({
+            where: { id },
+            include: { folder: { select: { id: true, folderName: true, githubPath: true, isActive: true } } },
+        });
+        if (!file) return res.status(404).json({ error: 'File not found' });
 
         // Permission check — only privileged users can rename files
         if (!canUserManageFiles(req)) {
@@ -405,6 +699,7 @@ router.patch('/:id/rename', async (req, res) => {
             where: { id },
             data: { fileName: fileName.trim() },
             include: {
+                folder: { select: { id: true, folderName: true, githubPath: true, isActive: true } },
                 uploadedBy: {
                     select: { id: true, fullName: true, profilePhotoUrl: true },
                 },
@@ -419,6 +714,88 @@ router.patch('/:id/rename', async (req, res) => {
 });
 
 // ============================================
+// PATCH /api/project-files/:id/move
+// Move a file between root and folders (metadata only — GitHub path unchanged)
+// Body: { folderId: number | null }
+// ============================================
+router.patch('/:id/move', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid file ID' });
+
+        const { folderId = null } = req.body;
+        const parsedFolderId = folderId === null || folderId === '' ? null : parseInt(folderId, 10);
+        if (folderId !== null && folderId !== '' && Number.isNaN(parsedFolderId)) {
+            return res.status(400).json({ error: 'folderId must be a valid folder ID or null' });
+        }
+
+        const file = await prisma.projectFile.findUnique({
+            where: { id },
+            include: { folder: { select: { id: true, folderName: true, githubPath: true, isActive: true } } },
+        });
+        if (!file) return res.status(404).json({ error: 'File not found' });
+
+        if (!canUserManageFiles(req)) {
+            return res.status(403).json({ error: 'You do not have permission to move files in this project' });
+        }
+
+        let targetFolder = null;
+        if (parsedFolderId !== null) {
+            targetFolder = await prisma.projectFolder.findUnique({ where: { id: parsedFolderId } });
+            if (!targetFolder || targetFolder.projectId !== file.projectId) {
+                return res.status(404).json({ error: 'Folder not found' });
+            }
+            if (!targetFolder.isActive) {
+                return res.status(400).json({ error: 'Cannot move files into a deleted folder' });
+            }
+        }
+
+        const duplicate = await prisma.projectFile.findFirst({
+            where: {
+                projectId: file.projectId,
+                fileName: file.fileName,
+                isActive: true,
+                folderId: targetFolder ? targetFolder.id : null,
+                id: { not: id },
+            },
+        });
+        if (duplicate) {
+            return res.status(409).json({ error: 'A file with this name already exists in the target folder' });
+        }
+
+        const sourceBaseName = file.githubPath.split('/').pop();
+        const targetGithubPath = targetFolder
+            ? `${targetFolder.githubPath}/${sourceBaseName}`
+            : `projects/${file.projectId}/${sourceBaseName}`;
+
+        const moveResult = await githubStorage.moveFile(
+            file.githubPath,
+            targetGithubPath,
+            file.githubSha,
+            `Move ${file.fileName}${targetFolder ? ` to ${targetFolder.folderName}` : ' to root'}`,
+        );
+
+        const moved = await prisma.projectFile.update({
+            where: { id },
+            data: {
+                folderId: targetFolder ? targetFolder.id : null,
+                githubPath: moveResult.githubPath,
+                githubSha: moveResult.githubSha,
+            },
+            include: {
+                folder: { select: { id: true, folderName: true, githubPath: true, isActive: true } },
+                uploadedBy: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+            },
+        });
+
+        res.json(moved);
+    } catch (error) {
+        console.error('PATCH /project-files/:id/move', error);
+        res.status(500).json({ error: 'Failed to move file' });
+    }
+});
+
+// ============================================
 // POST /api/project-files/:id/restore
 // Restore a soft-deleted file from GitHub history
 // ============================================
@@ -427,13 +804,24 @@ router.post('/:id/restore', async (req, res) => {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid file ID' });
 
-        const file = await prisma.projectFile.findUnique({ where: { id } });
+        const file = await prisma.projectFile.findUnique({
+            where: { id },
+            include: { folder: { select: { id: true, folderName: true, githubPath: true, isActive: true } } },
+        });
         if (!file) return res.status(404).json({ error: 'File not found' });
         if (file.isActive) return res.status(400).json({ error: 'File is not deleted' });
 
         // Permission check — only privileged users can restore files
         if (!canUserManageFiles(req)) {
             return res.status(403).json({ error: 'You do not have permission to restore files in this project' });
+        }
+
+        if (file.folderId && file.folder && !file.folder.isActive) {
+            const restoredFolderSha = await restoreFolderGitkeep(file.folder);
+            await prisma.projectFolder.update({
+                where: { id: file.folder.id },
+                data: { isActive: true, deletedAt: null, githubSha: restoredFolderSha },
+            });
         }
 
         // Restore the file on GitHub from commit history
@@ -447,6 +835,7 @@ router.post('/:id/restore', async (req, res) => {
                 githubSha: ghResult.githubSha,
             },
             include: {
+                folder: { select: { id: true, folderName: true, githubPath: true, isActive: true } },
                 uploadedBy: {
                     select: { id: true, fullName: true, profilePhotoUrl: true },
                 },

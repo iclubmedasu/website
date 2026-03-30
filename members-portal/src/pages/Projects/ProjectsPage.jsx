@@ -13,21 +13,32 @@ import {
     Paperclip,
     CheckCircle,
     Archive,
+    PlayCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { projectsAPI, tasksAPI, teamsAPI, membersAPI, phasesAPI, projectTypesAPI, projectFilesAPI, getProfilePhotoUrl } from '../../services/api';
 import FileUploadZone from '../../components/FileUpload/FileUploadZone';
 import './ProjectsPage.css';
+import {
+    fmtDate,
+    PriorityBadge,
+    ProjectCardView,
+    StatusBadge,
+    getLifecycleBadge,
+    isProjectAborted,
+    isProjectInactive,
+} from './components/ProjectCardView';
 
 import CreateProjectModal from './modals/CreateProjectModal';
-import DeactivateProjectModal from './modals/DeactivateProjectModal';
+import HoldProjectModal from './modals/HoldProjectModal';
+import AbortProjectModal from './modals/AbortProjectModal';
 import FinalizeProjectModal from './modals/FinalizeProjectModal';
 import ArchiveProjectModal from './modals/ArchiveProjectModal';
 import AddPhaseModal from './modals/AddPhaseModal';
 import AddTaskModal from './modals/AddTaskModal';
 import EditTaskModal from './modals/EditTaskModal';
 import EditPhaseModal from './modals/EditPhaseModal';
-import ConfirmModal from './modals/ConfirmModal';
+import DeletePhaseTaskModal from './modals/DeletePhaseTaskModal';
 import PhaseRow from './components/PhaseRow';
 import GanttChart from './components/GanttChart';
 
@@ -113,38 +124,9 @@ const PROJECT_STATUSES = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD', 
 const TASK_STATUSES = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'DELAYED', 'BLOCKED'];
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
-function fmtDate(d) {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-function getCategoryClass(category) {
-    return 'badge-category-' + (category ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-}
-
 function isOverdue(dueDate, status) {
     if (!dueDate || status === 'COMPLETED' || status === 'CANCELLED') return false;
     return new Date(dueDate) < new Date();
-}
-
-// ─────────────────────────────────────────────────────────
-//  Badge component
-// ─────────────────────────────────────────────────────────
-function StatusBadge({ status }) {
-    return (
-        <span className={`badge badge-status-${status}`}>
-            <span className={`status-dot status-dot-${status}`} />
-            {STATUS_LABELS[status] ?? status}
-        </span>
-    );
-}
-
-function PriorityBadge({ priority }) {
-    return (
-        <span className={`badge badge-priority-${priority}`}>
-            {PRIORITY_LABELS[priority] ?? priority}
-        </span>
-    );
 }
 
 // ─────────────────────────────────────────────────────────
@@ -312,11 +294,8 @@ function TaskItem({ task, canEdit, onStatusChange, onAddSubtask }) {
 // ─────────────────────────────────────────────────────────
 //  Project Card with Expandable Detail
 // ─────────────────────────────────────────────────────────
-function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeactivate, onFinalize, onArchive, onRefreshDetail, allMembers, canEdit, canManage, canUpload, canEditStructure, canEditStatus }) {
+function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, onEdit, onDeactivate, onFinalize, onArchive, onReactivate, onAbort, onPublish, onRefreshDetail, allMembers, canEdit, canManage, canUpload, canEditStructure, canEditStatus }) {
     const { user } = useAuth();
-    const over = isOverdue(project.dueDate, project.status);
-    const ownerTeam = fullDetail?.projectTeams?.find((pt) => pt.isOwner) ?? null;
-    const otherTeams = fullDetail?.projectTeams?.filter((pt) => !pt.isOwner) ?? [];
 
     // Local copy of detail for optimistic inline updates (avoids full refresh & scroll reset)
     const [localDetail, setLocalDetail] = useState(fullDetail);
@@ -358,9 +337,11 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
 
     // Project files state
     const [projectFiles, setProjectFiles] = useState([]);
+    const [projectFolders, setProjectFolders] = useState([]);
     useEffect(() => {
         if (expanded && localDetail?.id) {
             projectFilesAPI.getAll(localDetail.id).then(setProjectFiles).catch(() => setProjectFiles([]));
+            projectFilesAPI.getFolders(localDetail.id, true).then(setProjectFolders).catch(() => setProjectFolders([]));
         }
     }, [expanded, localDetail?.id]);
 
@@ -373,378 +354,305 @@ function ProjectCard({ project, expanded, fullDetail, onToggle, onEdit, onDeacti
 
     // Use localDetail for rendering instead of fullDetail
     const detail = localDetail;
+    const aborted = isProjectAborted(project);
+    const inactive = isProjectInactive(project);
+    const lifecycleBadge = getLifecycleBadge(project);
+    const LifecycleIcon = lifecycleBadge.icon;
 
     return (
-        <div
-            className={`project-card${expanded ? ' project-card--expanded' : ''}`}
-            onClick={() => !expanded && onToggle(project)}
-        >
-            {/* Close button when expanded */}
-            {expanded && (
-                <button
-                    className="expanded-close-btn"
-                    onClick={(e) => { e.stopPropagation(); onToggle(null); }}
-                    title="Close"
-                >
-                    <X size={16} />
-                </button>
+        <ProjectCardView
+            project={project}
+            expanded={expanded}
+            detail={detail}
+            detailLoading={detailLoading}
+            onToggle={onToggle}
+            collapsedMeta={(
+                <>
+                    <span className={`badge ${lifecycleBadge.className}`} title={lifecycleBadge.title}>
+                        <LifecycleIcon size={12} />
+                        {lifecycleBadge.label}
+                    </span>
+                    {project.isFinalized && canManage && (
+                        <>
+                            <button
+                                className="icon-btn archive-btn"
+                                title="Archive project"
+                                onClick={(e) => { e.stopPropagation(); onArchive(project); }}
+                            >
+                                <Archive size={14} />
+                            </button>
+                        </>
+                    )}
+                    {canEdit && !project.isFinalized && project.isActive && project.status !== 'CANCELLED' && (
+                        <>
+                            <button
+                                className="icon-btn edit-btn"
+                                title="Edit project"
+                                onClick={(e) => { e.stopPropagation(); onEdit(project); }}
+                            >
+                                <Pencil size={14} />
+                            </button>
+                            <button
+                                className="icon-btn hold-btn"
+                                title="Hold project"
+                                onClick={(e) => { e.stopPropagation(); onDeactivate(project); }}
+                            >
+                                <PauseCircle size={14} />
+                            </button>
+                            <button
+                                className="icon-btn deactivate-btn"
+                                title="Abort project"
+                                onClick={(e) => { e.stopPropagation(); onAbort(project); }}
+                            >
+                                <AlertCircle size={14} />
+                            </button>
+                            <button
+                                className="icon-btn finalize-btn"
+                                title="Finalize project"
+                                onClick={(e) => { e.stopPropagation(); onFinalize(project); }}
+                            >
+                                <CheckSquare size={14} />
+                            </button>
+                        </>
+                    )}
+                    {canManage && inactive && (
+                        <>
+                            <button
+                                className="icon-btn reactivate-btn"
+                                title="Reactivate project"
+                                onClick={(e) => { e.stopPropagation(); onReactivate(project); }}
+                            >
+                                <PlayCircle size={14} />
+                            </button>
+                            <button
+                                className="icon-btn deactivate-btn"
+                                title="Abort project"
+                                onClick={(e) => { e.stopPropagation(); onAbort(project); }}
+                            >
+                                <AlertCircle size={14} />
+                            </button>
+                            <button
+                                className="icon-btn finalize-btn"
+                                title="Finalize project"
+                                onClick={(e) => { e.stopPropagation(); onFinalize(project); }}
+                            >
+                                <CheckSquare size={14} />
+                            </button>
+                        </>
+                    )}
+                    {canManage && aborted && !project.isArchived && (
+                        <button
+                            className="icon-btn archive-btn"
+                            title="Archive project"
+                            onClick={(e) => { e.stopPropagation(); onArchive(project); }}
+                        >
+                            <Archive size={14} />
+                        </button>
+                    )}
+                </>
             )}
-
-            {/* Collapsed content - always visible but hidden when expanded */}
-            <div className="project-card-collapsed-content">
-                <div className="project-card-header">
-                    <span className="project-card-title">{project.title}</span>
-                    <div className="project-card-meta">
-                        {project.isFinalized && canManage && (
-                            <>
-                                <span className="badge badge-finalized" title="Finalized">
-                                    <CheckCircle size={12} />
-                                    Finalized
-                                </span>
-                                <button
-                                    className="icon-btn archive-btn"
-                                    title="Archive project"
-                                    onClick={(e) => { e.stopPropagation(); onArchive(project); }}
-                                >
-                                    <Archive size={14} />
-                                </button>
-                            </>
-                        )}
-                        {project.isFinalized && !canManage && (
-                            <span className="badge badge-finalized" title="Finalized">
-                                <CheckCircle size={12} />
-                                Finalized
-                            </span>
-                        )}
-                        {canEdit && !project.isFinalized && (
-                            <>
-                                <button
-                                    className="icon-btn edit-btn"
-                                    title="Edit project"
-                                    onClick={(e) => { e.stopPropagation(); onEdit(project); }}
-                                >
-                                    <Pencil size={14} />
-                                </button>
-                                <button
-                                    className="icon-btn finalize-btn"
-                                    title="Finalize project"
-                                    onClick={(e) => { e.stopPropagation(); onFinalize(project); }}
-                                >
-                                    <CheckCircle size={14} />
-                                </button>
-                                <button
-                                    className="icon-btn archive-btn"
-                                    title="Archive project"
-                                    onClick={(e) => { e.stopPropagation(); onArchive(project); }}
-                                >
-                                    <Archive size={14} />
-                                </button>
-                                <button
-                                    className="icon-btn deactivate-btn"
-                                    title="Deactivate project"
-                                    onClick={(e) => { e.stopPropagation(); onDeactivate(project); }}
-                                >
-                                    <PauseCircle size={14} />
-                                </button>
-                            </>
-                        )}
+            collapsedFooterTrailing={(
+                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div className="project-card-due project-card-date-range">
+                        <Calendar size={11} />
+                        {fmtDate(project.startDate)} → {fmtDate(project.dueDate)}
                     </div>
-                </div>
-
-                {project.description && (
-                    <div className="project-card-description">{project.description}</div>
-                )}
-
-                <div className="project-card-badges">
-                    <StatusBadge status={project.status} />
-                    <PriorityBadge priority={project.priority} />
-                </div>
-
-                <div className="project-card-footer">
-                    <div className="project-card-teams">
-                        {project.projectTeams?.slice(0, 3).map((pt) => (
-                            <span key={pt.id} className="badge-team">{pt.team?.name}</span>
-                        ))}
-                        {(project.projectTeams?.length ?? 0) > 3 && (
-                            <span className="badge-team">+{project.projectTeams.length - 3}</span>
-                        )}
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        {project.dueDate && (
-                            <div className={`project-card-due ${over ? 'overdue' : ''}`}>
-                                <Calendar size={11} />
-                                {fmtDate(project.dueDate)}
-                            </div>
-                        )}
-                        <div className="project-card-task-count">
-                            <SquareCheckBig size={11} />
-                            {project._count?.tasks ?? 0} task{project._count?.tasks !== 1 ? 's' : ''}
-                            {' · '}
-                            {project._count?.phases ?? 0} phase{project._count?.phases !== 1 ? 's' : ''}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Expanded content - only visible when card is expanded */}
-            {expanded && detail && (
-                <div className="project-card-expanded-content">
-                    <div className="expanded-content-wrapper">
-
-                        {/* Title row + action buttons */}
-                        <div style={{ marginBottom: '0.25rem' }}>
-                            <div className="expanded-title-row">
-                                <h2 className="project-card-title" style={{ marginBottom: 0 }}>
-                                    {detail.title}
-                                </h2>
-                                {detail.isFinalized && canManage && (
-                                    <div className="expanded-title-actions">
-                                        <span className="badge badge-finalized" style={{ fontSize: '0.82rem' }}>
-                                            <CheckCircle size={14} />
-                                            Finalized
-                                        </span>
-                                        <button
-                                            className="icon-btn archive-btn icon-btn--text"
-                                            onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
-                                        >
-                                            <Archive size={13} />
-                                            Archive
-                                        </button>
-                                    </div>
-                                )}
-                                {detail.isFinalized && !canManage && (
-                                    <span className="badge badge-finalized" style={{ fontSize: '0.82rem' }}>
-                                        <CheckCircle size={14} />
-                                        Finalized
-                                    </span>
-                                )}
-                                {canEdit && !detail.isFinalized && (
-                                    <div className="expanded-title-actions">
-                                        <button
-                                            className="icon-btn edit-btn icon-btn--text"
-                                            onClick={(e) => { e.stopPropagation(); onEdit(detail); }}
-                                        >
-                                            <Pencil size={13} />
-                                            Edit Project
-                                        </button>
-                                        <button
-                                            className="icon-btn finalize-btn icon-btn--text"
-                                            onClick={(e) => { e.stopPropagation(); onFinalize(detail); }}
-                                        >
-                                            <CheckCircle size={13} />
-                                            Finalize
-                                        </button>
-                                        <button
-                                            className="icon-btn archive-btn icon-btn--text"
-                                            onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
-                                        >
-                                            <Archive size={13} />
-                                            Archive
-                                        </button>
-                                        <button
-                                            className="icon-btn deactivate-btn icon-btn--text"
-                                            onClick={(e) => { e.stopPropagation(); onDeactivate(detail); }}
-                                        >
-                                            <PauseCircle size={13} />
-                                            Deactivate
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                            {detail.description && (
-                                <div className="expanded-description" style={{ marginTop: '0.4rem' }}>
-                                    {detail.description}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* ── Section 1: Details ── */}
-                        <div className="exp-card-section">
-                            <div className="exp-card-section-header">Details</div>
-                            {/* Row 1: category · type · status · priority */}
-                            <div className="exp-badges-row">
-                                <div className="exp-badges-item">
-                                    <span className="exp-badges-label">Category</span>
-                                    <span className="exp-badges-value">
-                                        {detail.projectType?.category ? (
-                                            <span className={`badge ${getCategoryClass(detail.projectType.category)}`}>
-                                                {detail.projectType.category}
-                                            </span>
-                                        ) : '—'}
-                                    </span>
-                                </div>
-                                <div className="exp-badges-item">
-                                    <span className="exp-badges-label">Type</span>
-                                    <span className="exp-badges-value">{detail.projectType ? (
-                                        <span className="badge badge-type">
-                                            {detail.projectType.name}
-                                        </span>
-                                    ) : '—'}</span>
-                                </div>
-                                <div className="exp-badges-item">
-                                    <span className="exp-badges-label">Status</span>
-                                    <span className="exp-badges-value"><StatusBadge status={detail.status} /></span>
-                                </div>
-                                <div className="exp-badges-item">
-                                    <span className="exp-badges-label">Priority</span>
-                                    <span className="exp-badges-value"><PriorityBadge priority={detail.priority} /></span>
-                                </div>
-                            </div>
-                            {/* Row 2: created · start · due dates */}
-                            <div className="exp-dates-row">
-                                <div className="exp-date-item">
-                                    <span className="exp-date-label">Created</span>
-                                    <span className="exp-date-value">{fmtDate(detail.createdAt) || '—'}</span>
-                                </div>
-                                <div className="exp-date-item">
-                                    <span className="exp-date-label">Start</span>
-                                    <span className="exp-date-value">{fmtDate(detail.startDate) || '—'}</span>
-                                </div>
-                                <div className="exp-date-item">
-                                    <span className="exp-date-label">Due</span>
-                                    <span className={`exp-date-value${over ? ' overdue' : ''}`}>
-                                        {fmtDate(detail.dueDate) || '—'}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* ── Section 2: Teams ── */}
-                        <div className="exp-card-section">
-                            <div className="exp-card-section-header">Teams</div>
-                            {/* Created by */}
-                            <div className="exp-teams-block">
-                                <span className="exp-creator-label">Created by</span>
-                                <div className="exp-teams-pills">
-                                    <span className="exp-creator-name">{detail.createdBy?.fullName ?? '—'}</span>
-                                    {ownerTeam && (
-                                        <span className="badge-team">{ownerTeam.team?.name}</span>
-                                    )}
-                                </div>
-                            </div>
-                            {/* All assigned teams */}
-                            {(detail.projectTeams?.length ?? 0) > 0 ? (
-                                <div className="exp-teams-block">
-                                    <span className="exp-creator-label">Assigned Teams</span>
-                                    <div className="exp-teams-pills">
-                                        {detail.projectTeams.map((pt) => (
-                                            <span key={pt.id} className="badge-team">
-                                                {pt.team?.name}
-                                                {pt.isOwner ? ' ★' : ''}
-                                                {!pt.canEdit ? ' (view)' : ''}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : (
-                                <span style={{ fontSize: '0.82rem', color: 'var(--gray-400)' }}>No teams assigned</span>
-                            )}
-                        </div>
-
-                        {/* ── Section 3: Gantt Chart ── */}
-                        <div className="exp-card-section" style={{ padding: 0 }}>
-                            <GanttChart
-                                phases={detail.phases || []}
-                                projectId={detail.id}
-                                projectStartDate={detail.startDate}
-                                projectDueDate={detail.dueDate}
-                                canEdit={canEditStructure}
-                                canEditStatus={canEditStatus}
-                                onAddPhase={() => setShowAddPhase(true)}
-                                onAddTask={(phase) => setAddTaskTarget({ phaseId: phase.id })}
-                                onAddSubtask={(phase, parentTask) => setAddTaskTarget({ phaseId: phase.id, parentTask })}
-                                onEditPhase={(phase) => setEditPhaseTarget(phase)}
-                                onEditTask={(task) => setEditTaskTarget(task)}
-                                onDeletePhase={(phase) => setConfirmDeletePhase(phase)}
-                                onRefresh={() => onRefreshDetail(detail.id)}
-                            />
-                        </div>
-
-                        {/* ── Section 4: Project Files ── */}
-                        <div className="exp-card-section">
-                            <div className="exp-card-section-header">
-                                <Paperclip size={14} style={{ marginRight: '0.35rem' }} />
-                                Project Files
-                            </div>
-                            <FileUploadZone
-                                projectId={detail.id}
-                                memberId={user?.id}
-                                existingFiles={projectFiles}
-                                onFileUploaded={(newFile, replaced) => setProjectFiles((prev) =>
-                                    replaced
-                                        ? prev.map((f) => f.id === newFile.id ? newFile : f)
-                                        : [newFile, ...prev]
-                                )}
-                                onFileRemoved={(fileId) => setProjectFiles((prev) => prev.filter((f) => f.id !== fileId))}
-                                onFileRenamed={(updated) => setProjectFiles((prev) =>
-                                    prev.map((f) => f.id === updated.id ? { ...f, fileName: updated.fileName } : f)
-                                )}
-                                disabled={!canUpload}
-                            />
-                        </div>
-
-
-
-                        {/* Edit Phase Modal */}
-                        {editPhaseTarget && (
-                            <EditPhaseModal
-                                phase={editPhaseTarget}
-                                onClose={() => setEditPhaseTarget(null)}
-                                onPhaseUpdated={() => { setEditPhaseTarget(null); onRefreshDetail(detail.id); }}
-                            />
-                        )}
-
-                        {/* Confirm Delete Phase Modal */}
-                        {confirmDeletePhase && (
-                            <ConfirmModal
-                                title="Delete Phase"
-                                itemName={confirmDeletePhase.title}
-                                message="All tasks, subtasks, and assignees in this phase will be permanently removed. This action cannot be undone."
-                                confirmLabel="Delete Phase"
-                                onConfirm={async () => {
-                                    await phasesAPI.remove(confirmDeletePhase.id);
-                                    onRefreshDetail(detail.id);
-                                }}
-                                onClose={() => setConfirmDeletePhase(null)}
-                            />
-                        )}
-
-                        {/* Add Phase Modal */}
-                        {showAddPhase && (
-                            <AddPhaseModal
-                                projectId={detail.id}
-                                existingPhasesCount={detail.phases?.length ?? 0}
-                                onClose={() => setShowAddPhase(false)}
-                                onPhaseCreated={() => { setShowAddPhase(false); onRefreshDetail(detail.id); }}
-                            />
-                        )}
-
-                        {/* Add Task / Subtask Modal */}
-                        {addTaskTarget && (
-                            <AddTaskModal
-                                projectId={detail.id}
-                                phaseId={addTaskTarget.phaseId}
-                                parentTask={addTaskTarget.parentTask || null}
-                                allMembers={allMembers}
-                                onClose={() => setAddTaskTarget(null)}
-                                onTaskCreated={() => { setAddTaskTarget(null); onRefreshDetail(detail.id); }}
-                            />
-                        )}
-
-                        {/* Edit Task / Subtask Modal */}
-                        {editTaskTarget && (
-                            <EditTaskModal
-                                task={editTaskTarget}
-                                allMembers={allMembers}
-                                onClose={() => setEditTaskTarget(null)}
-                                onTaskUpdated={() => { setEditTaskTarget(null); onRefreshDetail(detail.id); }}
-                            />
-                        )}
+                    <div className="project-card-task-count">
+                        <SquareCheckBig size={11} />
+                        {project._count?.tasks ?? 0} task{project._count?.tasks !== 1 ? 's' : ''}
+                        {' · '}
+                        {project._count?.phases ?? 0} phase{project._count?.phases !== 1 ? 's' : ''}
                     </div>
                 </div>
             )}
-        </div>
+            expandedMeta={(
+                <span className={`badge ${lifecycleBadge.className}`} style={{ fontSize: '0.82rem' }}>
+                    <LifecycleIcon size={14} />
+                    {lifecycleBadge.label}
+                </span>
+            )}
+            expandedActions={detail ? (
+                detail.isFinalized ? (
+                    canManage && (
+                        <div className="expanded-title-actions">
+                            <button
+                                className="icon-btn archive-btn icon-btn--text"
+                                onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
+                            >
+                                <Archive size={13} />
+                                Archive
+                            </button>
+                        </div>
+                    )
+                ) : detail.status === 'CANCELLED' ? (
+                    canManage && !detail.isArchived && (
+                        <div className="expanded-title-actions">
+                            <button
+                                className="icon-btn archive-btn icon-btn--text"
+                                onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
+                            >
+                                <Archive size={13} />
+                                Archive
+                            </button>
+                        </div>
+                    )
+                ) : detail.isActive === false ? (
+                    canManage && !detail.isArchived && (
+                        <div className="expanded-title-actions">
+                            <button
+                                className="icon-btn reactivate-btn icon-btn--text"
+                                onClick={(e) => { e.stopPropagation(); onReactivate(detail); }}
+                            >
+                                <PlayCircle size={13} />
+                                Reactivate
+                            </button>
+                            <button
+                                className="icon-btn deactivate-btn icon-btn--text"
+                                onClick={(e) => { e.stopPropagation(); onAbort(detail); }}
+                            >
+                                <AlertCircle size={13} />
+                                Abort
+                            </button>
+                            <button
+                                className="icon-btn finalize-btn icon-btn--text"
+                                onClick={(e) => { e.stopPropagation(); onFinalize(detail); }}
+                            >
+                                <CheckSquare size={13} />
+                                Finalize
+                            </button>
+                        </div>
+                    )
+                ) : canEdit && (
+                    <div className="expanded-title-actions">
+                        <button
+                            className="icon-btn edit-btn icon-btn--text"
+                            onClick={(e) => { e.stopPropagation(); onEdit(detail); }}
+                        >
+                            <Pencil size={13} />
+                            Edit Project
+                        </button>
+                        <button
+                            className="icon-btn hold-btn icon-btn--text"
+                            onClick={(e) => { e.stopPropagation(); onDeactivate(detail); }}
+                        >
+                            <PauseCircle size={13} />
+                            Hold
+                        </button>
+                        <button
+                            className="icon-btn deactivate-btn icon-btn--text"
+                            onClick={(e) => { e.stopPropagation(); onAbort(detail); }}
+                        >
+                            <AlertCircle size={13} />
+                            Abort
+                        </button>
+                        <button
+                            className="icon-btn finalize-btn icon-btn--text"
+                            onClick={(e) => { e.stopPropagation(); onFinalize(detail); }}
+                        >
+                            <CheckSquare size={13} />
+                            Finalize
+                        </button>
+                    </div>
+                )
+            ) : null}
+            teamEmptyMessage="No teams assigned"
+            formatAssignedTeamSuffix={(pt) => `${pt.isOwner ? ' ★' : ''}${!pt.canEdit ? ' (view)' : ''}`}
+            afterSections={detail ? (
+                <>
+                    <div className="exp-card-section" style={{ padding: 0 }}>
+                        <GanttChart
+                            phases={detail.phases || []}
+                            projectId={detail.id}
+                            projectStartDate={detail.startDate}
+                            projectDueDate={detail.dueDate}
+                            canEdit={canEditStructure}
+                            canEditStatus={canEditStatus}
+                            onAddPhase={() => setShowAddPhase(true)}
+                            onAddTask={(phase) => setAddTaskTarget({ phaseId: phase.id })}
+                            onAddSubtask={(phase, parentTask) => setAddTaskTarget({ phaseId: phase.id, parentTask })}
+                            onEditPhase={(phase) => setEditPhaseTarget(phase)}
+                            onEditTask={(task) => setEditTaskTarget(task)}
+                            onDeletePhase={(phase) => setConfirmDeletePhase(phase)}
+                            onRefresh={() => onRefreshDetail(detail.id)}
+                        />
+                    </div>
+
+                    <div className="exp-card-section">
+                        <div className="exp-card-section-header">
+                            <Paperclip size={14} style={{ marginRight: '0.35rem' }} />
+                            Project Files
+                        </div>
+                        <FileUploadZone
+                            projectId={detail.id}
+                            memberId={user?.id}
+                            existingFiles={projectFiles}
+                            existingFolders={projectFolders}
+                            onFileUploaded={(newFile, replaced) => setProjectFiles((prev) =>
+                                replaced
+                                    ? prev.map((f) => f.id === newFile.id ? newFile : f)
+                                    : [newFile, ...prev]
+                            )}
+                            onFileRemoved={(fileId) => setProjectFiles((prev) => prev.filter((f) => f.id !== fileId))}
+                            onFileRenamed={(updated) => setProjectFiles((prev) =>
+                                prev.map((f) => f.id === updated.id ? { ...f, fileName: updated.fileName } : f)
+                            )}
+                            disabled={!canUpload}
+                        />
+                    </div>
+
+                    {editPhaseTarget && (
+                        <EditPhaseModal
+                            phase={editPhaseTarget}
+                            onClose={() => setEditPhaseTarget(null)}
+                            onPhaseUpdated={() => { setEditPhaseTarget(null); onRefreshDetail(detail.id); }}
+                        />
+                    )}
+
+                    {confirmDeletePhase && (
+                        <DeletePhaseTaskModal
+                            title="Delete Phase"
+                            itemName={confirmDeletePhase.title}
+                            message="All tasks, subtasks, and assignees in this phase will be permanently removed. This action cannot be undone."
+                            confirmLabel="Delete Phase"
+                            onConfirm={async () => {
+                                await phasesAPI.remove(confirmDeletePhase.id);
+                                onRefreshDetail(detail.id);
+                            }}
+                            onClose={() => setConfirmDeletePhase(null)}
+                        />
+                    )}
+
+                    {showAddPhase && (
+                        <AddPhaseModal
+                            projectId={detail.id}
+                            existingPhasesCount={detail.phases?.length ?? 0}
+                            onClose={() => setShowAddPhase(false)}
+                            onPhaseCreated={() => { setShowAddPhase(false); onRefreshDetail(detail.id); }}
+                        />
+                    )}
+
+                    {addTaskTarget && (
+                        <AddTaskModal
+                            projectId={detail.id}
+                            phaseId={addTaskTarget.phaseId}
+                            parentTask={addTaskTarget.parentTask || null}
+                            allMembers={allMembers}
+                            onClose={() => setAddTaskTarget(null)}
+                            onTaskCreated={() => { setAddTaskTarget(null); onRefreshDetail(detail.id); }}
+                        />
+                    )}
+
+                    {editTaskTarget && (
+                        <EditTaskModal
+                            task={editTaskTarget}
+                            allMembers={allMembers}
+                            onClose={() => setEditTaskTarget(null)}
+                            onTaskUpdated={() => { setEditTaskTarget(null); onRefreshDetail(detail.id); }}
+                        />
+                    )}
+                </>
+            ) : null}
+        />
     );
 }
 
@@ -795,9 +703,12 @@ export default function ProjectsPage() {
     // Modals
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
-    const [deactivatingProject, setDeactivatingProject] = useState(null);
+    const [holdingProject, setHoldingProject] = useState(null);
     const [finalizingProject, setFinalizingProject] = useState(null);
     const [archivingProject, setArchivingProject] = useState(null);
+    const [reactivatingProject, setReactivatingProject] = useState(null);
+    const [abortingProject, setAbortingProject] = useState(null);
+    const [publishingProject, setPublishingProject] = useState(null);
 
     // ── Load all supporting data ──
     useEffect(() => {
@@ -817,10 +728,22 @@ export default function ProjectsPage() {
     const loadProjects = useCallback(async () => {
         setLoading(true); setError('');
         try {
-            const data = await projectsAPI.getAll({
-                teamId: filterTeam || undefined,
-                priority: filterPriority || undefined,
-            });
+            const [activeData, inactiveData] = await Promise.all([
+                projectsAPI.getAll({
+                    teamId: filterTeam || undefined,
+                    priority: filterPriority || undefined,
+                }),
+                projectsAPI.getAll({
+                    isActive: false,
+                    teamId: filterTeam || undefined,
+                    priority: filterPriority || undefined,
+                }),
+            ]);
+
+            const data = [...activeData, ...inactiveData].reduce((acc, item) => {
+                if (!acc.some((p) => p.id === item.id)) acc.push(item);
+                return acc;
+            }, []);
             // Client-side filter by category
             let filtered = data;
             if (filterCategory) {
@@ -900,11 +823,14 @@ export default function ProjectsPage() {
         loadProjects();
     };
 
-    const handleProjectDeactivated = (id) => {
-        setProjects((prev) => prev.filter((p) => p.id !== id));
-        if (expandedProjectId === id) {
-            setExpandedProjectId(null);
-            setExpandedProjectDetail(null);
+    const handleProjectHeld = () => {
+        handleProjectLifecycleChanged();
+    };
+
+    const handleProjectLifecycleChanged = () => {
+        loadProjects();
+        if (expandedProjectId) {
+            projectsAPI.getById(expandedProjectId).then(setExpandedProjectDetail).catch(() => { });
         }
     };
 
@@ -941,12 +867,9 @@ export default function ProjectsPage() {
     // Only privileged roles can create/edit/manage projects
     const canCreateProject = isPrivileged;
 
-    const canEditProject = (project) => {
-        if (project.isFinalized) return false;
-        return isPrivileged;
-    };
+    const canEditProject = (project) => isPrivileged && !!project?.isActive && !project?.isFinalized && project?.status !== 'CANCELLED';
 
-    // canManageProject: finalize, archive, deactivate (NOT blocked by finalized)
+    // canManageProject: finalize, archive, hold, abort, publish, reactivate (NOT blocked by finalized)
     const canManageProject = () => isPrivileged;
 
     // Can the user upload files? Any team member or privileged user
@@ -1028,9 +951,10 @@ export default function ProjectsPage() {
                                 project={p}
                                 expanded={expandedProjectId === p.id}
                                 fullDetail={expandedProjectId === p.id ? expandedProjectDetail : null}
+                                detailLoading={expandedProjectId === p.id && detailLoading}
                                 onToggle={handleToggleExpand}
                                 onEdit={(proj) => setEditingProject(proj)}
-                                onDeactivate={(proj) => setDeactivatingProject(proj)}
+                                onDeactivate={(proj) => setHoldingProject(proj)}
                                 onFinalize={(proj) => setFinalizingProject(proj)}
                                 onArchive={(proj) => setArchivingProject(proj)}
                                 onRefreshDetail={handleRefreshDetail}
@@ -1038,8 +962,11 @@ export default function ProjectsPage() {
                                 canEdit={canEditProject(p)}
                                 canManage={canManageProject()}
                                 canUpload={canUploadToProject(p)}
-                                canEditStructure={isPrivilegedOrSpecial && !p.isFinalized}
+                                canEditStructure={isPrivilegedOrSpecial && p.isActive && !p.isFinalized && p.status !== 'CANCELLED'}
                                 canEditStatus={isPrivilegedOrSpecial}
+                                onReactivate={(proj) => setReactivatingProject(proj)}
+                                onAbort={(proj) => setAbortingProject(proj)}
+                                onPublish={(proj) => setPublishingProject(proj)}
                             />
                         ))}
                         {canCreateProject && currentPage === 1 && (
@@ -1091,6 +1018,31 @@ export default function ProjectsPage() {
                 </>
             )}
 
+            {reactivatingProject && (
+                <ReactivateProjectModal
+                    project={reactivatingProject}
+                    onClose={() => setReactivatingProject(null)}
+                    onReactivated={handleProjectLifecycleChanged}
+                />
+            )}
+
+            {abortingProject && (
+                <AbortProjectModal
+                    project={abortingProject}
+                    onClose={() => setAbortingProject(null)}
+                    onAborted={() => {
+                        setAbortingProject(null);
+                        handleProjectLifecycleChanged();
+                    }}
+                />
+            )}
+
+            {/* Publish is intentionally hidden for now.
+            {publishingProject && (
+                <PublishProjectModal ... />
+            )}
+            */}
+
             {/* ─── Loading indicator for expanded card ─── */}
             {expandedProjectId && detailLoading && !expandedProjectDetail && (
                 <div style={{
@@ -1132,12 +1084,12 @@ export default function ProjectsPage() {
                 />
             )}
 
-            {/* ─── Deactivate Confirm ─── */}
-            {deactivatingProject && (
-                <DeactivateProjectModal
-                    project={deactivatingProject}
-                    onClose={() => setDeactivatingProject(null)}
-                    onConfirmed={handleProjectDeactivated}
+            {/* ─── Hold Confirm ─── */}
+            {holdingProject && (
+                <HoldProjectModal
+                    project={holdingProject}
+                    onClose={() => setHoldingProject(null)}
+                    onHeld={handleProjectHeld}
                 />
             )}
 

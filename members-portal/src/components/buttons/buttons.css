@@ -102,8 +102,41 @@
     color: #16a34a;
 }
 
+.icon-btn.publish-btn {
+    color: #16a34a;
+}
+
+.icon-btn.reactivate-btn {
+    color: #2563eb;
+}
+
 .icon-btn.finalize-btn:hover {
     background: #16a34a;
+    color: white;
+    transform: scale(1.05);
+    box-shadow: var(--shadow-md);
+}
+
+.icon-btn.publish-btn:hover {
+    background: #16a34a;
+    color: white;
+    transform: scale(1.05);
+    box-shadow: var(--shadow-md);
+}
+
+.icon-btn.reactivate-btn:hover {
+    background: #2563eb;
+    color: white;
+    transform: scale(1.05);
+    box-shadow: var(--shadow-md);
+}
+
+.icon-btn.hold-btn {
+    color: #d97706;
+}
+
+.icon-btn.hold-btn:hover {
+    background: #f59e0b;
     color: white;
     transform: scale(1.05);
     box-shadow: var(--shadow-md);

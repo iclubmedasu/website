@@ -34,6 +34,8 @@
     overflow-y: auto;
     z-index: 1001;
     animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    --modal-focus-border: var(--purple-700);
+    --modal-focus-shadow: var(--shadow-focus);
 }
 
 .modal-large {
@@ -158,8 +160,8 @@
 
 .form-input:focus {
     outline: none;
-    border-color: var(--purple-700);
-    box-shadow: var(--shadow-focus);
+    border-color: var(--modal-focus-border);
+    box-shadow: var(--modal-focus-shadow);
 }
 
 .form-input.error {
@@ -367,6 +369,26 @@
     box-shadow: 0 10px 15px -3px rgba(22, 163, 74, 0.3);
 }
 
+.btn-info {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+}
+
+.btn-info:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+    color: white;
+}
+
+.btn-warning:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(217, 119, 6, 0.3);
+}
+
 .btn-neutral {
     background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
     color: white;
@@ -383,6 +405,8 @@
 
 .modal-danger {
     border: 2px solid var(--error-border);
+    --modal-focus-border: var(--error-text);
+    --modal-focus-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
 }
 
 .modal-header-content {
@@ -439,6 +463,8 @@
 
 .modal-success {
     border: 2px solid var(--success-accent);
+    --modal-focus-border: var(--success-accent);
+    --modal-focus-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
 }
 
 .modal-icon-success {
@@ -479,10 +505,98 @@
     margin-bottom: 0;
 }
 
-/* ── Focus overrides for success variant ── */
-.modal-success .form-input:focus {
-    border-color: var(--success-accent);
-    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+/* ============================================
+   MODAL VARIANT: INFO / BLUE
+   ============================================ */
+
+.modal-info {
+    border: 2px solid #60a5fa;
+    --modal-focus-border: #3b82f6;
+    --modal-focus-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.modal-icon-info {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.14);
+    color: #2563eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.modal-icon-info svg {
+    width: 24px;
+    height: 24px;
+}
+
+.info-box {
+    padding: 1.25rem;
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.24);
+    border-radius: var(--radius-md);
+    margin-bottom: 1.5rem;
+}
+
+.info-highlight {
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #2563eb;
+    padding: 0.75rem;
+    background: white;
+    border-radius: var(--radius-sm);
+    margin: 0.75rem 0;
+    text-align: center;
+}
+
+/* ============================================
+   MODAL VARIANT: WARNING / HOLD
+   ============================================ */
+
+.modal-warning {
+    border: 2px solid #f59e0b;
+    --modal-focus-border: #f59e0b;
+    --modal-focus-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+}
+
+.modal-icon-warning {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(245, 158, 11, 0.14);
+    color: #d97706;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.modal-icon-warning svg {
+    width: 24px;
+    height: 24px;
+}
+
+.warning-info-box {
+    padding: 1.25rem;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.24);
+    border-radius: var(--radius-md);
+    margin-bottom: 1.5rem;
+}
+
+.warning-highlight {
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #d97706;
+    padding: 0.75rem;
+    background: white;
+    border-radius: var(--radius-sm);
+    margin: 0.75rem 0;
+    text-align: center;
 }
 
 /* ============================================
@@ -491,6 +605,8 @@
 
 .modal-neutral {
     border: 2px solid var(--gray-400);
+    --modal-focus-border: var(--gray-500);
+    --modal-focus-shadow: 0 0 0 3px rgba(107, 114, 128, 0.12);
 }
 
 .modal-icon-neutral {
@@ -528,11 +644,6 @@
     border-radius: var(--radius-sm);
     margin: 0.75rem 0;
     text-align: center;
-}
-
-.modal-neutral .form-input:focus {
-    border-color: var(--gray-500);
-    box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.12);
 }
 
 /* ============================================

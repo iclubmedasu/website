@@ -15,9 +15,11 @@ import {
     ClipboardPaste,
     Columns3,
     Milestone,
+    Maximize2,
+    Minimize2,
 } from 'lucide-react';
 import { tasksAPI, phasesAPI, projectsAPI, getProfilePhotoUrl } from '../../../services/api';
-import ConfirmModal from '../modals/ConfirmModal';
+import DeletePhaseTaskModal from '../modals/DeletePhaseTaskModal';
 import './GanttChart.css';
 
 // ─────────────────────────────────────────────────────────
@@ -96,9 +98,11 @@ const COL_WIDTHS = { quarter: 120, month: 100, week: 50, day: 32 };
 
 const ROW_HEIGHT = 36;
 const HEADER_HEIGHT = 52;
-const DEFAULT_TREE_WIDTH = 280;
+const DEFAULT_TREE_WIDTH = 360;
 const MIN_TREE_WIDTH = 160;
 const MAX_TREE_WIDTH = 600;
+const MAX_TREE_WIDTH_MAXIMIZED = 960;
+const TREE_WIDTH_MAXIMIZE_SCALE = 1.25;
 
 // ─────────────────────────────────────────────────────────
 //  Date helpers
@@ -298,6 +302,11 @@ function fmtDate(d) {
     return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function fmtDateCompact(d) {
+    if (!d) return '—';
+    return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+}
+
 // ─────────────────────────────────────────────────────────
 //  GanttChart — main export
 // ─────────────────────────────────────────────────────────
@@ -321,6 +330,7 @@ export default function GanttChart({
     const [expandedPhases, setExpandedPhases] = useState(() => new Set(phases.map((p) => p.id)));
     const [expandedTasks, setExpandedTasks] = useState(new Set());
     const [confirmDelete, setConfirmDelete] = useState(null); // { type, id, title }
+    const [isMaximized, setIsMaximized] = useState(false);
 
     // Clipboard: { mode: 'copy'|'cut', type: 'phase'|'task'|'subtask', id, data, phase?, parentTask? }
     const [clipboard, setClipboard] = useState(null);
@@ -351,7 +361,8 @@ export default function GanttChart({
         const handleMouseMove = (e) => {
             if (!isResizingRef.current) return;
             const delta = e.clientX - resizeStartXRef.current;
-            const newWidth = Math.min(MAX_TREE_WIDTH, Math.max(MIN_TREE_WIDTH, resizeStartWidthRef.current + delta));
+            const maxWidth = isMaximized ? MAX_TREE_WIDTH_MAXIMIZED : MAX_TREE_WIDTH;
+            const newWidth = Math.min(maxWidth, Math.max(MIN_TREE_WIDTH, resizeStartWidthRef.current + delta));
             setTreeWidth(newWidth);
         };
         const handleMouseUp = () => {
@@ -367,7 +378,7 @@ export default function GanttChart({
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
         };
-    }, []);
+    }, [isMaximized]);
 
     const handleResizeStart = useCallback((e) => {
         e.preventDefault();
@@ -377,6 +388,29 @@ export default function GanttChart({
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
     }, [treeWidth]);
+
+    const toggleMaximize = useCallback(() => {
+        setIsMaximized((prev) => {
+            const next = !prev;
+            setTreeWidth((width) => {
+                const scaled = next
+                    ? Math.round(width * TREE_WIDTH_MAXIMIZE_SCALE)
+                    : Math.round(width / TREE_WIDTH_MAXIMIZE_SCALE);
+                const maxWidth = next ? MAX_TREE_WIDTH_MAXIMIZED : MAX_TREE_WIDTH;
+                return Math.min(maxWidth, Math.max(MIN_TREE_WIDTH, scaled));
+            });
+            return next;
+        });
+    }, []);
+
+    useEffect(() => {
+        if (!isMaximized) return undefined;
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = prevOverflow;
+        };
+    }, [isMaximized]);
 
     // ── Baselines ──
     const [showBaselines, setShowBaselines] = useState(false);
@@ -830,6 +864,32 @@ export default function GanttChart({
         return result;
     }, [phases, expandedPhases, expandedTasks, canEdit]);
 
+    const selectedPhaseId = useMemo(() => {
+        if (!selected) return null;
+        if (selected.type === 'phase') return selected.id;
+        return selected.phase?.id || selected.data?.phaseId || null;
+    }, [selected]);
+
+    const phaseBoundaryRows = useMemo(() => {
+        const boundary = new Set();
+        const getPhaseId = (row) => {
+            if (!row) return null;
+            if (row.type === 'phase') return row.id;
+            return row.phase?.id || row.data?.phaseId || null;
+        };
+
+        for (let i = 0; i < rows.length; i++) {
+            const current = rows[i];
+            const next = rows[i + 1];
+            const currentPhaseId = getPhaseId(current);
+            const nextPhaseId = getPhaseId(next);
+            if (currentPhaseId && currentPhaseId !== nextPhaseId) {
+                boundary.add(`${current.type}-${current.id}`);
+            }
+        }
+        return boundary;
+    }, [rows]);
+
     // Clear selection if item no longer exists
     useEffect(() => {
         if (selected) {
@@ -931,7 +991,7 @@ export default function GanttChart({
         const width = Math.max(rightPx - leftPx, 6);
         const isMilestone = barStart.getTime() === barEnd.getTime();
 
-        return { left: leftPx, width, status, isMilestone };
+        return { left: leftPx, width, status, isMilestone, startDate: barStart, endDate: barEnd };
     }, [columns, colWidth]);
 
     // Auto-scroll timeline to the selected row's bar
@@ -1123,10 +1183,10 @@ export default function GanttChart({
     }
 
     return (
-        <div className="gantt">
+        <div className={`gantt${isMaximized ? ' gantt--maximized' : ''}`}>
             {/* ── Confirm delete modal ── */}
             {confirmDelete && (
-                <ConfirmModal
+                <DeletePhaseTaskModal
                     title={`Delete ${confirmDelete.type === 'phase' ? 'Phase' : confirmDelete.type === 'task' ? 'Task' : 'Subtask'}`}
                     itemName={confirmDelete.title}
                     message={
@@ -1276,6 +1336,14 @@ export default function GanttChart({
 
                 {/* Right: time controls (above timeline panel) */}
                 <div className="gantt-toolbar-right">
+                    <button
+                        className="gantt-today-btn"
+                        onClick={toggleMaximize}
+                        title={isMaximized ? 'Minimize gantt chart' : 'Maximize gantt chart'}
+                    >
+                        {isMaximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+                        <span>{isMaximized ? 'Minimize' : 'Maximize'}</span>
+                    </button>
                     <div className="gantt-scale-group">
                         {SCALES.map((s) => (
                             <button
@@ -1304,6 +1372,11 @@ export default function GanttChart({
                     </div>
                     <div className="gantt-tree-body" ref={treeBodyRef}>
                         {rows.map((row) => {
+                            const rowKey = `${row.type}-${row.id}`;
+                            const rowPhaseId = row.type === 'phase' ? row.id : row.phase?.id || row.data?.phaseId || null;
+                            const inSelectedPhase = !!selectedPhaseId && rowPhaseId === selectedPhaseId;
+                            const hasPhaseSeparator = phaseBoundaryRows.has(rowKey);
+
                             // "Add" placeholder rows
                             if (row.type === 'add-phase') {
                                 return (
@@ -1322,7 +1395,7 @@ export default function GanttChart({
                                 return (
                                     <div
                                         key={`tree-${row.id}`}
-                                        className="gantt-tree-row gantt-tree-row--add"
+                                        className={`gantt-tree-row gantt-tree-row--add${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}`}
                                         style={{ height: ROW_HEIGHT, paddingLeft: `${0.5 + 1 * 1.25}rem` }}
                                         onClick={() => onAddTask(row.phase)}
                                     >
@@ -1335,7 +1408,7 @@ export default function GanttChart({
                                 return (
                                     <div
                                         key={`tree-${row.id}`}
-                                        className="gantt-tree-row gantt-tree-row--add"
+                                        className={`gantt-tree-row gantt-tree-row--add${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}`}
                                         style={{ height: ROW_HEIGHT, paddingLeft: `${0.5 + 2 * 1.25}rem` }}
                                         onClick={() => onAddSubtask(row.phase, row.parentTask)}
                                     >
@@ -1364,7 +1437,7 @@ export default function GanttChart({
                             return (
                                 <div
                                     key={`tree-${row.type}-${row.id}`}
-                                    className={`gantt-tree-row gantt-tree-row--${row.type}${isSelected ? ' selected' : ''}`}
+                                    className={`gantt-tree-row gantt-tree-row--${row.type}${isSelected ? ' selected' : ''}${isSelected && row.type !== 'phase' ? ' selected-emphasis' : ''}${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}`}
                                     style={{ height: ROW_HEIGHT, paddingLeft: `${0.5 + row.depth * 1.25}rem` }}
                                     onClick={() => handleSelect(row.type, row.data, row.phase, row.parentTask)}
                                 >
@@ -1446,10 +1519,13 @@ export default function GanttChart({
                             {rows.map((row) => {
                                 const isAdd = row.type === 'add-phase' || row.type === 'add-task' || row.type === 'add-subtask';
                                 const isColSelected = !isAdd && selected?.type === row.type && selected?.id === row.id;
+                                const rowPhaseId = row.type === 'phase' ? row.id : row.phase?.id || row.data?.phaseId || null;
+                                const inSelectedPhase = !!selectedPhaseId && rowPhaseId === selectedPhaseId;
+                                const hasPhaseSeparator = phaseBoundaryRows.has(`${row.type}-${row.id}`);
                                 return (
                                     <div
                                         key={`col-${row.type}-${row.id}`}
-                                        className={`gantt-columns-row${isColSelected ? ' selected' : ''}${isAdd ? ' gantt-columns-row--add' : ''} gantt-columns-row--${row.type}`}
+                                        className={`gantt-columns-row${isColSelected ? ' selected' : ''}${isColSelected && row.type !== 'phase' ? ' selected-emphasis' : ''}${isAdd ? ' gantt-columns-row--add' : ''} gantt-columns-row--${row.type}${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}`}
                                         style={{ height: ROW_HEIGHT }}
                                     >
                                         {!isAdd && activeColumns.map((col) => {
@@ -1618,12 +1694,16 @@ export default function GanttChart({
 
                             {/* Rows with bars */}
                             {rows.map((row) => {
+                                const rowPhaseId = row.type === 'phase' ? row.id : row.phase?.id || row.data?.phaseId || null;
+                                const inSelectedPhase = !!selectedPhaseId && rowPhaseId === selectedPhaseId;
+                                const hasPhaseSeparator = phaseBoundaryRows.has(`${row.type}-${row.id}`);
+
                                 // "Add" rows have no bar — just an empty spacer row
                                 if (row.type === 'add-phase' || row.type === 'add-task' || row.type === 'add-subtask') {
                                     return (
                                         <div
                                             key={`tl-${row.id}`}
-                                            className="gantt-timeline-row gantt-timeline-row--add"
+                                            className={`gantt-timeline-row gantt-timeline-row--add${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}`}
                                             style={{ height: ROW_HEIGHT }}
                                         />
                                     );
@@ -1636,7 +1716,7 @@ export default function GanttChart({
                                 return (
                                     <div
                                         key={`tl-${row.type}-${row.id}`}
-                                        className={`gantt-timeline-row${isSelected ? ' selected' : ''}`}
+                                        className={`gantt-timeline-row${isSelected ? ' selected' : ''}${isSelected && row.type !== 'phase' ? ' selected-emphasis' : ''}${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}`}
                                         style={{ height: ROW_HEIGHT }}
                                         onClick={() => handleSelect(row.type, row.data, row.phase, row.parentTask)}
                                     >
@@ -1658,6 +1738,15 @@ export default function GanttChart({
                                                 {bar.width > 60 && row.type !== 'phase' && (
                                                     <span className="gantt-bar-label">{row.data.title}</span>
                                                 )}
+                                            </div>
+                                        )}
+                                        {bar && (
+                                            <div
+                                                className="gantt-bar-date-range"
+                                                style={{ left: bar.left, width: Math.max(bar.width, 90) }}
+                                                title={`${fmtDate(bar.startDate)} → ${fmtDate(bar.endDate)}`}
+                                            >
+                                                {fmtDateCompact(bar.startDate)} → {fmtDateCompact(bar.endDate)}
                                             </div>
                                         )}
                                     </div>

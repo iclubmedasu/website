@@ -36,6 +36,7 @@ model Member {
   taskComments        TaskComment[]           // Comments on tasks
   taskActivityLog     TaskActivityLog[]       // Activity log entries
   uploadedFiles       ProjectFile[]           // Files uploaded by this member
+  createdFolders      ProjectFolder[]         // Folders created by this member
 }
 
 // ============================================
@@ -241,6 +242,7 @@ model Project {
   tasks           Task[]           // Tasks under this project
   tags            ProjectTag[]     // Tags for categorization
   phases          ProjectPhase[]   // Phases within this project
+  folders         ProjectFolder[]  // Folder containers for attached files
   files           ProjectFile[]    // Files attached to this project
   projectType     ProjectType      @relation(fields: [projectTypeId], references: [id], onDelete: Restrict)
   
@@ -520,6 +522,7 @@ model TaskActivityLog {
 model ProjectFile {
   id                  Int       @id @default(autoincrement())
   projectId           Int
+  folderId            Int?
   uploadedByMemberId  Int
   fileName            String    // Original file name shown to users
   githubPath          String    // File path in GitHub storage repo, e.g. "projects/42/uuid-originalname.pdf"
@@ -532,8 +535,35 @@ model ProjectFile {
 
   // Relations
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  folder      ProjectFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
   uploadedBy  Member    @relation(fields: [uploadedByMemberId], references: [id])
 
   @@index([projectId])
+  @@index([folderId])
   @@index([uploadedByMemberId])
+}
+
+// ============================================
+// PROJECT FOLDERS - Folder containers for files
+// ============================================
+model ProjectFolder {
+  id                  Int       @id @default(autoincrement())
+  projectId           Int
+  createdByMemberId    Int
+  folderName          String
+  githubPath          String    // Folder path in GitHub storage repo, e.g. "projects/42/folders/specs-uuid"
+  githubSha           String    // Blob SHA for the .gitkeep marker
+  isActive            Boolean   @default(true)
+  deletedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Relations
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy   Member    @relation(fields: [createdByMemberId], references: [id])
+  files       ProjectFile[]
+
+  @@index([projectId])
+  @@index([projectId, isActive])
+  @@index([createdByMemberId])
 }

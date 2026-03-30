@@ -8,7 +8,7 @@ import {
     GripVertical,
 } from 'lucide-react';
 import { tasksAPI, phasesAPI, getProfilePhotoUrl } from '../../../services/api';
-import ConfirmModal from '../modals/ConfirmModal';
+import DeletePhaseTaskModal from '../modals/DeletePhaseTaskModal';
 import './PhaseRow.css';
 
 const STATUS_LABELS = {
@@ -438,7 +438,7 @@ export default function PhaseRow({ phase, canEdit, canEditStatus, allMembers, on
         <div className="phase-row">
             {/* Confirm delete modal for tasks/subtasks */}
             {confirmDelete && (
-                <ConfirmModal
+                <DeletePhaseTaskModal
                     title={`Delete ${confirmDelete.type === 'subtask' ? 'Subtask' : 'Task'}`}
                     itemName={confirmDelete.title}
                     message={confirmDelete.type === 'task'

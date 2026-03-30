@@ -59,16 +59,16 @@ async function isAdmin(req) {
 /**
  * Can the requesting user edit a specific project?
  * Only privileged roles (developer, officer, administration, leadership) can edit.
- * Blocked if the project is finalized.
+ * Blocked if the project is inactive, finalized, archived, or aborted.
  */
 async function canUserEditProject(req, projectId) {
     if (!req.user.memberId) return false;
 
     const project = await prisma.project.findUnique({
         where: { id: projectId },
-        select: { isFinalized: true },
+        select: { isActive: true, isFinalized: true, isArchived: true, status: true },
     });
-    if (project?.isFinalized) return false;
+    if (!project || project.isArchived || !project.isActive || project.isFinalized || project.status === 'CANCELLED') return false;
 
     return isPrivilegedUser(req);
 }
@@ -80,6 +80,22 @@ async function canUserEditProject(req, projectId) {
 function canUserManageProject(req) {
     if (!req.user.memberId) return false;
     return isPrivilegedUser(req);
+}
+
+async function getProjectById(projectId) {
+    return prisma.project.findUnique({
+        where: { id: projectId },
+        select: { id: true, isActive: true, isFinalized: true, isArchived: true, status: true },
+    });
+}
+
+function buildProjectInclude() {
+    return {
+        createdBy: { select: { id: true, fullName: true } },
+        projectTeams: { include: { team: { select: { id: true, name: true } } } },
+        projectType: { select: { id: true, name: true, category: true } },
+        tags: true,
+    };
 }
 
 // ============================================
@@ -110,14 +126,16 @@ router.get('/', async (req, res) => {
             where.createdByMemberId = req.user.memberId;
         }
 
-        // Non-admins can only see projects whose projectTeams overlap with their own teams
+        // Non-admins can only see projects they created or projects whose projectTeams overlap with their own teams
         if (!admin && req.user.memberId) {
             const myTeamIds = await getUserTeamIds(req.user.memberId);
-            where.projectTeams = {
-                some: {
-                    teamId: teamId ? parseInt(teamId) : { in: myTeamIds },
-                },
-            };
+            const accessFilter = teamId
+                ? { teamId: parseInt(teamId) }
+                : { in: myTeamIds };
+            where.OR = [
+                { createdByMemberId: req.user.memberId },
+                { projectTeams: { some: { teamId: accessFilter } } },
+            ];
         } else if (teamId) {
             where.projectTeams = { some: { teamId: parseInt(teamId) } };
         }
@@ -175,13 +193,17 @@ router.get('/:id', async (req, res) => {
 
         const admin = await isAdmin(req);
 
-        // Access check for non-admins: must be in one of the projectTeams
+        // Access check for non-admins: must be a participant (creator or team member)
         if (!admin && req.user.memberId) {
             const myTeamIds = await getUserTeamIds(req.user.memberId);
             const access = await prisma.projectTeam.findFirst({
                 where: { projectId: id, teamId: { in: myTeamIds } },
             });
-            if (!access) return res.status(403).json({ error: 'Access denied' });
+            const createdByMe = await prisma.project.findFirst({
+                where: { id, createdByMemberId: req.user.memberId },
+                select: { id: true },
+            });
+            if (!access && !createdByMe) return res.status(403).json({ error: 'Access denied' });
         }
 
         const project = await prisma.project.findUnique({
@@ -260,8 +282,8 @@ router.get('/:id', async (req, res) => {
         });
 
         if (!project) return res.status(404).json({ error: 'Project not found' });
-        // Allow viewing archived projects (isArchived=true), block only deactivated ones for non-admins
-        if (!project.isActive && !project.isArchived && !admin) return res.status(404).json({ error: 'Project not found' });
+        // Team access has already been verified above for non-admin users.
+        // Allow read-only viewing of inactive, aborted, and archived projects.
 
         // Attach edit permission flag for the requesting user
         const canEdit = await canUserEditProject(req, id);
@@ -431,19 +453,19 @@ router.patch('/:id/finalize', async (req, res) => {
         if (!canUserManageProject(req)) {
             return res.status(403).json({ error: 'Only developer, officer, administration and leadership can finalize projects' });
         }
+        const current = await getProjectById(id);
+        if (!current) return res.status(404).json({ error: 'Project not found' });
+        if (current.isArchived) return res.status(400).json({ error: 'Archived projects cannot be finalized' });
         const project = await prisma.project.update({
             where: { id },
             data: {
                 isFinalized: true,
+                isActive: true,
+                isArchived: false,
                 status: 'COMPLETED',
                 completedDate: new Date(),
             },
-            include: {
-                createdBy: { select: { id: true, fullName: true } },
-                projectTeams: { include: { team: { select: { id: true, name: true } } } },
-                projectType: { select: { id: true, name: true, category: true } },
-                tags: true,
-            },
+            include: buildProjectInclude(),
         });
         res.json(project);
     } catch (error) {
@@ -462,26 +484,119 @@ router.patch('/:id/archive', async (req, res) => {
         if (!canUserManageProject(req)) {
             return res.status(403).json({ error: 'Only developer, officer, administration and leadership can archive projects' });
         }
+        const current = await getProjectById(id);
+        if (!current) return res.status(404).json({ error: 'Project not found' });
+        if (!current.isFinalized && current.status !== 'CANCELLED') {
+            return res.status(400).json({ error: 'Only finalized or aborted projects can be archived' });
+        }
         const project = await prisma.project.update({
             where: { id },
             data: {
                 isArchived: true,
-                isFinalized: true,
                 isActive: false,
-                status: 'COMPLETED',
-                completedDate: new Date(),
+                isFinalized: current.isFinalized,
+                status: current.status,
             },
-            include: {
-                createdBy: { select: { id: true, fullName: true } },
-                projectTeams: { include: { team: { select: { id: true, name: true } } } },
-                projectType: { select: { id: true, name: true, category: true } },
-                tags: true,
-            },
+            include: buildProjectInclude(),
         });
         res.json(project);
     } catch (error) {
         console.error('PATCH /projects/:id/archive', error);
         res.status(500).json({ error: 'Failed to archive project' });
+    }
+});
+
+// ============================================
+// PATCH /api/projects/:id/reactivate  –  restore a deactivated project
+// ============================================
+router.patch('/:id/reactivate', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'Invalid project ID' });
+        if (!canUserManageProject(req)) {
+            return res.status(403).json({ error: 'Only developer, officer, administration and leadership can reactivate projects' });
+        }
+        const current = await getProjectById(id);
+        if (!current) return res.status(404).json({ error: 'Project not found' });
+        if (current.isArchived) return res.status(400).json({ error: 'Archived projects cannot be reactivated' });
+        if (current.isFinalized) return res.status(400).json({ error: 'Finalized projects must be published instead of reactivated' });
+
+        const project = await prisma.project.update({
+            where: { id },
+            data: {
+                isActive: true,
+                status: current.status === 'CANCELLED' ? 'NOT_STARTED' : current.status,
+            },
+            include: buildProjectInclude(),
+        });
+        res.json(project);
+    } catch (error) {
+        console.error('PATCH /projects/:id/reactivate', error);
+        res.status(500).json({ error: 'Failed to reactivate project' });
+    }
+});
+
+// ============================================
+// PATCH /api/projects/:id/abort  –  cancel a project
+// ============================================
+router.patch('/:id/abort', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'Invalid project ID' });
+        if (!canUserManageProject(req)) {
+            return res.status(403).json({ error: 'Only developer, officer, administration and leadership can abort projects' });
+        }
+        const current = await getProjectById(id);
+        if (!current) return res.status(404).json({ error: 'Project not found' });
+        if (current.isArchived || current.isFinalized) return res.status(400).json({ error: 'Only active or inactive projects can be aborted' });
+
+        const project = await prisma.project.update({
+            where: { id },
+            data: {
+                isActive: false,
+                isFinalized: false,
+                isArchived: false,
+                status: 'CANCELLED',
+                completedDate: null,
+            },
+            include: buildProjectInclude(),
+        });
+        res.json(project);
+    } catch (error) {
+        console.error('PATCH /projects/:id/abort', error);
+        res.status(500).json({ error: 'Failed to abort project' });
+    }
+});
+
+// ============================================
+// PATCH /api/projects/:id/publish  –  unfinalize and return to active workflow
+// ============================================
+router.patch('/:id/publish', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'Invalid project ID' });
+        if (!canUserManageProject(req)) {
+            return res.status(403).json({ error: 'Only developer, officer, administration and leadership can publish projects' });
+        }
+        const current = await getProjectById(id);
+        if (!current) return res.status(404).json({ error: 'Project not found' });
+        if (!current.isFinalized) return res.status(400).json({ error: 'Only finalized projects can be published' });
+
+        const project = await prisma.project.update({
+            where: { id },
+            data: {
+                isActive: true,
+                isFinalized: false,
+                isArchived: false,
+                status: 'NOT_STARTED',
+                completedDate: null,
+            },
+            include: buildProjectInclude(),
+        });
+        res.json(project);
+    } catch (error) {
+        console.error('PATCH /projects/:id/publish', error);
+        res.status(500).json({ error: 'Failed to publish project' });
     }
 });
 
@@ -493,6 +608,11 @@ router.patch('/:id/deactivate', async (req, res) => {
         const id = parseInt(req.params.id);
         if (!canUserManageProject(req)) {
             return res.status(403).json({ error: 'Only developer, officer, administration and leadership can deactivate projects' });
+        }
+        const current = await getProjectById(id);
+        if (!current) return res.status(404).json({ error: 'Project not found' });
+        if (current.isArchived || current.isFinalized || current.status === 'CANCELLED' || !current.isActive) {
+            return res.status(400).json({ error: 'Only active projects can be deactivated' });
         }
         const project = await prisma.project.update({ where: { id }, data: { isActive: false } });
         res.json({ message: 'Project deactivated', project });

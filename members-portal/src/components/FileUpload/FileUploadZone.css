@@ -6,6 +6,54 @@
     gap: 0.5rem;
 }
 
+.folder-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 0.75rem;
+}
+
+.folder-toolbar-select {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.folder-create-btn {
+    width: auto;
+    min-height: 2.95rem;
+    padding: 0 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid rgba(37, 99, 235, 0.25);
+    border-radius: var(--radius-sm);
+    background: rgba(37, 99, 235, 0.08);
+    color: var(--blue-700, #1d4ed8);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.folder-create-btn:hover {
+    background: var(--blue-600, #2563eb);
+    color: #ffffff;
+    border-color: var(--blue-600, #2563eb);
+}
+
+@media (max-width: 640px) {
+    .folder-toolbar {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .folder-create-btn {
+        justify-self: start;
+    }
+}
+
 /* Drop area */
 .file-drop-area {
     display: flex;
@@ -61,14 +109,259 @@
     display: flex;
     flex-direction: column;
     gap: 0;
-    margin-top: 0.25rem;
+    margin-top: 0;
+}
+
+.repository-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.repository-list {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    padding: 0.15rem 0;
+}
+
+.repository-list--drop-target {
+    border-color: var(--purple-300);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1), var(--shadow-sm);
+}
+
+.repository-add-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.75rem 1rem;
+    border: none;
+    border-top: 1px solid var(--gray-50);
+    background: var(--bg-card);
+    cursor: pointer;
+    text-align: left;
+    color: var(--purple-400);
+    font-family: var(--font-heading);
+    font-size: 0.78rem;
+    font-weight: 600;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.repository-add-row:hover {
+    background: var(--gray-50);
+    color: var(--purple-700);
+}
+
+.repository-add-icon {
+    color: var(--purple-400);
+    flex-shrink: 0;
+    transition: color 0.12s ease;
+}
+
+.repository-add-row:hover .repository-add-icon {
+    color: var(--purple-600);
+}
+
+.repository-add-label {
+    min-width: 0;
+    transition: color 0.12s ease;
+}
+
+.file-row {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--bg-card);
+    cursor: grab;
+}
+
+.file-row:hover {
+    background: var(--gray-50);
+}
+
+.file-row:active {
+    cursor: grabbing;
+}
+
+.file-row--dragging {
+    opacity: 0.55;
+    background: var(--purple-50);
+}
+
+.file-row:last-child {
+    border-bottom: none;
+}
+
+.file-row--nested {
+    margin-left: 1.5rem;
+    padding-left: 0.75rem;
+    border-left: 2px solid var(--gray-100);
+}
+
+.folder-section,
+.folder-stack,
+.deleted-files-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.folder-section-title {
+    font-family: var(--font-heading);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--gray-500);
+    padding: 0.8rem 0.9rem 0.55rem;
+}
+
+.folder-row {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.folder-row--drop-target {
+    background: rgba(139, 92, 246, 0.08);
+}
+
+.folder-row:last-child {
+    border-bottom: none;
+}
+
+.folder-row--deleted {
+    opacity: 0.9;
+    background: var(--gray-50);
+}
+
+.folder-row-header {
+    width: 100%;
+    border: none;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+}
+
+.folder-row-header--drop-target {
+    background: rgba(139, 92, 246, 0.08);
+}
+
+.folder-row-header:hover {
+    background: var(--gray-50);
+}
+
+.folder-row-header-left,
+.folder-row-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.folder-row-header-left {
+    flex: 1;
+}
+
+.folder-card-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    color: var(--gray-400);
+    flex-shrink: 0;
+}
+
+.folder-row-title-group {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    min-width: 0;
+    flex: 1;
+}
+
+.folder-card-title {
+    font-family: var(--font-heading);
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--gray-800);
+}
+
+.folder-card-count,
+.folder-card-badge {
+    font-family: var(--font-heading);
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    background: var(--gray-100);
+    border-radius: 99px;
+    padding: 0.15rem 0.45rem;
+}
+
+.folder-card-badge {
+    color: var(--purple-700);
+    background: var(--purple-50);
+}
+
+.folder-row-body {
+    border-top: 1px solid var(--gray-200);
+    background: var(--gray-50);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.folder-row-body--scrollable {
+    max-height: min(20rem, 40vh);
+    overflow-y: auto;
+}
+
+.folder-row-children {
+    display: flex;
+    flex-direction: column;
+}
+
+.folder-empty {
+    margin: 0;
+    padding: 0.75rem 1rem;
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    color: var(--gray-400);
+    font-style: italic;
+}
+
+.file-restore-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    cursor: pointer;
+    color: var(--gray-400);
+    transition: color 0.2s, background 0.2s;
+    padding: 0 0.4rem;
+    font-family: var(--font-heading);
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.file-restore-btn:hover {
+    color: var(--purple-700);
+    background: var(--purple-50);
 }
 
 .file-item {
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    padding: 0.5rem 0.25rem;
+    padding: 0.6rem 0.75rem;
     border-bottom: 1px solid var(--gray-100);
 }
 
@@ -216,7 +509,8 @@
 .file-retry-btn,
 .file-delete-btn,
 .file-history-btn,
-.file-rename-btn {
+.file-rename-btn,
+.folder-upload-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -231,6 +525,14 @@
     padding: 0;
 }
 
+.file-rename-btn {
+    color: var(--gray-400);
+}
+
+.folder-upload-btn {
+    color: var(--gray-400);
+}
+
 .file-download-btn:hover {
     color: #16a34a;
     background: #f0fdf4;
@@ -242,8 +544,13 @@
 }
 
 .file-rename-btn:hover {
-    color: var(--purple-700);
-    background: var(--purple-50);
+    color: #2563eb;
+    background: #eff6ff;
+}
+
+.folder-upload-btn:hover {
+    color: #d97706;
+    background: #fff7ed;
 }
 
 .file-retry-btn:hover {
@@ -335,39 +642,29 @@
     text-overflow: ellipsis;
 }
 
-/* ─── Deleted files toggle + section ─── */
+/* ─── Archive / deleted content ─── */
 
-.deleted-files-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.35rem 0.7rem;
-    border: 1px solid var(--gray-300);
-    border-radius: var(--radius-sm);
-    background: white;
-    color: var(--gray-500);
-    font-family: var(--font-heading);
-    font-size: 0.78rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    align-self: flex-start;
+.archive-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+    padding-top: 0.65rem;
+    border-top: 1px solid var(--gray-200);
 }
 
-.deleted-files-toggle:hover {
-    border-color: var(--gray-400);
-    color: var(--gray-700);
-    background: var(--gray-50);
-}
-
-.deleted-files-toggle--active {
-    border-color: var(--purple-300);
-    color: var(--purple-600);
-    background: var(--purple-50);
+.deleted-files-row {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-card);
+    border: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
 }
 
 .deleted-files-section {
-    margin-top: 0.25rem;
+    margin-top: 0;
 }
 
 .deleted-files-loading {
@@ -389,9 +686,9 @@
 }
 
 .file-list--deleted {
-    border: 1px dashed var(--gray-300);
-    border-radius: var(--radius-sm);
-    background: var(--gray-50);
+    background: transparent;
+    border: none;
+    overflow: hidden;
 }
 
 .file-item--deleted {

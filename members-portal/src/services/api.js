@@ -529,6 +529,22 @@ export const projectsAPI = {
         return handleResponse(response);
     },
 
+    reactivate: async (id) => {
+        const response = await fetch(`${API_BASE_URL}/projects/${id}/reactivate`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    abort: async (id) => {
+        const response = await fetch(`${API_BASE_URL}/projects/${id}/abort`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
     activate: async (id) => {
         const response = await fetch(`${API_BASE_URL}/projects/${id}/activate`, {
             method: 'PATCH',
@@ -539,6 +555,14 @@ export const projectsAPI = {
 
     finalize: async (id) => {
         const response = await fetch(`${API_BASE_URL}/projects/${id}/finalize`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    publish: async (id) => {
+        const response = await fetch(`${API_BASE_URL}/projects/${id}/publish`, {
             method: 'PATCH',
             headers: getAuthHeaders(),
         });
@@ -902,19 +926,68 @@ export const projectFilesAPI = {
         return handleResponse(response);
     },
 
+    getFolders: async (projectId, includeDeleted = false) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/folders?projectId=${projectId}&includeDeleted=${includeDeleted}`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    createFolder: async (projectId, folderName, createdByMemberId) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/folders`, {
+            method: 'POST',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectId, folderName, createdByMemberId }),
+        });
+        return handleResponse(response);
+    },
+
+    removeFolder: async (folderId) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/folders/${folderId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    restoreFolder: async (folderId) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/folders/${folderId}/restore`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    getFolderHistory: async (folderId) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/folders/${folderId}/history`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    renameFolder: async (folderId, folderName) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/folders/${folderId}/rename`, {
+            method: 'PATCH',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folderName }),
+        });
+        return handleResponse(response);
+    },
+
     /** Build a download URL that works for browser-opened links (token in query). */
     getDownloadUrl: (fileId) => {
         const token = localStorage.getItem('token');
         return `${API_BASE_URL}/project-files/${fileId}/download?token=${token}`;
     },
 
-    upload: (projectId, uploadedByMemberId, file, onProgress) => {
+    upload: (projectId, uploadedByMemberId, file, onProgress, folderId = null) => {
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             const formData = new FormData();
             formData.append('file', file);
             formData.append('projectId', projectId);
             formData.append('uploadedByMemberId', uploadedByMemberId);
+            if (folderId) formData.append('folderId', folderId);
 
             xhr.upload.onprogress = (e) => {
                 if (e.lengthComputable && onProgress) {
@@ -974,6 +1047,16 @@ export const projectFilesAPI = {
             method: 'PATCH',
             headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify({ fileName }),
+        });
+        return handleResponse(response);
+    },
+
+    /** Move a file between root and folders (metadata only). */
+    move: async (fileId, folderId = null) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/${fileId}/move`, {
+            method: 'PATCH',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folderId }),
         });
         return handleResponse(response);
     },

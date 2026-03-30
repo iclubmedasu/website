@@ -64,6 +64,42 @@
 
 
 /* ============================================
+   PROJECT LIFECYCLE BADGES
+   ============================================ */
+
+.badge-lifecycle-active {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.badge-lifecycle-hold {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.badge-lifecycle-deactivated,
+.badge-lifecycle-inactive {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.badge-lifecycle-aborted {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.badge-lifecycle-finalized {
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+.badge-lifecycle-archived {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+
+/* ============================================
    PRIORITY BADGES
    ============================================ */
 

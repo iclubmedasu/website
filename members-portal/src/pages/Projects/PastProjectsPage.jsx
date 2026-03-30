@@ -10,11 +10,24 @@ import {
     Paperclip,
     Archive,
     CheckCircle,
+    PlayCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { projectsAPI, teamsAPI, membersAPI, projectTypesAPI, projectFilesAPI, getProfilePhotoUrl } from '../../services/api';
 import FileUploadZone from '../../components/FileUpload/FileUploadZone';
 import './ProjectsPage.css';
+import {
+    fmtDate,
+    ProjectCardView,
+    getArchiveOutcomeBadge,
+    getLifecycleBadge,
+    isProjectAborted,
+    isProjectInactive,
+} from './components/ProjectCardView';
+import ReactivateProjectModal from './modals/ReactivateProjectModal';
+import FinalizeProjectModal from './modals/FinalizeProjectModal';
+import ArchiveProjectModal from './modals/ArchiveProjectModal';
+import AbortProjectModal from './modals/AbortProjectModal';
 import PhaseRow from './components/PhaseRow';
 
 // ─────────────────────────────────────────────────────────
@@ -97,257 +110,185 @@ const PRIORITY_LABELS = {
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
-function fmtDate(d) {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-function getCategoryClass(category) {
-    return 'badge-category-' + (category ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-}
-
-function StatusBadge({ status }) {
-    return (
-        <span className={`badge badge-status-${status}`}>
-            <span className={`status-dot status-dot-${status}`} />
-            {STATUS_LABELS[status] ?? status}
-        </span>
-    );
-}
-
-function PriorityBadge({ priority }) {
-    return (
-        <span className={`badge badge-priority-${priority}`}>
-            {PRIORITY_LABELS[priority] ?? priority}
-        </span>
-    );
-}
-
 // ─────────────────────────────────────────────────────────
 //  Past-Project Card (read-only)
 // ─────────────────────────────────────────────────────────
-function PastProjectCard({ project, expanded, fullDetail, onToggle, allMembers }) {
+function PastProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, allMembers, onReactivate, onAbort, onFinalize, onPublish, onArchive }) {
     const { user } = useAuth();
-    const ownerTeam = fullDetail?.projectTeams?.find((pt) => pt.isOwner) ?? null;
 
     const [projectFiles, setProjectFiles] = useState([]);
+    const [projectFolders, setProjectFolders] = useState([]);
     useEffect(() => {
         if (expanded && fullDetail?.id) {
             projectFilesAPI.getAll(fullDetail.id).then(setProjectFiles).catch(() => setProjectFiles([]));
+            projectFilesAPI.getFolders(fullDetail.id, true).then(setProjectFolders).catch(() => setProjectFolders([]));
         }
     }, [expanded, fullDetail?.id]);
 
     const detail = fullDetail;
+    const aborted = isProjectAborted(project);
+    const inactive = isProjectInactive(project);
+    const lifecycleBadge = getLifecycleBadge(project);
+    const LifecycleIcon = lifecycleBadge.icon;
+    const archiveOutcomeBadge = getArchiveOutcomeBadge(project);
+    const ArchiveOutcomeIcon = archiveOutcomeBadge?.icon;
 
     return (
-        <div
-            className={`project-card${expanded ? ' project-card--expanded' : ''}`}
-            onClick={() => !expanded && onToggle(project)}
-        >
-            {expanded && (
-                <button
-                    className="expanded-close-btn"
-                    onClick={(e) => { e.stopPropagation(); onToggle(null); }}
-                    title="Close"
-                >
-                    <X size={16} />
-                </button>
-            )}
-
-            {/* Collapsed content */}
-            <div className="project-card-collapsed-content">
-                <div className="project-card-header">
-                    <span className="project-card-title">{project.title}</span>
-                    <div className="project-card-meta">
-                        <span className="badge badge-finalized" title="Finalized">
-                            <CheckCircle size={12} />
-                            Finalized
+        <ProjectCardView
+            project={project}
+            expanded={expanded}
+            detail={detail}
+            detailLoading={detailLoading}
+            onToggle={onToggle}
+            collapsedMeta={(
+                <>
+                    {archiveOutcomeBadge && (
+                        <span className={`badge ${archiveOutcomeBadge.className}`} title={archiveOutcomeBadge.title}>
+                            <ArchiveOutcomeIcon size={12} />
+                            {archiveOutcomeBadge.label}
                         </span>
-                    </div>
-                </div>
-
-                {project.description && (
-                    <div className="project-card-description">{project.description}</div>
-                )}
-
-                <div className="project-card-badges">
-                    <StatusBadge status={project.status} />
-                    <PriorityBadge priority={project.priority} />
-                </div>
-
-                <div className="project-card-footer">
-                    <div className="project-card-teams">
-                        {project.projectTeams?.slice(0, 3).map((pt) => (
-                            <span key={pt.id} className="badge-team">{pt.team?.name}</span>
-                        ))}
-                        {(project.projectTeams?.length ?? 0) > 3 && (
-                            <span className="badge-team">+{project.projectTeams.length - 3}</span>
-                        )}
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        {project.dueDate && (
-                            <div className="project-card-due">
-                                <Calendar size={11} />
-                                {fmtDate(project.dueDate)}
-                            </div>
-                        )}
-                        <div className="project-card-task-count">
-                            <SquareCheckBig size={11} />
-                            {project._count?.tasks ?? 0} task{project._count?.tasks !== 1 ? 's' : ''}
-                            {' · '}
-                            {project._count?.phases ?? 0} phase{project._count?.phases !== 1 ? 's' : ''}
+                    )}
+                    <span className={`badge ${lifecycleBadge.className}`} title={lifecycleBadge.title}>
+                        <LifecycleIcon size={12} />
+                        {lifecycleBadge.label}
+                    </span>
+                    {inactive && (
+                        <>
+                            <button className="icon-btn reactivate-btn" title="Reactivate project" onClick={(e) => { e.stopPropagation(); onReactivate(project); }}>
+                                <PlayCircle size={14} />
+                            </button>
+                            <button className="icon-btn finalize-btn" title="Finalize project" onClick={(e) => { e.stopPropagation(); onFinalize(project); }}>
+                                <CheckSquare size={14} />
+                            </button>
+                            <button className="icon-btn deactivate-btn" title="Abort project" onClick={(e) => { e.stopPropagation(); onAbort(project); }}>
+                                <AlertCircle size={14} />
+                            </button>
+                        </>
+                    )}
+                    {aborted && !project.isArchived && (
+                        <button className="icon-btn archive-btn" title="Archive project" onClick={(e) => { e.stopPropagation(); onArchive(project); }}>
+                            <Archive size={14} />
+                        </button>
+                    )}
+                </>
+            )}
+            collapsedFooterTrailing={(
+                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {project.dueDate && (
+                        <div className="project-card-due">
+                            <Calendar size={11} />
+                            {fmtDate(project.dueDate)}
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Expanded content (read-only) */}
-            {expanded && detail && (
-                <div className="project-card-expanded-content">
-                    <div className="expanded-content-wrapper">
-
-                        <div style={{ marginBottom: '0.25rem' }}>
-                            <div className="expanded-title-row">
-                                <h2 className="project-card-title" style={{ marginBottom: 0 }}>
-                                    {detail.title}
-                                </h2>
-                                <span className="badge badge-finalized" style={{ fontSize: '0.82rem' }}>
-                                    <CheckCircle size={14} />
-                                    Finalized
-                                </span>
-                            </div>
-                            {detail.description && (
-                                <div className="expanded-description" style={{ marginTop: '0.4rem' }}>
-                                    {detail.description}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Details */}
-                        <div className="exp-card-section">
-                            <div className="exp-card-section-header">Details</div>
-                            <div className="exp-badges-row">
-                                <div className="exp-badges-item">
-                                    <span className="exp-badges-label">Category</span>
-                                    <span className="exp-badges-value">
-                                        {detail.projectType?.category ? (
-                                            <span className={`badge ${getCategoryClass(detail.projectType.category)}`}>
-                                                {detail.projectType.category}
-                                            </span>
-                                        ) : '—'}
-                                    </span>
-                                </div>
-                                <div className="exp-badges-item">
-                                    <span className="exp-badges-label">Type</span>
-                                    <span className="exp-badges-value">{detail.projectType ? (
-                                        <span className="badge badge-type">
-                                            {detail.projectType.name}
-                                        </span>
-                                    ) : '—'}</span>
-                                </div>
-                                <div className="exp-badges-item">
-                                    <span className="exp-badges-label">Status</span>
-                                    <span className="exp-badges-value"><StatusBadge status={detail.status} /></span>
-                                </div>
-                                <div className="exp-badges-item">
-                                    <span className="exp-badges-label">Priority</span>
-                                    <span className="exp-badges-value"><PriorityBadge priority={detail.priority} /></span>
-                                </div>
-                            </div>
-                            <div className="exp-dates-row">
-                                <div className="exp-date-item">
-                                    <span className="exp-date-label">Created</span>
-                                    <span className="exp-date-value">{fmtDate(detail.createdAt) || '—'}</span>
-                                </div>
-                                <div className="exp-date-item">
-                                    <span className="exp-date-label">Start</span>
-                                    <span className="exp-date-value">{fmtDate(detail.startDate) || '—'}</span>
-                                </div>
-                                <div className="exp-date-item">
-                                    <span className="exp-date-label">Due</span>
-                                    <span className="exp-date-value">{fmtDate(detail.dueDate) || '—'}</span>
-                                </div>
-                                {detail.completedDate && (
-                                    <div className="exp-date-item">
-                                        <span className="exp-date-label">Completed</span>
-                                        <span className="exp-date-value">{fmtDate(detail.completedDate)}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Teams */}
-                        <div className="exp-card-section">
-                            <div className="exp-card-section-header">Teams</div>
-                            <div className="exp-teams-block">
-                                <span className="exp-creator-label">Created by</span>
-                                <div className="exp-teams-pills">
-                                    <span className="exp-creator-name">{detail.createdBy?.fullName ?? '—'}</span>
-                                    {ownerTeam && (
-                                        <span className="badge-team">{ownerTeam.team?.name}</span>
-                                    )}
-                                </div>
-                            </div>
-                            {(detail.projectTeams?.length ?? 0) > 0 && (
-                                <div className="exp-teams-block">
-                                    <span className="exp-creator-label">Assigned Teams</span>
-                                    <div className="exp-teams-pills">
-                                        {detail.projectTeams.map((pt) => (
-                                            <span key={pt.id} className="badge-team">
-                                                {pt.team?.name}
-                                                {pt.isOwner ? ' ★' : ''}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Phases & Tasks (read-only) */}
-                        <div className="exp-card-section">
-                            <div className="exp-card-section-header">
-                                Phases ({detail.phases?.length ?? 0})
-                            </div>
-                            <div className="phase-list" style={{ marginTop: '0.5rem' }}>
-                                {detail.phases?.map((phase) => (
-                                    <PhaseRow
-                                        key={phase.id}
-                                        phase={phase}
-                                        canEdit={false}
-                                        allMembers={allMembers}
-                                        onPhaseUpdated={() => { }}
-                                        onTaskUpdated={() => { }}
-                                        onAddTask={() => { }}
-                                        onAddSubtask={() => { }}
-                                        onEditTask={() => { }}
-                                        onEditPhase={() => { }}
-                                        onDeletePhase={() => { }}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Project Files (read-only) */}
-                        <div className="exp-card-section">
-                            <div className="exp-card-section-header">
-                                <Paperclip size={14} style={{ marginRight: '0.35rem' }} />
-                                Project Files
-                            </div>
-                            <FileUploadZone
-                                projectId={detail.id}
-                                memberId={user?.id}
-                                existingFiles={projectFiles}
-                                onFileUploaded={() => { }}
-                                onFileRemoved={() => { }}
-                                disabled={true}
-                            />
-                        </div>
-
+                    )}
+                    <div className="project-card-task-count">
+                        <SquareCheckBig size={11} />
+                        {project._count?.tasks ?? 0} task{project._count?.tasks !== 1 ? 's' : ''}
+                        {' · '}
+                        {project._count?.phases ?? 0} phase{project._count?.phases !== 1 ? 's' : ''}
                     </div>
                 </div>
             )}
-        </div>
+            expandedMeta={(
+                <>
+                    {archiveOutcomeBadge && (
+                        <span className={`badge ${archiveOutcomeBadge.className}`} style={{ fontSize: '0.82rem' }} title={archiveOutcomeBadge.title}>
+                            <ArchiveOutcomeIcon size={14} />
+                            {archiveOutcomeBadge.label}
+                        </span>
+                    )}
+                    <span className={`badge ${lifecycleBadge.className}`} style={{ fontSize: '0.82rem' }}>
+                        <LifecycleIcon size={14} />
+                        {lifecycleBadge.label}
+                    </span>
+                </>
+            )}
+            expandedActions={(
+                inactive ? (
+                    <div className="expanded-title-actions">
+                        <button
+                            className="icon-btn reactivate-btn icon-btn--text"
+                            onClick={(e) => { e.stopPropagation(); onReactivate(detail); }}
+                        >
+                            <PlayCircle size={13} />
+                            Reactivate
+                        </button>
+                        <button
+                            className="icon-btn finalize-btn icon-btn--text"
+                            onClick={(e) => { e.stopPropagation(); onFinalize(detail); }}
+                        >
+                            <CheckSquare size={13} />
+                            Finalize
+                        </button>
+                        <button
+                            className="icon-btn deactivate-btn icon-btn--text"
+                            onClick={(e) => { e.stopPropagation(); onAbort(detail); }}
+                        >
+                            <AlertCircle size={13} />
+                            Abort
+                        </button>
+                    </div>
+                ) : aborted && !project.isArchived ? (
+                    <div className="expanded-title-actions">
+                        <button
+                            className="icon-btn archive-btn icon-btn--text"
+                            onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
+                        >
+                            <Archive size={13} />
+                            Archive
+                        </button>
+                    </div>
+                ) : null
+            )}
+            detailExtra={detail?.completedDate ? (
+                <div className="exp-date-item">
+                    <span className="exp-date-label">Completed</span>
+                    <span className="exp-date-value">{fmtDate(detail.completedDate)}</span>
+                </div>
+            ) : null}
+            formatAssignedTeamSuffix={(pt) => `${pt.isOwner ? ' ★' : ''}`}
+            afterSections={detail ? (
+                <>
+                    <div className="exp-card-section">
+                        <div className="exp-card-section-header">
+                            Phases ({detail.phases?.length ?? 0})
+                        </div>
+                        <div className="phase-list" style={{ marginTop: '0.5rem' }}>
+                            {detail.phases?.map((phase) => (
+                                <PhaseRow
+                                    key={phase.id}
+                                    phase={phase}
+                                    canEdit={false}
+                                    allMembers={allMembers}
+                                    onPhaseUpdated={() => { }}
+                                    onTaskUpdated={() => { }}
+                                    onAddTask={() => { }}
+                                    onAddSubtask={() => { }}
+                                    onEditTask={() => { }}
+                                    onEditPhase={() => { }}
+                                    onDeletePhase={() => { }}
+                                />
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="exp-card-section">
+                        <div className="exp-card-section-header">
+                            <Paperclip size={14} style={{ marginRight: '0.35rem' }} />
+                            Project Files
+                        </div>
+                        <FileUploadZone
+                            projectId={detail.id}
+                            memberId={user?.id}
+                            existingFiles={projectFiles}
+                            existingFolders={projectFolders}
+                            onFileUploaded={() => { }}
+                            onFileRemoved={() => { }}
+                            disabled={true}
+                        />
+                    </div>
+                </>
+            ) : null}
+        />
     );
 }
 
@@ -392,6 +333,7 @@ export default function PastProjectsPage() {
     const [expandedProjectId, setExpandedProjectId] = useState(null);
     const [expandedProjectDetail, setExpandedProjectDetail] = useState(null);
     const [detailLoading, setDetailLoading] = useState(false);
+    const [actionProject, setActionProject] = useState(null);
 
     // Load supporting data
     useEffect(() => {
@@ -416,6 +358,7 @@ export default function PastProjectsPage() {
                 teamId: filterTeam || undefined,
                 priority: filterPriority || undefined,
             });
+
             let filtered = data;
             if (filterCategory) {
                 filtered = data.filter((p) => p.projectType?.category === filterCategory);
@@ -431,6 +374,13 @@ export default function PastProjectsPage() {
             setLoading(false);
         }
     }, [filterTeam, filterCategory, filterPriority]);
+
+    const handleLifecycleRefresh = useCallback(() => {
+        loadProjects();
+        if (expandedProjectId) {
+            projectsAPI.getById(expandedProjectId).then(setExpandedProjectDetail).catch(() => { });
+        }
+    }, [expandedProjectId, loadProjects]);
 
     useEffect(() => { loadProjects(); }, [loadProjects]);
     useEffect(() => { setCurrentPage(1); }, [filterTeam, filterCategory, filterPriority]);
@@ -521,8 +471,14 @@ export default function PastProjectsPage() {
                                 project={p}
                                 expanded={expandedProjectId === p.id}
                                 fullDetail={expandedProjectId === p.id ? expandedProjectDetail : null}
+                                detailLoading={expandedProjectId === p.id && detailLoading}
                                 onToggle={handleToggleExpand}
                                 allMembers={allMembers}
+                                onReactivate={(proj) => setActionProject({ type: 'reactivate', project: proj })}
+                                onAbort={(proj) => setActionProject({ type: 'abort', project: proj })}
+                                onFinalize={(proj) => setActionProject({ type: 'finalize', project: proj })}
+                                onPublish={(proj) => setActionProject({ type: 'publish', project: proj })}
+                                onArchive={(proj) => setActionProject({ type: 'archive', project: proj })}
                             />
                         ))}
                     </div>
@@ -578,6 +534,50 @@ export default function PastProjectsPage() {
                 }}>
                     Loading details…
                 </div>
+            )}
+
+            {actionProject?.type === 'reactivate' && (
+                <ReactivateProjectModal
+                    project={actionProject.project}
+                    onClose={() => setActionProject(null)}
+                    onReactivated={() => {
+                        setActionProject(null);
+                        handleLifecycleRefresh();
+                    }}
+                />
+            )}
+
+            {actionProject?.type === 'finalize' && (
+                <FinalizeProjectModal
+                    project={actionProject.project}
+                    onClose={() => setActionProject(null)}
+                    onFinalized={() => {
+                        setActionProject(null);
+                        handleLifecycleRefresh();
+                    }}
+                />
+            )}
+
+            {actionProject?.type === 'archive' && (
+                <ArchiveProjectModal
+                    project={actionProject.project}
+                    onClose={() => setActionProject(null)}
+                    onArchived={() => {
+                        setActionProject(null);
+                        handleLifecycleRefresh();
+                    }}
+                />
+            )}
+
+            {actionProject?.type === 'abort' && (
+                <AbortProjectModal
+                    project={actionProject.project}
+                    onClose={() => setActionProject(null)}
+                    onAborted={() => {
+                        setActionProject(null);
+                        handleLifecycleRefresh();
+                    }}
+                />
             )}
         </div>
     );

@@ -19,6 +19,34 @@ function headers(extraAccept) {
     };
 }
 
+async function uploadContentAtPath(contentBuffer, githubPath, message, existingSha) {
+    const bodyObj = {
+        content: contentBuffer.toString('base64'),
+        message,
+    };
+
+    if (existingSha) {
+        bodyObj.sha = existingSha;
+    }
+
+    const res = await fetch(`${BASE}/${githubPath}`, {
+        method: 'PUT',
+        headers: { ...headers(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyObj),
+    });
+
+    if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`GitHub upload failed (${res.status}): ${err}`);
+    }
+
+    const data = await res.json();
+    return {
+        githubPath,
+        githubSha: data.content.sha,
+    };
+}
+
 /**
  * Upload a file to the GitHub storage repo.
  * If `existingSha` is provided the file is updated in-place at `existingPath`.
@@ -38,38 +66,107 @@ async function uploadFile(fileBuffer, originalFileName, mimeType, projectId, rep
         );
     }
 
-    // If replacing, reuse the same GitHub path; otherwise create a fresh one
-    let githubPath;
-    const bodyObj = {
-        content: fileBuffer.toString('base64'),
-    };
+    const safeName = originalFileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const uniqueName = `${uuidv4()}-${safeName}`;
 
-    if (replaceOpts.existingPath && replaceOpts.existingSha) {
-        githubPath = replaceOpts.existingPath;
-        bodyObj.message = `Update ${originalFileName}`;
-        bodyObj.sha = replaceOpts.existingSha; // required for update
-    } else {
-        const safeName = originalFileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const uniqueName = `${uuidv4()}-${safeName}`;
-        githubPath = `projects/${projectId}/${uniqueName}`;
-        bodyObj.message = `Upload ${originalFileName}`;
+    let githubPath = replaceOpts.existingPath || `projects/${projectId}/${uniqueName}`;
+    const message = replaceOpts.existingPath
+        ? `Update ${originalFileName}`
+        : `Upload ${originalFileName}`;
+
+    return uploadContentAtPath(
+        fileBuffer,
+        githubPath,
+        message,
+        replaceOpts.existingSha,
+    );
+}
+
+/**
+ * Upload arbitrary content to an explicit GitHub path.
+ * Useful for folder marker files such as .gitkeep.
+ *
+ * @param {Buffer} contentBuffer
+ * @param {string} githubPath
+ * @param {string} message
+ * @param {string|undefined} existingSha
+ * @returns {{ githubPath: string, githubSha: string }}
+ */
+async function uploadContent(contentBuffer, githubPath, message, existingSha) {
+    return uploadContentAtPath(contentBuffer, githubPath, message, existingSha);
+}
+
+/**
+ * Move a file to a new GitHub path by creating the new file and deleting the old one.
+ * This updates the repository contents, but the file history remains path-based.
+ * @param {string} fromGithubPath
+ * @param {string} toGithubPath
+ * @param {string} fromGithubSha
+ * @param {string} message
+ * @returns {{ githubPath: string, githubSha: string }}
+ */
+async function moveFile(fromGithubPath, toGithubPath, fromGithubSha, message) {
+    if (fromGithubPath === toGithubPath) {
+        return { githubPath: fromGithubPath, githubSha: fromGithubSha };
     }
 
-    const res = await fetch(`${BASE}/${githubPath}`, {
-        method: 'PUT',
-        headers: { ...headers(), 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyObj),
+    const downloadRes = await fetch(`${BASE}/${fromGithubPath}`, {
+        headers: headers('application/vnd.github.raw+json'),
     });
 
-    if (!res.ok) {
-        const err = await res.text();
-        throw new Error(`GitHub upload failed (${res.status}): ${err}`);
+    if (!downloadRes.ok) {
+        const err = await downloadRes.text();
+        throw new Error(`GitHub move source fetch failed (${downloadRes.status}): ${err}`);
     }
 
-    const data = await res.json();
+    const contentBuffer = Buffer.from(await downloadRes.arrayBuffer());
+    const uploadRes = await fetch(`${BASE}/${toGithubPath}`, {
+        method: 'PUT',
+        headers: { ...headers(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            content: contentBuffer.toString('base64'),
+            message,
+        }),
+    });
+
+    if (!uploadRes.ok) {
+        const err = await uploadRes.text();
+        throw new Error(`GitHub move upload failed (${uploadRes.status}): ${err}`);
+    }
+
+    const uploadData = await uploadRes.json();
+    const newSha = uploadData?.content?.sha;
+
+    const deleteRes = await fetch(`${BASE}/${fromGithubPath}`, {
+        method: 'DELETE',
+        headers: { ...headers(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            message: `Move ${fromGithubPath} to ${toGithubPath}`,
+            sha: fromGithubSha,
+        }),
+    });
+
+    if (!deleteRes.ok) {
+        const err = await deleteRes.text();
+        // Best-effort rollback to avoid leaving duplicate files in the repo.
+        try {
+            await fetch(`${BASE}/${toGithubPath}`, {
+                method: 'DELETE',
+                headers: { ...headers(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: `Rollback failed move ${toGithubPath}`,
+                    sha: newSha,
+                }),
+            });
+        } catch {
+            // ignore rollback errors; original delete failure will be reported below
+        }
+        throw new Error(`GitHub move delete failed (${deleteRes.status}): ${err}`);
+    }
+
     return {
-        githubPath,
-        githubSha: data.content.sha,
+        githubPath: toGithubPath,
+        githubSha: newSha,
     };
 }
 
@@ -115,7 +212,7 @@ async function downloadFile(githubPath) {
     return res;
 }
 
-module.exports = { uploadFile, deleteFile, downloadFile, getFileHistory, downloadFileAtVersion, restoreDeletedFile };
+module.exports = { uploadFile, uploadContent, moveFile, deleteFile, downloadFile, getFileHistory, downloadFileAtVersion, restoreDeletedFile };
 
 /**
  * Get the commit history for a specific file.
