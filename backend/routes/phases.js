@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { prisma } = require('../db');
 const { recomputeProjectWbs } = require('../services/wbsService');
+const { logProjectActivity } = require('../services/activityLogService');
 
 /**
  * Is the user privileged (developer, officer, administration, leadership)?
@@ -87,6 +88,16 @@ router.post('/', async (req, res) => {
         // Recompute WBS codes for the project
         await recomputeProjectWbs(parseInt(projectId));
 
+        await logProjectActivity({
+            projectId: parseInt(projectId),
+            phaseId: phase.id,
+            memberId: req.user.memberId,
+            actionType: 'CREATED',
+            entityType: 'PHASE',
+            newValue: { title: phase.title, order: phase.order },
+            description: `Phase "${phase.title}" created`,
+        });
+
         res.status(201).json(phase);
     } catch (error) {
         console.error('POST /phases', error);
@@ -127,6 +138,17 @@ router.patch('/:id', async (req, res) => {
         // Recompute WBS codes for the project
         await recomputeProjectWbs(phase.projectId);
 
+        await logProjectActivity({
+            projectId: phase.projectId,
+            phaseId: phase.id,
+            memberId: req.user.memberId,
+            actionType: 'UPDATED',
+            entityType: 'PHASE',
+            oldValue: req.body,
+            newValue: data,
+            description: `Phase "${phase.title}" updated`,
+        });
+
         res.json(phase);
     } catch (error) {
         console.error('PATCH /phases/:id', error);
@@ -147,8 +169,19 @@ router.delete('/:id', async (req, res) => {
             return res.status(403).json({ error: 'Only privileged and special roles can delete phases' });
         }
 
-        // Fetch projectId before deleting
-        const phaseToDelete = await prisma.projectPhase.findUnique({ where: { id }, select: { projectId: true } });
+        // Fetch projectId before deleting so the project history keeps the removal event.
+        const phaseToDelete = await prisma.projectPhase.findUnique({ where: { id }, select: { projectId: true, title: true } });
+        if (!phaseToDelete) return res.status(404).json({ error: 'Phase not found' });
+
+        await logProjectActivity({
+            projectId: phaseToDelete.projectId,
+            phaseId: id,
+            memberId: req.user.memberId,
+            actionType: 'DELETED',
+            entityType: 'PHASE',
+            description: `Phase "${phaseToDelete.title}" deleted`,
+        });
+
         await prisma.projectPhase.delete({ where: { id } });
 
         // Recompute WBS codes for the project
@@ -251,9 +284,19 @@ router.post('/:id/duplicate', async (req, res) => {
                         teamId: tt.teamId,
                         canEdit: tt.canEdit,
                     },
-                }).catch(() => {});
+                }).catch(() => { });
             }
         }
+
+        await logProjectActivity({
+            projectId: source.projectId,
+            phaseId: newPhase.id,
+            memberId: req.user.memberId,
+            actionType: 'CREATED',
+            entityType: 'PHASE',
+            newValue: { title: newPhase.title, order: newPhase.order },
+            description: `Phase "${newPhase.title}" duplicated from phase #${sourceId}`,
+        });
 
         const result = await prisma.projectPhase.findUnique({
             where: { id: newPhase.id },

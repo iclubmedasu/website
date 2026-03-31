@@ -15,6 +15,7 @@ const administrationRoutes = require('./administration');
 const projectsRoutes = require('./projects');
 const tasksRoutes = require('./tasks');
 const phasesRoutes = require('./phases');
+const scheduleSlotsRoutes = require('./scheduleSlots');
 const projectFilesRoutes = require('./projectFiles');
 
 const { downloadProfilePhoto } = require('../services/githubStorage');
@@ -53,6 +54,7 @@ router.use('/administration', authenticateToken, administrationRoutes);
 router.use('/projects', authenticateToken, projectsRoutes);
 router.use('/tasks', authenticateToken, tasksRoutes);
 router.use('/phases', authenticateToken, phasesRoutes);
+router.use('/schedule-slots', authenticateToken, scheduleSlotsRoutes);
 router.use('/project-files', authenticateToken, projectFilesRoutes);
 
 // API documentation endpoint
@@ -73,6 +75,7 @@ router.get('/', (req, res) => {
             projects: '/api/projects',
             tasks: '/api/tasks',
             phases: '/api/phases',
+            scheduleSlots: '/api/schedule-slots',
             projectFiles: '/api/project-files',
         }
     });

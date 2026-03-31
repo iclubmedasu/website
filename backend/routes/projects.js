@@ -2,6 +2,12 @@ const express = require('express');
 const router = express.Router();
 const { prisma } = require('../db');
 const { requireAdmin } = require('../middleware/auth');
+const {
+    collectChangedFields,
+    changesToPayload,
+    logProjectActivity,
+    summarizeChanges,
+} = require('../services/activityLogService');
 
 const ADMINISTRATION_TEAM_NAME = 'Administration';
 
@@ -80,6 +86,47 @@ async function canUserEditProject(req, projectId) {
 function canUserManageProject(req) {
     if (!req.user.memberId) return false;
     return isPrivilegedUser(req);
+}
+
+function buildTaskHierarchyInclude(depth = 0) {
+    const include = {
+        dependencies: {
+            include: {
+                dependsOnTask: { select: { id: true, title: true, status: true, parentTaskId: true, phaseId: true } },
+            },
+        },
+        dependsOn: {
+            include: {
+                task: { select: { id: true, title: true, status: true, parentTaskId: true, phaseId: true } },
+            },
+        },
+        scheduleSlots: {
+            include: {
+                member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+                createdBy: { select: { id: true, fullName: true } },
+            },
+            orderBy: [{ startDateTime: 'asc' }, { createdAt: 'asc' }],
+        },
+        assignments: {
+            include: {
+                member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+            },
+        },
+        taskTeams: {
+            include: { team: { select: { id: true, name: true } } },
+        },
+        tags: true,
+    };
+
+    if (depth < 2) {
+        include.subtasks = {
+            where: { isActive: true },
+            orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+            include: buildTaskHierarchyInclude(depth + 1),
+        };
+    }
+
+    return include;
 }
 
 async function getProjectById(projectId) {
@@ -217,65 +264,28 @@ router.get('/:id', async (req, res) => {
                 },
                 projectType: { select: { id: true, name: true, category: true } },
                 tags: true,
+                scheduleSlots: {
+                    include: {
+                        member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+                        task: { select: { id: true, title: true, parentTaskId: true } },
+                        createdBy: { select: { id: true, fullName: true } },
+                    },
+                    orderBy: [{ startDateTime: 'asc' }, { createdAt: 'asc' }],
+                },
                 phases: {
                     where: { isActive: true },
                     orderBy: { order: 'asc' },
                     include: {
                         tasks: {
                             where: { isActive: true, parentTaskId: null },
-                            include: {
-                                subtasks: {
-                                    where: { isActive: true },
-                                    orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
-                                    include: {
-                                        assignments: {
-                                            include: {
-                                                member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
-                                            },
-                                        },
-                                        tags: true,
-                                    },
-                                },
-                                assignments: {
-                                    include: {
-                                        member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
-                                    },
-                                },
-                                tags: true,
-                            },
+                            include: buildTaskHierarchyInclude(0),
                             orderBy: [{ order: 'asc' }, { priority: 'desc' }, { createdAt: 'asc' }],
                         },
                     },
                 },
                 tasks: {
                     where: { isActive: true, parentTaskId: null },
-                    include: {
-                        subtasks: {
-                            where: { isActive: true },
-                            orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
-                            include: {
-                                subtasks: { where: { isActive: true }, orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] },
-                                assignments: {
-                                    include: {
-                                        member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
-                                    },
-                                },
-                                taskTeams: {
-                                    include: { team: { select: { id: true, name: true } } },
-                                },
-                                tags: true,
-                            },
-                        },
-                        assignments: {
-                            include: {
-                                member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
-                            },
-                        },
-                        taskTeams: {
-                            include: { team: { select: { id: true, name: true } } },
-                        },
-                        tags: true,
-                    },
+                    include: buildTaskHierarchyInclude(0),
                     orderBy: [{ order: 'asc' }, { priority: 'desc' }, { createdAt: 'asc' }],
                 },
             },
@@ -360,6 +370,20 @@ router.post('/', async (req, res) => {
             console.error('Failed to create default phase for project', project.id, phaseErr);
         }
 
+        await logProjectActivity({
+            projectId: project.id,
+            memberId: req.user.memberId,
+            actionType: 'CREATED',
+            entityType: 'PROJECT',
+            newValue: {
+                title: project.title,
+                projectTypeId: project.projectTypeId,
+                priority: project.priority,
+                status: project.status,
+            },
+            description: `Project "${project.title}" created`,
+        });
+
         res.status(201).json(project);
     } catch (error) {
         console.error('POST /projects', error);
@@ -377,6 +401,35 @@ router.put('/:id', async (req, res) => {
         if (!(await canUserEditProject(req, id))) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
+
+        const before = await prisma.project.findUnique({
+            where: { id },
+            select: {
+                title: true,
+                description: true,
+                projectTypeId: true,
+                priority: true,
+                status: true,
+                startDate: true,
+                dueDate: true,
+                completedDate: true,
+                projectTeams: {
+                    select: {
+                        teamId: true,
+                        canEdit: true,
+                        isOwner: true,
+                    },
+                },
+            },
+        });
+        const normalizedBefore = {
+            ...before,
+            projectTeams: (before?.projectTeams || []).map((projectTeam) => ({
+                teamId: projectTeam.teamId,
+                canEdit: projectTeam.canEdit,
+                isOwner: projectTeam.isOwner,
+            })).sort((a, b) => a.teamId - b.teamId),
+        };
 
         const {
             title,
@@ -436,10 +489,79 @@ router.put('/:id', async (req, res) => {
             },
         });
 
+        const after = {
+            title: project.title,
+            description: project.description,
+            projectTypeId: project.projectTypeId,
+            priority: project.priority,
+            status: project.status,
+            startDate: project.startDate,
+            dueDate: project.dueDate,
+            completedDate: project.completedDate,
+            projectTeams: (project.projectTeams || []).map((projectTeam) => ({
+                teamId: projectTeam.teamId,
+                canEdit: projectTeam.canEdit,
+                isOwner: projectTeam.isOwner,
+            })).sort((a, b) => a.teamId - b.teamId),
+        };
+
+        const changes = collectChangedFields(normalizedBefore || {}, after, {
+            title: 'title',
+            description: 'description',
+            projectTypeId: 'project type',
+            priority: 'priority',
+            status: 'status',
+            startDate: 'start date',
+            dueDate: 'due date',
+            completedDate: 'completed date',
+            projectTeams: 'teams',
+        });
+
+        if (changes.length > 0) {
+            const { oldValue, newValue } = changesToPayload(changes);
+            await logProjectActivity({
+                projectId: id,
+                memberId: req.user.memberId,
+                actionType: 'UPDATED',
+                entityType: 'PROJECT',
+                oldValue,
+                newValue,
+                description: summarizeChanges(changes) || `Project "${project.title}" updated`,
+            });
+        }
+
         res.json(project);
     } catch (error) {
         console.error('PUT /projects/:id', error);
         res.status(500).json({ error: 'Failed to update project' });
+    }
+});
+
+// ============================================
+// GET /api/projects/:id/activity  –  project history
+// ============================================
+router.get('/:id/activity', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'Invalid project ID' });
+
+        const project = await getProjectById(id);
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+
+        const activity = await prisma.projectActivityLog.findMany({
+            where: { projectId: id },
+            include: {
+                member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+                task: { select: { id: true, title: true, parentTaskId: true } },
+                phase: { select: { id: true, title: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        res.json(activity);
+    } catch (error) {
+        console.error('GET /projects/:id/activity', error);
+        res.status(500).json({ error: 'Failed to fetch project activity' });
     }
 });
 
@@ -467,6 +589,17 @@ router.patch('/:id/finalize', async (req, res) => {
             },
             include: buildProjectInclude(),
         });
+
+        await logProjectActivity({
+            projectId: id,
+            memberId: req.user.memberId,
+            actionType: 'FINALIZED',
+            entityType: 'PROJECT',
+            oldValue: { status: current.status, isFinalized: current.isFinalized },
+            newValue: { status: 'COMPLETED', isFinalized: true },
+            description: `Project "${project.title}" finalized`,
+        });
+
         res.json(project);
     } catch (error) {
         console.error('PATCH /projects/:id/finalize', error);
@@ -499,6 +632,17 @@ router.patch('/:id/archive', async (req, res) => {
             },
             include: buildProjectInclude(),
         });
+
+        await logProjectActivity({
+            projectId: id,
+            memberId: req.user.memberId,
+            actionType: 'ARCHIVED',
+            entityType: 'PROJECT',
+            oldValue: { isArchived: current.isArchived, isActive: current.isActive },
+            newValue: { isArchived: true, isActive: false },
+            description: `Project "${project.title}" archived`,
+        });
+
         res.json(project);
     } catch (error) {
         console.error('PATCH /projects/:id/archive', error);
@@ -529,6 +673,17 @@ router.patch('/:id/reactivate', async (req, res) => {
             },
             include: buildProjectInclude(),
         });
+
+        await logProjectActivity({
+            projectId: id,
+            memberId: req.user.memberId,
+            actionType: 'REACTIVATED',
+            entityType: 'PROJECT',
+            oldValue: { isActive: current.isActive, status: current.status },
+            newValue: { isActive: true, status: current.status === 'CANCELLED' ? 'NOT_STARTED' : current.status },
+            description: `Project "${project.title}" reactivated`,
+        });
+
         res.json(project);
     } catch (error) {
         console.error('PATCH /projects/:id/reactivate', error);
@@ -561,6 +716,17 @@ router.patch('/:id/abort', async (req, res) => {
             },
             include: buildProjectInclude(),
         });
+
+        await logProjectActivity({
+            projectId: id,
+            memberId: req.user.memberId,
+            actionType: 'ABORTED',
+            entityType: 'PROJECT',
+            oldValue: { status: current.status, isActive: current.isActive },
+            newValue: { status: 'CANCELLED', isActive: false },
+            description: `Project "${project.title}" aborted`,
+        });
+
         res.json(project);
     } catch (error) {
         console.error('PATCH /projects/:id/abort', error);
@@ -593,6 +759,17 @@ router.patch('/:id/publish', async (req, res) => {
             },
             include: buildProjectInclude(),
         });
+
+        await logProjectActivity({
+            projectId: id,
+            memberId: req.user.memberId,
+            actionType: 'PUBLISHED',
+            entityType: 'PROJECT',
+            oldValue: { isFinalized: current.isFinalized, isArchived: current.isArchived },
+            newValue: { isFinalized: false, isArchived: false, status: 'NOT_STARTED' },
+            description: `Project "${project.title}" published`,
+        });
+
         res.json(project);
     } catch (error) {
         console.error('PATCH /projects/:id/publish', error);
@@ -615,6 +792,17 @@ router.patch('/:id/deactivate', async (req, res) => {
             return res.status(400).json({ error: 'Only active projects can be deactivated' });
         }
         const project = await prisma.project.update({ where: { id }, data: { isActive: false } });
+
+        await logProjectActivity({
+            projectId: id,
+            memberId: req.user.memberId,
+            actionType: 'DEACTIVATED',
+            entityType: 'PROJECT',
+            oldValue: { isActive: current.isActive },
+            newValue: { isActive: false },
+            description: `Project "${project.title}" deactivated`,
+        });
+
         res.json({ message: 'Project deactivated', project });
     } catch (error) {
         console.error('PATCH /projects/:id/deactivate', error);
@@ -630,6 +818,16 @@ router.patch('/:id/activate', async (req, res) => {
         const id = parseInt(req.params.id);
         if (!(await isAdmin(req))) return res.status(403).json({ error: 'Admin access required' });
         const project = await prisma.project.update({ where: { id }, data: { isActive: true } });
+
+        await logProjectActivity({
+            projectId: id,
+            memberId: req.user.memberId,
+            actionType: 'ACTIVATED',
+            entityType: 'PROJECT',
+            newValue: { isActive: true },
+            description: `Project "${project.title}" activated`,
+        });
+
         res.json({ message: 'Project activated', project });
     } catch (error) {
         console.error('PATCH /projects/:id/activate', error);

@@ -68,6 +68,7 @@
     right: 1.5rem;
     bottom: 1.5rem;
     z-index: 100;
+    background: var(--bg-card);
     border-radius: var(--radius-lg);
     border: 2px solid var(--gray-200);
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
@@ -264,6 +265,31 @@
 .expanded-content-wrapper::-webkit-scrollbar {
     display: none;
     /* Chrome / Safari */
+}
+
+.project-card-loading-state {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 280px;
+    padding: 2rem;
+    text-align: center;
+    color: var(--gray-600);
+}
+
+.project-card-loading-title {
+    font-family: var(--font-heading);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 0.45rem;
+}
+
+.project-card-loading-text {
+    font-size: 0.9rem;
+    line-height: 1.55;
+    max-width: 420px;
 }
 
 

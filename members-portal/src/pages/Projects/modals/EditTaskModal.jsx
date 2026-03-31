@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Link2, Trash2 } from 'lucide-react';
 import { tasksAPI } from '../../../services/api';
 import { toTitleCase } from '../../../utils/titleCase';
 
@@ -11,7 +11,22 @@ const PRIORITY_LABELS = { LOW: 'Low', MEDIUM: 'Medium', HIGH: 'High', URGENT: 'U
 const DIFFICULTY_LABELS = { EASY: 'Easy', MEDIUM: 'Medium', HARD: 'Hard' };
 const STATUS_LABELS = { NOT_STARTED: 'Not Started', IN_PROGRESS: 'In Progress', COMPLETED: 'Completed', DELAYED: 'Delayed', BLOCKED: 'Blocked', ON_HOLD: 'On Hold', CANCELLED: 'Cancelled' };
 
-export default function EditTaskModal({ task, allMembers = [], onClose, onTaskUpdated }) {
+function flattenProjectTasks(projectDetail) {
+    const flattened = [];
+
+    const visitTask = (task) => {
+        flattened.push(task);
+        (task.subtasks || []).forEach(visitTask);
+    };
+
+    (projectDetail?.phases || []).forEach((phase) => {
+        (phase.tasks || []).forEach(visitTask);
+    });
+
+    return flattened;
+}
+
+export default function EditTaskModal({ task, projectDetail = null, allMembers = [], onClose, onTaskUpdated }) {
     const [form, setForm] = useState({
         title: '',
         description: '',
@@ -25,7 +40,11 @@ export default function EditTaskModal({ task, allMembers = [], onClose, onTaskUp
         assigneeIds: [],
     });
     const [loading, setLoading] = useState(false);
+    const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState('');
+    const [taskDetail, setTaskDetail] = useState(task);
+    const [dependencyTaskId, setDependencyTaskId] = useState('');
+    const [dependencyType, setDependencyType] = useState('FINISH_TO_START');
 
     useEffect(() => {
         if (task) {
@@ -44,6 +63,30 @@ export default function EditTaskModal({ task, allMembers = [], onClose, onTaskUp
         }
     }, [task]);
 
+    useEffect(() => {
+        if (!task?.id) return;
+
+        let cancelled = false;
+
+        const loadTaskDetail = async () => {
+            try {
+                const detailedTask = await tasksAPI.getById(task.id);
+                if (cancelled) return;
+                setTaskDetail(detailedTask);
+            } catch (err) {
+                if (!cancelled) {
+                    setError(err.message || 'Failed to load task details');
+                }
+            }
+        };
+
+        loadTaskDetail();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [task?.id]);
+
     const setField = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
     const toggleAssignee = (memberId) => {
@@ -56,6 +99,42 @@ export default function EditTaskModal({ task, allMembers = [], onClose, onTaskUp
                     : [...f.assigneeIds, memberId],
             };
         });
+    };
+
+    const refreshTaskDetail = async () => {
+        if (!task?.id) return;
+        const detailedTask = await tasksAPI.getById(task.id);
+        setTaskDetail(detailedTask);
+        return detailedTask;
+    };
+
+    const handleAddDependency = async () => {
+        if (!dependencyTaskId) return;
+        setActionLoading(true);
+        setError('');
+        try {
+            await tasksAPI.addDependency(task.id, dependencyTaskId, dependencyType);
+            setDependencyTaskId('');
+            setDependencyType('FINISH_TO_START');
+            await refreshTaskDetail();
+        } catch (err) {
+            setError(err.message || 'Failed to add dependency');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleRemoveDependency = async (dependsOnTaskId) => {
+        setActionLoading(true);
+        setError('');
+        try {
+            await tasksAPI.removeDependency(task.id, dependsOnTaskId);
+            await refreshTaskDetail();
+        } catch (err) {
+            setError(err.message || 'Failed to remove dependency');
+        } finally {
+            setActionLoading(false);
+        }
     };
 
     const handleSubmit = async () => {
@@ -88,6 +167,11 @@ export default function EditTaskModal({ task, allMembers = [], onClose, onTaskUp
 
     const isSubtask = !!task?.parentTaskId;
     const heading = isSubtask ? `Edit Subtask` : 'Edit Task';
+    const currentTask = taskDetail || task;
+    const projectTasks = flattenProjectTasks(projectDetail).filter((candidate) => candidate.id !== task?.id);
+    const dependencies = currentTask?.dependencies || [];
+    const dependsOn = currentTask?.dependsOn || [];
+    const canManageTask = currentTask?.canEdit ?? task?.canEdit ?? true;
 
     return (
         <>
@@ -207,10 +291,96 @@ export default function EditTaskModal({ task, allMembers = [], onClose, onTaskUp
                         </div>
                     </div>
 
-                    {/* ── Assignees ── */}
-                    {allMembers.length > 0 && (
-                        <div className="form-section">
-                            <h3 className="form-section-title">Assignees</h3>
+                    <div className="form-section">
+                        <h3 className="form-section-title">Dependencies</h3>
+
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label className="form-label">Depends on</label>
+                                {projectDetail ? (
+                                    <select
+                                        className="form-input"
+                                        value={dependencyTaskId}
+                                        onChange={(e) => setDependencyTaskId(e.target.value)}
+                                    >
+                                        <option value="">Select a task</option>
+                                        {projectTasks.map((candidate) => (
+                                            <option key={candidate.id} value={candidate.id}>
+                                                {candidate.title}
+                                            </option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input
+                                        className="form-input"
+                                        type="number"
+                                        min="1"
+                                        placeholder="Task ID"
+                                        value={dependencyTaskId}
+                                        onChange={(e) => setDependencyTaskId(e.target.value)}
+                                    />
+                                )}
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Dependency Type</label>
+                                <select
+                                    className="form-input"
+                                    value={dependencyType}
+                                    onChange={(e) => setDependencyType(e.target.value)}
+                                >
+                                    <option value="FINISH_TO_START">Finish to Start</option>
+                                    <option value="START_TO_START">Start to Start</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button className="btn btn-secondary" type="button" onClick={handleAddDependency} disabled={!canManageTask || !dependencyTaskId || actionLoading}>
+                            <Link2 size={14} />
+                            Add Dependency
+                        </button>
+
+                        <div style={{ display: 'grid', gap: '0.9rem', marginTop: '1rem' }}>
+                            <div>
+                                <p className="form-hint" style={{ marginBottom: '0.45rem' }}>This task depends on</p>
+                                {dependencies.length > 0 ? dependencies.map((dependency) => (
+                                    <div
+                                        key={dependency.id}
+                                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', padding: '0.6rem 0.75rem', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-sm)', marginBottom: '0.45rem' }}
+                                    >
+                                        <div>
+                                            <strong>{dependency.dependsOnTask?.title ?? 'Unknown task'}</strong>
+                                            <div className="form-hint" style={{ margin: 0 }}>{dependency.dependencyType}</div>
+                                        </div>
+                                        <button className="btn btn-secondary" type="button" onClick={() => handleRemoveDependency(dependency.dependsOnTask?.id)} disabled={!canManageTask || actionLoading}>
+                                            <Trash2 size={13} />
+                                            Remove
+                                        </button>
+                                    </div>
+                                )) : (
+                                    <p className="form-hint">No prerequisites set.</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <p className="form-hint" style={{ marginBottom: '0.45rem' }}>Tasks depending on this task</p>
+                                {dependsOn.length > 0 ? dependsOn.map((dependency) => (
+                                    <div
+                                        key={dependency.id}
+                                        style={{ padding: '0.6rem 0.75rem', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-sm)', marginBottom: '0.45rem' }}
+                                    >
+                                        <strong>{dependency.task?.title ?? 'Unknown task'}</strong>
+                                        <div className="form-hint" style={{ margin: 0 }}>{dependency.dependencyType}</div>
+                                    </div>
+                                )) : (
+                                    <p className="form-hint">No tasks depend on this one yet.</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="form-section">
+                        <h3 className="form-section-title">Assignees</h3>
+                        {allMembers.length > 0 ? (
                             <div className="team-badge-picker">
                                 {allMembers.map((m) => {
                                     const selected = form.assigneeIds.includes(m.id);
@@ -226,15 +396,17 @@ export default function EditTaskModal({ task, allMembers = [], onClose, onTaskUp
                                     );
                                 })}
                             </div>
-                        </div>
-                    )}
+                        ) : (
+                            <p className="form-hint">No members available.</p>
+                        )}
+                    </div>
                 </div>
 
                 <div className="modal-footer">
-                    <button className="btn btn-secondary" type="button" onClick={onClose} disabled={loading}>
+                    <button className="btn btn-secondary" type="button" onClick={onClose} disabled={loading || actionLoading}>
                         Cancel
                     </button>
-                    <button className="btn btn-primary" type="button" onClick={handleSubmit} disabled={loading}>
+                    <button className="btn btn-primary" type="button" onClick={handleSubmit} disabled={loading || actionLoading}>
                         {loading ? 'Saving…' : 'Save Changes'}
                     </button>
                 </div>

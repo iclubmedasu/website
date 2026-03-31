@@ -539,8 +539,8 @@
 }
 
 .file-history-btn:hover {
-    color: var(--purple-700);
-    background: var(--purple-50);
+    background: rgba(255, 199, 114, 0.308);
+    color: #ff571f;
 }
 
 .file-rename-btn:hover {

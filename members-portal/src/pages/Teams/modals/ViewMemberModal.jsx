@@ -55,6 +55,16 @@ const ViewMemberModal = ({ isOpen, onClose, memberId }) => {
         });
     };
 
+    const getTimelineLineClass = (items) => {
+        if (!Array.isArray(items) || items.length < 2) return 'timeline-line--ascending';
+
+        const firstStart = new Date(items[0]?.period?.start).getTime();
+        const lastStart = new Date(items[items.length - 1]?.period?.start).getTime();
+
+        if (Number.isNaN(firstStart) || Number.isNaN(lastStart)) return 'timeline-line--ascending';
+        return firstStart <= lastStart ? 'timeline-line--ascending' : 'timeline-line--descending';
+    };
+
     const getDurationText = (duration) => {
         if (duration === 'Ongoing') return 'Ongoing';
         if (duration === 0) return 'Less than a day';
@@ -118,75 +128,80 @@ const ViewMemberModal = ({ isOpen, onClose, memberId }) => {
                                 <h4 className="timeline-title">Role History</h4>
 
                                 {roleHistory.length > 0 ? (
-                                    <div className="vertical-timeline">
-                                        {roleHistory.map((entry, index) => (
-                                            <div key={entry.id} className="timeline-item">
-                                                {/* Timeline Dot and Line */}
-                                                <div className="timeline-marker">
-                                                    <div className={`timeline-dot ${getChangeTypeColor(entry.changeType)}`} />
-                                                    {index < roleHistory.length - 1 && (
-                                                        <div className="timeline-line" />
-                                                    )}
-                                                </div>
-
-                                                {/* Timeline Content */}
-                                                <div className="timeline-content">
-                                                    <div className="timeline-header">
-                                                        <span className={`change-type-badge ${getChangeTypeColor(entry.changeType)}`}>
-                                                            {entry.changeType}
-                                                        </span>
-                                                        <span className="timeline-date">
-                                                            {formatDate(entry.period.start)}
-                                                        </span>
-                                                    </div>
-
-                                                    <div className="role-info">
-                                                        <div className="role-item">
-                                                            <Briefcase size={14} />
-                                                            <span className="role-item-label">Role:</span>
-                                                            <span className="role-name">{entry.roleName}</span>
+                                    (() => {
+                                        const timelineLineClass = getTimelineLineClass(roleHistory);
+                                        return (
+                                            <div className="vertical-timeline">
+                                                {roleHistory.map((entry, index) => (
+                                                    <div key={entry.id} className="timeline-item">
+                                                        {/* Timeline Dot and Line */}
+                                                        <div className="timeline-marker">
+                                                            <div className={`timeline-dot ${getChangeTypeColor(entry.changeType)}`} />
+                                                            {index < roleHistory.length - 1 && (
+                                                                <div className={`timeline-line ${timelineLineClass}`} />
+                                                            )}
                                                         </div>
-                                                        <div className="role-item">
-                                                            <MapPin size={14} />
-                                                            <span className="role-item-label">Team:</span>
-                                                            <span className="team-name">{entry.teamName}</span>
-                                                        </div>
-                                                        {entry.subteamName && (
-                                                            <div className="role-item">
-                                                                <Briefcase size={14} />
-                                                                <span className="role-item-label">Subteam:</span>
-                                                                <span className="subteam-name">{entry.subteamName}</span>
+
+                                                        {/* Timeline Content */}
+                                                        <div className="timeline-content">
+                                                            <div className="timeline-header">
+                                                                <span className={`change-type-badge ${getChangeTypeColor(entry.changeType)}`}>
+                                                                    {entry.changeType}
+                                                                </span>
+                                                                <span className="timeline-date">
+                                                                    {formatDate(entry.period.start)}
+                                                                </span>
                                                             </div>
-                                                        )}
-                                                    </div>
 
-                                                    <div className="duration-info">
-                                                        <Calendar size={14} />
-                                                        <span className="duration-text">
-                                                            {entry.period.end
-                                                                ? `${formatDate(entry.period.start)} - ${formatDate(entry.period.end)} (${getDurationText(entry.period.duration)})`
-                                                                : `${formatDate(entry.period.start)} - Ongoing`
-                                                            }
-                                                        </span>
-                                                    </div>
+                                                            <div className="role-info">
+                                                                <div className="role-item">
+                                                                    <Briefcase size={14} />
+                                                                    <span className="role-item-label">Role:</span>
+                                                                    <span className="role-name">{entry.roleName}</span>
+                                                                </div>
+                                                                <div className="role-item">
+                                                                    <MapPin size={14} />
+                                                                    <span className="role-item-label">Team:</span>
+                                                                    <span className="team-name">{entry.teamName}</span>
+                                                                </div>
+                                                                {entry.subteamName && (
+                                                                    <div className="role-item">
+                                                                        <Briefcase size={14} />
+                                                                        <span className="role-item-label">Subteam:</span>
+                                                                        <span className="subteam-name">{entry.subteamName}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
 
-                                                    {entry.changeReason && (
-                                                        <div className="reason-info">
-                                                            <MessageCircle size={14} />
-                                                            <span className="reason-text">{entry.changeReason}</span>
+                                                            <div className="duration-info">
+                                                                <Calendar size={14} />
+                                                                <span className="duration-text">
+                                                                    {entry.period.end
+                                                                        ? `${formatDate(entry.period.start)} - ${formatDate(entry.period.end)} (${getDurationText(entry.period.duration)})`
+                                                                        : `${formatDate(entry.period.start)} - Ongoing`
+                                                                    }
+                                                                </span>
+                                                            </div>
+
+                                                            {entry.changeReason && (
+                                                                <div className="reason-info">
+                                                                    <MessageCircle size={14} />
+                                                                    <span className="reason-text">{entry.changeReason}</span>
+                                                                </div>
+                                                            )}
+
+                                                            {entry.notes && (
+                                                                <div className="notes-info">
+                                                                    <p className="notes-label">Notes:</p>
+                                                                    <p className="notes-text">{entry.notes}</p>
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    )}
-
-                                                    {entry.notes && (
-                                                        <div className="notes-info">
-                                                            <p className="notes-label">Notes:</p>
-                                                            <p className="notes-text">{entry.notes}</p>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
+                                        );
+                                    })()
                                 ) : (
                                     <div className="empty-state">
                                         <p>No role history available</p>

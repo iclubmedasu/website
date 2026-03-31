@@ -35,6 +35,9 @@ model Member {
   taskAssignments     TaskAssignment[]        // Tasks assigned to this member
   taskComments        TaskComment[]           // Comments on tasks
   taskActivityLog     TaskActivityLog[]       // Activity log entries
+  projectActivityLog  ProjectActivityLog[]     // Project-level activity log entries
+  scheduleSlots       ProjectScheduleSlot[]    // Time slots assigned to this member
+  createdScheduleSlots ProjectScheduleSlot[]   @relation("ProjectScheduleSlotCreatedBy")
   uploadedFiles       ProjectFile[]           // Files uploaded by this member
   createdFolders      ProjectFolder[]         // Folders created by this member
 }
@@ -242,6 +245,8 @@ model Project {
   tasks           Task[]           // Tasks under this project
   tags            ProjectTag[]     // Tags for categorization
   phases          ProjectPhase[]   // Phases within this project
+  activityLog     ProjectActivityLog[] // Project and task history entries
+  scheduleSlots   ProjectScheduleSlot[] // People/time allocations for this project
   folders         ProjectFolder[]  // Folder containers for attached files
   files           ProjectFile[]    // Files attached to this project
   projectType     ProjectType      @relation(fields: [projectTypeId], references: [id], onDelete: Restrict)
@@ -333,6 +338,7 @@ model ProjectPhase {
   // Relations
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   tasks       Task[]
+  activityLog ProjectActivityLog[]
 
   @@index([projectId])
   @@index([order])
@@ -374,6 +380,8 @@ model Task {
   assignments     TaskAssignment[]   // Individual members assigned
   comments        TaskComment[]      // Comments/discussion
   activityLog     TaskActivityLog[]  // History of changes
+  projectActivityLog ProjectActivityLog[] // Project-level history entries mirrored from task changes
+  scheduleSlots   ProjectScheduleSlot[] // Time slots assigned to this task
   tags            TaskTag[]          // Status tags
   dependencies    TaskDependency[]   @relation("DependentTask")      // Tasks that depend on this one
   dependsOn       TaskDependency[]   @relation("DependsOnTask")      // Tasks this one depends on
@@ -514,6 +522,68 @@ model TaskActivityLog {
   @@index([memberId])
   @@index([taskId, createdAt])
   @@index([actionType])
+}
+
+// ============================================
+// PROJECT ACTIVITY LOG - Project, task, and phase history
+// ============================================
+model ProjectActivityLog {
+  id          Int       @id @default(autoincrement())
+  projectId   Int
+  taskId      Int?
+  phaseId     Int?
+  memberId    Int
+  entityType  String    @default("PROJECT") // PROJECT, TASK, SUBTASK, PHASE, COMMENT, DEPENDENCY, ASSIGNMENT, SCHEDULE_SLOT, etc.
+  actionType  String    // CREATED, UPDATED, DEACTIVATED, REACTIVATED, FINALIZED, ARCHIVED, COMMENTED, etc.
+  oldValue    String?   // Previous value (JSON string)
+  newValue    String?   // New value (JSON string)
+  description String?   // Human-readable description
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task        Task?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  phase       ProjectPhase? @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  member      Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([taskId])
+  @@index([phaseId])
+  @@index([memberId])
+  @@index([projectId, createdAt])
+  @@index([actionType])
+  @@index([entityType])
+}
+
+// ============================================
+// PROJECT SCHEDULE SLOTS - People/time allocations for projects and tasks
+// ============================================
+model ProjectScheduleSlot {
+  id                Int       @id @default(autoincrement())
+  projectId         Int
+  taskId            Int?
+  memberId          Int
+  createdByMemberId  Int?
+  title             String?
+  notes             String?
+  startDateTime     DateTime
+  endDateTime       DateTime
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task        Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  member      Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdBy   Member?   @relation("ProjectScheduleSlotCreatedBy", fields: [createdByMemberId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([taskId])
+  @@index([memberId])
+  @@index([startDateTime])
+  @@index([endDateTime])
+  @@index([projectId, memberId, startDateTime])
 }
 
 // ============================================

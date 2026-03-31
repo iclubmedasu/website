@@ -521,6 +521,13 @@ export const projectsAPI = {
         return handleResponse(response);
     },
 
+    getActivity: async (id) => {
+        const response = await fetch(`${API_BASE_URL}/projects/${id}/activity`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
     deactivate: async (id) => {
         const response = await fetch(`${API_BASE_URL}/projects/${id}/deactivate`, {
             method: 'PATCH',
@@ -820,6 +827,51 @@ export const tasksAPI = {
 
     removeDependency: async (taskId, dependsOnTaskId) => {
         const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/dependencies/${dependsOnTaskId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+};
+
+// ============================================
+// SCHEDULE SLOTS API
+// ============================================
+
+export const scheduleSlotsAPI = {
+    getAll: async ({ projectId, taskId, memberId, includeInactive } = {}) => {
+        const params = new URLSearchParams();
+        if (projectId) params.append('projectId', projectId);
+        if (taskId) params.append('taskId', taskId);
+        if (memberId) params.append('memberId', memberId);
+        if (includeInactive) params.append('includeInactive', 'true');
+        const qs = params.toString();
+        const response = await fetch(`${API_BASE_URL}/schedule-slots${qs ? `?${qs}` : ''}`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    create: async (data) => {
+        const response = await fetch(`${API_BASE_URL}/schedule-slots`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+        return handleResponse(response);
+    },
+
+    update: async (id, data) => {
+        const response = await fetch(`${API_BASE_URL}/schedule-slots/${id}`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+        return handleResponse(response);
+    },
+
+    remove: async (id) => {
+        const response = await fetch(`${API_BASE_URL}/schedule-slots/${id}`, {
             method: 'DELETE',
             headers: getAuthHeaders(),
         });

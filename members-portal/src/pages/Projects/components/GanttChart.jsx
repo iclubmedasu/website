@@ -5,6 +5,10 @@ import {
     Plus,
     Pencil,
     Trash2,
+    X,
+    MessageCircle,
+    Clock3,
+    History,
     Crosshair,
     ArrowUp,
     ArrowDown,
@@ -15,8 +19,10 @@ import {
     ClipboardPaste,
     Columns3,
     Milestone,
+    Download,
     Maximize2,
     Minimize2,
+    Calendar,
 } from 'lucide-react';
 import { tasksAPI, phasesAPI, projectsAPI, getProfilePhotoUrl } from '../../../services/api';
 import DeletePhaseTaskModal from '../modals/DeletePhaseTaskModal';
@@ -103,6 +109,11 @@ const MIN_TREE_WIDTH = 160;
 const MAX_TREE_WIDTH = 600;
 const MAX_TREE_WIDTH_MAXIMIZED = 960;
 const TREE_WIDTH_MAXIMIZE_SCALE = 1.25;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const PREVIEW_MAX_WIDTH = 440;
+const PREVIEW_PADDING = 12;
+const PREVIEW_ESTIMATED_HEIGHT = 360;
+const PREVIEW_HOVER_DELAY_MS = 1200;
 
 // ─────────────────────────────────────────────────────────
 //  Date helpers
@@ -117,6 +128,460 @@ function addDays(d, n) {
     const r = new Date(d);
     r.setDate(r.getDate() + n);
     return r;
+}
+
+function flattenTaskNodes(phases = []) {
+    const nodes = [];
+
+    const visitTask = (task, phase, parentTask = null, depth = 0) => {
+        nodes.push({
+            id: task.id,
+            type: parentTask ? 'subtask' : 'task',
+            phaseId: phase?.id ?? task.phaseId ?? null,
+            parentTaskId: parentTask?.id ?? task.parentTaskId ?? null,
+            depth,
+            data: task,
+            phase,
+            parentTask,
+        });
+
+        for (const subtask of (task.subtasks || [])) {
+            visitTask(subtask, phase, task, depth + 1);
+        }
+    };
+
+    for (const phase of phases) {
+        for (const task of (phase.tasks || [])) {
+            visitTask(task, phase, null, 0);
+        }
+    }
+
+    return nodes;
+}
+
+function getTaskDurationDays(task) {
+    const startDate = task?.startDate ? new Date(task.startDate) : null;
+    const dueDate = task?.dueDate ? new Date(task.dueDate) : null;
+
+    if (startDate && dueDate) {
+        const span = Math.ceil((dueDate.getTime() - startDate.getTime()) / DAY_MS);
+        return Math.max(1, span);
+    }
+
+    if (task?.estimatedHours != null) {
+        return Math.max(1, Math.ceil(Number(task.estimatedHours) / 8));
+    }
+
+    return 1;
+}
+
+function getPhaseDurationDays(phase) {
+    const range = getPhaseRange(phase);
+    if (!range.start && !range.end) return 1;
+
+    const start = range.start || range.end;
+    const end = range.end || range.start;
+    const span = Math.ceil((end.getTime() - start.getTime()) / DAY_MS);
+    return Math.max(1, span);
+}
+
+function getDependencyEdgeKey(edge) {
+    return `${edge.sourceType || 'task'}:${edge.sourceId}->${edge.targetType || 'task'}:${edge.targetId}`;
+}
+
+function getOrderedPhases(phases = []) {
+    return [...phases].sort((a, b) => {
+        const orderA = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.MAX_SAFE_INTEGER;
+        const orderB = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.MAX_SAFE_INTEGER;
+        if (orderA !== orderB) return orderA - orderB;
+
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (dateA !== dateB) return dateA - dateB;
+
+        return (a.id || 0) - (b.id || 0);
+    });
+}
+
+function buildDependencyGraph(nodes = []) {
+    const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+    const incoming = new Map();
+    const outgoing = new Map();
+    const edges = [];
+
+    for (const node of nodes) {
+        const dependencies = Array.isArray(node.data?.dependencies) ? node.data.dependencies : [];
+        for (const dependency of dependencies) {
+            const sourceId = dependency.dependsOnTask?.id ?? dependency.dependsOnTaskId;
+            if (!sourceId || sourceId === node.id || !nodeMap.has(sourceId)) continue;
+
+            const edge = {
+                sourceId,
+                targetId: node.id,
+                sourceType: nodeMap.get(sourceId)?.type || 'task',
+                targetType: node.type,
+                dependencyType: dependency.dependencyType || 'FINISH_TO_START',
+            };
+
+            edges.push(edge);
+
+            if (!outgoing.has(sourceId)) outgoing.set(sourceId, []);
+            outgoing.get(sourceId).push(edge);
+
+            if (!incoming.has(node.id)) incoming.set(node.id, []);
+            incoming.get(node.id).push(edge);
+        }
+    }
+
+    return { nodeMap, incoming, outgoing, edges };
+}
+
+function calculatePhaseChain(phases = []) {
+    const orderedPhases = getOrderedPhases(phases);
+    const nodeAnalysis = new Map();
+    const criticalPhaseIds = new Set();
+    const criticalEdgeKeys = new Set();
+    const edges = [];
+
+    let elapsedDays = 0;
+
+    for (let index = 0; index < orderedPhases.length; index++) {
+        const phase = orderedPhases[index];
+        const duration = getPhaseDurationDays(phase);
+        const earliestStart = elapsedDays;
+        const earliestFinish = earliestStart + duration;
+
+        nodeAnalysis.set(phase.id, {
+            durationDays: duration,
+            earliestStart,
+            earliestFinish,
+            latestStart: earliestStart,
+            latestFinish: earliestFinish,
+            slack: 0,
+            critical: true,
+        });
+        criticalPhaseIds.add(phase.id);
+
+        if (index < orderedPhases.length - 1) {
+            const nextPhase = orderedPhases[index + 1];
+            const edge = {
+                sourceId: phase.id,
+                targetId: nextPhase.id,
+                sourceType: 'phase',
+                targetType: 'phase',
+                dependencyType: 'FINISH_TO_START',
+            };
+            edges.push(edge);
+            criticalEdgeKeys.add(getDependencyEdgeKey(edge));
+        }
+
+        elapsedDays = earliestFinish;
+    }
+
+    return { nodeAnalysis, criticalPhaseIds, criticalEdgeKeys, edges };
+}
+
+function topologicalSort(nodeIds, incoming, outgoing) {
+    const indegree = new Map(nodeIds.map((id) => [id, 0]));
+
+    for (const id of nodeIds) {
+        indegree.set(id, (incoming.get(id) || []).length);
+    }
+
+    const queue = nodeIds.filter((id) => indegree.get(id) === 0);
+    const ordered = [];
+
+    while (queue.length > 0) {
+        const id = queue.shift();
+        ordered.push(id);
+
+        for (const edge of outgoing.get(id) || []) {
+            const nextDegree = (indegree.get(edge.targetId) || 0) - 1;
+            indegree.set(edge.targetId, nextDegree);
+            if (nextDegree === 0) queue.push(edge.targetId);
+        }
+    }
+
+    if (ordered.length < nodeIds.length) {
+        const seen = new Set(ordered);
+        for (const id of nodeIds) {
+            if (!seen.has(id)) ordered.push(id);
+        }
+    }
+
+    return ordered;
+}
+
+function calculateCriticalPath(nodes = [], phases = []) {
+    if (!nodes.length) {
+        const phaseChain = calculatePhaseChain(phases);
+        return {
+            nodeAnalysis: new Map(),
+            criticalNodeIds: new Set(),
+            criticalPhaseIds: phaseChain.criticalPhaseIds,
+            criticalEdgeKeys: phaseChain.criticalEdgeKeys,
+            edges: phaseChain.edges,
+        };
+    }
+
+    const { incoming, outgoing, edges } = buildDependencyGraph(nodes);
+    const nodeIds = nodes.map((node) => node.id);
+    const orderedIds = topologicalSort(nodeIds, incoming, outgoing);
+    const durationDays = new Map(nodes.map((node) => [node.id, getTaskDurationDays(node.data)]));
+    const earliestStart = new Map();
+
+    for (const id of orderedIds) {
+        let start = 0;
+        for (const edge of incoming.get(id) || []) {
+            const predecessorStart = earliestStart.get(edge.sourceId) ?? 0;
+            const predecessorDuration = durationDays.get(edge.sourceId) ?? 1;
+            const constraint = edge.dependencyType === 'START_TO_START'
+                ? predecessorStart
+                : predecessorStart + predecessorDuration;
+            start = Math.max(start, constraint);
+        }
+        earliestStart.set(id, start);
+    }
+
+    let projectDuration = 1;
+    for (const id of orderedIds) {
+        const finish = (earliestStart.get(id) ?? 0) + (durationDays.get(id) ?? 1);
+        projectDuration = Math.max(projectDuration, finish);
+    }
+
+    const latestStart = new Map();
+
+    for (let i = orderedIds.length - 1; i >= 0; i--) {
+        const id = orderedIds[i];
+        const nodeDuration = durationDays.get(id) ?? 1;
+        const successors = outgoing.get(id) || [];
+
+        let latest = projectDuration - nodeDuration;
+        if (successors.length > 0) {
+            latest = Math.min(...successors.map((edge) => {
+                const successorLatestStart = latestStart.get(edge.targetId) ?? (projectDuration - (durationDays.get(edge.targetId) ?? 1));
+                if (edge.dependencyType === 'START_TO_START') {
+                    return successorLatestStart;
+                }
+                return successorLatestStart - nodeDuration;
+            }));
+        }
+
+        if (!Number.isFinite(latest)) latest = earliestStart.get(id) ?? 0;
+        latestStart.set(id, Math.max(0, latest));
+    }
+
+    const nodeAnalysis = new Map();
+    const criticalNodeIds = new Set();
+
+    for (const node of nodes) {
+        const es = earliestStart.get(node.id) ?? 0;
+        const ls = latestStart.get(node.id) ?? es;
+        const duration = durationDays.get(node.id) ?? 1;
+        const slack = Math.max(0, ls - es);
+        const critical = slack <= 0.0001;
+
+        if (critical) criticalNodeIds.add(node.id);
+        nodeAnalysis.set(node.id, {
+            durationDays: duration,
+            earliestStart: es,
+            earliestFinish: es + duration,
+            latestStart: ls,
+            latestFinish: ls + duration,
+            slack,
+            critical,
+        });
+    }
+
+    const criticalEdgeKeys = new Set();
+
+    for (const edge of edges) {
+        const source = nodeAnalysis.get(edge.sourceId);
+        const target = nodeAnalysis.get(edge.targetId);
+        if (!source || !target || !source.critical || !target.critical) continue;
+
+        const satisfiesConstraint = edge.dependencyType === 'START_TO_START'
+            ? Math.abs(target.earliestStart - source.earliestStart) <= 0.0001
+            : Math.abs(target.earliestStart - source.earliestFinish) <= 0.0001;
+
+        if (satisfiesConstraint) {
+            criticalEdgeKeys.add(getDependencyEdgeKey(edge));
+        }
+    }
+
+    const phaseChain = calculatePhaseChain(phases);
+    const criticalPhaseIds = new Set([...phaseChain.criticalPhaseIds]);
+    for (const node of nodes) {
+        if (criticalNodeIds.has(node.id) && node.phaseId) {
+            criticalPhaseIds.add(node.phaseId);
+        }
+    }
+
+    for (const edgeKey of phaseChain.criticalEdgeKeys) {
+        criticalEdgeKeys.add(edgeKey);
+    }
+
+    return {
+        nodeAnalysis,
+        criticalNodeIds,
+        criticalPhaseIds,
+        criticalEdgeKeys,
+        edges: [...edges, ...phaseChain.edges],
+    };
+}
+
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function formatExportDate(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toISOString();
+}
+
+function getDateOrNull(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatPreviewDateTime(value) {
+    const date = getDateOrNull(value);
+    if (!date) return '—';
+    return date.toLocaleString([], {
+        month: 'short',
+        day: '2-digit',
+        hour: 'numeric',
+        minute: '2-digit',
+    });
+}
+
+function formatPreviewClock(value) {
+    const date = getDateOrNull(value);
+    if (!date) return '—';
+    return date.toLocaleTimeString([], {
+        hour: 'numeric',
+        minute: '2-digit',
+    });
+}
+
+function formatPreviewRange(start, end) {
+    return `${formatPreviewDateTime(start)} → ${formatPreviewDateTime(end)}`;
+}
+
+function uniqueSlots(slots = []) {
+    const seen = new Set();
+    return slots.filter((slot) => {
+        const key = slot?.id ?? `${slot?.member?.id ?? 'member'}-${slot?.task?.id ?? 'task'}-${slot?.startDateTime ?? ''}-${slot?.endDateTime ?? ''}-${slot?.title ?? ''}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+function slotOverlapsRange(slot, rangeStart, rangeEnd) {
+    const start = getDateOrNull(slot?.startDateTime);
+    const end = getDateOrNull(slot?.endDateTime);
+    if (!start || !end || !rangeStart || !rangeEnd) return false;
+    return start <= rangeEnd && end >= rangeStart;
+}
+
+function groupSlotsByMember(slots = []) {
+    const groups = new Map();
+
+    for (const slot of slots) {
+        const member = slot?.member || { id: slot?.memberId ?? `slot-${slot?.id}`, fullName: 'Unknown member' };
+        const key = member.id ?? `slot-${slot?.id}`;
+        if (!groups.has(key)) {
+            groups.set(key, { key, member, slots: [] });
+        }
+        groups.get(key).slots.push(slot);
+    }
+
+    return [...groups.values()].map((group) => ({
+        ...group,
+        slots: group.slots.sort((a, b) => {
+            const startA = getDateOrNull(a.startDateTime)?.getTime() ?? 0;
+            const startB = getDateOrNull(b.startDateTime)?.getTime() ?? 0;
+            return startA - startB;
+        }),
+    })).sort((a, b) => (a.member?.fullName ?? '').localeCompare(b.member?.fullName ?? ''));
+}
+
+function getPreviewWindow(slots = [], fallbackStart = null, fallbackEnd = null) {
+    let start = getDateOrNull(fallbackStart);
+    let end = getDateOrNull(fallbackEnd);
+
+    for (const slot of slots) {
+        const slotStart = getDateOrNull(slot?.startDateTime);
+        const slotEnd = getDateOrNull(slot?.endDateTime);
+        if (slotStart && (!start || slotStart < start)) start = slotStart;
+        if (slotEnd && (!end || slotEnd > end)) end = slotEnd;
+    }
+
+    if (!start && end) start = new Date(end);
+    if (!end && start) end = new Date(start);
+    if (!start || !end) return null;
+    if (start.getTime() === end.getTime()) end = new Date(start.getTime() + DAY_MS);
+
+    return { start, end };
+}
+
+function getPreviewPosition(rect) {
+    const popupWidth = Math.min(PREVIEW_MAX_WIDTH, window.innerWidth - PREVIEW_PADDING * 2);
+    const popupHeight = PREVIEW_ESTIMATED_HEIGHT;
+    const centeredLeft = rect.left + (rect.width / 2) - (popupWidth / 2);
+    const left = Math.max(PREVIEW_PADDING, Math.min(centeredLeft, window.innerWidth - popupWidth - PREVIEW_PADDING));
+    const spaceBelow = window.innerHeight - rect.bottom - PREVIEW_PADDING;
+    const spaceAbove = rect.top - PREVIEW_PADDING;
+    const placeAbove = spaceBelow < popupHeight && spaceAbove > spaceBelow;
+    let top = placeAbove
+        ? rect.top - popupHeight - PREVIEW_PADDING
+        : rect.bottom + PREVIEW_PADDING;
+    top = Math.max(PREVIEW_PADDING, Math.min(top, window.innerHeight - popupHeight - PREVIEW_PADDING));
+
+    return {
+        left,
+        top,
+        width: popupWidth,
+        placement: placeAbove ? 'above' : 'below',
+    };
+}
+
+function getPreviewKindLabel(rowType) {
+    if (rowType === 'phase') return 'Phase';
+    if (rowType === 'subtask') return 'Subtask';
+    return 'Task';
+}
+
+function collectPreviewSlots(row, allTaskNodes = [], projectDetail = null) {
+    if (!row) return [];
+
+    if (row.type === 'phase') {
+        const phaseRange = getPhaseRange(row.data);
+        const phaseStart = phaseRange.start ? new Date(phaseRange.start) : null;
+        const phaseEnd = phaseRange.end ? new Date(phaseRange.end) : null;
+        const descendantSlots = allTaskNodes
+            .filter((node) => node.phaseId === row.id)
+            .flatMap((node) => node.data?.scheduleSlots || []);
+        const projectSlots = (projectDetail?.scheduleSlots || []).filter((slot) => {
+            if (!phaseStart || !phaseEnd) return true;
+            return slotOverlapsRange(slot, phaseStart, phaseEnd);
+        });
+
+        return uniqueSlots([...descendantSlots, ...projectSlots]);
+    }
+
+    return uniqueSlots(row.data?.scheduleSlots || []);
 }
 
 // ─────────────────────────────────────────────────────────
@@ -313,6 +778,8 @@ function fmtDateCompact(d) {
 export default function GanttChart({
     phases,
     projectId,
+    projectTitle,
+    projectDetail,
     projectStartDate,
     projectDueDate,
     canEdit,
@@ -322,15 +789,20 @@ export default function GanttChart({
     onAddSubtask,
     onEditPhase,
     onEditTask,
+    onOpenTaskComments,
+    onOpenTaskScheduleSlots,
+    onOpenTaskActivity,
     onDeletePhase,
     onRefresh,
 }) {
-    const [scale, setScale] = useState('month');
+    const [scale, setScale] = useState('week');
     const [selected, setSelected] = useState(null); // { type, id, data, phase?, parentTask? }
     const [expandedPhases, setExpandedPhases] = useState(() => new Set(phases.map((p) => p.id)));
     const [expandedTasks, setExpandedTasks] = useState(new Set());
     const [confirmDelete, setConfirmDelete] = useState(null); // { type, id, title }
     const [isMaximized, setIsMaximized] = useState(false);
+    const [exportingFormat, setExportingFormat] = useState(null);
+    const [preview, setPreview] = useState(null);
 
     // Clipboard: { mode: 'copy'|'cut', type: 'phase'|'task'|'subtask', id, data, phase?, parentTask? }
     const [clipboard, setClipboard] = useState(null);
@@ -350,6 +822,10 @@ export default function GanttChart({
     const treeBodyRef = useRef(null);
     const timelineRef = useRef(null);
     const colsBodyRef = useRef(null);
+    const ganttMainRef = useRef(null);
+    const previewPopoverRef = useRef(null);
+    const barRefs = useRef(new Map());
+    const previewHoverTimerRef = useRef(null);
 
     // ── Resizable tree panel ──
     const [treeWidth, setTreeWidth] = useState(DEFAULT_TREE_WIDTH);
@@ -414,6 +890,14 @@ export default function GanttChart({
 
     // ── Baselines ──
     const [showBaselines, setShowBaselines] = useState(false);
+
+    const allTaskNodes = useMemo(() => flattenTaskNodes(phases), [phases]);
+    const dependencyAnalysis = useMemo(() => calculateCriticalPath(allTaskNodes, phases), [allTaskNodes, phases]);
+    const exportBaseName = useMemo(() => {
+        const raw = (projectTitle || `project-${projectId || 'gantt'}`).toString().trim().toLowerCase();
+        const slug = raw.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        return slug || 'gantt-chart';
+    }, [projectId, projectTitle]);
 
     // Check if any task in the project has baseline dates set
     const hasBaseline = useMemo(() => {
@@ -803,7 +1287,17 @@ export default function GanttChart({
             if (treeBodyRef.current) treeBodyRef.current.scrollTop = top;
             if (colsBodyRef.current) colsBodyRef.current.scrollTop = top;
         }
-    }, []);
+        if (preview?.rowKey) {
+            const bar = barRefs.current.get(preview.rowKey);
+            if (bar) {
+                const position = getPreviewPosition(bar.getBoundingClientRect());
+                setPreview((current) => {
+                    if (!current || current.rowKey !== preview.rowKey) return current;
+                    return { ...current, position };
+                });
+            }
+        }
+    }, [preview?.rowKey]);
 
     // Toggle expand/collapse
     const togglePhase = useCallback((id) => {
@@ -889,6 +1383,204 @@ export default function GanttChart({
         }
         return boundary;
     }, [rows]);
+
+    const rowIndexByKey = useMemo(() => new Map(rows.map((row, index) => [`${row.type}-${row.id}`, index])), [rows]);
+    const timelineBodyHeight = rows.length * ROW_HEIGHT;
+
+    const criticalPhaseIds = dependencyAnalysis.criticalPhaseIds;
+    const criticalNodeIds = dependencyAnalysis.criticalNodeIds;
+    const criticalEdgeKeys = dependencyAnalysis.criticalEdgeKeys;
+
+    const previewRow = useMemo(() => {
+        if (!preview) return null;
+        return rows.find((row) => `${row.type}-${row.id}` === preview.rowKey) || null;
+    }, [preview, rows]);
+
+    const previewData = useMemo(() => {
+        if (!previewRow) return null;
+
+        const slots = collectPreviewSlots(previewRow, allTaskNodes, projectDetail);
+        const baseRange = previewRow.type === 'phase'
+            ? getPhaseRange(previewRow.data)
+            : {
+                start: getDateOrNull(previewRow.data?.startDate),
+                end: getDateOrNull(previewRow.data?.dueDate),
+            };
+        const window = getPreviewWindow(slots, baseRange.start, baseRange.end);
+        const status = previewRow.type === 'phase'
+            ? getPhaseStatus(previewRow.data)
+            : previewRow.data?.status;
+        const priority = previewRow.type === 'phase'
+            ? null
+            : previewRow.data?.priority;
+
+        return {
+            row: previewRow,
+            kindLabel: getPreviewKindLabel(previewRow.type),
+            title: previewRow.data?.title || '',
+            status,
+            statusLabel: STATUS_LABELS[status] || status || '—',
+            priority,
+            priorityLabel: previewRow.type === 'phase' ? '—' : (PRIORITY_LABELS[priority] || priority || '—'),
+            isCritical: previewRow.type === 'phase'
+                ? criticalPhaseIds.has(previewRow.id)
+                : criticalNodeIds.has(previewRow.id),
+            slots,
+            groups: groupSlotsByMember(slots),
+            window,
+            baseRange,
+            hasSlots: slots.length > 0,
+        };
+    }, [allTaskNodes, criticalNodeIds, criticalPhaseIds, previewRow, projectDetail]);
+
+    const previewTimeline = useMemo(() => {
+        if (!previewData?.window) return null;
+
+        const { start, end } = previewData.window;
+        const total = Math.max(end.getTime() - start.getTime(), DAY_MS);
+
+        const toPercent = (value) => {
+            const date = getDateOrNull(value);
+            if (!date) return 0;
+            return Math.max(0, Math.min(100, ((date.getTime() - start.getTime()) / total) * 100));
+        };
+
+        return {
+            start,
+            end,
+            toPercent,
+        };
+    }, [previewData]);
+
+    const refreshPreviewPosition = useCallback((rowKey) => {
+        const targetKey = rowKey || preview?.rowKey;
+        if (!targetKey) return;
+
+        const bar = barRefs.current.get(targetKey);
+        if (!bar) {
+            setPreview(null);
+            return;
+        }
+
+        const position = getPreviewPosition(bar.getBoundingClientRect());
+        setPreview((current) => {
+            if (!current || current.rowKey !== targetKey) return current;
+            if (
+                current.position
+                && current.position.left === position.left
+                && current.position.top === position.top
+                && current.position.width === position.width
+                && current.position.placement === position.placement
+            ) {
+                return current;
+            }
+            return { ...current, position };
+        });
+    }, [preview?.rowKey]);
+
+    const clearPreviewHoverTimer = useCallback(() => {
+        if (previewHoverTimerRef.current) {
+            window.clearTimeout(previewHoverTimerRef.current);
+            previewHoverTimerRef.current = null;
+        }
+    }, []);
+
+    const openPreview = useCallback((row, element, pinned = false) => {
+        if (!row || !element) return;
+        const rowKey = `${row.type}-${row.id}`;
+        const position = getPreviewPosition(element.getBoundingClientRect());
+
+        setPreview((current) => {
+            if (current?.pinned && current.rowKey !== rowKey && !pinned) return current;
+            if (current?.pinned && current.rowKey === rowKey && !pinned) return current;
+            return {
+                rowKey,
+                pinned: pinned || (current?.pinned && current.rowKey === rowKey),
+                position,
+            };
+        });
+    }, []);
+
+    const handlePreviewMouseEnter = useCallback((row, event) => {
+        clearPreviewHoverTimer();
+
+        if (preview?.pinned && preview.rowKey !== `${row.type}-${row.id}`) return;
+
+        const element = event.currentTarget;
+        previewHoverTimerRef.current = window.setTimeout(() => {
+            openPreview(row, element, false);
+        }, PREVIEW_HOVER_DELAY_MS);
+    }, [clearPreviewHoverTimer, openPreview, preview?.pinned, preview?.rowKey]);
+
+    const handlePreviewMouseLeave = useCallback((row) => {
+        clearPreviewHoverTimer();
+        const rowKey = `${row.type}-${row.id}`;
+        setPreview((current) => {
+            if (!current || current.rowKey !== rowKey || current.pinned) return current;
+            return null;
+        });
+    }, [clearPreviewHoverTimer]);
+
+    const handlePreviewClick = useCallback((row, event) => {
+        event.stopPropagation();
+        clearPreviewHoverTimer();
+        const rowKey = `${row.type}-${row.id}`;
+        setPreview((current) => {
+            if (current?.rowKey === rowKey && current.pinned) return null;
+            const position = getPreviewPosition(event.currentTarget.getBoundingClientRect());
+            return { rowKey, pinned: true, position };
+        });
+    }, [clearPreviewHoverTimer]);
+
+    const setBarRef = useCallback((rowKey) => (node) => {
+        if (node) {
+            barRefs.current.set(rowKey, node);
+        } else {
+            barRefs.current.delete(rowKey);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!preview?.rowKey) return;
+
+        const exists = rows.some((row) => `${row.type}-${row.id}` === preview.rowKey);
+        if (!exists) {
+            setPreview(null);
+            return;
+        }
+
+        refreshPreviewPosition(preview.rowKey);
+    }, [preview?.rowKey, rows, refreshPreviewPosition]);
+
+    useEffect(() => {
+        if (!preview?.rowKey) return undefined;
+
+        const handleResize = () => refreshPreviewPosition(preview.rowKey);
+        const handleEscape = (event) => {
+            if (event.key === 'Escape') {
+                setPreview(null);
+            }
+        };
+        const handlePointerDown = (event) => {
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+            if (previewPopoverRef.current?.contains(target)) return;
+            if (target.closest('.gantt-bar')) return;
+            setPreview(null);
+        };
+
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('keydown', handleEscape);
+        document.addEventListener('mousedown', handlePointerDown);
+
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('keydown', handleEscape);
+            document.removeEventListener('mousedown', handlePointerDown);
+        };
+    }, [preview?.rowKey, refreshPreviewPosition]);
+
+    useEffect(() => () => clearPreviewHoverTimer(), [clearPreviewHoverTimer]);
 
     // Clear selection if item no longer exists
     useEffect(() => {
@@ -993,6 +1685,187 @@ export default function GanttChart({
 
         return { left: leftPx, width, status, isMilestone, startDate: barStart, endDate: barEnd };
     }, [columns, colWidth]);
+
+    const dependencySegments = useMemo(() => {
+        const segments = [];
+
+        for (const edge of dependencyAnalysis.edges) {
+            const sourceRow = rows.find((row) => row.type === (edge.sourceType || 'task') && row.id === edge.sourceId);
+            const targetRow = rows.find((row) => row.type === (edge.targetType || 'task') && row.id === edge.targetId);
+            if (!sourceRow || !targetRow) continue;
+
+            const sourceBar = getBarData(sourceRow);
+            const targetBar = getBarData(targetRow);
+            const sourceIndex = rowIndexByKey.get(`${sourceRow.type}-${sourceRow.id}`);
+            const targetIndex = rowIndexByKey.get(`${targetRow.type}-${targetRow.id}`);
+
+            if (!sourceBar || !targetBar || sourceIndex == null || targetIndex == null) continue;
+
+            const sourceY = sourceIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
+            const targetY = targetIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
+            const sourceX = sourceBar.left + sourceBar.width;
+            const targetX = targetBar.left;
+            const direction = targetX >= sourceX ? 1 : -1;
+            const elbowX = sourceX + (direction * 14);
+
+            segments.push({
+                key: getDependencyEdgeKey(edge),
+                critical: criticalEdgeKeys.has(getDependencyEdgeKey(edge)),
+                sourceX,
+                sourceY,
+                targetX,
+                targetY,
+                elbowX,
+            });
+        }
+
+        return segments;
+    }, [criticalEdgeKeys, dependencyAnalysis.edges, getBarData, rowIndexByKey, rows]);
+
+    const exportAsPng = useCallback(async () => {
+        if (!ganttMainRef.current || exportingFormat) return;
+
+        setExportingFormat('png');
+        let wrapper = null;
+        try {
+            const html2canvasModule = await import('html2canvas');
+            const html2canvas = html2canvasModule.default || html2canvasModule;
+            const source = ganttMainRef.current;
+            const clone = source.cloneNode(true);
+
+            wrapper = document.createElement('div');
+            wrapper.style.position = 'fixed';
+            wrapper.style.left = '-100000px';
+            wrapper.style.top = '0';
+            wrapper.style.background = 'white';
+            wrapper.style.pointerEvents = 'none';
+            wrapper.style.zIndex = '-1';
+            wrapper.appendChild(clone);
+            document.body.appendChild(wrapper);
+
+            const setStyle = (selector, styles) => {
+                const element = clone.querySelector(selector);
+                if (element) Object.assign(element.style, styles);
+            };
+
+            setStyle('.gantt-main', { height: 'auto', overflow: 'visible', minHeight: '0' });
+            setStyle('.gantt-tree-panel', { height: 'auto', overflow: 'visible' });
+            setStyle('.gantt-tree-body', { height: 'auto', overflow: 'visible' });
+            setStyle('.gantt-columns-panel', { height: 'auto', overflow: 'visible' });
+            setStyle('.gantt-columns-body', { height: 'auto', overflow: 'visible' });
+            setStyle('.gantt-timeline-panel', { height: 'auto', overflow: 'visible' });
+            setStyle('.gantt-timeline-body', { height: 'auto', overflow: 'visible' });
+            setStyle('.gantt-timeline-surface', { height: 'auto', overflow: 'visible' });
+            setStyle('.gantt-dependency-overlay', { overflow: 'visible' });
+
+            const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+            await nextFrame();
+            await nextFrame();
+
+            const canvas = await html2canvas(clone, {
+                backgroundColor: '#ffffff',
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                windowWidth: Math.max(clone.scrollWidth, clone.getBoundingClientRect().width),
+                windowHeight: Math.max(clone.scrollHeight, clone.getBoundingClientRect().height),
+            });
+
+            const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+            if (blob) {
+                downloadBlob(blob, `${exportBaseName}-gantt.png`);
+            }
+        } catch (error) {
+            console.error('PNG export failed', error);
+        } finally {
+            if (wrapper?.parentNode) wrapper.parentNode.removeChild(wrapper);
+            setExportingFormat(null);
+        }
+    }, [exportBaseName, exportingFormat]);
+
+    const exportAsExcel = useCallback(async () => {
+        if (exportingFormat) return;
+
+        setExportingFormat('xlsx');
+        try {
+            const xlsxModule = await import('xlsx');
+            const XLSX = xlsxModule.default || xlsxModule;
+
+            const taskRows = allTaskNodes.map((node) => {
+                const summary = dependencyAnalysis.nodeAnalysis.get(node.id) || {};
+                return {
+                    Phase: node.phase?.title || '',
+                    Parent: node.parentTask?.title || '',
+                    WBS: node.data.wbs || '',
+                    Type: node.type,
+                    Title: node.data.title,
+                    Status: node.data.status,
+                    Priority: node.data.priority,
+                    Start: formatExportDate(node.data.startDate),
+                    Due: formatExportDate(node.data.dueDate),
+                    DurationDays: summary.durationDays ?? getTaskDurationDays(node.data),
+                    EarliestStart: summary.earliestStart ?? '',
+                    EarliestFinish: summary.earliestFinish ?? '',
+                    LatestStart: summary.latestStart ?? '',
+                    LatestFinish: summary.latestFinish ?? '',
+                    SlackDays: summary.slack ?? '',
+                    Critical: summary.critical ? 'Yes' : 'No',
+                    Predecessors: (node.data.dependencies || [])
+                        .map((dependency) => dependency.dependsOnTask?.title || dependency.dependsOnTaskId)
+                        .filter(Boolean)
+                        .join(', '),
+                };
+            });
+
+            const dependencyRows = dependencyAnalysis.edges.map((edge) => {
+                const source = edge.sourceType === 'phase'
+                    ? phases.find((phase) => phase.id === edge.sourceId)
+                    : allTaskNodes.find((node) => node.id === edge.sourceId);
+                const target = edge.targetType === 'phase'
+                    ? phases.find((phase) => phase.id === edge.targetId)
+                    : allTaskNodes.find((node) => node.id === edge.targetId);
+                const sourceAnalysis = dependencyAnalysis.nodeAnalysis.get(edge.sourceId) || {};
+                const targetAnalysis = dependencyAnalysis.nodeAnalysis.get(edge.targetId) || {};
+                return {
+                    Source: source?.title || source?.data?.title || edge.sourceId,
+                    Target: target?.title || target?.data?.title || edge.targetId,
+                    Type: edge.dependencyType,
+                    Critical: dependencyAnalysis.criticalEdgeKeys.has(getDependencyEdgeKey(edge)) ? 'Yes' : 'No',
+                    SourceSlack: sourceAnalysis.slack ?? '',
+                    TargetSlack: targetAnalysis.slack ?? '',
+                };
+            });
+
+            const criticalRows = allTaskNodes
+                .filter((node) => dependencyAnalysis.criticalNodeIds.has(node.id))
+                .map((node) => {
+                    const summary = dependencyAnalysis.nodeAnalysis.get(node.id) || {};
+                    return {
+                        WBS: node.data.wbs || '',
+                        Title: node.data.title,
+                        Phase: node.phase?.title || '',
+                        Type: node.type,
+                        EarliestStart: summary.earliestStart ?? '',
+                        EarliestFinish: summary.earliestFinish ?? '',
+                        LatestStart: summary.latestStart ?? '',
+                        LatestFinish: summary.latestFinish ?? '',
+                        SlackDays: summary.slack ?? '',
+                    };
+                })
+                .sort((a, b) => (a.EarliestStart ?? 0) - (b.EarliestStart ?? 0));
+
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(taskRows), 'Tasks');
+            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(dependencyRows), 'Dependencies');
+            XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(criticalRows), 'Critical Path');
+
+            XLSX.writeFile(workbook, `${exportBaseName}-gantt.xlsx`);
+        } catch (error) {
+            console.error('Excel export failed', error);
+        } finally {
+            setExportingFormat(null);
+        }
+    }, [allTaskNodes, dependencyAnalysis, exportBaseName, exportingFormat]);
 
     // Auto-scroll timeline to the selected row's bar
     useEffect(() => {
@@ -1359,11 +2232,33 @@ export default function GanttChart({
                         <Crosshair size={13} />
                         <span>Today</span>
                     </button>
+                    <div className="gantt-export-group">
+                        <button
+                            className="gantt-export-btn"
+                            type="button"
+                            onClick={exportAsPng}
+                            disabled={!!exportingFormat}
+                            title="Export the Gantt chart as a PNG image"
+                        >
+                            <Download size={13} />
+                            <span>{exportingFormat === 'png' ? 'Exporting…' : 'PNG'}</span>
+                        </button>
+                        <button
+                            className="gantt-export-btn"
+                            type="button"
+                            onClick={exportAsExcel}
+                            disabled={!!exportingFormat}
+                            title="Export the Gantt chart data as Excel"
+                        >
+                            <Download size={13} />
+                            <span>{exportingFormat === 'xlsx' ? 'Exporting…' : 'Excel'}</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {/* ── Main chart area ── */}
-            <div className="gantt-main">
+            <div className="gantt-main" ref={ganttMainRef}>
                 {/* Left: Tree panel */}
                 <div className="gantt-tree-panel" style={{ width: treeWidth, minWidth: treeWidth }}>
                     <div className="gantt-tree-header" style={{ height: HEADER_HEIGHT }}>
@@ -1433,11 +2328,14 @@ export default function GanttChart({
                                 : STATUS_COLORS[row.data.status];
 
                             const rowCanEdit = row.type === 'phase' ? canEdit : (canEdit || canEditStatus);
+                            const isCriticalRow = row.type === 'phase'
+                                ? criticalPhaseIds.has(row.id)
+                                : criticalNodeIds.has(row.id);
 
                             return (
                                 <div
                                     key={`tree-${row.type}-${row.id}`}
-                                    className={`gantt-tree-row gantt-tree-row--${row.type}${isSelected ? ' selected' : ''}${isSelected && row.type !== 'phase' ? ' selected-emphasis' : ''}${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}`}
+                                    className={`gantt-tree-row gantt-tree-row--${row.type}${isSelected ? ' selected' : ''}${isSelected && row.type !== 'phase' ? ' selected-emphasis' : ''}${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}${isCriticalRow ? ' gantt-tree-row--critical' : ''}`}
                                     style={{ height: ROW_HEIGHT, paddingLeft: `${0.5 + row.depth * 1.25}rem` }}
                                     onClick={() => handleSelect(row.type, row.data, row.phase, row.parentTask)}
                                 >
@@ -1455,7 +2353,20 @@ export default function GanttChart({
                                         <span className="gantt-tree-chevron-placeholder" />
                                     )}
                                     <span className="gantt-tree-status-dot" style={{ background: statusColor }} />
-                                    <span className="gantt-tree-wbs">{row.data.wbs || ''}</span>
+                                    <div className="gantt-tree-wbs-stack">
+                                        <span className="gantt-tree-wbs">{row.data.wbs || ''}</span>
+                                        {/* Inline progress bar */}
+                                        {(() => {
+                                            const pct = getProgress(row);
+                                            return (
+                                                <span className="gantt-progress-wrap" title={`${pct}%`}>
+                                                    <span className="gantt-progress-track">
+                                                        <span className="gantt-progress-fill" style={{ width: `${pct}%` }} />
+                                                    </span>
+                                                </span>
+                                            );
+                                        })()}
+                                    </div>
                                     <span className={`gantt-tree-title gantt-tree-title--${row.type}`} title={row.data.title}>
                                         {row.data.title}
                                     </span>
@@ -1464,20 +2375,27 @@ export default function GanttChart({
                                             {(row.data.tasks?.length ?? 0)}
                                         </span>
                                     )}
-                                    {/* Inline progress bar */}
-                                    {(() => {
-                                        const pct = getProgress(row);
-                                        return (
-                                            <span className="gantt-progress-wrap" title={`${pct}%`}>
-                                                <span className="gantt-progress-track">
-                                                    <span className="gantt-progress-fill" style={{ width: `${pct}%` }} />
-                                                </span>
-                                            </span>
-                                        );
-                                    })()}
                                     {/* Inline edit / delete actions */}
                                     {rowCanEdit && (
                                         <div className="gantt-row-actions" onClick={(e) => e.stopPropagation()}>
+                                            {row.type !== 'phase' && onOpenTaskComments && (
+                                                <button
+                                                    className="gantt-row-btn gantt-row-btn--comment"
+                                                    title="Task comments"
+                                                    onClick={() => onOpenTaskComments(row.data)}
+                                                >
+                                                    <MessageCircle size={12} />
+                                                </button>
+                                            )}
+                                            {row.type !== 'phase' && onOpenTaskScheduleSlots && (
+                                                <button
+                                                    className="gantt-row-btn gantt-row-btn--schedule"
+                                                    title="Task time slots"
+                                                    onClick={() => onOpenTaskScheduleSlots(row.data)}
+                                                >
+                                                    <Calendar size={12} />
+                                                </button>
+                                            )}
                                             <button
                                                 className="gantt-row-btn gantt-row-btn--edit"
                                                 title={`Edit ${row.type}`}
@@ -1492,6 +2410,15 @@ export default function GanttChart({
                                                     onClick={() => setConfirmDelete({ type: row.type, id: row.id, title: row.data.title })}
                                                 >
                                                     <Trash2 size={12} />
+                                                </button>
+                                            )}
+                                            {row.type !== 'phase' && onOpenTaskActivity && (
+                                                <button
+                                                    className="gantt-row-btn gantt-row-btn--activity"
+                                                    title="Task activity"
+                                                    onClick={() => onOpenTaskActivity(row.data)}
+                                                >
+                                                    <History size={12} />
                                                 </button>
                                             )}
                                         </div>
@@ -1522,10 +2449,13 @@ export default function GanttChart({
                                 const rowPhaseId = row.type === 'phase' ? row.id : row.phase?.id || row.data?.phaseId || null;
                                 const inSelectedPhase = !!selectedPhaseId && rowPhaseId === selectedPhaseId;
                                 const hasPhaseSeparator = phaseBoundaryRows.has(`${row.type}-${row.id}`);
+                                const isCriticalRow = row.type === 'phase'
+                                    ? criticalPhaseIds.has(row.id)
+                                    : criticalNodeIds.has(row.id);
                                 return (
                                     <div
                                         key={`col-${row.type}-${row.id}`}
-                                        className={`gantt-columns-row${isColSelected ? ' selected' : ''}${isColSelected && row.type !== 'phase' ? ' selected-emphasis' : ''}${isAdd ? ' gantt-columns-row--add' : ''} gantt-columns-row--${row.type}${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}`}
+                                        className={`gantt-columns-row${isColSelected ? ' selected' : ''}${isColSelected && row.type !== 'phase' ? ' selected-emphasis' : ''}${isAdd ? ' gantt-columns-row--add' : ''} gantt-columns-row--${row.type}${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}${isCriticalRow ? ' gantt-columns-row--critical' : ''}`}
                                         style={{ height: ROW_HEIGHT }}
                                     >
                                         {!isAdd && activeColumns.map((col) => {
@@ -1675,7 +2605,7 @@ export default function GanttChart({
                         </div>
 
                         {/* Body */}
-                        <div className="gantt-timeline-body">
+                        <div className="gantt-timeline-body" style={{ minHeight: timelineBodyHeight || ROW_HEIGHT }}>
                             {/* Grid lines (rendered once, spans full height) */}
                             <div className="gantt-grid-lines">
                                 {columns.map((col) => (
@@ -1692,11 +2622,47 @@ export default function GanttChart({
                                 <div className="gantt-today-line" style={{ left: todayPx }} />
                             )}
 
+                            {dependencySegments.length > 0 && (
+                                <svg
+                                    className="gantt-dependency-overlay"
+                                    width={totalWidth}
+                                    height={timelineBodyHeight || ROW_HEIGHT}
+                                    viewBox={`0 0 ${totalWidth} ${timelineBodyHeight || ROW_HEIGHT}`}
+                                    aria-hidden="true"
+                                >
+                                    <defs>
+                                        <marker
+                                            id="gantt-dependency-arrow"
+                                            markerWidth="8"
+                                            markerHeight="8"
+                                            refX="7"
+                                            refY="4"
+                                            orient="auto"
+                                            markerUnits="strokeWidth"
+                                        >
+                                            <path d="M 0 0 L 8 4 L 0 8 z" fill="currentColor" />
+                                        </marker>
+                                    </defs>
+                                    {dependencySegments.map((segment) => (
+                                        <path
+                                            key={segment.key}
+                                            className={`gantt-dependency-path${segment.critical ? ' gantt-dependency-path--critical' : ''}`}
+                                            d={`M ${segment.sourceX} ${segment.sourceY} H ${segment.elbowX} V ${segment.targetY} H ${segment.targetX}`}
+                                            markerEnd="url(#gantt-dependency-arrow)"
+                                            style={{ color: segment.critical ? 'var(--purple-600)' : '#64748b' }}
+                                        />
+                                    ))}
+                                </svg>
+                            )}
+
                             {/* Rows with bars */}
                             {rows.map((row) => {
                                 const rowPhaseId = row.type === 'phase' ? row.id : row.phase?.id || row.data?.phaseId || null;
                                 const inSelectedPhase = !!selectedPhaseId && rowPhaseId === selectedPhaseId;
                                 const hasPhaseSeparator = phaseBoundaryRows.has(`${row.type}-${row.id}`);
+                                const isCriticalRow = row.type === 'phase'
+                                    ? criticalPhaseIds.has(row.id)
+                                    : criticalNodeIds.has(row.id);
 
                                 // "Add" rows have no bar — just an empty spacer row
                                 if (row.type === 'add-phase' || row.type === 'add-task' || row.type === 'add-subtask') {
@@ -1709,6 +2675,7 @@ export default function GanttChart({
                                     );
                                 }
 
+                                const rowKey = `${row.type}-${row.id}`;
                                 const bar = getBarData(row);
                                 const baselineBar = showBaselines ? getBaselineBarData(row) : null;
                                 const isSelected = selected?.type === row.type && selected?.id === row.id;
@@ -1716,7 +2683,7 @@ export default function GanttChart({
                                 return (
                                     <div
                                         key={`tl-${row.type}-${row.id}`}
-                                        className={`gantt-timeline-row${isSelected ? ' selected' : ''}${isSelected && row.type !== 'phase' ? ' selected-emphasis' : ''}${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}`}
+                                        className={`gantt-timeline-row${isSelected ? ' selected' : ''}${isSelected && row.type !== 'phase' ? ' selected-emphasis' : ''}${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}${isCriticalRow ? ' gantt-timeline-row--critical' : ''}`}
                                         style={{ height: ROW_HEIGHT }}
                                         onClick={() => handleSelect(row.type, row.data, row.phase, row.parentTask)}
                                     >
@@ -1730,12 +2697,16 @@ export default function GanttChart({
                                         )}
                                         {bar && (
                                             <div
-                                                className={`gantt-bar gantt-bar--${row.type} gantt-bar--${bar.status}${bar.isMilestone ? ' gantt-bar--milestone' : ''}`}
+                                                className={`gantt-bar gantt-bar--${row.type} gantt-bar--${bar.status}${bar.isMilestone ? ' gantt-bar--milestone' : ''}${isCriticalRow ? ' gantt-bar--critical' : ''}`}
                                                 style={{ left: bar.left, width: bar.width }}
-                                                title={getBarTooltip(row)}
+                                                ref={setBarRef(rowKey)}
+                                                aria-label={getBarTooltip(row)}
+                                                onMouseEnter={(event) => handlePreviewMouseEnter(row, event)}
+                                                onMouseLeave={() => handlePreviewMouseLeave(row)}
+                                                onClick={(event) => handlePreviewClick(row, event)}
                                             >
                                                 {/* Show label inside bar if wide enough */}
-                                                {bar.width > 60 && row.type !== 'phase' && (
+                                                {bar.width > 60 && (
                                                     <span className="gantt-bar-label">{row.data.title}</span>
                                                 )}
                                             </div>
@@ -1755,6 +2726,122 @@ export default function GanttChart({
                         </div>
                     </div>
                 </div>
+
+                {preview && previewData && preview.position && (
+                    <div
+                        ref={previewPopoverRef}
+                        className={`gantt-preview-popover gantt-preview-popover--${preview.position.placement}`}
+                        style={{
+                            left: `${preview.position.left}px`,
+                            top: `${preview.position.top}px`,
+                            width: `${preview.position.width}px`,
+                        }}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="gantt-preview-header">
+                            <div className="gantt-preview-heading">
+                                <span className="gantt-preview-kind">{previewData.kindLabel}</span>
+                                <h4 className="gantt-preview-title">{previewData.title}</h4>
+                            </div>
+                            <button
+                                type="button"
+                                className="gantt-preview-close"
+                                onClick={() => setPreview(null)}
+                                aria-label="Close schedule preview"
+                            >
+                                <X size={12} />
+                            </button>
+                        </div>
+
+                        <div className="gantt-preview-meta">
+                            <span className="gantt-preview-pill">{previewData.statusLabel}</span>
+                            <span className="gantt-preview-pill">Priority: {previewData.priorityLabel}</span>
+                            {previewData.isCritical && (
+                                <span className="gantt-preview-pill gantt-preview-pill--critical">Critical path</span>
+                            )}
+                        </div>
+
+                        <div className="gantt-preview-dates">
+                            <div className="gantt-preview-date-card">
+                                <span>Start</span>
+                                <strong>{formatPreviewDateTime(previewData.baseRange.start || previewData.window?.start)}</strong>
+                            </div>
+                            <div className="gantt-preview-date-card">
+                                <span>End</span>
+                                <strong>{formatPreviewDateTime(previewData.baseRange.end || previewData.window?.end)}</strong>
+                            </div>
+                        </div>
+
+                        <div className="gantt-preview-summary">
+                            {previewData.slots.length} slot{previewData.slots.length === 1 ? '' : 's'} across {previewData.groups.length} member{previewData.groups.length === 1 ? '' : 's'}
+                        </div>
+
+                        <div className="gantt-preview-schedule">
+                            {previewTimeline ? (
+                                <>
+                                    <div className="gantt-preview-schedule-header">
+                                        <span>{formatPreviewDateTime(previewTimeline.start)}</span>
+                                        <span>{formatPreviewDateTime(previewTimeline.end)}</span>
+                                    </div>
+
+                                    {previewData.hasSlots ? (
+                                        <div className="gantt-preview-member-list">
+                                            {previewData.groups.map((group) => (
+                                                <div className="gantt-preview-member-row" key={group.key}>
+                                                    <div className="gantt-preview-member-info">
+                                                        <span className="gantt-preview-member-avatar">
+                                                            {group.member?.profilePhotoUrl ? (
+                                                                <img src={getProfilePhotoUrl(group.member.id)} alt={group.member.fullName || 'Member'} />
+                                                            ) : (
+                                                                (group.member?.fullName || '?').charAt(0).toUpperCase()
+                                                            )}
+                                                        </span>
+                                                        <div className="gantt-preview-member-copy">
+                                                            <strong>{group.member?.fullName || 'Unknown member'}</strong>
+                                                            <span>{group.slots.length} slot{group.slots.length === 1 ? '' : 's'}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="gantt-preview-track">
+                                                        <div className="gantt-preview-track-grid" />
+                                                        {group.slots.map((slot) => {
+                                                            const slotStart = getDateOrNull(slot.startDateTime);
+                                                            const slotEnd = getDateOrNull(slot.endDateTime);
+                                                            if (!slotStart || !slotEnd) return null;
+
+                                                            const left = previewTimeline.toPercent(slot.startDateTime);
+                                                            const right = previewTimeline.toPercent(slot.endDateTime);
+                                                            const width = Math.max(4, right - left);
+                                                            const label = slot.title || slot.task?.title || 'Time slot';
+
+                                                            return (
+                                                                <div
+                                                                    key={slot.id}
+                                                                    className={`gantt-preview-slot${slot.isActive === false ? ' gantt-preview-slot--inactive' : ''}`}
+                                                                    style={{ left: `${left}%`, width: `${width}%` }}
+                                                                    title={formatPreviewRange(slot.startDateTime, slot.endDateTime)}
+                                                                >
+                                                                    <span className="gantt-preview-slot-title">{label}</span>
+                                                                    <span className="gantt-preview-slot-time">
+                                                                        {formatPreviewClock(slot.startDateTime)} - {formatPreviewClock(slot.endDateTime)}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="gantt-preview-empty">No schedule slots available for this item.</div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="gantt-preview-empty">No schedule window available.</div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -2,6 +2,12 @@
 const router = express.Router();
 const { prisma } = require('../db');
 const { recomputeProjectWbs } = require('../services/wbsService');
+const {
+    collectChangedFields,
+    changesToPayload,
+    logTaskAndProjectActivity,
+    summarizeChanges,
+} = require('../services/activityLogService');
 
 const ADMINISTRATION_TEAM_NAME = 'Administration';
 
@@ -135,16 +141,21 @@ async function syncParentTaskStatus(taskId, memberId) {
 /**
  * Log a task activity event in the TaskActivityLog.
  */
-async function logActivity(taskId, memberId, actionType, { oldValue, newValue, description } = {}) {
-    await prisma.taskActivityLog.create({
-        data: {
-            taskId,
-            memberId,
-            actionType,
-            oldValue: oldValue !== undefined ? String(oldValue) : null,
-            newValue: newValue !== undefined ? String(newValue) : null,
-            description: description || null,
-        },
+async function logActivity(taskId, memberId, actionType, { oldValue, newValue, description, projectId, entityType } = {}) {
+    const task = entityType ? null : await prisma.task.findUnique({
+        where: { id: taskId },
+        select: { projectId: true, parentTaskId: true },
+    });
+
+    await logTaskAndProjectActivity({
+        taskId,
+        projectId: projectId ?? task?.projectId,
+        memberId,
+        actionType,
+        oldValue,
+        newValue,
+        description,
+        entityType: entityType ?? (task?.parentTaskId ? 'SUBTASK' : 'TASK'),
     });
 }
 
@@ -262,6 +273,12 @@ router.get('/:id', async (req, res) => {
                     },
                     orderBy: { createdAt: 'asc' },
                 },
+                activityLog: {
+                    include: {
+                        member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+                    },
+                    orderBy: { createdAt: 'desc' },
+                },
                 tags: true,
                 dependencies: {
                     include: {
@@ -272,6 +289,13 @@ router.get('/:id', async (req, res) => {
                     include: {
                         task: { select: { id: true, title: true, status: true } },
                     },
+                },
+                scheduleSlots: {
+                    include: {
+                        member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+                        createdBy: { select: { id: true, fullName: true } },
+                    },
+                    orderBy: { startDateTime: 'asc' },
                 },
             },
         });
@@ -404,7 +428,31 @@ router.put('/:id', async (req, res) => {
             return res.status(403).json({ error: 'Edit access denied' });
         }
 
-        const old = await prisma.task.findUnique({ where: { id }, select: { status: true } });
+        const before = await prisma.task.findUnique({
+            where: { id },
+            select: {
+                title: true,
+                description: true,
+                type: true,
+                priority: true,
+                status: true,
+                difficulty: true,
+                phaseId: true,
+                parentTaskId: true,
+                order: true,
+                startDate: true,
+                dueDate: true,
+                completedDate: true,
+                estimatedHours: true,
+                actualHours: true,
+                assignments: { select: { memberId: true } },
+            },
+        });
+
+        const normalizedBefore = {
+            ...before,
+            assigneeIds: (before?.assignments || []).map((assignment) => assignment.memberId).sort((a, b) => a - b),
+        };
 
         const {
             title,
@@ -418,6 +466,7 @@ router.put('/:id', async (req, res) => {
             completedDate,
             estimatedHours,
             actualHours,
+            assigneeIds,
         } = req.body;
 
         const data = {};
@@ -431,19 +480,19 @@ router.put('/:id', async (req, res) => {
         if (req.body.order !== undefined) data.order = parseInt(req.body.order);
         if (status !== undefined) {
             data.status = status;
-            if (status === 'COMPLETED' && !completedDate) data.completedDate = new Date();
-            else if (status !== 'COMPLETED') data.completedDate = null;
+            if (status === 'COMPLETED') {
+                data.completedDate = completedDate ? new Date(completedDate) : new Date();
+            } else {
+                data.completedDate = null;
+            }
         }
         if (startDate !== undefined) data.startDate = startDate ? new Date(startDate) : null;
         if (dueDate !== undefined) data.dueDate = dueDate ? new Date(dueDate) : null;
         if (completedDate !== undefined) data.completedDate = completedDate ? new Date(completedDate) : null;
-        if (estimatedHours !== undefined) data.estimatedHours = estimatedHours ? parseFloat(estimatedHours) : null;
-        if (actualHours !== undefined) data.actualHours = actualHours ? parseFloat(actualHours) : null;
+        if (estimatedHours !== undefined) data.estimatedHours = estimatedHours !== '' && estimatedHours !== null ? parseFloat(estimatedHours) : null;
+        if (actualHours !== undefined) data.actualHours = actualHours !== '' && actualHours !== null ? parseFloat(actualHours) : null;
 
-        // Sync assignees if provided
-        const { assigneeIds } = req.body;
         if (assigneeIds !== undefined) {
-            // Remove existing assignments and re-create
             await prisma.taskAssignment.deleteMany({ where: { taskId: id } });
             if (assigneeIds.length > 0) {
                 await prisma.taskAssignment.createMany({
@@ -473,11 +522,48 @@ router.put('/:id', async (req, res) => {
             },
         });
 
-        if (status !== undefined && old && old.status !== status) {
-            await logActivity(id, req.user.memberId, 'STATUS_CHANGED', {
-                oldValue: old.status,
-                newValue: status,
-                description: `Status changed from ${old.status} to ${status}`,
+        const after = {
+            title: task.title,
+            description: task.description,
+            type: task.type,
+            priority: task.priority,
+            status: task.status,
+            difficulty: task.difficulty,
+            phaseId: task.phaseId,
+            parentTaskId: task.parentTaskId,
+            order: task.order,
+            startDate: task.startDate,
+            dueDate: task.dueDate,
+            completedDate: task.completedDate,
+            estimatedHours: task.estimatedHours,
+            actualHours: task.actualHours,
+            assigneeIds: (task.assignments || []).map((assignment) => assignment.memberId).sort((a, b) => a - b),
+        };
+
+        const changes = collectChangedFields(normalizedBefore || {}, after, {
+            title: 'title',
+            description: 'description',
+            type: 'type',
+            priority: 'priority',
+            status: 'status',
+            difficulty: 'difficulty',
+            phaseId: 'phase',
+            parentTaskId: 'parent task',
+            order: 'order',
+            startDate: 'start date',
+            dueDate: 'due date',
+            completedDate: 'completed date',
+            estimatedHours: 'estimated hours',
+            actualHours: 'actual hours',
+            assigneeIds: 'assignees',
+        });
+
+        if (changes.length > 0) {
+            const { oldValue, newValue } = changesToPayload(changes);
+            await logActivity(id, req.user.memberId, 'UPDATED', {
+                oldValue,
+                newValue,
+                description: summarizeChanges(changes) || `Task "${task.title}" updated`,
             });
         }
 
@@ -543,8 +629,19 @@ router.delete('/:id', async (req, res) => {
         if (!canUserEditTask(req)) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
-        // Fetch projectId before deleting
-        const taskToDelete = await prisma.task.findUnique({ where: { id }, select: { projectId: true } });
+        // Fetch task details before deleting so the project timeline keeps the removal event.
+        const taskToDelete = await prisma.task.findUnique({
+            where: { id },
+            select: { projectId: true, title: true, parentTaskId: true },
+        });
+        if (!taskToDelete) return res.status(404).json({ error: 'Task not found' });
+
+        await logActivity(id, req.user.memberId, 'DELETED', {
+            projectId: taskToDelete.projectId,
+            entityType: taskToDelete.parentTaskId ? 'SUBTASK' : 'TASK',
+            description: `${taskToDelete.parentTaskId ? 'Subtask' : 'Task'} "${taskToDelete.title}" deleted`,
+        });
+
         await prisma.task.delete({ where: { id } });
 
         // Recompute WBS codes for the project
@@ -616,7 +713,7 @@ router.post('/:id/duplicate', async (req, res) => {
 
         // Copy subtasks
         for (const sub of source.subtasks) {
-            await prisma.task.create({
+            const copiedSubtask = await prisma.task.create({
                 data: {
                     projectId: sub.projectId,
                     parentTaskId: newTask.id,
@@ -631,6 +728,10 @@ router.post('/:id/duplicate', async (req, res) => {
                     dueDate: sub.dueDate,
                     estimatedHours: sub.estimatedHours,
                 },
+            });
+
+            await logActivity(copiedSubtask.id, req.user.memberId, 'CREATED', {
+                description: `Subtask "${copiedSubtask.title}" duplicated from task #${sourceId}`,
             });
         }
 
@@ -827,6 +928,12 @@ router.patch('/:id/assign/:memberId', async (req, res) => {
             },
         });
 
+        await logActivity(taskId, req.user.memberId, 'ASSIGNMENT_STATUS_CHANGED', {
+            oldValue: null,
+            newValue: status,
+            description: `Assignment for member ${memberId} changed to ${status}`,
+        });
+
         res.json(assignment);
     } catch (error) {
         console.error('PATCH /tasks/:id/assign/:memberId', error);
@@ -942,6 +1049,12 @@ router.put('/:id/comments/:commentId', async (req, res) => {
             },
         });
 
+        await logActivity(taskId, req.user.memberId, 'COMMENT_EDITED', {
+            oldValue: existing.comment,
+            newValue: comment.trim(),
+            description: `Comment #${commentId} edited`,
+        });
+
         res.json(updated);
     } catch (error) {
         console.error('PUT /tasks/:id/comments/:commentId', error);
@@ -962,6 +1075,11 @@ router.delete('/:id/comments/:commentId', async (req, res) => {
         if (existing.memberId !== req.user.memberId && !(await isAdmin(req))) {
             return res.status(403).json({ error: 'Can only delete your own comments' });
         }
+
+        await logActivity(existing.taskId, req.user.memberId, 'COMMENT_DELETED', {
+            oldValue: existing.comment,
+            description: `Comment #${commentId} deleted`,
+        });
 
         await prisma.taskComment.delete({ where: { id: commentId } });
         res.json({ message: 'Comment deleted' });
@@ -1065,6 +1183,11 @@ router.post('/:id/dependencies', async (req, res) => {
             },
         });
 
+        await logActivity(taskId, req.user.memberId, 'DEPENDENCY_ADDED', {
+            newValue: { dependsOnTaskId: parseInt(dependsOnTaskId), dependencyType },
+            description: `Dependency added on task #${dependsOnTaskId}`,
+        });
+
         res.status(201).json(dep);
     } catch (error) {
         console.error('POST /tasks/:id/dependencies', error);
@@ -1082,6 +1205,11 @@ router.delete('/:id/dependencies/:dependsOnTaskId', async (req, res) => {
         if (!canUserEditTask(req)) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
+
+        await logActivity(taskId, req.user.memberId, 'DEPENDENCY_REMOVED', {
+            oldValue: { dependsOnTaskId },
+            description: `Dependency removed from task #${dependsOnTaskId}`,
+        });
 
         await prisma.taskDependency.delete({
             where: { taskId_dependsOnTaskId: { taskId, dependsOnTaskId } },

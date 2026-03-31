@@ -98,6 +98,32 @@
     box-shadow: var(--shadow-md);
 }
 
+.icon-btn.activity-btn,
+.icon-btn.history-btn {
+    color: #ff571f;
+}
+
+.icon-btn.activity-btn:hover,
+.icon-btn.history-btn:hover {
+    background: #ff571f;
+    color: white;
+    transform: scale(1.05);
+    box-shadow: var(--shadow-md);
+}
+
+.icon-btn.schedule-btn,
+.icon-btn.time-slot-btn {
+    color: #0097b2;
+}
+
+.icon-btn.schedule-btn:hover,
+.icon-btn.time-slot-btn:hover {
+    background: #0097b2;
+    color: #0f172a;
+    transform: scale(1.05);
+    box-shadow: var(--shadow-md);
+}
+
 .icon-btn.finalize-btn {
     color: #16a34a;
 }

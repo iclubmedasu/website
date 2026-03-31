@@ -14,6 +14,7 @@ import {
     CheckCircle,
     Archive,
     PlayCircle,
+    History,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { projectsAPI, tasksAPI, teamsAPI, membersAPI, phasesAPI, projectTypesAPI, projectFilesAPI, getProfilePhotoUrl } from '../../services/api';
@@ -34,11 +35,16 @@ import HoldProjectModal from './modals/HoldProjectModal';
 import AbortProjectModal from './modals/AbortProjectModal';
 import FinalizeProjectModal from './modals/FinalizeProjectModal';
 import ArchiveProjectModal from './modals/ArchiveProjectModal';
+import ReactivateProjectModal from './modals/ReactivateProjectModal';
 import AddPhaseModal from './modals/AddPhaseModal';
 import AddTaskModal from './modals/AddTaskModal';
 import EditTaskModal from './modals/EditTaskModal';
+import TaskCommentsModal from './modals/TaskCommentsModal';
+import TaskScheduleSlotsModal from './modals/TaskScheduleSlotsModal';
+import TaskActivityModal from './modals/TaskActivityModal';
 import EditPhaseModal from './modals/EditPhaseModal';
 import DeletePhaseTaskModal from './modals/DeletePhaseTaskModal';
+import ProjectActivityModal from './modals/ProjectActivityModal';
 import PhaseRow from './components/PhaseRow';
 import GanttChart from './components/GanttChart';
 
@@ -294,7 +300,7 @@ function TaskItem({ task, canEdit, onStatusChange, onAddSubtask }) {
 // ─────────────────────────────────────────────────────────
 //  Project Card with Expandable Detail
 // ─────────────────────────────────────────────────────────
-function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, onEdit, onDeactivate, onFinalize, onArchive, onReactivate, onAbort, onPublish, onRefreshDetail, allMembers, canEdit, canManage, canUpload, canEditStructure, canEditStatus }) {
+function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, onEdit, onDeactivate, onFinalize, onArchive, onReactivate, onAbort, onPublish, onRefreshDetail, onViewActivity, allMembers, canEdit, canManage, canUpload, canEditStructure, canEditStatus }) {
     const { user } = useAuth();
 
     // Local copy of detail for optimistic inline updates (avoids full refresh & scroll reset)
@@ -349,6 +355,9 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
     const [showAddPhase, setShowAddPhase] = useState(false);
     const [addTaskTarget, setAddTaskTarget] = useState(null); // { phaseId, parentTask? }
     const [editTaskTarget, setEditTaskTarget] = useState(null); // task object to edit
+    const [taskCommentsTarget, setTaskCommentsTarget] = useState(null);
+    const [taskScheduleTarget, setTaskScheduleTarget] = useState(null);
+    const [taskActivityTarget, setTaskActivityTarget] = useState(null);
     const [editPhaseTarget, setEditPhaseTarget] = useState(null); // phase object to edit
     const [confirmDeletePhase, setConfirmDeletePhase] = useState(null); // phase object to delete
 
@@ -373,15 +382,13 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
                         {lifecycleBadge.label}
                     </span>
                     {project.isFinalized && canManage && (
-                        <>
-                            <button
-                                className="icon-btn archive-btn"
-                                title="Archive project"
-                                onClick={(e) => { e.stopPropagation(); onArchive(project); }}
-                            >
-                                <Archive size={14} />
-                            </button>
-                        </>
+                        <button
+                            className="icon-btn archive-btn"
+                            title="Archive project"
+                            onClick={(e) => { e.stopPropagation(); onArchive(project); }}
+                        >
+                            <Archive size={14} />
+                        </button>
                     )}
                     {canEdit && !project.isFinalized && project.isActive && project.status !== 'CANCELLED' && (
                         <>
@@ -449,6 +456,13 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
                             <Archive size={14} />
                         </button>
                     )}
+                    <button
+                        className="icon-btn activity-btn"
+                        title="View activity"
+                        onClick={(e) => { e.stopPropagation(); onViewActivity(project); }}
+                    >
+                        <History size={14} />
+                    </button>
                 </>
             )}
             collapsedFooterTrailing={(
@@ -472,39 +486,72 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
                 </span>
             )}
             expandedActions={detail ? (
-                detail.isFinalized ? (
-                    canManage && (
+                <>
+                    {detail.isFinalized ? (
+                        canManage && (
+                            <div className="expanded-title-actions">
+                                <button
+                                    className="icon-btn archive-btn icon-btn--text"
+                                    onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
+                                >
+                                    <Archive size={13} />
+                                    Archive
+                                </button>
+                            </div>
+                        )
+                    ) : detail.status === 'CANCELLED' ? (
+                        canManage && !detail.isArchived && (
+                            <div className="expanded-title-actions">
+                                <button
+                                    className="icon-btn archive-btn icon-btn--text"
+                                    onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
+                                >
+                                    <Archive size={13} />
+                                    Archive
+                                </button>
+                            </div>
+                        )
+                    ) : detail.isActive === false ? (
+                        canManage && !detail.isArchived && (
+                            <div className="expanded-title-actions">
+                                <button
+                                    className="icon-btn reactivate-btn icon-btn--text"
+                                    onClick={(e) => { e.stopPropagation(); onReactivate(detail); }}
+                                >
+                                    <PlayCircle size={13} />
+                                    Reactivate
+                                </button>
+                                <button
+                                    className="icon-btn deactivate-btn icon-btn--text"
+                                    onClick={(e) => { e.stopPropagation(); onAbort(detail); }}
+                                >
+                                    <AlertCircle size={13} />
+                                    Abort
+                                </button>
+                                <button
+                                    className="icon-btn finalize-btn icon-btn--text"
+                                    onClick={(e) => { e.stopPropagation(); onFinalize(detail); }}
+                                >
+                                    <CheckSquare size={13} />
+                                    Finalize
+                                </button>
+                            </div>
+                        )
+                    ) : canEdit && (
                         <div className="expanded-title-actions">
                             <button
-                                className="icon-btn archive-btn icon-btn--text"
-                                onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
+                                className="icon-btn edit-btn icon-btn--text"
+                                onClick={(e) => { e.stopPropagation(); onEdit(detail); }}
                             >
-                                <Archive size={13} />
-                                Archive
+                                <Pencil size={13} />
+                                Edit Project
                             </button>
-                        </div>
-                    )
-                ) : detail.status === 'CANCELLED' ? (
-                    canManage && !detail.isArchived && (
-                        <div className="expanded-title-actions">
                             <button
-                                className="icon-btn archive-btn icon-btn--text"
-                                onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
+                                className="icon-btn hold-btn icon-btn--text"
+                                onClick={(e) => { e.stopPropagation(); onDeactivate(detail); }}
                             >
-                                <Archive size={13} />
-                                Archive
-                            </button>
-                        </div>
-                    )
-                ) : detail.isActive === false ? (
-                    canManage && !detail.isArchived && (
-                        <div className="expanded-title-actions">
-                            <button
-                                className="icon-btn reactivate-btn icon-btn--text"
-                                onClick={(e) => { e.stopPropagation(); onReactivate(detail); }}
-                            >
-                                <PlayCircle size={13} />
-                                Reactivate
+                                <PauseCircle size={13} />
+                                Hold
                             </button>
                             <button
                                 className="icon-btn deactivate-btn icon-btn--text"
@@ -521,39 +568,19 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
                                 Finalize
                             </button>
                         </div>
-                    )
-                ) : canEdit && (
-                    <div className="expanded-title-actions">
-                        <button
-                            className="icon-btn edit-btn icon-btn--text"
-                            onClick={(e) => { e.stopPropagation(); onEdit(detail); }}
-                        >
-                            <Pencil size={13} />
-                            Edit Project
-                        </button>
-                        <button
-                            className="icon-btn hold-btn icon-btn--text"
-                            onClick={(e) => { e.stopPropagation(); onDeactivate(detail); }}
-                        >
-                            <PauseCircle size={13} />
-                            Hold
-                        </button>
-                        <button
-                            className="icon-btn deactivate-btn icon-btn--text"
-                            onClick={(e) => { e.stopPropagation(); onAbort(detail); }}
-                        >
-                            <AlertCircle size={13} />
-                            Abort
-                        </button>
-                        <button
-                            className="icon-btn finalize-btn icon-btn--text"
-                            onClick={(e) => { e.stopPropagation(); onFinalize(detail); }}
-                        >
-                            <CheckSquare size={13} />
-                            Finalize
-                        </button>
-                    </div>
-                )
+                    )}
+                    {onViewActivity && (
+                        <div className="expanded-title-actions">
+                            <button
+                                className="icon-btn activity-btn icon-btn--text"
+                                onClick={(e) => { e.stopPropagation(); onViewActivity(detail); }}
+                            >
+                                <History size={13} />
+                                View activity
+                            </button>
+                        </div>
+                    )}
+                </>
             ) : null}
             teamEmptyMessage="No teams assigned"
             formatAssignedTeamSuffix={(pt) => `${pt.isOwner ? ' ★' : ''}${!pt.canEdit ? ' (view)' : ''}`}
@@ -563,6 +590,7 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
                         <GanttChart
                             phases={detail.phases || []}
                             projectId={detail.id}
+                            projectDetail={detail}
                             projectStartDate={detail.startDate}
                             projectDueDate={detail.dueDate}
                             canEdit={canEditStructure}
@@ -572,6 +600,9 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
                             onAddSubtask={(phase, parentTask) => setAddTaskTarget({ phaseId: phase.id, parentTask })}
                             onEditPhase={(phase) => setEditPhaseTarget(phase)}
                             onEditTask={(task) => setEditTaskTarget(task)}
+                            onOpenTaskComments={(task) => setTaskCommentsTarget(task)}
+                            onOpenTaskScheduleSlots={(task) => setTaskScheduleTarget(task)}
+                            onOpenTaskActivity={(task) => setTaskActivityTarget(task)}
                             onDeletePhase={(phase) => setConfirmDeletePhase(phase)}
                             onRefresh={() => onRefreshDetail(detail.id)}
                         />
@@ -645,9 +676,32 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
                     {editTaskTarget && (
                         <EditTaskModal
                             task={editTaskTarget}
+                            projectDetail={detail}
                             allMembers={allMembers}
                             onClose={() => setEditTaskTarget(null)}
                             onTaskUpdated={() => { setEditTaskTarget(null); onRefreshDetail(detail.id); }}
+                        />
+                    )}
+
+                    {taskCommentsTarget && (
+                        <TaskCommentsModal
+                            task={taskCommentsTarget}
+                            onClose={() => setTaskCommentsTarget(null)}
+                        />
+                    )}
+
+                    {taskScheduleTarget && (
+                        <TaskScheduleSlotsModal
+                            task={taskScheduleTarget}
+                            allMembers={allMembers}
+                            onClose={() => setTaskScheduleTarget(null)}
+                        />
+                    )}
+
+                    {taskActivityTarget && (
+                        <TaskActivityModal
+                            task={taskActivityTarget}
+                            onClose={() => setTaskActivityTarget(null)}
                         />
                     )}
                 </>
@@ -709,6 +763,7 @@ export default function ProjectsPage() {
     const [reactivatingProject, setReactivatingProject] = useState(null);
     const [abortingProject, setAbortingProject] = useState(null);
     const [publishingProject, setPublishingProject] = useState(null);
+    const [activityProject, setActivityProject] = useState(null);
 
     // ── Load all supporting data ──
     useEffect(() => {
@@ -967,6 +1022,7 @@ export default function ProjectsPage() {
                                 onReactivate={(proj) => setReactivatingProject(proj)}
                                 onAbort={(proj) => setAbortingProject(proj)}
                                 onPublish={(proj) => setPublishingProject(proj)}
+                                onViewActivity={(proj) => setActivityProject(proj)}
                             />
                         ))}
                         {canCreateProject && currentPage === 1 && (
@@ -1108,6 +1164,13 @@ export default function ProjectsPage() {
                     project={archivingProject}
                     onClose={() => setArchivingProject(null)}
                     onArchived={handleProjectArchived}
+                />
+            )}
+
+            {activityProject && (
+                <ProjectActivityModal
+                    project={activityProject}
+                    onClose={() => setActivityProject(null)}
                 />
             )}
 

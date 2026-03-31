@@ -1267,11 +1267,21 @@
 }
 
 .timeline-line {
-    width: 2px;
+    width: 10px;
     flex: 1;
-    background: linear-gradient(to bottom, var(--purple-700), var(--gray-200));
-    margin-top: 0.5rem;
+    background: var(--purple-700);
+    margin-top: 0.45rem;
     min-height: 2.5rem;
+    clip-path: polygon(45% 0, 55% 0, 82% 100%, 18% 100%);
+    border-radius: 999px;
+}
+
+.timeline-line--ascending {
+    clip-path: polygon(18% 0, 82% 0, 55% 100%, 45% 100%);
+}
+
+.timeline-line--descending {
+    clip-path: polygon(45% 0, 55% 0, 82% 100%, 18% 100%);
 }
 
 /* Change type dot color variations — dot uses badge TEXT color for a bold fill */
@@ -1411,6 +1421,195 @@
     font-size: 0.813rem;
     color: var(--gray-500);
     font-weight: 500;
+}
+
+.activity-actor-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.activity-actor {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    color: var(--gray-700);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.activity-actor-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gray-100);
+    color: var(--gray-500);
+    flex-shrink: 0;
+}
+
+.activity-actor-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.activity-entity-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.55rem;
+    border-radius: var(--radius-sm);
+    background: rgba(122, 71, 163, 0.08);
+    color: var(--purple-700);
+    font-size: 0.688rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.activity-ref-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.activity-ref-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.55rem;
+    border-radius: var(--radius-sm);
+    background: var(--gray-100);
+    color: var(--gray-700);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.activity-description {
+    margin: 0 0 0.75rem;
+    color: var(--gray-800);
+    line-height: 1.55;
+}
+
+.activity-diff-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.activity-diff-card {
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+    border: 1px solid var(--gray-200);
+    background: var(--gray-50);
+}
+
+.activity-diff-card--old {
+    border-color: rgba(220, 38, 38, 0.16);
+    background: rgba(220, 38, 38, 0.04);
+}
+
+.activity-diff-card--new {
+    border-color: rgba(16, 185, 129, 0.16);
+    background: rgba(16, 185, 129, 0.04);
+}
+
+.activity-diff-label {
+    margin-bottom: 0.35rem;
+    font-size: 0.688rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--gray-500);
+}
+
+.activity-diff-value {
+    font-size: 0.875rem;
+    color: var(--gray-900);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.project-slot-grid {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.project-slot-card {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 0.85rem;
+    background: var(--gray-50);
+}
+
+.project-slot-card--inactive {
+    opacity: 0.72;
+}
+
+.project-slot-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.7rem;
+    flex-wrap: wrap;
+}
+
+.project-slot-card-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+.project-slot-state {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(122, 71, 163, 0.08);
+    color: var(--purple-700);
+    font-size: 0.688rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.project-slot-card-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.875rem;
+    color: var(--gray-700);
+    margin-bottom: 0.5rem;
+}
+
+.project-slot-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    object-fit: cover;
+    margin-left: auto;
+}
+
+.project-slot-task-link {
+    margin: 0.35rem 0 0.45rem;
+    font-size: 0.813rem;
+    color: var(--gray-500);
+}
+
+.project-slot-notes {
+    margin: 0.5rem 0 0;
+    color: var(--gray-700);
+    white-space: pre-wrap;
 }
 
 /* Role info */

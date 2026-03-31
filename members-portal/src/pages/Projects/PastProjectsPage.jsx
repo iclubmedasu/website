@@ -10,6 +10,7 @@ import {
     Paperclip,
     Archive,
     CheckCircle,
+    History,
     PlayCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -28,6 +29,7 @@ import ReactivateProjectModal from './modals/ReactivateProjectModal';
 import FinalizeProjectModal from './modals/FinalizeProjectModal';
 import ArchiveProjectModal from './modals/ArchiveProjectModal';
 import AbortProjectModal from './modals/AbortProjectModal';
+import ProjectActivityModal from './modals/ProjectActivityModal';
 import PhaseRow from './components/PhaseRow';
 
 // ─────────────────────────────────────────────────────────
@@ -113,7 +115,7 @@ const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 // ─────────────────────────────────────────────────────────
 //  Past-Project Card (read-only)
 // ─────────────────────────────────────────────────────────
-function PastProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, allMembers, onReactivate, onAbort, onFinalize, onPublish, onArchive }) {
+function PastProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, allMembers, onReactivate, onAbort, onFinalize, onPublish, onArchive, onViewActivity }) {
     const { user } = useAuth();
 
     const [projectFiles, setProjectFiles] = useState([]);
@@ -170,6 +172,13 @@ function PastProjectCard({ project, expanded, fullDetail, detailLoading, onToggl
                             <Archive size={14} />
                         </button>
                     )}
+                    <button
+                        className="icon-btn activity-btn"
+                        title="View activity"
+                        onClick={(e) => { e.stopPropagation(); onViewActivity(project); }}
+                    >
+                        <History size={14} />
+                    </button>
                 </>
             )}
             collapsedFooterTrailing={(
@@ -203,41 +212,52 @@ function PastProjectCard({ project, expanded, fullDetail, detailLoading, onToggl
                 </>
             )}
             expandedActions={(
-                inactive ? (
+                <>
+                    {inactive ? (
+                        <div className="expanded-title-actions">
+                            <button
+                                className="icon-btn reactivate-btn icon-btn--text"
+                                onClick={(e) => { e.stopPropagation(); onReactivate(detail); }}
+                            >
+                                <PlayCircle size={13} />
+                                Reactivate
+                            </button>
+                            <button
+                                className="icon-btn finalize-btn icon-btn--text"
+                                onClick={(e) => { e.stopPropagation(); onFinalize(detail); }}
+                            >
+                                <CheckSquare size={13} />
+                                Finalize
+                            </button>
+                            <button
+                                className="icon-btn deactivate-btn icon-btn--text"
+                                onClick={(e) => { e.stopPropagation(); onAbort(detail); }}
+                            >
+                                <AlertCircle size={13} />
+                                Abort
+                            </button>
+                        </div>
+                    ) : aborted && !project.isArchived ? (
+                        <div className="expanded-title-actions">
+                            <button
+                                className="icon-btn archive-btn icon-btn--text"
+                                onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
+                            >
+                                <Archive size={13} />
+                                Archive
+                            </button>
+                        </div>
+                    ) : null}
                     <div className="expanded-title-actions">
                         <button
-                            className="icon-btn reactivate-btn icon-btn--text"
-                            onClick={(e) => { e.stopPropagation(); onReactivate(detail); }}
+                            className="icon-btn activity-btn icon-btn--text"
+                            onClick={(e) => { e.stopPropagation(); onViewActivity(detail); }}
                         >
-                            <PlayCircle size={13} />
-                            Reactivate
-                        </button>
-                        <button
-                            className="icon-btn finalize-btn icon-btn--text"
-                            onClick={(e) => { e.stopPropagation(); onFinalize(detail); }}
-                        >
-                            <CheckSquare size={13} />
-                            Finalize
-                        </button>
-                        <button
-                            className="icon-btn deactivate-btn icon-btn--text"
-                            onClick={(e) => { e.stopPropagation(); onAbort(detail); }}
-                        >
-                            <AlertCircle size={13} />
-                            Abort
+                            <History size={13} />
+                            View activity
                         </button>
                     </div>
-                ) : aborted && !project.isArchived ? (
-                    <div className="expanded-title-actions">
-                        <button
-                            className="icon-btn archive-btn icon-btn--text"
-                            onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
-                        >
-                            <Archive size={13} />
-                            Archive
-                        </button>
-                    </div>
-                ) : null
+                </>
             )}
             detailExtra={detail?.completedDate ? (
                 <div className="exp-date-item">
@@ -479,6 +499,7 @@ export default function PastProjectsPage() {
                                 onFinalize={(proj) => setActionProject({ type: 'finalize', project: proj })}
                                 onPublish={(proj) => setActionProject({ type: 'publish', project: proj })}
                                 onArchive={(proj) => setActionProject({ type: 'archive', project: proj })}
+                                onViewActivity={(proj) => setActionProject({ type: 'activity', project: proj })}
                             />
                         ))}
                     </div>
@@ -566,6 +587,13 @@ export default function PastProjectsPage() {
                         setActionProject(null);
                         handleLifecycleRefresh();
                     }}
+                />
+            )}
+
+            {actionProject?.type === 'activity' && (
+                <ProjectActivityModal
+                    project={actionProject.project}
+                    onClose={() => setActionProject(null)}
                 />
             )}
 
