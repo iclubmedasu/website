@@ -34,6 +34,7 @@ model Member {
   createdProjects     Project[]               // Projects created by this member
   taskAssignments     TaskAssignment[]        // Tasks assigned to this member
   taskComments        TaskComment[]           // Comments on tasks
+  projectFileComments ProjectFileComment[]    // Comments on project files
   taskActivityLog     TaskActivityLog[]       // Activity log entries
   projectActivityLog  ProjectActivityLog[]     // Project-level activity log entries
   scheduleSlots       ProjectScheduleSlot[]    // Time slots assigned to this member
@@ -607,10 +608,32 @@ model ProjectFile {
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   folder      ProjectFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
   uploadedBy  Member    @relation(fields: [uploadedByMemberId], references: [id])
+  comments    ProjectFileComment[]
 
   @@index([projectId])
   @@index([folderId])
   @@index([uploadedByMemberId])
+}
+
+// ============================================
+// PROJECT FILE COMMENTS - Discussion/notes on files
+// ============================================
+model ProjectFileComment {
+  id          Int       @id @default(autoincrement())
+  fileId      Int
+  memberId    Int
+  comment     String
+  isEdited    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  file        ProjectFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  member      Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([fileId])
+  @@index([memberId])
+  @@index([fileId, createdAt])
 }
 
 // ============================================

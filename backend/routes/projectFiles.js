@@ -5,6 +5,7 @@ const { Readable } = require('stream');
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../db');
 const githubStorage = require('../services/githubStorageService');
+const { logProjectActivity } = require('../services/activityLogService');
 
 const ADMINISTRATION_TEAM_NAME = 'Administration';
 
@@ -574,6 +575,179 @@ router.get('/:id/history', async (req, res) => {
     } catch (error) {
         console.error('GET /project-files/:id/history', error);
         res.status(500).json({ error: 'Failed to fetch file history' });
+    }
+});
+
+// ============================================
+// GET /api/project-files/:id/comments
+// Returns comments for a file
+// ============================================
+router.get('/:id/comments', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid file ID' });
+
+        const file = await prisma.projectFile.findUnique({
+            where: { id },
+            select: { id: true },
+        });
+        if (!file) return res.status(404).json({ error: 'File not found' });
+
+        const comments = await prisma.projectFileComment.findMany({
+            where: { fileId: id },
+            include: {
+                member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+            },
+            orderBy: { createdAt: 'asc' },
+        });
+
+        res.json(comments);
+    } catch (error) {
+        console.error('GET /project-files/:id/comments', error);
+        res.status(500).json({ error: 'Failed to fetch file comments' });
+    }
+});
+
+// ============================================
+// POST /api/project-files/:id/comments
+// Body: { comment }
+// ============================================
+router.post('/:id/comments', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid file ID' });
+
+        const file = await prisma.projectFile.findUnique({
+            where: { id },
+            select: { id: true, projectId: true, fileName: true },
+        });
+        if (!file) return res.status(404).json({ error: 'File not found' });
+
+        if (!req.user.memberId) return res.status(400).json({ error: 'memberId required' });
+
+        const { comment } = req.body;
+        if (!comment?.trim()) return res.status(400).json({ error: 'comment is required' });
+
+        const newComment = await prisma.projectFileComment.create({
+            data: {
+                fileId: id,
+                memberId: req.user.memberId,
+                comment: comment.trim(),
+            },
+            include: {
+                member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+            },
+        });
+
+        await logProjectActivity({
+            projectId: file.projectId,
+            memberId: req.user.memberId,
+            actionType: 'COMMENTED',
+            entityType: 'FILE',
+            newValue: comment.trim(),
+            description: `Comment added on file ${file.fileName}`,
+        });
+
+        res.status(201).json(newComment);
+    } catch (error) {
+        console.error('POST /project-files/:id/comments', error);
+        res.status(500).json({ error: 'Failed to add file comment' });
+    }
+});
+
+// ============================================
+// PUT /api/project-files/:id/comments/:commentId
+// Body: { comment }
+// ============================================
+router.put('/:id/comments/:commentId', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const commentId = parseInt(req.params.commentId);
+        if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid file ID' });
+        if (Number.isNaN(commentId)) return res.status(400).json({ error: 'Invalid comment ID' });
+
+        const file = await prisma.projectFile.findUnique({
+            where: { id },
+            select: { id: true, projectId: true, fileName: true },
+        });
+        if (!file) return res.status(404).json({ error: 'File not found' });
+
+        const existing = await prisma.projectFileComment.findFirst({
+            where: { id: commentId, fileId: id },
+        });
+        if (!existing) return res.status(404).json({ error: 'Comment not found' });
+
+        if (existing.memberId !== req.user.memberId && !canUserManageFiles(req)) {
+            return res.status(403).json({ error: 'Can only edit your own comments' });
+        }
+
+        const { comment } = req.body;
+        if (!comment?.trim()) return res.status(400).json({ error: 'comment is required' });
+
+        const updated = await prisma.projectFileComment.update({
+            where: { id: commentId },
+            data: { comment: comment.trim(), isEdited: true },
+            include: {
+                member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+            },
+        });
+
+        await logProjectActivity({
+            projectId: file.projectId,
+            memberId: req.user.memberId,
+            actionType: 'COMMENT_EDITED',
+            entityType: 'FILE',
+            oldValue: existing.comment,
+            newValue: comment.trim(),
+            description: `Comment #${commentId} edited on file ${file.fileName}`,
+        });
+
+        res.json(updated);
+    } catch (error) {
+        console.error('PUT /project-files/:id/comments/:commentId', error);
+        res.status(500).json({ error: 'Failed to edit file comment' });
+    }
+});
+
+// ============================================
+// DELETE /api/project-files/:id/comments/:commentId
+// ============================================
+router.delete('/:id/comments/:commentId', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const commentId = parseInt(req.params.commentId);
+        if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid file ID' });
+        if (Number.isNaN(commentId)) return res.status(400).json({ error: 'Invalid comment ID' });
+
+        const file = await prisma.projectFile.findUnique({
+            where: { id },
+            select: { id: true, projectId: true, fileName: true },
+        });
+        if (!file) return res.status(404).json({ error: 'File not found' });
+
+        const existing = await prisma.projectFileComment.findFirst({
+            where: { id: commentId, fileId: id },
+        });
+        if (!existing) return res.status(404).json({ error: 'Comment not found' });
+
+        if (existing.memberId !== req.user.memberId && !canUserManageFiles(req)) {
+            return res.status(403).json({ error: 'Can only delete your own comments' });
+        }
+
+        await logProjectActivity({
+            projectId: file.projectId,
+            memberId: req.user.memberId,
+            actionType: 'COMMENT_DELETED',
+            entityType: 'FILE',
+            oldValue: existing.comment,
+            description: `Comment #${commentId} deleted on file ${file.fileName}`,
+        });
+
+        await prisma.projectFileComment.delete({ where: { id: commentId } });
+        res.json({ message: 'Comment deleted' });
+    } catch (error) {
+        console.error('DELETE /project-files/:id/comments/:commentId', error);
+        res.status(500).json({ error: 'Failed to delete file comment' });
     }
 });
 

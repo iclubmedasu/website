@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     X,
     ChevronDown,
@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { projectsAPI, teamsAPI, membersAPI, projectTypesAPI, projectFilesAPI, getProfilePhotoUrl } from '../../services/api';
 import FileUploadZone from '../../components/FileUpload/FileUploadZone';
+import Dropdown from '../../components/dropdown/dropdown';
 import './ProjectsPage.css';
 import {
     fmtDate,
@@ -24,69 +25,13 @@ import {
     getLifecycleBadge,
     isProjectAborted,
     isProjectInactive,
-} from './components/ProjectCardView';
+} from './components/ProjectCardView/ProjectCardView';
+import GanttChart from './components/GanttChart/GanttChart';
 import ReactivateProjectModal from './modals/ReactivateProjectModal';
 import FinalizeProjectModal from './modals/FinalizeProjectModal';
 import ArchiveProjectModal from './modals/ArchiveProjectModal';
 import AbortProjectModal from './modals/AbortProjectModal';
 import ProjectActivityModal from './modals/ProjectActivityModal';
-import PhaseRow from './components/PhaseRow';
-
-// ─────────────────────────────────────────────────────────
-//  Filter Dropdown (same as ProjectsPage)
-// ─────────────────────────────────────────────────────────
-function FilterDropdown({ options, value, onChange, triggerLabel }) {
-    const [isOpen, setIsOpen] = useState(false);
-    const dropdownRef = useRef(null);
-
-    useEffect(() => {
-        const handleClickOutside = (e) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setIsOpen(false);
-        };
-        if (isOpen) document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isOpen]);
-
-    const selected = options.find((o) => String(o.value) === String(value)) || options[0];
-    const displayLabel = selected ? selected.label : triggerLabel;
-
-    return (
-        <div className="manage-roles-container" ref={dropdownRef}>
-            <div className="manage-roles-header">
-                <div
-                    className="manage-combobox-trigger"
-                    onClick={() => setIsOpen(!isOpen)}
-                    onKeyDown={(e) => e.key === 'Enter' && setIsOpen(!isOpen)}
-                    role="button"
-                    tabIndex={0}
-                    aria-expanded={isOpen}
-                    aria-haspopup="listbox"
-                >
-                    <span className="manage-combobox-label">{displayLabel}</span>
-                    <ChevronDown className={`manage-combobox-chevron ${isOpen ? 'open' : ''}`} size={20} />
-                </div>
-            </div>
-            <div className={`manage-dropdown-menu ${isOpen ? 'open' : ''}`} role="listbox">
-                {options.map((opt) => (
-                    <div key={opt.value ?? 'all'} className="manage-dropdown-item-wrapper">
-                        <button
-                            type="button"
-                            role="option"
-                            aria-selected={String(opt.value) === String(value)}
-                            className={`manage-dropdown-item ${String(opt.value) === String(value) ? 'active' : ''}`}
-                            onClick={() => {
-                                onChange(opt.value);
-                                setIsOpen(false);
-                            }}
-                        >
-                            <span className="manage-dropdown-item-label">{opt.label}</span>
-                        </button>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
 
 // ─────────────────────────────────────────────────────────
 //  Small helpers (duplicated to keep this page self-contained)
@@ -268,27 +213,26 @@ function PastProjectCard({ project, expanded, fullDetail, detailLoading, onToggl
             formatAssignedTeamSuffix={(pt) => `${pt.isOwner ? ' ★' : ''}`}
             afterSections={detail ? (
                 <>
-                    <div className="exp-card-section">
-                        <div className="exp-card-section-header">
-                            Phases ({detail.phases?.length ?? 0})
-                        </div>
-                        <div className="phase-list" style={{ marginTop: '0.5rem' }}>
-                            {detail.phases?.map((phase) => (
-                                <PhaseRow
-                                    key={phase.id}
-                                    phase={phase}
-                                    canEdit={false}
-                                    allMembers={allMembers}
-                                    onPhaseUpdated={() => { }}
-                                    onTaskUpdated={() => { }}
-                                    onAddTask={() => { }}
-                                    onAddSubtask={() => { }}
-                                    onEditTask={() => { }}
-                                    onEditPhase={() => { }}
-                                    onDeletePhase={() => { }}
-                                />
-                            ))}
-                        </div>
+                    <div className="exp-card-section" style={{ padding: 0 }}>
+                        <GanttChart
+                            phases={detail.phases || []}
+                            projectId={detail.id}
+                            projectDetail={detail}
+                            projectStartDate={detail.startDate}
+                            projectDueDate={detail.dueDate}
+                            canEdit={false}
+                            canEditStatus={false}
+                            onAddPhase={() => { }}
+                            onAddTask={() => { }}
+                            onAddSubtask={() => { }}
+                            onEditPhase={() => { }}
+                            onEditTask={() => { }}
+                            onOpenTaskComments={() => { }}
+                            onOpenTaskScheduleSlots={() => { }}
+                            onOpenTaskActivity={() => { }}
+                            onDeletePhase={() => { }}
+                            onRefresh={() => { }}
+                        />
                     </div>
 
                     <div className="exp-card-section">
@@ -440,7 +384,7 @@ export default function PastProjectsPage() {
             <div className="page-header">
                 <h1 className="projects-title">Past Projects</h1>
                 <div className="page-header-actions">
-                    <FilterDropdown
+                    <Dropdown
                         triggerLabel="Team"
                         options={[
                             { value: '', label: 'All Teams' },
@@ -449,7 +393,7 @@ export default function PastProjectsPage() {
                         value={filterTeam}
                         onChange={setFilterTeam}
                     />
-                    <FilterDropdown
+                    <Dropdown
                         triggerLabel="Category"
                         options={[
                             { value: '', label: 'All Categories' },
@@ -458,7 +402,7 @@ export default function PastProjectsPage() {
                         value={filterCategory}
                         onChange={setFilterCategory}
                     />
-                    <FilterDropdown
+                    <Dropdown
                         triggerLabel="Priority"
                         options={[
                             { value: '', label: 'All Priorities' },

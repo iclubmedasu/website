@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { X, Loader } from 'lucide-react';
+import { X } from 'lucide-react';
 import { tasksAPI } from '../../../services/api';
-import ActivityTimeline from '../../../components/ActivityTimeline';
+import ActivityTimeline from '../../../components/ActivityTimeline/ActivityTimeline';
 
 export default function TaskActivityModal({ task, onClose }) {
     const [events, setEvents] = useState([]);
@@ -32,7 +32,7 @@ export default function TaskActivityModal({ task, onClose }) {
     return (
         <>
             <div className="modal-backdrop" onClick={onClose} />
-            <div className="modal-container modal-large">
+            <div className="modal-container modal-large activity-history-modal">
                 <div className="modal-header">
                     <div>
                         <h2 className="modal-title">Task Activity</h2>
@@ -44,21 +44,27 @@ export default function TaskActivityModal({ task, onClose }) {
                 </div>
 
                 <div className="modal-body">
-                    {loading ? (
-                        <div className="empty-state">
-                            <Loader size={16} className="file-status-processing" />
-                            <p>Loading activity…</p>
-                        </div>
-                    ) : error ? (
-                        <div className="error-message">{error}</div>
-                    ) : (
-                        <ActivityTimeline
-                            title="Task History"
-                            events={events}
-                            emptyMessage="No task activity yet."
-                            chronology="descending"
-                        />
-                    )}
+                    <div className="activity-history-content">
+                        {loading ? (
+                            <div className="loading-state">
+                                <div className="spinner" />
+                                <p>Loading task activity…</p>
+                            </div>
+                        ) : error ? (
+                            <div className="error-message">{error}</div>
+                        ) : (
+                            <ActivityTimeline
+                                title="Task History"
+                                events={events}
+                                emptyMessage="No task activity yet."
+                                chronology="descending"
+                                contextEntity={{
+                                    label: task.parentTaskId ? 'Subtask' : 'Task',
+                                    name: task.title || task.name || 'Untitled task',
+                                }}
+                            />
+                        )}
+                    </div>
                 </div>
             </div>
         </>

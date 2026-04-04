@@ -1,16 +1,10 @@
 import { useEffect, useState } from 'react';
-import { X, CalendarDays, Clock3, Users } from 'lucide-react';
-import { projectsAPI, scheduleSlotsAPI, getProfilePhotoUrl } from '../../../services/api';
-import ActivityTimeline from '../../../components/ActivityTimeline';
-
-function formatDateTime(value) {
-    if (!value) return '—';
-    return new Date(value).toLocaleString();
-}
+import { X } from 'lucide-react';
+import { projectsAPI } from '../../../services/api';
+import ActivityTimeline from '../../../components/ActivityTimeline/ActivityTimeline';
 
 export default function ProjectActivityModal({ project, onClose }) {
     const [activity, setActivity] = useState([]);
-    const [slots, setSlots] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -22,14 +16,10 @@ export default function ProjectActivityModal({ project, onClose }) {
             try {
                 setLoading(true);
                 setError('');
-                const [activityData, slotsData] = await Promise.all([
-                    projectsAPI.getActivity(project.id),
-                    scheduleSlotsAPI.getAll({ projectId: project.id, includeInactive: true }),
-                ]);
+                const activityData = await projectsAPI.getActivity(project.id);
 
                 if (cancelled) return;
                 setActivity(Array.isArray(activityData) ? activityData : []);
-                setSlots(Array.isArray(slotsData) ? slotsData : []);
             } catch (err) {
                 if (!cancelled) setError(err.message || 'Failed to load project activity');
             } finally {
@@ -49,7 +39,7 @@ export default function ProjectActivityModal({ project, onClose }) {
     return (
         <>
             <div className="modal-backdrop" onClick={onClose} />
-            <div className="modal-container modal-large project-activity-modal">
+            <div className="modal-container modal-large activity-history-modal project-activity-modal">
                 <div className="modal-header">
                     <div>
                         <h2 className="modal-title">Project Activity</h2>
@@ -61,66 +51,27 @@ export default function ProjectActivityModal({ project, onClose }) {
                 </div>
 
                 <div className="modal-body">
-                    {loading ? (
-                        <div className="empty-state">
-                            <p>Loading project history…</p>
-                        </div>
-                    ) : error ? (
-                        <div className="error-message">{error}</div>
-                    ) : (
-                        <>
-                            {/*
-                            <div className="form-section">
-                                <h3 className="form-section-title">Schedule Snapshot</h3>
-                                {slots.length > 0 ? (
-                                    <div className="project-slot-grid">
-                                        {slots.map((slot) => (
-                                            <div key={slot.id} className={`project-slot-card${slot.isActive ? '' : ' project-slot-card--inactive'}`}>
-                                                <div className="project-slot-card-header">
-                                                    <div className="project-slot-card-title">
-                                                        <CalendarDays size={14} />
-                                                        <span>{slot.title || (slot.task ? slot.task.title : 'Project Slot')}</span>
-                                                    </div>
-                                                    <span className="project-slot-state">{slot.isActive ? 'Active' : 'Inactive'}</span>
-                                                </div>
-                                                <div className="project-slot-card-row">
-                                                    <Users size={13} />
-                                                    <span>{slot.member?.fullName ?? 'Unknown member'}</span>
-                                                    {slot.member?.profilePhotoUrl && (
-                                                        <img
-                                                            src={getProfilePhotoUrl(slot.member.id)}
-                                                            alt={slot.member.fullName}
-                                                            className="project-slot-avatar"
-                                                        />
-                                                    )}
-                                                </div>
-                                                <div className="project-slot-card-row">
-                                                    <Clock3 size={13} />
-                                                    <span>{formatDateTime(slot.startDateTime)} → {formatDateTime(slot.endDateTime)}</span>
-                                                </div>
-                                                {slot.task && (
-                                                    <div className="project-slot-task-link">Task: {slot.task.title}</div>
-                                                )}
-                                                {slot.notes && <p className="project-slot-notes">{slot.notes}</p>}
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="empty-state">
-                                        <p>No schedule slots yet.</p>
-                                    </div>
-                                )}
+                    <div className="activity-history-content">
+                        {loading ? (
+                            <div className="loading-state">
+                                <div className="spinner" />
+                                <p>Loading project activity…</p>
                             </div>
-                            */}
-
+                        ) : error ? (
+                            <div className="error-message">{error}</div>
+                        ) : (
                             <ActivityTimeline
-                                title="History"
+                                title="Project History"
                                 events={activity}
-                                emptyMessage="No activity recorded yet."
+                                emptyMessage="No project activity yet."
                                 chronology="descending"
+                                contextEntity={{
+                                    label: 'Project',
+                                    name: project.title || project.name || 'Untitled project',
+                                }}
                             />
-                        </>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
         </>

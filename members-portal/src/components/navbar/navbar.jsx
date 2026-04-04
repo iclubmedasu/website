@@ -1,5 +1,5 @@
 import React from "react";
-import Dropdown from "components/dropdown";
+import Dropdown from './Dropdown';
 import { FiAlignJustify } from "react-icons/fi";
 import { Link } from "react-router-dom";
 import navbarimage from "assets/img/layout/Navbar.png";

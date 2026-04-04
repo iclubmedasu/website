@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, Loader, Trash2 } from 'lucide-react';
 import { scheduleSlotsAPI } from '../../../services/api';
+import ScheduleTimetable from '../components/ScheduleTimetable/ScheduleTimetable';
 
 function formatDateTime(value) {
     if (!value) return '—';
@@ -128,7 +129,9 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
                             <div className="form-section">
                                 <h3 className="form-section-title">Current Slots</h3>
                                 {slots.length > 0 ? (
-                                    <div style={{ display: 'grid', gap: '0.75rem' }}>
+                                    <div style={{ display: 'grid', gap: '0.9rem' }}>
+                                        <ScheduleTimetable slots={slots} emptyMessage="No schedule slots available." />
+
                                         {slots.map((slot) => (
                                             <div
                                                 key={slot.id}

@@ -1087,6 +1087,39 @@ export const projectFilesAPI = {
         return handleResponse(response);
     },
 
+    getComments: async (fileId) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/${fileId}/comments`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    addComment: async (fileId, comment) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/${fileId}/comments`, {
+            method: 'POST',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ comment }),
+        });
+        return handleResponse(response);
+    },
+
+    editComment: async (fileId, commentId, comment) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/${fileId}/comments/${commentId}`, {
+            method: 'PUT',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ comment }),
+        });
+        return handleResponse(response);
+    },
+
+    deleteComment: async (fileId, commentId) => {
+        const response = await fetch(`${API_BASE_URL}/project-files/${fileId}/comments/${commentId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
     /** Build a URL to download a specific version of a file. */
     getVersionDownloadUrl: (fileId, commitSha) => {
         const token = localStorage.getItem('token');

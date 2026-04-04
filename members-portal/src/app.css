@@ -83,6 +83,29 @@
   --info-text: #1d4ed8;
   --info-border: #bfdbfe;
 
+  /* Semantic Colors — Status */
+  --status-not-started: #94a3b8;
+  --status-not-started-bg: #f1f5f9;
+  --status-not-started-text: #475569;
+  --status-in-progress: #3b82f6;
+  --status-in-progress-bg: #eff6ff;
+  --status-in-progress-text: #1d4ed8;
+  --status-completed: #22c55e;
+  --status-completed-bg: #f0fdf4;
+  --status-completed-text: #15803d;
+  --status-delayed: #f97316;
+  --status-delayed-bg: #fff7ed;
+  --status-delayed-text: #c2410c;
+  --status-blocked: #f87171;
+  --status-blocked-bg: #fee2e2;
+  --status-blocked-text: #b91c1c;
+  --status-on-hold: #ca8a04;
+  --status-on-hold-bg: #fef3c7;
+  --status-on-hold-text: #8a5b00;
+  --status-cancelled: #991b1b;
+  --status-cancelled-bg: #fef2f2;
+  --status-cancelled-text: #7f1d1d;
+
   /* Gradients — Danger / Success */
   --gradient-danger: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
   --gradient-success: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);

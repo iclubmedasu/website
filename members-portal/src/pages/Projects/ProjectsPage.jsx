@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Plus,
     X,
@@ -19,6 +19,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { projectsAPI, tasksAPI, teamsAPI, membersAPI, phasesAPI, projectTypesAPI, projectFilesAPI, getProfilePhotoUrl } from '../../services/api';
 import FileUploadZone from '../../components/FileUpload/FileUploadZone';
+import Dropdown from '../../components/dropdown/dropdown';
 import './ProjectsPage.css';
 import {
     fmtDate,
@@ -28,7 +29,7 @@ import {
     getLifecycleBadge,
     isProjectAborted,
     isProjectInactive,
-} from './components/ProjectCardView';
+} from './components/ProjectCardView/ProjectCardView';
 
 import CreateProjectModal from './modals/CreateProjectModal';
 import HoldProjectModal from './modals/HoldProjectModal';
@@ -45,64 +46,7 @@ import TaskActivityModal from './modals/TaskActivityModal';
 import EditPhaseModal from './modals/EditPhaseModal';
 import DeletePhaseTaskModal from './modals/DeletePhaseTaskModal';
 import ProjectActivityModal from './modals/ProjectActivityModal';
-import PhaseRow from './components/PhaseRow';
-import GanttChart from './components/GanttChart';
-
-// ─────────────────────────────────────────────────────────
-//  Filter Dropdown (matches Members / Teams page style)
-// ─────────────────────────────────────────────────────────
-function FilterDropdown({ options, value, onChange, triggerLabel }) {
-    const [isOpen, setIsOpen] = useState(false);
-    const dropdownRef = useRef(null);
-
-    useEffect(() => {
-        const handleClickOutside = (e) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setIsOpen(false);
-        };
-        if (isOpen) document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isOpen]);
-
-    const selected = options.find((o) => String(o.value) === String(value)) || options[0];
-    const displayLabel = selected ? selected.label : triggerLabel;
-
-    return (
-        <div className="manage-roles-container" ref={dropdownRef}>
-            <div className="manage-roles-header">
-                <div
-                    className="manage-combobox-trigger"
-                    onClick={() => setIsOpen(!isOpen)}
-                    onKeyDown={(e) => e.key === 'Enter' && setIsOpen(!isOpen)}
-                    role="button"
-                    tabIndex={0}
-                    aria-expanded={isOpen}
-                    aria-haspopup="listbox"
-                >
-                    <span className="manage-combobox-label">{displayLabel}</span>
-                    <ChevronDown className={`manage-combobox-chevron ${isOpen ? 'open' : ''}`} size={20} />
-                </div>
-            </div>
-            <div className={`manage-dropdown-menu ${isOpen ? 'open' : ''}`} role="listbox">
-                {options.map((opt) => (
-                    <div key={opt.value ?? 'all'} className="manage-dropdown-item-wrapper">
-                        <button
-                            type="button"
-                            role="option"
-                            aria-selected={String(opt.value) === String(value)}
-                            className={`manage-dropdown-item ${String(opt.value) === String(value) ? 'active' : ''}`}
-                            onClick={() => {
-                                onChange(opt.value);
-                                setIsOpen(false);
-                            }}
-                        >
-                            <span className="manage-dropdown-item-label">{opt.label}</span>
-                        </button>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
+import GanttChart from './components/GanttChart/GanttChart';
 
 // ─────────────────────────────────────────────────────────
 //  Small helpers
@@ -951,7 +895,7 @@ export default function ProjectsPage() {
             <div className="page-header">
                 <h1 className="projects-title">Projects</h1>
                 <div className="page-header-actions">
-                    <FilterDropdown
+                    <Dropdown
                         triggerLabel="Team"
                         options={[
                             { value: '', label: 'All Teams' },
@@ -960,7 +904,7 @@ export default function ProjectsPage() {
                         value={filterTeam}
                         onChange={setFilterTeam}
                     />
-                    <FilterDropdown
+                    <Dropdown
                         triggerLabel="Category"
                         options={[
                             { value: '', label: 'All Categories' },
@@ -969,7 +913,7 @@ export default function ProjectsPage() {
                         value={filterCategory}
                         onChange={setFilterCategory}
                     />
-                    <FilterDropdown
+                    <Dropdown
                         triggerLabel="Priority"
                         options={[
                             { value: '', label: 'All Priorities' },

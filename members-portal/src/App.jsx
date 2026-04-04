@@ -1,12 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
-import AdministrationPage from './pages/Administration/AdministrationPage';
+import AdministrationPage from './pages/Personnel/Administration/AdministrationPage';
 import ProjectsPage from './pages/Projects/ProjectsPage';
 import PastProjectsPage from './pages/Projects/PastProjectsPage';
-import TeamsPage from './pages/Teams/TeamsPage';
-import MembersPage from './pages/Members/MembersPage';
-import AlumniPage from './pages/Alumni/AlumniPage';
+import TeamsPage from './pages/Personnel/Teams/TeamsPage';
+import MembersPage from './pages/Personnel/Members/MembersPage';
+import AlumniPage from './pages/Personnel/Alumni/AlumniPage';
 import HelpAndSupportPage from './pages/HelpAndSupport/HelpAndSupportPage';
 import UserPage from './pages/User/UserPage';
 import ProtectedRoute from './components/ProtectedRoute';

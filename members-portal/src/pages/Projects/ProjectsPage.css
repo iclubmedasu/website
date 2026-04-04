@@ -2,10 +2,7 @@
    PROJECTS PAGE STYLES
    ============================================ */
 
-/* projects-page container: max-width/margin now in shared page.css */
-.projects-page {
-    padding: 2rem;
-}
+/* projects-page container spacing now comes from shared page.css */
 
 /* projects-title base: now in shared page.css */
 
@@ -196,9 +193,6 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 0.5rem;
-    padding-top: 0.65rem;
-    margin-top: 0.65rem;
-    border-top: 1px solid var(--gray-200);
 }
 
 .project-card-bottom-bar {

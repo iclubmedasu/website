@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { FileText, Image, File, Folder, FolderOpen, Upload, Check, X, RotateCcw, Trash2, Loader, Download, AlertTriangle, History, ArchiveRestore, Pencil, ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { FileText, Image, File, Folder, FolderOpen, Upload, Check, X, RotateCcw, Trash2, Loader, Download, AlertTriangle, History, ArchiveRestore, Pencil, ChevronDown, ChevronRight, Plus, MessageCircle } from 'lucide-react';
 import { projectFilesAPI } from '../../services/api';
+import FileCommentsModal from '../../pages/Projects/modals/FileCommentsModal';
 import '../../components/modal/modal.css';
 import './FileUploadZone.css';
 
@@ -44,6 +45,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
     const [historyTarget, setHistoryTarget] = useState(null);
     const [historyData, setHistoryData] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
+    const [commentTarget, setCommentTarget] = useState(null);
     const [showDeleted, setShowDeleted] = useState(false);
     const [deletedFiles, setDeletedFiles] = useState([]);
     const [deletedLoading, setDeletedLoading] = useState(false);
@@ -315,6 +317,14 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         setHistoryLoading(false);
     };
 
+    const openComments = (fileEntry) => {
+        setCommentTarget(fileEntry);
+    };
+
+    const closeComments = () => {
+        setCommentTarget(null);
+    };
+
     const formatHistoryDate = (iso) => {
         const d = new Date(iso);
         return d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -579,14 +589,9 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                     {!f.failed && !f.done && !f.processing && (
                         <span className="file-status-uploading">{f.progress}%</span>
                     )}
-                    {f.done && downloadUrl && (
-                        <button className="file-history-btn" title="Version history" onClick={() => openHistory(f)}>
-                            <History size={14} />
-                        </button>
-                    )}
-                    {!disabled && f.done && (
-                        <button className="file-rename-btn" title="Rename" onClick={() => openRename(f)}>
-                            <Pencil size={14} />
+                    {f.done && (
+                        <button className="file-comment-btn" title="Comments" onClick={() => openComments(f)}>
+                            <MessageCircle size={12} />
                         </button>
                     )}
                     {f.done && downloadUrl && (
@@ -594,9 +599,19 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                             <Download size={14} />
                         </a>
                     )}
+                    {!disabled && f.done && (
+                        <button className="file-rename-btn" title="Rename" onClick={() => openRename(f)}>
+                            <Pencil size={14} />
+                        </button>
+                    )}
                     {!disabled && (
                         <button className="file-delete-btn" title="Remove" onClick={() => requestDelete(f)}>
                             {f.done ? <Trash2 size={14} /> : <X size={14} />}
+                        </button>
+                    )}
+                    {f.done && downloadUrl && (
+                        <button className="file-history-btn" title="Version history" onClick={() => openHistory(f)}>
+                            <History size={14} />
                         </button>
                     )}
                 </div>
@@ -644,16 +659,13 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                         {!folder.isActive && <span className="folder-card-badge">Deleted</span>}
                     </div>
                     <div className="folder-row-header-actions" onClick={(e) => e.stopPropagation()}>
-                        <button type="button" className="file-history-btn" title="Folder history" onClick={() => openFolderHistory(folder)}>
-                            <History size={14} />
-                        </button>
                         {!disabled && folder.isActive ? (
                             <>
-                                <button type="button" className="file-rename-btn" title="Rename folder" onClick={() => openFolderRename(folder)}>
-                                    <Pencil size={14} />
-                                </button>
                                 <button type="button" className="folder-upload-btn" title="Upload to this folder" onClick={() => { setTargetFolderId(String(folder.id)); fileInputRef.current?.click(); }}>
                                     <Upload size={14} />
+                                </button>
+                                <button type="button" className="file-rename-btn" title="Rename folder" onClick={() => openFolderRename(folder)}>
+                                    <Pencil size={14} />
                                 </button>
                                 <button type="button" className="file-delete-btn" title="Delete folder" onClick={() => openFolderAction('delete', folder)}>
                                     <Trash2 size={14} />
@@ -665,6 +677,9 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                                 Restore
                             </button>
                         ) : null}
+                        <button type="button" className="file-history-btn" title="Folder history" onClick={() => openFolderHistory(folder)}>
+                            <History size={14} />
+                        </button>
                     </div>
                 </div>
                 {isExpanded && (
@@ -882,6 +897,13 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                 </>
             )}
 
+            {commentTarget && (
+                <FileCommentsModal
+                    file={commentTarget}
+                    onClose={closeComments}
+                />
+            )}
+
             {folderAction?.type === 'history' && folderAction.folder && (
                 <>
                     <div className="modal-backdrop" onClick={closeFolderAction} />
@@ -950,10 +972,9 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
             {folderCreateOpen && (
                 <>
                     <div className="modal-backdrop" onClick={closeCreateFolder} />
-                    <div className="modal-container modal-info">
+                    <div className="modal-container folder-basic-modal">
                         <div className="modal-header">
                             <div className="modal-header-content">
-                                <div className="modal-icon-info"><FolderOpen /></div>
                                 <h2 className="modal-title">Create Folder</h2>
                             </div>
                             <button className="modal-close-btn" type="button" onClick={closeCreateFolder} disabled={folderCreateLoading}><X /></button>
@@ -962,13 +983,11 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                             {folderCreateError && <div className="error-message">{folderCreateError}</div>}
                             <label className="form-label" htmlFor="folder-name-input">Folder name</label>
                             <input id="folder-name-input" className="form-input" value={folderName} onChange={(e) => setFolderName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !folderCreateLoading && confirmCreateFolder()} autoFocus />
-                            <div className="info-box" style={{ marginTop: '1rem' }}>
-                                <p className="info-text">A .gitkeep marker will be created automatically so the folder exists even when empty.</p>
-                            </div>
+                            <p className="form-hint" style={{ marginTop: '1rem' }}>A .gitkeep marker will be created automatically so the folder exists even when empty.</p>
                         </div>
                         <div className="modal-footer">
                             <button type="button" className="btn btn-secondary" onClick={closeCreateFolder} disabled={folderCreateLoading}>Cancel</button>
-                            <button type="button" className="btn btn-info" onClick={confirmCreateFolder} disabled={folderCreateLoading || !folderName.trim()}>{folderCreateLoading ? 'Creating…' : 'Create folder'}</button>
+                            <button type="button" className="btn btn-primary" onClick={confirmCreateFolder} disabled={folderCreateLoading || !folderName.trim()}>{folderCreateLoading ? 'Creating…' : 'Create folder'}</button>
                         </div>
                     </div>
                 </>
@@ -977,10 +996,9 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
             {renameTarget && (
                 <>
                     <div className="modal-backdrop" onClick={closeRename} />
-                    <div className="modal-container modal-info">
+                    <div className="modal-container folder-basic-modal">
                         <div className="modal-header">
                             <div className="modal-header-content">
-                                <div className="modal-icon-info"><Pencil /></div>
                                 <h2 className="modal-title">Rename {renameTarget.kind === 'folder' ? 'Folder' : 'File'}</h2>
                             </div>
                             <button className="modal-close-btn" type="button" onClick={closeRename} disabled={renameLoading}><X /></button>
@@ -992,7 +1010,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                         </div>
                         <div className="modal-footer">
                             <button type="button" className="btn btn-secondary" onClick={closeRename} disabled={renameLoading}>Cancel</button>
-                            <button type="button" className="btn btn-info" onClick={handleRename} disabled={renameLoading || !renameValue.trim()}>{renameLoading ? 'Saving…' : 'Save'}</button>
+                            <button type="button" className="btn btn-primary" onClick={handleRename} disabled={renameLoading || !renameValue.trim()}>{renameLoading ? 'Saving…' : 'Save'}</button>
                         </div>
                     </div>
                 </>

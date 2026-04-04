@@ -15,8 +15,9 @@
 .members-page,
 .help-support-page,
 .administration-page {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
+    padding: 2rem;
 }
 
 
@@ -132,6 +133,16 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--gray-600);
+}
+
+.exp-teams-label {
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-600);
+    margin-top: 0.5rem;
 }
 
 /* Detail labels (larger variant for full-page panels) */

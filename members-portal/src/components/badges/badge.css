@@ -28,38 +28,38 @@
    ============================================ */
 
 .badge-status-NOT_STARTED {
-    background: #f1f5f9;
-    color: #475569;
+    background: var(--status-not-started-bg);
+    color: var(--status-not-started-text);
 }
 
 .badge-status-IN_PROGRESS {
-    background: #eff6ff;
-    color: #1d4ed8;
+    background: var(--status-in-progress-bg);
+    color: var(--status-in-progress-text);
 }
 
 .badge-status-COMPLETED {
-    background: #f0fdf4;
-    color: #15803d;
+    background: var(--status-completed-bg);
+    color: var(--status-completed-text);
 }
 
 .badge-status-ON_HOLD {
-    background: #fef3c7;
-    color: #92400e;
+    background: var(--status-on-hold-bg);
+    color: var(--status-on-hold-text);
 }
 
 .badge-status-CANCELLED {
-    background: #fef2f2;
-    color: #b91c1c;
+    background: var(--status-cancelled-bg);
+    color: var(--status-cancelled-text);
 }
 
 .badge-status-DELAYED {
-    background: #fff7ed;
-    color: #c2410c;
+    background: var(--status-delayed-bg);
+    color: var(--status-delayed-text);
 }
 
 .badge-status-BLOCKED {
-    background: #fdf4ff;
-    color: #7e22ce;
+    background: var(--status-blocked-bg);
+    color: var(--status-blocked-text);
 }
 
 
@@ -73,19 +73,19 @@
 }
 
 .badge-lifecycle-hold {
-    background: #fef3c7;
-    color: #92400e;
+    background: var(--status-on-hold-bg);
+    color: var(--status-on-hold-text);
 }
 
 .badge-lifecycle-deactivated,
 .badge-lifecycle-inactive {
-    background: #fef2f2;
-    color: #b91c1c;
+    background: var(--status-cancelled-bg);
+    color: var(--status-cancelled-text);
 }
 
 .badge-lifecycle-aborted {
-    background: #fef2f2;
-    color: #b91c1c;
+    background: var(--status-cancelled-bg);
+    color: var(--status-cancelled-text);
 }
 
 .badge-lifecycle-finalized {
@@ -222,31 +222,31 @@
 }
 
 .status-dot-NOT_STARTED {
-    background: #94a3b8;
+    background: var(--status-not-started);
 }
 
 .status-dot-IN_PROGRESS {
-    background: #3b82f6;
+    background: var(--status-in-progress);
 }
 
 .status-dot-COMPLETED {
-    background: #22c55e;
+    background: var(--status-completed);
 }
 
 .status-dot-ON_HOLD {
-    background: #f59e0b;
+    background: var(--status-on-hold);
 }
 
 .status-dot-CANCELLED {
-    background: #ef4444;
+    background: var(--status-cancelled);
 }
 
 .status-dot-DELAYED {
-    background: #f97316;
+    background: var(--status-delayed);
 }
 
 .status-dot-BLOCKED {
-    background: #a855f7;
+    background: var(--status-blocked);
 }
 
 
@@ -277,43 +277,43 @@
 }
 
 .status-select-inline.s-NOT_STARTED {
-    background-color: #f1f5f9;
-    color: #475569;
+    background-color: var(--status-not-started-bg);
+    color: var(--status-not-started-text);
     border-color: #e2e8f0;
 }
 
 .status-select-inline.s-IN_PROGRESS {
-    background-color: #eff6ff;
-    color: #1d4ed8;
+    background-color: var(--status-in-progress-bg);
+    color: var(--status-in-progress-text);
     border-color: #bfdbfe;
 }
 
 .status-select-inline.s-COMPLETED {
-    background-color: #f0fdf4;
-    color: #15803d;
+    background-color: var(--status-completed-bg);
+    color: var(--status-completed-text);
     border-color: #bbf7d0;
 }
 
 .status-select-inline.s-DELAYED {
-    background-color: #fff7ed;
-    color: #c2410c;
+    background-color: var(--status-delayed-bg);
+    color: var(--status-delayed-text);
     border-color: #fed7aa;
 }
 
-.status-select-inline.s-BLOCKED {
-    background-color: #fdf4ff;
-    color: #7e22ce;
-    border-color: #e9d5ff;
-}
-
 .status-select-inline.s-ON_HOLD {
-    background-color: #fef3c7;
-    color: #92400e;
+    background-color: var(--status-on-hold-bg);
+    color: var(--status-on-hold-text);
     border-color: #fde68a;
 }
 
 .status-select-inline.s-CANCELLED {
-    background-color: #fef2f2;
-    color: #b91c1c;
+    background-color: var(--status-cancelled-bg);
+    color: var(--status-cancelled-text);
+    border-color: #fecaca;
+}
+
+.status-select-inline.s-BLOCKED {
+    background-color: var(--status-blocked-bg);
+    color: var(--status-blocked-text);
     border-color: #fecaca;
 }
