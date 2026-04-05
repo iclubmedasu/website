@@ -1,0 +1,5 @@
+packages:
+  - backend
+  - members-portal
+  - public-website
+  - packages/*

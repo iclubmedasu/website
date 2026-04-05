@@ -1,9 +1,11 @@
 {
   "include": [
-    "**/*",
-    "**/.server/**/*",
-    "**/.client/**/*",
-    ".react-router/types/**/*"
+    "src/**/*",
+    "vite.config.ts"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules"
   ],
   "compilerOptions": {
     "lib": [
@@ -19,16 +21,12 @@
     "module": "ES2022",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "rootDirs": [
-      ".",
-      "./.react-router/types"
-    ],
-    "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
     "forceConsistentCasingInFileNames": true,
+    "allowJs": false,
+    "checkJs": false,
     "paths": {
       "~/*": [
-        "./app/*"
+        "./src/*"
       ]
     },
     "esModuleInterop": true,
@@ -36,6 +34,9 @@
     "noEmit": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "strict": true
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true
   }
 }

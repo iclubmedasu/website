@@ -1,0 +1,50 @@
+import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+import { resolve } from 'path'
+
+export default defineConfig({
+    plugins: [react()],
+    resolve: {
+        alias: {
+            '~': resolve(__dirname, 'members-portal/src')
+        }
+    },
+    test: {
+        environment: 'jsdom',
+        environmentMatchGlobs: [
+            ['backend/**', 'node']
+        ],
+        globals: true,
+        setupFiles: ['./test-setup.ts'],
+        include: ['**/*.{test,spec}.{ts,tsx}'],
+        exclude: [
+            '**/node_modules/**',
+            '**/.next/**',
+            '**/dist/**',
+            '**/coverage/**',
+            '**/generated/**'
+        ],
+        coverage: {
+            provider: 'v8',
+            reporter: ['text', 'text-summary', 'html', 'lcov'],
+            all: true,
+            include: [
+                'backend/**/*.ts',
+                'members-portal/src/**/*.{ts,tsx}',
+                'packages/shared/src/**/*.ts'
+            ],
+            exclude: [
+                '**/*.d.ts',
+                '**/__tests__/**',
+                '**/*.test.*',
+                '**/*.spec.*',
+                'backend/generated/**',
+                'members-portal/src/main.*'
+            ],
+            lines: 60,
+            functions: 60,
+            statements: 60,
+            branches: 50
+        }
+    }
+})

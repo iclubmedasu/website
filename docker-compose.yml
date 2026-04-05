@@ -1,0 +1,54 @@
+# ============================================
+# iClub Platform - Docker Compose
+# For local development and testing
+# ============================================
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: iclub
+      POSTGRES_PASSWORD: iclub_dev_password
+      POSTGRES_DB: iclub
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U iclub']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_URL: postgresql://iclub:iclub_dev_password@db:5432/iclub
+      JWT_SECRET: local_dev_secret_change_in_production
+      NODE_ENV: development
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app/backend
+      - /app/backend/node_modules
+
+  # Members Portal
+  portal:
+    build:
+      context: .
+      dockerfile: members-portal/Dockerfile
+    ports:
+      - '3001:80'
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
