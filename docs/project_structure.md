@@ -1,4 +1,4 @@
-﻿## Project Structure (Filtered)
+## Project Structure (Filtered)
 
 ```text
 website/
@@ -59,6 +59,7 @@ website/
 │   ├── .gitignore
 │   ├── .gitkeep
 │   ├── db.ts
+│   ├── Dockerfile
 │   ├── package.json
 │   ├── prisma.config.ts
 │   ├── server.ts
@@ -147,7 +148,6 @@ website/
 │   │   │   │   └── popover.tsx
 │   │   │   ├── scrollbar/
 │   │   │   │   └── scrollbar.css
-│   │   │   ├── sidebar/
 │   │   │   ├── StepProgressBar/
 │   │   │   │   ├── StepProgressBar.css
 │   │   │   │   └── StepProgressBar.tsx
@@ -277,8 +277,8 @@ website/
 │   ├── CSS Standards Summary.md
 │   ├── Dockerfile
 │   ├── index.html
+│   ├── nginx.conf
 │   ├── package.json
-│   ├── package-lock.json
 │   ├── README.md
 │   ├── tsconfig.json
 │   ├── vite.config.ts
@@ -327,6 +327,7 @@ website/
 ├── .gitignore
 ├── .prettierignore
 ├── .prettierrc
+├── docker-compose.yml
 ├── eslint.config.mjs
 ├── iClub Website Development Roadmap.pdf
 ├── package.json

@@ -397,7 +397,13 @@ const EditAdminMembersModal = ({
                             {memberDisplayName} • {currentTeam?.name} • {currentRole?.roleName}
                         </p>
                     </div>
-                    <button type="button" className="modal-close-btn" onClick={handleClose}>
+                    <button
+                        type="button"
+                        className="modal-close-btn"
+                        onClick={handleClose}
+                        title="Close dialog"
+                        aria-label="Close dialog"
+                    >
                         <X />
                     </button>
                 </div>

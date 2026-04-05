@@ -102,6 +102,8 @@ function TaskStatusSelect({ taskId, current, canEdit, onChanged }: any) {
     return (
         <select
             className={`status-select-inline s-${current}`}
+            title="Select task status"
+            aria-label="Select task status"
             value={current}
             onChange={handleChange}
             disabled={busy}
@@ -126,7 +128,7 @@ function SubtaskItem({ task, canEdit, onStatusChange, depth = 0 }: any) {
         <div>
             <div className="subtask-item" onClick={() => hasSubs && setOpen((o) => !o)}>
                 <span className="subtask-item-title">{task.title}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <div className="subtask-item-meta-inline">
                     <TaskStatusSelect
                         taskId={task.id}
                         current={task.status}
@@ -134,7 +136,7 @@ function SubtaskItem({ task, canEdit, onStatusChange, depth = 0 }: any) {
                         onChanged={onStatusChange}
                     />
                     {over && (
-                        <span title="Overdue" style={{ color: '#dc2626', display: 'flex' }}>
+                        <span title="Overdue" className="task-overdue-indicator">
                             <AlertCircle size={12} />
                         </span>
                     )}
@@ -146,7 +148,7 @@ function SubtaskItem({ task, canEdit, onStatusChange, depth = 0 }: any) {
                 </div>
             </div>
             {open && hasSubs && (
-                <div className="subtask-list" style={{ marginLeft: depth > 0 ? '1rem' : undefined }}>
+                <div className={`subtask-list${depth > 0 ? ' subtask-list--nested' : ''}`}>
                     {task.subtasks.map((s: any) => (
                         <SubtaskItem key={s.id} task={s} canEdit={canEdit} onStatusChange={onStatusChange} depth={depth + 1} />
                     ))}
@@ -177,7 +179,7 @@ function TaskItem({ task, canEdit, onStatusChange, onAddSubtask }: any) {
                     />
                     <PriorityBadge priority={task.priority} />
                     {over && (
-                        <span title="Overdue" style={{ color: '#dc2626', display: 'flex' }}>
+                        <span title="Overdue" className="task-overdue-indicator">
                             <AlertCircle size={13} />
                         </span>
                     )}
@@ -219,7 +221,7 @@ function TaskItem({ task, canEdit, onStatusChange, onAddSubtask }: any) {
 
             {/* due date */}
             {task.dueDate && (
-                <div className={`project-card-due ${over ? 'overdue' : ''}`} style={{ fontSize: '0.72rem' }}>
+                <div className={`project-card-due project-card-due--compact ${over ? 'overdue' : ''}`}>
                     <Calendar size={11} />
                     Due {fmtDate(task.dueDate)}
                 </div>
@@ -244,7 +246,7 @@ void TaskItem;
 // ─────────────────────────────────────────────────────────
 //  Project Card with Expandable Detail
 // ─────────────────────────────────────────────────────────
-function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, onEdit, onDeactivate, onFinalize, onArchive, onReactivate, onAbort, onPublish: _onPublish, onRefreshDetail, onViewActivity, allMembers, canEdit, canManage, canUpload, canEditStructure, canEditStatus }: any) {
+function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, onEdit, onDeactivate, onFinalize, onArchive, onReactivate, onAbort, onRefreshDetail, onViewActivity, allMembers, canEdit, canManage, canUpload, canEditStructure, canEditStatus }: any) {
     const { user } = useAuth();
 
     // Local copy of detail for optimistic inline updates (avoids full refresh & scroll reset)
@@ -411,7 +413,7 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
                 </>
             )}
             collapsedFooterTrailing={(
-                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div className="project-card-footer-trailing">
                     <div className="project-card-due project-card-date-range">
                         <Calendar size={11} />
                         {fmtDate(project.startDate)} → {fmtDate(project.dueDate)}
@@ -425,7 +427,7 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
                 </div>
             )}
             expandedMeta={(
-                <span className={`badge ${lifecycleBadge.className}`} style={{ fontSize: '0.82rem' }}>
+                <span className={`badge badge--compact ${lifecycleBadge.className}`}>
                     <LifecycleIcon size={14} />
                     {lifecycleBadge.label}
                 </span>
@@ -531,7 +533,7 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
             formatAssignedTeamSuffix={(pt) => `${pt.isOwner ? ' ★' : ''}${!pt.canEdit ? ' (view)' : ''}`}
             afterSections={detail ? (
                 <>
-                    <div className="exp-card-section" style={{ padding: 0 }}>
+                    <div className="exp-card-section exp-card-section--flush">
                         <GanttChart
                             phases={detail.phases || []}
                             projectId={detail.id}
@@ -556,7 +558,7 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
 
                     <div className="exp-card-section">
                         <div className="exp-card-section-header">
-                            <Paperclip size={14} style={{ marginRight: '0.35rem' }} />
+                            <Paperclip size={14} className="exp-card-section-icon" />
                             Project Files
                         </div>
                         <FileUploadZone
@@ -1049,18 +1051,7 @@ export default function ProjectsPage() {
 
             {/* ─── Loading indicator for expanded card ─── */}
             {expandedProjectId && detailLoading && !expandedProjectDetail && (
-                <div style={{
-                    position: 'fixed',
-                    bottom: '1.5rem',
-                    right: '1.5rem',
-                    background: 'var(--bg-card)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '0.6rem 1rem',
-                    boxShadow: 'var(--shadow-md)',
-                    fontSize: '0.82rem',
-                    fontFamily: 'var(--font-heading)',
-                    color: 'var(--gray-500)'
-                }}>
+                <div className="project-detail-loading-indicator">
                     Loading details…
                 </div>
             )}

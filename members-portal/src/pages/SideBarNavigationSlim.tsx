@@ -3,6 +3,7 @@ import {
   type MouseEvent,
   type ReactNode,
   useCallback,
+  useEffect,
   useRef,
   useState,
 } from "react";
@@ -50,7 +51,14 @@ export const SidebarNavigationSlim = ({
   const flyoutCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sidebarCollapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const flyoutPanelRef = useRef<HTMLDivElement | null>(null);
   const isHoveringRef = useRef(false);
+
+  useEffect(() => {
+    if (flyoutPanelRef.current) {
+      flyoutPanelRef.current.style.top = `${flyoutTop}px`;
+    }
+  }, [flyoutTop]);
 
   const clearFlyoutCloseTimer = () => {
     if (flyoutCloseTimer.current !== null) {
@@ -274,8 +282,8 @@ export const SidebarNavigationSlim = ({
 
       {activeFlyoutItem && (
         <div
+          ref={flyoutPanelRef}
           className={`sidebar-flyout-panel ${activeFlyoutItem ? "open" : ""}`}
-          style={{ top: flyoutTop }}
           onMouseEnter={handleFlyoutMouseEnter}
           onMouseLeave={handleFlyoutMouseLeave}
         >
@@ -307,7 +315,6 @@ export const SidebarNavigationSlim = ({
                     to={subItem.href}
                     className={`sidebar-flyout-item ${isActive(subItem.href) ? "active" : ""}`}
                     onClick={handleSubItemClick}
-                    style={{ animationDelay: `${subIndex * 35}ms` }}
                   >
                     <SubIcon className="sidebar-flyout-icon" />
                     <span className="sidebar-flyout-label">{subItem.label}</span>

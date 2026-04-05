@@ -120,23 +120,6 @@ interface SubteamFormData {
     isActive?: boolean;
 }
 
-interface AddMemberSubmitPayload {
-    member?: {
-        id: Id;
-    };
-    assignmentData?: {
-        memberId: Id;
-        teamId: number;
-        roleId: number;
-        changeReason: string;
-    };
-}
-
-interface EditMemberSubmitPayload {
-    member?: unknown;
-    changes?: unknown;
-}
-
 interface TeamDropdownItem {
     id: Id;
     label: string;
@@ -238,7 +221,7 @@ const TitleDropdown = ({
     onEditTeam,
     onToggleTeamActive,
     canManageTeams = false,
-    canEditTeam = (_teamId: Id) => false,
+    canEditTeam = () => false,
 }: TitleDropdownProps) => {
     const currentTeam = teams.find((team) => team.id === selectedTeam);
 
@@ -1028,7 +1011,7 @@ function TeamsPage() {
         setShowAddMembersModal(true);
     };
 
-    const handleAddMember = async (_memberData: AddMemberSubmitPayload): Promise<void> => {
+    const handleAddMember = async (): Promise<void> => {
         setError(null);
         try {
             if (selectedTeamId != null) {
@@ -1041,7 +1024,7 @@ function TeamsPage() {
         }
     };
 
-    const handleEditMemberSubmit = async (_editData: EditMemberSubmitPayload): Promise<void> => {
+    const handleEditMemberSubmit = async (): Promise<void> => {
         setError(null);
         try {
             if (selectedTeamId != null) {

@@ -206,6 +206,13 @@
     border-top: 1px solid var(--gray-200);
 }
 
+.project-card-footer-trailing {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
 .project-card-date-range {
     font-family: var(--font-heading);
     font-size: 0.74rem;
@@ -230,6 +237,10 @@
 .project-card-due.overdue {
     color: var(--error-text);
     font-weight: 600;
+}
+
+.project-card-due--compact {
+    font-size: 0.72rem;
 }
 
 .project-card-task-count {
@@ -795,6 +806,21 @@
     font-family: var(--font-heading);
 }
 
+.subtask-item-meta-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.subtask-list--nested {
+    margin-left: 1rem;
+}
+
+.task-overdue-indicator {
+    color: #dc2626;
+    display: flex;
+}
+
 /* ── expand/collapse toggle ── */
 .task-expand-btn {
     background: none;
@@ -810,6 +836,31 @@
 
 .task-expand-btn:hover {
     color: var(--purple-700);
+}
+
+.badge--compact {
+    font-size: 0.82rem;
+}
+
+.exp-card-section--flush {
+    padding: 0;
+}
+
+.exp-card-section-icon {
+    margin-right: 0.35rem;
+}
+
+.project-detail-loading-indicator {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: 0.6rem 1rem;
+    box-shadow: var(--shadow-md);
+    font-size: 0.82rem;
+    font-family: var(--font-heading);
+    color: var(--gray-500);
 }
 
 /* ── task detail panel (nested inside project panel) ── */

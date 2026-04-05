@@ -107,6 +107,28 @@ function UserPage() {
     const [showNewPwd, setShowNewPwd] = useState(false);
     const [showConfirmPwd, setShowConfirmPwd] = useState(false);
 
+    // ── History tab helpers ──
+    const fetchHistory = async () => {
+        if (!user?.id) return;
+        setHistoryLoading(true);
+        setHistoryError('');
+        try {
+            const data = await roleHistoryAPI.getMemberTimeline(user.id);
+            setRoleHistory(Array.isArray(data) ? (data as RoleHistoryEntry[]) : []);
+            setHistoryFetched(true);
+        } catch {
+            setHistoryError('Failed to load history.');
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'history' && !historyFetched && user?.id) {
+            void fetchHistory();
+        }
+    }, [activeTab, historyFetched, user?.id]);
+
     if (!user) return null;
 
     const isDeveloper = user.isDeveloper === true;
@@ -188,28 +210,6 @@ function UserPage() {
         setPhotoVersion((v) => v + 1);
         setPhotoModalOpen(false);
     };
-
-    // ── History tab helpers ──
-    const fetchHistory = async () => {
-        if (!user?.id) return;
-        setHistoryLoading(true);
-        setHistoryError('');
-        try {
-            const data = await roleHistoryAPI.getMemberTimeline(user.id);
-            setRoleHistory(Array.isArray(data) ? (data as RoleHistoryEntry[]) : []);
-            setHistoryFetched(true);
-        } catch {
-            setHistoryError('Failed to load history.');
-        } finally {
-            setHistoryLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (activeTab === 'history' && !historyFetched && user?.id) {
-            fetchHistory();
-        }
-    }, [activeTab, historyFetched, user?.id]);
 
     const getChangeTypeColor = (changeType: string): string => {
         const colors: Record<string, string> = {

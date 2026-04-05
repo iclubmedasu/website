@@ -127,13 +127,10 @@ const Navbar = ({ onOpenSidenav, brandText }: NavbarProps) => {
           }
           children={
             <div className="flex w-[350px] flex-col gap-2 rounded-[20px] bg-white p-4 shadow-xl shadow-shadow-500 dark:!bg-navy-700 dark:text-white dark:shadow-none">
-              <div
-                style={{
-                  backgroundImage: `url(${navbarimage})`,
-                  backgroundRepeat: "no-repeat",
-                  backgroundSize: "cover",
-                }}
-                className="mb-2 aspect-video w-full rounded-lg"
+              <img
+                src={navbarimage}
+                alt=""
+                className="mb-2 aspect-video w-full rounded-lg object-cover"
               />
               <a
                 target="blank"

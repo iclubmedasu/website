@@ -80,8 +80,9 @@ const AssignToTeamModal = ({
     onSubmit,
     member,
     teams,
-    roles: _roles = [],
+    roles = [],
 }: AssignToTeamModalProps) => {
+    void roles;
     const [mode, setMode] = useState<Mode>(MODES.ASSIGN);
     const [formData, setFormData] = useState<AssignFormData>({
         teamId: '',
@@ -322,7 +323,13 @@ const AssignToTeamModal = ({
                             </p>
                         )}
                     </div>
-                    <button type="button" className="modal-close-btn" onClick={handleClose}>
+                    <button
+                        type="button"
+                        className="modal-close-btn"
+                        onClick={handleClose}
+                        title="Close dialog"
+                        aria-label="Close dialog"
+                    >
                         <X />
                     </button>
                 </div>

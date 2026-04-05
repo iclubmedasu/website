@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../db';
 import { JWT_SECRET, authenticateToken } from '../middleware/auth';
+import type { RequestUser } from '../types/auth';
 
 const router: any = express.Router();
 
@@ -1004,7 +1005,7 @@ router.get('/me', async (req, res) => {
             return res.status(401).json({ error: 'No token provided' });
         }
 
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET) as RequestUser;
 
         // Developer backdoor (authority level 1)
         if (decoded.isDeveloper) {
@@ -1069,6 +1070,7 @@ router.get('/me', async (req, res) => {
         const leadershipTeamIds = getLeadershipTeamIds(member.teamMemberships || []);
 
         const { teamMemberships, ...memberData } = member;
+        void teamMemberships;
         // Don't expose placeholder phone/phone2 to the client so profile shows "—" until real values are set
         const userPayload = {
             ...memberData,

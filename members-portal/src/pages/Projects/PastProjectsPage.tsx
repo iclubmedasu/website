@@ -158,7 +158,7 @@ function PastProjectCard({ project, expanded, fullDetail, detailLoading, onToggl
                 </>
             )}
             collapsedFooterTrailing={(
-                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div className="project-card-footer-trailing">
                     {project.dueDate && (
                         <div className="project-card-due">
                             <Calendar size={11} />
@@ -176,12 +176,12 @@ function PastProjectCard({ project, expanded, fullDetail, detailLoading, onToggl
             expandedMeta={(
                 <>
                     {archiveOutcomeBadge && (
-                        <span className={`badge ${archiveOutcomeBadge.className}`} style={{ fontSize: '0.82rem' }} title={archiveOutcomeBadge.title}>
+                        <span className={`badge badge--compact ${archiveOutcomeBadge.className}`} title={archiveOutcomeBadge.title}>
                             <ArchiveOutcomeIcon size={14} />
                             {archiveOutcomeBadge.label}
                         </span>
                     )}
-                    <span className={`badge ${lifecycleBadge.className}`} style={{ fontSize: '0.82rem' }}>
+                    <span className={`badge badge--compact ${lifecycleBadge.className}`}>
                         <LifecycleIcon size={14} />
                         {lifecycleBadge.label}
                     </span>
@@ -244,7 +244,7 @@ function PastProjectCard({ project, expanded, fullDetail, detailLoading, onToggl
             formatAssignedTeamSuffix={(pt) => `${pt.isOwner ? ' ★' : ''}`}
             afterSections={detail ? (
                 <>
-                    <div className="exp-card-section" style={{ padding: 0 }}>
+                    <div className="exp-card-section exp-card-section--flush">
                         <GanttChart
                             phases={detail.phases || []}
                             projectId={detail.id}
@@ -269,7 +269,7 @@ function PastProjectCard({ project, expanded, fullDetail, detailLoading, onToggl
 
                     <div className="exp-card-section">
                         <div className="exp-card-section-header">
-                            <Paperclip size={14} style={{ marginRight: '0.35rem' }} />
+                            <Paperclip size={14} className="exp-card-section-icon" />
                             Project Files
                         </div>
                         <FileUploadZone
@@ -522,18 +522,7 @@ export default function PastProjectsPage() {
 
             {/* Loading indicator for expanded card */}
             {expandedProjectId && detailLoading && !expandedProjectDetail && (
-                <div style={{
-                    position: 'fixed',
-                    bottom: '1.5rem',
-                    right: '1.5rem',
-                    background: 'var(--bg-card)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '0.6rem 1rem',
-                    boxShadow: 'var(--shadow-md)',
-                    fontSize: '0.82rem',
-                    fontFamily: 'var(--font-heading)',
-                    color: 'var(--gray-500)'
-                }}>
+                <div className="project-detail-loading-indicator">
                     Loading details…
                 </div>
             )}

@@ -78,6 +78,8 @@ function InlineSelect({ taskId, field, current, options, labels, canEdit, onChan
     return (
         <select
             className={`phase-row-select phase-row-select--${field} phase-row-select--${current}`}
+            title={`Select ${field}`}
+            aria-label={`Select ${field}`}
             value={effectiveCurrent}
             onChange={handleChange}
             disabled={busy}
@@ -122,7 +124,7 @@ function MiniProgress({ completed, total }: any) {
     return (
         <div className="phase-row-mini-progress" title={`${completed}/${total} subtasks done`}>
             <div className="phase-row-mini-progress-bar">
-                <div className="phase-row-mini-progress-fill" style={{ width: `${pct}%` }} />
+                <progress className="phase-row-mini-progress-native" value={pct} max={100} aria-label="Task progress" />
             </div>
             <span className="phase-row-mini-progress-text">{pct}%</span>
         </div>
@@ -139,7 +141,7 @@ function SubtaskRow({ task, canEdit, canEditStatus, onFieldChange, onEditTask, o
             onDrop={(e: React.DragEvent<HTMLTableRowElement>) => { e.preventDefault(); e.stopPropagation(); onSubDrop && onSubDrop(task.id); }}
         >
             {canEdit && (
-                <td className="phase-row-td phase-row-td--drag" style={{ padding: 0 }}>
+                <td className="phase-row-td phase-row-td--drag">
                     <span
                         className="drag-handle"
                         draggable
@@ -262,7 +264,7 @@ function TaskRow({ task, canEdit, canEditStatus, onFieldChange, onAddSubtask, on
                 onDrop={(e: React.DragEvent<HTMLTableRowElement>) => { e.preventDefault(); e.stopPropagation(); onTaskDrop && onTaskDrop(task.id); }}
             >
                 {canEdit && (
-                    <td className="phase-row-td phase-row-td--drag" style={{ padding: 0 }}>
+                    <td className="phase-row-td phase-row-td--drag">
                         <span
                             className="drag-handle"
                             draggable
@@ -284,7 +286,7 @@ function TaskRow({ task, canEdit, canEditStatus, onFieldChange, onAddSubtask, on
                     <span className="phase-row-task-expand">
                         {hasSubs
                             ? (expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)
-                            : <span style={{ width: 14, display: 'inline-block' }} />}
+                            : <span className="phase-row-task-expand-placeholder" />}
                     </span>
                     <span className="phase-row-task-title-text">{task.title}</span>
                 </td>
@@ -366,7 +368,9 @@ function TaskRow({ task, canEdit, canEditStatus, onFieldChange, onAddSubtask, on
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    PhaseRow — main export
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-export default function PhaseRow({ phase, canEdit, canEditStatus, allMembers: _allMembers, onPhaseUpdated: _onPhaseUpdated, onTaskUpdated, onAddTask, onAddSubtask, onEditTask, onEditPhase, onDeletePhase }: any) {
+export default function PhaseRow({ phase, canEdit, canEditStatus, allMembers, onPhaseUpdated, onTaskUpdated, onAddTask, onAddSubtask, onEditTask, onEditPhase, onDeletePhase }: any) {
+    void allMembers;
+    void onPhaseUpdated;
     const [expanded, setExpanded] = useState(false);
     // Confirm modal state: { type: 'task'|'subtask', id, title } | null
     const [confirmDelete, setConfirmDelete] = useState<{ type: 'task' | 'subtask'; id: number; title: string } | null>(null);
@@ -464,10 +468,7 @@ export default function PhaseRow({ phase, canEdit, canEditStatus, allMembers: _a
                 </div>
                 <div className="phase-row-progress">
                     <div className="phase-row-progress-bar">
-                        <div
-                            className="phase-row-progress-fill"
-                            style={{ width: `${progressPct}%` }}
-                        />
+                        <progress className="phase-row-progress-native" value={progressPct} max={100} aria-label="Phase progress" />
                     </div>
                     <span className="phase-row-progress-text">{progressPct}%</span>
                 </div>
@@ -506,7 +507,7 @@ export default function PhaseRow({ phase, canEdit, canEditStatus, allMembers: _a
                                     <th className="phase-row-th">Due</th>
                                     <th className="phase-row-th">Assignees</th>
                                     <th className="phase-row-th">Progress</th>
-                                    <th className="phase-row-th" style={{ width: '4.5rem' }} />
+                                    <th className="phase-row-th phase-row-th--actions" />
                                 </tr>
                             </thead>
                             <tbody>

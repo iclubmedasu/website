@@ -21,7 +21,7 @@
         "build:portal": "pnpm --filter iclub-frontend build",
         "build:api": "pnpm --filter backend build",
         "build:web": "pnpm --filter public-website build",
-        "typecheck": "pnpm --filter backend tsc --noEmit && pnpm --filter iclub-frontend tsc --noEmit && pnpm --filter public-website tsc --noEmit",
+        "typecheck": "pnpm --filter backend typecheck && pnpm --filter iclub-frontend typecheck && pnpm --filter public-website typecheck",
         "lint": "eslint . --ext .ts,.tsx",
         "lint:fix": "eslint . --ext .ts,.tsx --fix",
         "format": "prettier --write \"**/*.{ts,tsx,css,md,json}\"",

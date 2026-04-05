@@ -147,6 +147,17 @@ function addDays(d: any, n: number) {
     return r;
 }
 
+function applyElementStyles(
+    node: HTMLElement | SVGElement | null,
+    styles: Record<string, string | undefined>,
+) {
+    if (!node) return;
+    const elementStyle = node.style as unknown as Record<string, string>;
+    for (const [property, value] of Object.entries(styles)) {
+        elementStyle[property] = value ?? '';
+    }
+}
+
 function flattenTaskNodes(phases: any[] = []) {
     const nodes: any[] = [];
 
@@ -1553,17 +1564,17 @@ export default function GanttChart({
                 select.showPicker();
                 return;
             }
-        } catch (error) {
+        } catch {
             // Fall through to the compatibility path below.
         }
 
         try {
             select.focus();
             select.click();
-        } catch (error) {
+        } catch {
             try {
                 select.focus();
-            } catch (focusError) {
+            } catch {
                 // Ignore browsers that refuse programmatic focus here.
             }
         }
@@ -2954,7 +2965,11 @@ export default function GanttChart({
                                     <button
                                         className="gantt-utility-btn"
                                         title="Toggle attribute columns"
-                                        style={{ width: 'auto', padding: '0 0.45rem', gap: '0.25rem' }}
+                                        ref={(node) => applyElementStyles(node, {
+                                            width: 'auto',
+                                            padding: '0 0.45rem',
+                                            gap: '0.25rem',
+                                        })}
                                         onClick={() => {
                                             setVisibleCols((prev) =>
                                                 prev.size === ATTR_COLUMNS.length ? new Set() : new Set(ATTR_COLUMNS.map((c) => c.key))
@@ -3073,8 +3088,17 @@ export default function GanttChart({
             {/* ── Main chart area ── */}
             <div className="gantt-main" ref={ganttMainRef}>
                 {/* Left: Tree panel */}
-                <div className="gantt-tree-panel" style={{ width: treeWidth, minWidth: treeWidth }}>
-                    <div className="gantt-tree-header" style={{ height: HEADER_HEIGHT }}>
+                <div
+                    className="gantt-tree-panel"
+                    ref={(node) => applyElementStyles(node, {
+                        width: `${treeWidth}px`,
+                        minWidth: `${treeWidth}px`,
+                    })}
+                >
+                    <div
+                        className="gantt-tree-header"
+                        ref={(node) => applyElementStyles(node, { height: `${HEADER_HEIGHT}px` })}
+                    >
                         <span className="gantt-tree-header-wbs">WBS</span>
                         <span>Task Name</span>
                     </div>
@@ -3091,7 +3115,10 @@ export default function GanttChart({
                                     <div
                                         key="tree-add-phase"
                                         className="gantt-tree-row gantt-tree-row--add"
-                                        style={{ height: ROW_HEIGHT, paddingLeft: '0.5rem' }}
+                                        ref={(node) => applyElementStyles(node, {
+                                            height: `${ROW_HEIGHT}px`,
+                                            paddingLeft: '0.5rem',
+                                        })}
                                         onClick={onAddPhase}
                                     >
                                         <Plus size={13} className="gantt-add-icon" />
@@ -3104,7 +3131,10 @@ export default function GanttChart({
                                     <div
                                         key={`tree-${row.id}`}
                                         className={`gantt-tree-row gantt-tree-row--add${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}`}
-                                        style={{ height: ROW_HEIGHT, paddingLeft: `${0.5 + 1 * 1.25}rem` }}
+                                        ref={(node) => applyElementStyles(node, {
+                                            height: `${ROW_HEIGHT}px`,
+                                            paddingLeft: `${0.5 + 1 * 1.25}rem`,
+                                        })}
                                         onClick={() => onAddTask(row.phase)}
                                     >
                                         <Plus size={13} className="gantt-add-icon" />
@@ -3117,7 +3147,10 @@ export default function GanttChart({
                                     <div
                                         key={`tree-${row.id}`}
                                         className={`gantt-tree-row gantt-tree-row--add${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}`}
-                                        style={{ height: ROW_HEIGHT, paddingLeft: `${0.5 + 2 * 1.25}rem` }}
+                                        ref={(node) => applyElementStyles(node, {
+                                            height: `${ROW_HEIGHT}px`,
+                                            paddingLeft: `${0.5 + 2 * 1.25}rem`,
+                                        })}
                                         onClick={() => onAddSubtask(row.phase, row.parentTask)}
                                     >
                                         <Plus size={13} className="gantt-add-icon" />
@@ -3149,7 +3182,10 @@ export default function GanttChart({
                                 <div
                                     key={`tree-${row.type}-${row.id}`}
                                     className={`gantt-tree-row gantt-tree-row--${row.type}${isSelected ? ' selected' : ''}${isSelected && row.type !== 'phase' ? ' selected-emphasis' : ''}${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}${isCriticalRow ? ' gantt-tree-row--critical' : ''}`}
-                                    style={{ height: ROW_HEIGHT, paddingLeft: `${0.5 + row.depth * 1.25}rem` }}
+                                    ref={(node) => applyElementStyles(node, {
+                                        height: `${ROW_HEIGHT}px`,
+                                        paddingLeft: `${0.5 + row.depth * 1.25}rem`,
+                                    })}
                                     onClick={() => handleSelect(row.type, row.data, row.phase, row.parentTask)}
                                 >
                                     {hasChildren ? (
@@ -3165,7 +3201,10 @@ export default function GanttChart({
                                     ) : (
                                         <span className="gantt-tree-chevron-placeholder" />
                                     )}
-                                    <span className="gantt-tree-status-dot" style={{ background: statusColor }} />
+                                    <span
+                                        className="gantt-tree-status-dot"
+                                        ref={(node) => applyElementStyles(node, { background: statusColor })}
+                                    />
                                     <div className="gantt-tree-wbs-stack">
                                         <span className="gantt-tree-wbs">{row.data.wbs || ''}</span>
                                         {/* Inline progress bar */}
@@ -3174,7 +3213,10 @@ export default function GanttChart({
                                             return (
                                                 <span className="gantt-progress-wrap" title={`${pct}%`}>
                                                     <span className="gantt-progress-track">
-                                                        <span className="gantt-progress-fill" style={{ width: `${pct}%` }} />
+                                                        <span
+                                                            className="gantt-progress-fill"
+                                                            ref={(node) => applyElementStyles(node, { width: `${pct}%` })}
+                                                        />
                                                     </span>
                                                 </span>
                                             );
@@ -3247,10 +3289,23 @@ export default function GanttChart({
 
                 {/* Middle: Attribute columns (slide in/out) */}
                 {activeColumns.length > 0 && (
-                    <div className="gantt-columns-panel" style={{ width: columnsWidth, minWidth: columnsWidth }}>
-                        <div className="gantt-columns-header" style={{ height: HEADER_HEIGHT }}>
+                    <div
+                        className="gantt-columns-panel"
+                        ref={(node) => applyElementStyles(node, {
+                            width: `${columnsWidth}px`,
+                            minWidth: `${columnsWidth}px`,
+                        })}
+                    >
+                        <div
+                            className="gantt-columns-header"
+                            ref={(node) => applyElementStyles(node, { height: `${HEADER_HEIGHT}px` })}
+                        >
                             {activeColumns.map((col) => (
-                                <div key={col.key} className="gantt-col-hdr" style={{ width: col.width }}>
+                                <div
+                                    key={col.key}
+                                    className="gantt-col-hdr"
+                                    ref={(node) => applyElementStyles(node, { width: `${col.width}px` })}
+                                >
                                     {col.label}
                                 </div>
                             ))}
@@ -3269,7 +3324,7 @@ export default function GanttChart({
                                     <div
                                         key={`col-${row.type}-${row.id}`}
                                         className={`gantt-columns-row${isColSelected ? ' selected' : ''}${isColSelected && row.type !== 'phase' ? ' selected-emphasis' : ''}${isAdd ? ' gantt-columns-row--add' : ''} gantt-columns-row--${row.type}${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}${isCriticalRow ? ' gantt-columns-row--critical' : ''}`}
-                                        style={{ height: ROW_HEIGHT }}
+                                        ref={(node) => applyElementStyles(node, { height: `${ROW_HEIGHT}px` })}
                                     >
                                         {!isAdd && activeColumns.map((col) => {
                                             const isEditing = editingCell?.rowId === row.id && editingCell?.rowType === row.type && editingCell?.colKey === col.key;
@@ -3278,7 +3333,7 @@ export default function GanttChart({
                                                 <div
                                                     key={col.key}
                                                     className={`gantt-col-cell gantt-col-cell--${col.key}${cellEditable ? ' gantt-col-cell--editable' : ''}`}
-                                                    style={{ width: col.width }}
+                                                    ref={(node) => applyElementStyles(node, { width: `${col.width}px` })}
                                                     onPointerDown={(e) => {
                                                         e.stopPropagation();
                                                         if (!cellEditable || isEditing) return;
@@ -3314,7 +3369,10 @@ export default function GanttChart({
                                                     {col.key === 'status' && row.type !== 'phase' && !isEditing && (
                                                         <span
                                                             className="gantt-col-badge"
-                                                            style={{ background: STATUS_COLORS[row.data.status], color: '#fff' }}
+                                                            ref={(node) => applyElementStyles(node, {
+                                                                background: STATUS_COLORS[row.data.status],
+                                                                color: '#fff',
+                                                            })}
                                                         >
                                                             {STATUS_LABELS[row.data.status] || row.data.status}
                                                         </span>
@@ -3323,6 +3381,8 @@ export default function GanttChart({
                                                         <select
                                                             ref={activeSelectRef}
                                                             className="gantt-col-select"
+                                                            title="Select status"
+                                                            aria-label="Select status"
                                                             defaultValue={row.data.status}
                                                             onChange={(e) => handleCellUpdate(row.type, row.id, 'status', e.target.value)}
                                                             onBlur={() => setEditingCell(null)}
@@ -3335,7 +3395,10 @@ export default function GanttChart({
                                                     {col.key === 'status' && row.type === 'phase' && (
                                                         <span
                                                             className="gantt-col-badge"
-                                                            style={{ background: STATUS_COLORS[getPhaseStatus(row.data)], color: '#fff' }}
+                                                            ref={(node) => applyElementStyles(node, {
+                                                                background: STATUS_COLORS[getPhaseStatus(row.data)],
+                                                                color: '#fff',
+                                                            })}
                                                         >
                                                             {STATUS_LABELS[getPhaseStatus(row.data)] || ''}
                                                         </span>
@@ -3343,7 +3406,13 @@ export default function GanttChart({
 
                                                     {/* Priority */}
                                                     {col.key === 'priority' && row.type !== 'phase' && !isEditing && (
-                                                        <span className="gantt-col-badge" style={{ background: PRIORITY_COLORS[row.data.priority], color: '#fff' }}>
+                                                        <span
+                                                            className="gantt-col-badge"
+                                                            ref={(node) => applyElementStyles(node, {
+                                                                background: PRIORITY_COLORS[row.data.priority],
+                                                                color: '#fff',
+                                                            })}
+                                                        >
                                                             {PRIORITY_LABELS[row.data.priority] || row.data.priority}
                                                         </span>
                                                     )}
@@ -3351,6 +3420,8 @@ export default function GanttChart({
                                                         <select
                                                             ref={activeSelectRef}
                                                             className="gantt-col-select"
+                                                            title="Select priority"
+                                                            aria-label="Select priority"
                                                             defaultValue={row.data.priority}
                                                             onChange={(e) => handleCellUpdate(row.type, row.id, 'priority', e.target.value)}
                                                             onBlur={() => setEditingCell(null)}
@@ -3363,7 +3434,13 @@ export default function GanttChart({
 
                                                     {/* Difficulty */}
                                                     {col.key === 'difficulty' && row.type !== 'phase' && !isEditing && (
-                                                        <span className="gantt-col-badge" style={{ background: DIFFICULTY_COLORS[row.data.difficulty], color: '#fff' }}>
+                                                        <span
+                                                            className="gantt-col-badge"
+                                                            ref={(node) => applyElementStyles(node, {
+                                                                background: DIFFICULTY_COLORS[row.data.difficulty],
+                                                                color: '#fff',
+                                                            })}
+                                                        >
                                                             {DIFFICULTY_LABELS[row.data.difficulty] || row.data.difficulty}
                                                         </span>
                                                     )}
@@ -3371,6 +3448,8 @@ export default function GanttChart({
                                                         <select
                                                             ref={activeSelectRef}
                                                             className="gantt-col-select"
+                                                            title="Select difficulty"
+                                                            aria-label="Select difficulty"
                                                             defaultValue={row.data.difficulty}
                                                             onChange={(e) => handleCellUpdate(row.type, row.id, 'difficulty', e.target.value)}
                                                             onBlur={() => setEditingCell(null)}
@@ -3392,15 +3471,18 @@ export default function GanttChart({
 
                 {/* Right: Timeline panel */}
                 <div className="gantt-timeline-panel" ref={timelineRef} onScroll={handleTimelineScroll}>
-                    <div style={{ minWidth: totalWidth }}>
+                    <div ref={(node) => applyElementStyles(node, { minWidth: `${totalWidth}px` })}>
                         {/* Header */}
-                        <div className="gantt-timeline-header" style={{ height: HEADER_HEIGHT }}>
+                        <div
+                            className="gantt-timeline-header"
+                            ref={(node) => applyElementStyles(node, { height: `${HEADER_HEIGHT}px` })}
+                        >
                             <div className="gantt-header-top">
                                 {topHeaders.map((h) => (
                                     <div
                                         key={h.key}
                                         className="gantt-header-top-cell"
-                                        style={{ width: h.colSpan * colWidth }}
+                                        ref={(node) => applyElementStyles(node, { width: `${h.colSpan * colWidth}px` })}
                                     >
                                         {h.label}
                                     </div>
@@ -3411,7 +3493,7 @@ export default function GanttChart({
                                     <div
                                         key={col.key}
                                         className={`gantt-header-bottom-cell${col.isToday ? ' today' : ''}${col.isWeekend ? ' weekend' : ''}`}
-                                        style={{ width: colWidth }}
+                                        ref={(node) => applyElementStyles(node, { width: `${colWidth}px` })}
                                     >
                                         {col.label}
                                     </div>
@@ -3420,21 +3502,27 @@ export default function GanttChart({
                         </div>
 
                         {/* Body */}
-                        <div className="gantt-timeline-body" style={{ minHeight: timelineBodyHeight || ROW_HEIGHT }}>
+                        <div
+                            className="gantt-timeline-body"
+                            ref={(node) => applyElementStyles(node, { minHeight: `${timelineBodyHeight || ROW_HEIGHT}px` })}
+                        >
                             {/* Grid lines (rendered once, spans full height) */}
                             <div className="gantt-grid-lines">
                                 {columns.map((col) => (
                                     <div
                                         key={col.key}
                                         className={`gantt-grid-col${col.isWeekend ? ' weekend' : ''}${col.isToday ? ' today' : ''}`}
-                                        style={{ width: colWidth }}
+                                        ref={(node) => applyElementStyles(node, { width: `${colWidth}px` })}
                                     />
                                 ))}
                             </div>
 
                             {/* Today line */}
                             {todayPx != null && (
-                                <div className="gantt-today-line" style={{ left: todayPx }} />
+                                <div
+                                    className="gantt-today-line"
+                                    ref={(node) => applyElementStyles(node, { left: `${todayPx}px` })}
+                                />
                             )}
 
                             {dependencySegments.length > 0 && (
@@ -3464,7 +3552,9 @@ export default function GanttChart({
                                             className={`gantt-dependency-path${segment.critical ? ' gantt-dependency-path--critical' : ''}`}
                                             d={`M ${segment.sourceX} ${segment.sourceY} H ${segment.elbowX} V ${segment.targetY} H ${segment.targetX}`}
                                             markerEnd="url(#gantt-dependency-arrow)"
-                                            style={{ color: segment.critical ? 'var(--purple-600)' : '#64748b' }}
+                                            ref={(node) => applyElementStyles(node, {
+                                                color: segment.critical ? 'var(--purple-600)' : '#64748b',
+                                            })}
                                         />
                                     ))}
                                 </svg>
@@ -3485,7 +3575,7 @@ export default function GanttChart({
                                         <div
                                             key={`tl-${row.id}`}
                                             className={`gantt-timeline-row gantt-timeline-row--add${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}`}
-                                            style={{ height: ROW_HEIGHT }}
+                                            ref={(node) => applyElementStyles(node, { height: `${ROW_HEIGHT}px` })}
                                         />
                                     );
                                 }
@@ -3499,22 +3589,30 @@ export default function GanttChart({
                                     <div
                                         key={`tl-${row.type}-${row.id}`}
                                         className={`gantt-timeline-row${isSelected ? ' selected' : ''}${isSelected && row.type !== 'phase' ? ' selected-emphasis' : ''}${inSelectedPhase ? ' phase-highlighted' : ''}${hasPhaseSeparator ? ' gantt-row-phase-separator' : ''}${isCriticalRow ? ' gantt-timeline-row--critical' : ''}`}
-                                        style={{ height: ROW_HEIGHT }}
+                                        ref={(node) => applyElementStyles(node, { height: `${ROW_HEIGHT}px` })}
                                         onClick={() => handleSelect(row.type, row.data, row.phase, row.parentTask)}
                                     >
                                         {/* Baseline bar (behind actual bar) */}
                                         {baselineBar && (
                                             <div
                                                 className={`gantt-bar-baseline gantt-bar-baseline--${row.type}`}
-                                                style={{ left: baselineBar.left, width: baselineBar.width }}
+                                                ref={(node) => applyElementStyles(node, {
+                                                    left: `${baselineBar.left}px`,
+                                                    width: `${baselineBar.width}px`,
+                                                })}
                                                 title={`Baseline: ${fmtDate(row.data.baselineStartDate)} → ${fmtDate(row.data.baselineDueDate)}`}
                                             />
                                         )}
                                         {bar && (
                                             <div
                                                 className={`gantt-bar gantt-bar--${row.type} gantt-bar--${bar.status}${bar.isMilestone ? ' gantt-bar--milestone' : ''}${isCriticalRow ? ' gantt-bar--critical' : ''}`}
-                                                style={{ left: bar.left, width: bar.width }}
-                                                ref={setBarRef(rowKey)}
+                                                ref={(node) => {
+                                                    setBarRef(rowKey)(node);
+                                                    applyElementStyles(node, {
+                                                        left: `${bar.left}px`,
+                                                        width: `${bar.width}px`,
+                                                    });
+                                                }}
                                                 aria-label={getBarTooltip(row)}
                                                 onMouseEnter={(event) => handlePreviewMouseEnter(row, event)}
                                                 onMouseLeave={() => handlePreviewMouseLeave(row)}
@@ -3529,7 +3627,10 @@ export default function GanttChart({
                                         {bar && (
                                             <div
                                                 className="gantt-bar-date-range"
-                                                style={{ left: bar.left, width: Math.max(bar.width, 90) }}
+                                                ref={(node) => applyElementStyles(node, {
+                                                    left: `${bar.left}px`,
+                                                    width: `${Math.max(bar.width, 90)}px`,
+                                                })}
                                                 title={`${fmtDate(bar.startDate)} → ${fmtDate(bar.endDate)}`}
                                             >
                                                 {fmtDateCompact(bar.startDate)} → {fmtDateCompact(bar.endDate)}
@@ -3544,13 +3645,15 @@ export default function GanttChart({
 
                 {preview && previewData && preview.position && (
                     <div
-                        ref={previewPopoverRef}
-                        className={`gantt-preview-popover gantt-preview-popover--${preview.position.placement}`}
-                        style={{
-                            left: `${preview.position.left}px`,
-                            top: `${preview.position.top}px`,
-                            width: `${preview.position.width}px`,
+                        ref={(node) => {
+                            previewPopoverRef.current = node;
+                            applyElementStyles(node, {
+                                left: `${preview.position.left}px`,
+                                top: `${preview.position.top}px`,
+                                width: `${preview.position.width}px`,
+                            });
                         }}
+                        className={`gantt-preview-popover gantt-preview-popover--${preview.position.placement}`}
                         onClick={(event) => event.stopPropagation()}
                     >
                         <div className="gantt-preview-header">
@@ -3571,13 +3674,19 @@ export default function GanttChart({
                         <div className="gantt-preview-meta">
                             <span
                                 className="gantt-preview-pill"
-                                style={previewData.statusColor ? { backgroundColor: previewData.statusColor, color: '#fff' } : undefined}
+                                ref={(node) => applyElementStyles(node, {
+                                    backgroundColor: previewData.statusColor || '',
+                                    color: previewData.statusColor ? '#fff' : '',
+                                })}
                             >
                                 {previewData.statusLabel}
                             </span>
                             <span
                                 className="gantt-preview-pill"
-                                style={previewData.priorityColor ? { backgroundColor: previewData.priorityColor, color: '#fff' } : undefined}
+                                ref={(node) => applyElementStyles(node, {
+                                    backgroundColor: previewData.priorityColor || '',
+                                    color: previewData.priorityColor ? '#fff' : '',
+                                })}
                             >
                                 Priority: {previewData.priorityLabel}
                             </span>

@@ -494,9 +494,9 @@ function LoginPage() {
                                 <form onSubmit={handleCompleteProfileDetailsContinue}>
                                     <div className="form-group">
                                         <label className="form-label">Student ID</label>
-                                        <input type="text" className="form-input" value={studentId} disabled />
+                                        <input type="text" className="form-input" value={studentId} disabled title="Student ID" />
                                     </div>
-                                    <p className="login-subtitle" style={{ marginBottom: '0.5rem', fontSize: '0.8rem' }}>
+                                    <p className="login-subtitle login-subtitle--compact">
                                         Official email will be {studentId}@med.asu.edu.eg (cannot be changed).
                                     </p>
                                     <div className="form-group">
@@ -756,6 +756,7 @@ function LoginPage() {
                                             type="text"
                                             className="form-input"
                                             value={email}
+                                            title="Email"
                                             disabled
                                         />
                                     </div>
@@ -800,7 +801,7 @@ function LoginPage() {
                                 <form onSubmit={handleSetupProfileSubmit}>
                                     <div className="form-group">
                                         <label className="form-label">Email</label>
-                                        <input type="email" className="form-input" value={email} disabled />
+                                        <input type="email" className="form-input" value={email} disabled title="Email" />
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">Full Name<span className="required-star"> *</span></label>
@@ -874,7 +875,7 @@ function LoginPage() {
                                 <form onSubmit={handleSetupPassword}>
                                     <div className="form-group">
                                         <label className="form-label">Email</label>
-                                        <input type="email" className="form-input" value={email} disabled />
+                                        <input type="email" className="form-input" value={email} disabled title="Email" />
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">Password<span className="required-star"> *</span></label>
@@ -913,7 +914,7 @@ function LoginPage() {
                                     <button type="button" onClick={() => { setStep('setupProfile'); setError(''); }}>
                                         Back to profile
                                     </button>
-                                    <button type="button" onClick={resetToEmail} style={{ marginLeft: 8 }}>
+                                    <button type="button" onClick={resetToEmail} className="toggle-form-button-offset">
                                         Use different email
                                     </button>
                                 </div>
