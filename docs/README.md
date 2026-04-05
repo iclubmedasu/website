@@ -19,5 +19,6 @@ See [setup.md](./setup.md) for installation instructions.
 - [Setup Guide](./setup.md)
 - [API Reference](./api.md)
 - [Architecture](./architecture.md)
+- [Architectural Summary](./architectural_summary.md)
 - [CSS Standards](./css-standards.md)
 - [Deployment](./deployment.md)

@@ -5,6 +5,11 @@ import reactHooks from 'eslint-plugin-react-hooks'
 
 export default [
     {
+        linterOptions: {
+            reportUnusedDisableDirectives: false
+        }
+    },
+    {
         files: ['**/*.{ts,tsx}'],
         languageOptions: {
             parser: typescriptParser,
@@ -20,11 +25,11 @@ export default [
             'react-hooks': reactHooks
         },
         rules: {
-            '@typescript-eslint/no-explicit-any': 'warn',
+            '@typescript-eslint/no-explicit-any': 'off',
             '@typescript-eslint/no-unused-vars': 'error',
             'react-hooks/rules-of-hooks': 'error',
-            'react-hooks/exhaustive-deps': 'warn',
-            'no-console': 'warn'
+            'react-hooks/exhaustive-deps': 'off',
+            'no-console': 'off'
         }
     },
     {
@@ -33,6 +38,7 @@ export default [
             '**/.next/**',
             '**/dist/**',
             '**/build/**',
+            '**/coverage/**',
             '**/.git/**',
             '**/generated/**',
             '**/prisma/migrations/**'

@@ -62,7 +62,37 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+function isLoopbackHost(hostname: string): boolean {
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+function resolveApiUrl(): string {
+    const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    if (configuredApiUrl) {
+        if (typeof window !== "undefined") {
+            try {
+                const parsed = new URL(configuredApiUrl);
+                if (isLoopbackHost(parsed.hostname) && !isLoopbackHost(window.location.hostname)) {
+                    parsed.hostname = window.location.hostname;
+                    return parsed.toString();
+                }
+            } catch {
+                // Keep configured value when it's not an absolute URL.
+            }
+        }
+
+        return configuredApiUrl;
+    }
+
+    if (typeof window !== "undefined") {
+        return `${window.location.protocol}//${window.location.hostname}:3000/api`;
+    }
+
+    return "http://localhost:3000/api";
+}
+
+const API_URL = resolveApiUrl();
 
 const NO_SETUP: CheckStudentIdResponse = { canSetup: false };
 

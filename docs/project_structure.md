@@ -80,9 +80,46 @@ website/
 ├── e2e/
 │   └── auth.smoke.spec.ts
 ├── members-portal/
+│   ├── public/
+│   │   ├── manifest.json
+│   │   ├── sw.js
+│   │   └── workbox-0f7cba1c.js
 │   ├── src/
-│   │   ├── __tests__/
-│   │   │   └── titleCase.test.ts
+│   │   ├── app/
+│   │   │   ├── (protected)/
+│   │   │   │   ├── administration/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── alumni/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── dashboard/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── help/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── members/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── past-projects/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── projects/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── teams/
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── user/
+│   │   │   │   │   ├── page.client.tsx
+│   │   │   │   │   ├── page.tsx
+│   │   │   │   │   └── UserPage.css
+│   │   │   │   ├── layout.tsx
+│   │   │   │   └── loading.tsx
+│   │   │   ├── (public)/
+│   │   │   │   ├── login/
+│   │   │   │   │   ├── LoginPage.css
+│   │   │   │   │   ├── page.client.tsx
+│   │   │   │   │   └── page.tsx
+│   │   │   │   └── layout.tsx
+│   │   │   ├── favicon.ico
+│   │   │   ├── globals.css
+│   │   │   ├── layout.tsx
+│   │   │   ├── not-found.tsx
+│   │   │   └── page.tsx
 │   │   ├── components/
 │   │   │   ├── __tests__/
 │   │   │   │   ├── ProtectedRoute.integration.test.tsx
@@ -92,6 +129,9 @@ website/
 │   │   │   ├── AlumniGate/
 │   │   │   │   ├── AlumniGate.css
 │   │   │   │   └── AlumniGate.tsx
+│   │   │   ├── AuthGuard/
+│   │   │   │   ├── AdminGuard.tsx
+│   │   │   │   └── AuthGuard.tsx
 │   │   │   ├── badges/
 │   │   │   │   └── badge.css
 │   │   │   ├── buttons/
@@ -146,8 +186,16 @@ website/
 │   │   │   │   └── PhoneInput.tsx
 │   │   │   ├── popover/
 │   │   │   │   └── popover.tsx
+│   │   │   ├── providers/
+│   │   │   │   └── AuthProvider.tsx
+│   │   │   ├── PWAInstallPrompt/
+│   │   │   │   ├── PWAInstallPrompt.css
+│   │   │   │   └── PWAInstallPrompt.tsx
 │   │   │   ├── scrollbar/
 │   │   │   │   └── scrollbar.css
+│   │   │   ├── SideBarNavigationSlim/
+│   │   │   │   ├── SideBarNavigationSlim.css
+│   │   │   │   └── SideBarNavigationSlim.tsx
 │   │   │   ├── StepProgressBar/
 │   │   │   │   ├── StepProgressBar.css
 │   │   │   │   └── StepProgressBar.tsx
@@ -172,14 +220,8 @@ website/
 │   │   │   ├── ProtectedRoute.css
 │   │   │   └── ProtectedRoute.tsx
 │   │   ├── context/
-│   │   │   ├── __tests__/
-│   │   │   │   └── AuthContext.integration.test.tsx
 │   │   │   └── AuthContext.tsx
-│   │   ├── hooks/
-│   │   │   ├── __tests__/
-│   │   │   │   └── useTitleCaseInput.test.tsx
-│   │   │   └── useTitleCaseInput.ts
-│   │   ├── pages/
+│   │   ├── features/
 │   │   │   ├── HelpAndSupport/
 │   │   │   │   ├── HelpAndSupportPage.css
 │   │   │   │   └── HelpAndSupportPage.tsx
@@ -249,40 +291,28 @@ website/
 │   │   │   │   ├── ProjectsPage.css
 │   │   │   │   └── ProjectsPage.tsx
 │   │   │   ├── User/
-│   │   │   │   ├── UserPage.css
-│   │   │   │   └── UserPage.tsx
+│   │   │   │   └── UserPage.css
 │   │   │   ├── LoginPage.css
-│   │   │   ├── LoginPage.tsx
-│   │   │   ├── SideBarNavigationSlim.css
-│   │   │   └── SideBarNavigationSlim.tsx
+│   │   │   └── SideBarNavigationSlim.css
+│   │   ├── hooks/
+│   │   │   ├── use-breakpoint.ts
+│   │   │   └── useTitleCaseInput.ts
 │   │   ├── services/
 │   │   │   └── api.ts
 │   │   ├── types/
 │   │   │   └── backend-contracts.ts
-│   │   ├── utils/
-│   │   │   ├── __tests__/
-│   │   │   │   └── countryCodes.test.ts
-│   │   │   ├── countryCodes.ts
-│   │   │   └── titleCase.ts
-│   │   ├── app.css
-│   │   ├── App.tsx
-│   │   ├── cx.ts
-│   │   ├── is-react-component.ts
-│   │   ├── main.tsx
-│   │   └── use-breakpoint.ts
-│   ├── .dockerignore
+│   │   └── utils/
+│   │       ├── countryCodes.ts
+│   │       └── titleCase.ts
 │   ├── .env.local
-│   ├── .gitignore
-│   ├── .gitkeep
-│   ├── CSS Standards Summary.md
+│   ├── .env.local.example
 │   ├── Dockerfile
-│   ├── index.html
-│   ├── nginx.conf
+│   ├── next.config.ts
+│   ├── next-env.d.ts
+│   ├── next-pwa.d.ts
 │   ├── package.json
-│   ├── README.md
 │   ├── tsconfig.json
-│   ├── vite.config.ts
-│   └── vitest.config.ts
+│   └── tsconfig.tsbuildinfo
 ├── packages/
 │   └── shared/
 │       ├── src/

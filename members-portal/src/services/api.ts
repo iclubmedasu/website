@@ -33,8 +33,37 @@ import type {
     UpdateTaskPayload,
 } from "../types/backend-contracts";
 
-// API Base URL - Update this based on your environment
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'
+function isLoopbackHost(hostname: string): boolean {
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+}
+
+function resolveApiBaseUrl(): string {
+    const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    if (configuredApiUrl) {
+        if (typeof window !== 'undefined') {
+            try {
+                const parsed = new URL(configuredApiUrl);
+                if (isLoopbackHost(parsed.hostname) && !isLoopbackHost(window.location.hostname)) {
+                    parsed.hostname = window.location.hostname;
+                    return parsed.toString();
+                }
+            } catch {
+                // Keep configured value when it's not an absolute URL.
+            }
+        }
+
+        return configuredApiUrl;
+    }
+
+    if (typeof window !== 'undefined') {
+        return `${window.location.protocol}//${window.location.hostname}:3000/api`;
+    }
+
+    return 'http://localhost:3000/api';
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 type ApiNamespace = Record<string, (...args: any[]) => any>;
 type JsonHeaders = Record<string, string>;

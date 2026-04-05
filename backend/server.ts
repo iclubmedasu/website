@@ -27,11 +27,49 @@ const frontendOrigins = [
     "http://localhost:3002",
     "http://127.0.0.1:3002",
     process.env.FRONTEND_URL,
+    ...(process.env.FRONTEND_ORIGINS
+        ? process.env.FRONTEND_ORIGINS.split(",").map((value) => value.trim())
+        : []),
 ].filter(Boolean) as string[];
+
+const frontendOriginSet = new Set(frontendOrigins);
+const isDevelopment = process.env.NODE_ENV !== "production";
+
+function isPrivateNetworkOrigin(origin: string): boolean {
+    try {
+        const url = new URL(origin);
+        const host = url.hostname;
+
+        if (host.startsWith("192.168.")) return true;
+        if (host.startsWith("10.")) return true;
+        if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) return true;
+
+        return false;
+    } catch {
+        return false;
+    }
+}
 
 app.use(
     cors({
-        origin: frontendOrigins,
+        origin: (origin, callback) => {
+            if (!origin) {
+                callback(null, true);
+                return;
+            }
+
+            if (frontendOriginSet.has(origin)) {
+                callback(null, true);
+                return;
+            }
+
+            if (isDevelopment && isPrivateNetworkOrigin(origin)) {
+                callback(null, true);
+                return;
+            }
+
+            callback(null, false);
+        },
         credentials: true,
     }),
 );
@@ -66,6 +104,9 @@ const PORT = Number(process.env.PORT ?? 3000);
 const server = app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`CORS enabled for ${frontendOrigins.join(", ")}`);
+    if (isDevelopment) {
+        console.log("CORS also allows private-network origins in development mode.");
+    }
 });
 
 server.on("error", (err: NodeJS.ErrnoException) => {

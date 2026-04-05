@@ -63,6 +63,10 @@
         "vitest": "^1.6.1"
     },
     "pnpm": {
+        "overrides": {
+            "serialize-javascript": "7.0.5",
+            "esbuild": "0.25.0"
+        },
         "onlyBuiltDependencies": [
             "@prisma/client",
             "@prisma/engines",

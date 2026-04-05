@@ -5,6 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon --watch . --ext ts,js --exec tsx server.ts",
+    "tsc": "tsc -p tsconfig.json",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "start": "node dist/server.js",

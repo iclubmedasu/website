@@ -10,6 +10,7 @@ const withPWAWrapped = withPWA({
 
 const nextConfig: NextConfig = {
     output: 'standalone',
+    allowedDevOrigins: ['192.168.1.*'],
     images: {
         remotePatterns: [
             {
