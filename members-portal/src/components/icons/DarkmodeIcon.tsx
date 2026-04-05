@@ -1,3 +1,4 @@
+'use client';
 const DarkmodeIcon = () => {
   return (
     <span className="cursor-pointer">

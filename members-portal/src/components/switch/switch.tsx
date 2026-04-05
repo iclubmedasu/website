@@ -1,3 +1,4 @@
+'use client';
 import type { InputHTMLAttributes } from 'react';
 
 type ColorVariant =

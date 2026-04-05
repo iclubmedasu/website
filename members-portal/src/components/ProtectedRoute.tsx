@@ -1,6 +1,6 @@
-import { Navigate } from "react-router-dom";
+'use client';
 import type { ReactNode } from "react";
-import { useAuth } from "../context/AuthContext";
+import { AuthGuard } from "@/components/AuthGuard/AuthGuard";
 import "./ProtectedRoute.css";
 
 interface ProtectedRouteProps {
@@ -8,19 +8,5 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-    const { user, loading } = useAuth();
-
-    if (loading) {
-        return (
-            <div className="protected-route-loading">
-                Loading...
-            </div>
-        );
-    }
-
-    if (!user) {
-        return <Navigate to="/login" replace />;
-    }
-
-    return <>{children}</>;
+    return <AuthGuard>{children}</AuthGuard>;
 }

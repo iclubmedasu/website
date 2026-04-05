@@ -1,42 +1,32 @@
 {
-  "name": "iclub-frontend",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "typecheck": "tsc --noEmit",
-    "typecheck:watch": "tsc --noEmit --watch",
-    "build": "pnpm run typecheck && vite build",
-    "preview": "vite preview",
-    "test": "vitest run --config ./vitest.config.ts",
-    "test:watch": "vitest --config ./vitest.config.ts"
-  },
-  "dependencies": {
-    "@iclub/shared": "workspace:*",
-    "@untitledui/icons": "^0.0.20",
-    "@untitledui/icons-react": "^0.3.0",
-    "apexcharts": "^5.10.4",
-    "html2canvas": "^1.4.1",
-    "lucide-react": "^0.563.0",
-    "react": "^18.3.1",
-    "react-apexcharts": "^2.1.0",
-    "react-aria": "^3.45.0",
-    "react-aria-components": "^1.14.0",
-    "react-calendar": "^6.0.0",
-    "react-dom": "^18.3.1",
-    "react-icons": "^5.6.0",
-    "react-router-dom": "^6.22.0",
-    "tailwind-merge": "^3.4.0",
-    "xlsx": "^0.18.5",
-    "xlsx-js-style": "^1.2.0"
-  },
-  "devDependencies": {
-    "@types/node": "^24.12.2",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.4",
-    "typescript": "^5.9.3",
-    "vite": "^5.4.11"
-  }
+    "name": "members-portal",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev --port 3001",
+        "build": "next build",
+        "start": "next start --port 3001",
+        "lint": "next lint",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@iclub/shared": "workspace:*",
+        "apexcharts": "^5.10.4",
+        "html2canvas": "^1.4.1",
+        "lucide-react": "^0.563.0",
+        "next": "^15.0.0",
+        "next-pwa": "^5.6.0",
+        "react": "^19.0.0",
+        "react-apexcharts": "^2.1.0",
+        "react-calendar": "^6.0.0",
+        "react-dom": "^19.0.0",
+        "react-icons": "^5.6.0",
+        "xlsx-js-style": "^1.2.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "@types/react": "^19.0.0",
+        "@types/react-dom": "^19.0.0",
+        "typescript": "^5.0.0"
+    }
 }

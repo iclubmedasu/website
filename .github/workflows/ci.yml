@@ -30,13 +30,13 @@ jobs:
         run: pnpm install
 
       - name: Type check backend
-        run: pnpm --filter backend tsc --noEmit
+        run: pnpm --filter backend typecheck
 
       - name: Type check members portal
-        run: pnpm --filter iclub-frontend tsc --noEmit
+        run: pnpm --filter members-portal typecheck
 
       - name: Type check public website
-        run: pnpm --filter public-website tsc --noEmit
+        run: pnpm --filter public-website typecheck
 
       - name: Lint
         run: pnpm lint
@@ -99,6 +99,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
+
+      - name: Build members portal
+        run: pnpm --filter members-portal build
 
       - name: Build public website
         run: pnpm --filter public-website build

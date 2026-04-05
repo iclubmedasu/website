@@ -1,13 +1,14 @@
+'use client';
 import type { ReactNode } from "react";
 import { GraduationCap } from "lucide-react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import "../UnassignedGate/UnassignedGate.css";
 
 interface AlumniGateProps {
     children: ReactNode;
 }
 
-export default function AlumniGate({ children }: AlumniGateProps) {
+export function AlumniGate({ children }: AlumniGateProps) {
     const { isAlumni, logout } = useAuth();
 
     if (!isAlumni) {
@@ -34,3 +35,5 @@ export default function AlumniGate({ children }: AlumniGateProps) {
         </div>
     );
 }
+
+export default AlumniGate;

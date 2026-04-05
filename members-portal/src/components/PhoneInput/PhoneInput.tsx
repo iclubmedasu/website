@@ -1,5 +1,6 @@
+'use client';
 import { useEffect, useState, type ChangeEvent } from "react";
-import { COUNTRY_CODES, parsePhoneValue, formatPhoneValue } from "../../utils/countryCodes";
+import { COUNTRY_CODES, parsePhoneValue, formatPhoneValue } from "@/utils/countryCodes";
 import "./PhoneInput.css";
 
 interface ParsedPhoneValue {

@@ -1,7 +1,8 @@
+'use client';
 import { useState } from "react";
 import Dropdown from './Dropdown';
 import { FiAlignJustify } from "react-icons/fi";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import navbarimage from "../../assets/img/layout/Navbar.png";
 import { BsArrowBarUp } from "react-icons/bs";
 import { FiSearch } from "react-icons/fi";
@@ -36,14 +37,14 @@ const Navbar = ({ onOpenSidenav, brandText }: NavbarProps) => {
           </a>
           <Link
             className="text-sm font-normal capitalize text-navy-700 hover:underline dark:text-white dark:hover:text-white"
-            to="#"
+            href="#"
           >
             {brandText}
           </Link>
         </div>
         <p className="shrink text-[33px] capitalize text-navy-700 dark:text-white">
           <Link
-            to="#"
+            href="#"
             className="font-bold capitalize hover:text-navy-700 dark:hover:text-white"
           >
             {brandText}
@@ -127,13 +128,10 @@ const Navbar = ({ onOpenSidenav, brandText }: NavbarProps) => {
           }
           children={
             <div className="flex w-[350px] flex-col gap-2 rounded-[20px] bg-white p-4 shadow-xl shadow-shadow-500 dark:!bg-navy-700 dark:text-white dark:shadow-none">
-              <div
-                style={{
-                  backgroundImage: `url(${navbarimage})`,
-                  backgroundRepeat: "no-repeat",
-                  backgroundSize: "cover",
-                }}
-                className="mb-2 aspect-video w-full rounded-lg"
+              <img
+                src={navbarimage.src}
+                alt=""
+                className="mb-2 aspect-video w-full rounded-lg object-cover"
               />
               <a
                 target="blank"
@@ -184,7 +182,7 @@ const Navbar = ({ onOpenSidenav, brandText }: NavbarProps) => {
           button={
             <img
               className="h-10 w-10 rounded-full"
-              src={avatar}
+              src={avatar.src}
               alt="Elon Musk"
             />
           }

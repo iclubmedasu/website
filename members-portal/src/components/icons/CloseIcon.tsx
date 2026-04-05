@@ -1,3 +1,4 @@
+'use client';
 const CloseIcon = () => {
   return <div>hello</div>;
 };

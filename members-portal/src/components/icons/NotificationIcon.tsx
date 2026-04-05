@@ -1,3 +1,4 @@
+'use client';
 const NotificationIcon = () => {
   return (
     <span className="cursor-pointer">

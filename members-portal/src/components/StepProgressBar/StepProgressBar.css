@@ -7,6 +7,10 @@
     width: 100%;
 }
 
+.step-progress-fragment {
+    display: contents;
+}
+
 .step-progress-item {
     display: flex;
     flex-direction: column;

@@ -1,3 +1,4 @@
+'use client';
 import { useEffect, useRef, useState } from "react";
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
 
@@ -9,7 +10,7 @@ interface DropdownProps {
 }
 
 function useOutsideAlerter(
-    ref: RefObject<HTMLDivElement>,
+    ref: RefObject<HTMLDivElement | null>,
     setOpen: Dispatch<SetStateAction<boolean>>,
 ) {
     useEffect(() => {
@@ -39,8 +40,8 @@ const Dropdown = ({ button, children, classNames = "", animation }: DropdownProp
             </div>
             <div
                 className={`${classNames} absolute z-10 ${animation
-                        ? animation
-                        : 'origin-top-right transition-all duration-300 ease-in-out'
+                    ? animation
+                    : 'origin-top-right transition-all duration-300 ease-in-out'
                     } ${openWrapper ? 'scale-100' : 'scale-0'}`}
             >
                 {children}

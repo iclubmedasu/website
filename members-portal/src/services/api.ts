@@ -34,7 +34,7 @@ import type {
 } from "../types/backend-contracts";
 
 // API Base URL - Update this based on your environment
-const API_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || 'http://localhost:3000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'
 
 type ApiNamespace = Record<string, (...args: any[]) => any>;
 type JsonHeaders = Record<string, string>;

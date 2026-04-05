@@ -1,3 +1,4 @@
+'use client';
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import type { ReactNode } from "react";
 
@@ -46,7 +47,6 @@ const PopoverHorizon = (props: PopoverHorizonProps) => {
         tabIndex={0}
         onClick={handleTriggerClick}
         onKeyDown={handleTriggerKeyDown}
-        aria-expanded={isOpen}
         aria-haspopup="dialog"
         className="inline-flex"
       >

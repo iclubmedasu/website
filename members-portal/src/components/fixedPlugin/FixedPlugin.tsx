@@ -1,3 +1,4 @@
+'use client';
 import type { ButtonHTMLAttributes } from "react";
 import { useState } from "react";
 import { RiMoonFill, RiSunFill } from "react-icons/ri";

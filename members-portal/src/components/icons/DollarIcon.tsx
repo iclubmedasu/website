@@ -1,3 +1,4 @@
+'use client';
 const DollarIcon = () => {
   return (
     <svg

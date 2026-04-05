@@ -1,0 +1,331 @@
+﻿'use client';
+
+import { useState, useEffect, type FormEvent, type MouseEvent } from 'react';
+import { X } from 'lucide-react';
+import type { Id } from '../../../../types/backend-contracts';
+
+const MODES = {
+    RETIRE: 'retire',
+    HANDOVER: 'handover',
+} as const;
+
+type Mode = (typeof MODES)[keyof typeof MODES];
+type RetireChangeType = 'Retirement' | 'Resignation';
+
+const RETIRE_TYPE_OPTIONS: Array<{ value: RetireChangeType; label: string }> = [
+    { value: 'Retirement', label: 'Retirement' },
+    { value: 'Resignation', label: 'Resignation' },
+];
+
+interface OfficerAssignee {
+    id: Id | string;
+    memberId: Id;
+    isActive?: boolean;
+    joinedDate?: string | null;
+    member?: {
+        id?: Id;
+        fullName?: string | null;
+    } | null;
+    role?: {
+        roleName?: string | null;
+    } | null;
+}
+
+interface RetirePayload {
+    changeType: RetireChangeType;
+    changeReason: string;
+    notes: string | null;
+}
+
+interface HandoverPayload {
+    identifier: string;
+}
+
+interface OfficerHandoverModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    currentOfficerAssignee?: OfficerAssignee | null;
+    onRetire: (payload: RetirePayload) => Promise<void> | void;
+    onHandover: (payload: HandoverPayload) => Promise<void> | void;
+}
+
+interface RetireFormData {
+    changeType: RetireChangeType;
+    changeReason: string;
+    notes: string;
+}
+
+interface HandoverFormData {
+    identifier: string;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+    if (error instanceof Error && error.message) {
+        return error.message;
+    }
+    return fallback;
+}
+
+function OfficerHandoverModal({
+    isOpen,
+    onClose,
+    currentOfficerAssignee,
+    onRetire,
+    onHandover,
+}: OfficerHandoverModalProps) {
+    const [mode, setMode] = useState<Mode>(MODES.RETIRE);
+    const [retireData, setRetireData] = useState<RetireFormData>({
+        changeType: 'Retirement',
+        changeReason: '',
+        notes: '',
+    });
+    const [handoverData, setHandoverData] = useState<HandoverFormData>({
+        identifier: '',
+    });
+    const [error, setError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        if (isOpen && currentOfficerAssignee) {
+            setMode(MODES.RETIRE);
+            setRetireData({ changeType: 'Retirement', changeReason: '', notes: '' });
+            setHandoverData({ identifier: '' });
+            setError('');
+        }
+    }, [isOpen, currentOfficerAssignee]);
+
+    const handleRetireSubmit = async (e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setError('');
+        setIsSubmitting(true);
+        try {
+            await onRetire({
+                changeType: retireData.changeType,
+                changeReason: retireData.changeReason.trim() || retireData.changeType,
+                notes: retireData.notes.trim() || null,
+            });
+            onClose();
+        } catch (err: unknown) {
+            setError(getErrorMessage(err, 'Failed to record retirement'));
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleHandoverSubmit = async (e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const value = handoverData.identifier.trim();
+        if (!value) {
+            setError('Email or phone number is required for the new officer.');
+            return;
+        }
+        setError('');
+        setIsSubmitting(true);
+        try {
+            await onHandover({ identifier: value });
+            onClose();
+        } catch (err: unknown) {
+            setError(getErrorMessage(err, 'Failed to complete handover'));
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+        if (mode === MODES.RETIRE) {
+            void handleRetireSubmit(e);
+        } else {
+            void handleHandoverSubmit(e);
+        }
+    };
+
+    if (!isOpen || !currentOfficerAssignee) return null;
+
+    const currentName = currentOfficerAssignee.member?.fullName || 'Current officer';
+
+    return (
+        <div className="modal-backdrop officer-handover-modal" onClick={onClose}>
+            <div className="modal-container" onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div>
+                        <h2 className="modal-title">{mode === MODES.RETIRE ? 'Retire Officer' : 'Officer Handover'}</h2>
+                        <p className="modal-subtitle">{currentName}</p>
+                    </div>
+                    <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-body">
+                        {error && <div className="error-message">{error}</div>}
+
+                        <div className="form-section info-section">
+                            <h3 className="form-section-title">Current Officer</h3>
+                            <div className="info-grid">
+                                <div className="info-item">
+                                    <label className="info-label">Name</label>
+                                    <p className="info-value">{currentName}</p>
+                                </div>
+                                <div className="info-item">
+                                    <label className="info-label">Team</label>
+                                    <p className="info-value">Administration</p>
+                                </div>
+                                <div className="info-item">
+                                    <label className="info-label">Role</label>
+                                    <p className="info-value">{currentOfficerAssignee.role?.roleName || 'Officer'}</p>
+                                </div>
+                                <div className="info-item">
+                                    <label className="info-label">Status</label>
+                                    <p className="info-value">{currentOfficerAssignee.isActive !== false ? 'Active' : 'Inactive'}</p>
+                                </div>
+                                {currentOfficerAssignee.joinedDate && (
+                                    <div className="info-item">
+                                        <label className="info-label">Since</label>
+                                        <p className="info-value">
+                                            {!Number.isNaN(new Date(currentOfficerAssignee.joinedDate).getTime())
+                                                ? new Date(currentOfficerAssignee.joinedDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                                                : 'â€”'}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="form-section">
+                            <h3 className="form-section-title">What do you want to do?</h3>
+                            <div className="radio-group-list">
+                                <label className={`radio-option-card ${mode === MODES.RETIRE ? 'selected' : ''}`}>
+                                    <input
+                                        type="radio"
+                                        name="officerMode"
+                                        value={MODES.RETIRE}
+                                        checked={mode === MODES.RETIRE}
+                                        onChange={() => setMode(MODES.RETIRE)}
+                                        disabled={isSubmitting}
+                                    />
+                                    <span className="radio-option-title">1. Retire</span>
+                                    <span className="radio-option-desc">Record the current officer leaving the role (retirement or resignation).</span>
+                                </label>
+                                <label className={`radio-option-card ${mode === MODES.HANDOVER ? 'selected' : ''}`}>
+                                    <input
+                                        type="radio"
+                                        name="officerMode"
+                                        value={MODES.HANDOVER}
+                                        checked={mode === MODES.HANDOVER}
+                                        onChange={() => setMode(MODES.HANDOVER)}
+                                        disabled={isSubmitting}
+                                    />
+                                    <span className="radio-option-title">2. Handover</span>
+                                    <span className="radio-option-desc">Hand the position to a new officer. Enter the new officer&apos;s details; the current officer will be retired automatically.</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {mode === MODES.RETIRE && (
+                            <div className="form-section conditional-section">
+                                <h3 className="form-section-title">Retire</h3>
+                                <div className="form-group">
+                                    <label htmlFor="retire-changeType" className="form-label">Type *</label>
+                                    <select
+                                        id="retire-changeType"
+                                        className="form-input"
+                                        value={retireData.changeType}
+                                        onChange={(e) => setRetireData((prev) => ({ ...prev, changeType: e.target.value as RetireChangeType }))}
+                                        disabled={isSubmitting}
+                                    >
+                                        {RETIRE_TYPE_OPTIONS.map((opt) => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="retire-changeReason" className="form-label">Reason</label>
+                                    <textarea
+                                        id="retire-changeReason"
+                                        className="form-input form-textarea"
+                                        value={retireData.changeReason}
+                                        onChange={(e) => setRetireData((prev) => ({ ...prev, changeReason: e.target.value }))}
+                                        placeholder="Optional"
+                                        rows={2}
+                                        disabled={isSubmitting}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="retire-notes" className="form-label">Notes</label>
+                                    <textarea
+                                        id="retire-notes"
+                                        className="form-input form-textarea"
+                                        value={retireData.notes}
+                                        onChange={(e) => setRetireData((prev) => ({ ...prev, notes: e.target.value }))}
+                                        placeholder="Optional"
+                                        rows={2}
+                                        disabled={isSubmitting}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {mode === MODES.HANDOVER && (
+                            <>
+                                <div className="form-section info-section">
+                                    <h3 className="form-section-title">Assignment for new officer</h3>
+                                    <div className="info-grid">
+                                        <div className="info-item">
+                                            <label className="info-label">Team</label>
+                                            <p className="info-value">Administration</p>
+                                        </div>
+                                        <div className="info-item">
+                                            <label className="info-label">Role</label>
+                                            <p className="info-value">Officer</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="form-section">
+                                    <h3 className="form-section-title">New officer details</h3>
+                                    <div className="form-group">
+                                        <label htmlFor="handover-identifier" className="form-label">New Officer Email or Phone Number *</label>
+                                        <input
+                                            id="handover-identifier"
+                                            type="text"
+                                            value={handoverData.identifier}
+                                            onChange={(e) => setHandoverData((prev) => ({ ...prev, identifier: e.target.value }))}
+                                            className="form-input"
+                                            placeholder="e.g. name.surname@med.asu.edu.eg or 01012345678"
+                                            disabled={isSubmitting}
+                                        />
+                                        <p className="form-hint-text">
+                                            Enter their official @med.asu.edu.eg email, or their primary phone number. They will complete their profile on first sign-in.
+                                        </p>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    <div className="modal-footer">
+                        <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={onClose}
+                            disabled={isSubmitting}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className={`btn ${mode === MODES.RETIRE ? 'btn-danger' : 'btn-primary'}`}
+                            disabled={isSubmitting}
+                        >
+                            {isSubmitting
+                                ? (mode === MODES.HANDOVER ? 'Completing handover...' : 'Retiring...')
+                                : (mode === MODES.HANDOVER ? 'Complete handover' : 'Retire')}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+export default OfficerHandoverModal;
+

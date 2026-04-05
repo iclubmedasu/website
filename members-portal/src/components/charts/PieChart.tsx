@@ -1,3 +1,4 @@
+'use client';
 import Chart from "react-apexcharts";
 import type { ApexNonAxisChartSeries, ApexOptions } from "apexcharts";
 

@@ -5,7 +5,7 @@
 | Service | Purpose | Provider |
 |---------|---------|---------|
 | Backend + Database | API and PostgreSQL | Railway |
-| Members Portal | Frontend app | Netlify or Railway |
+| Members Portal | Next.js Node.js app | Railway, Vercel, or Docker |
 | Public Website | Public Next.js site | Netlify or Railway |
  
 ## Environment Variables
@@ -20,12 +20,25 @@ See .env.example for all required variables with descriptions.
 4. Set all environment variables from .env.example
 5. Run database migrations: prisma migrate deploy
  
-## Netlify Deployment (Frontend)
+## Members Portal Deployment (Next.js)
  
-1. Connect your GitHub repository
-2. Set build command: pnpm --filter members-portal build
-3. Set publish directory: members-portal/dist
-4. Set environment variables
+1. Build command: pnpm --filter members-portal build
+2. Runtime: Node.js process (Next.js server)
+3. App port: 3001
+4. This app is not static files; it must run as a server process
+
+## Members Portal Deployment Note
+
+The members portal is now a Next.js app (not static files).
+This means it requires a Node.js server to run.
+
+Recommended deployment options:
+1. Railway - supports Node.js apps natively (recommended)
+2. Vercel - made by the Next.js team, zero config
+3. Docker - use the provided Dockerfile
+
+Note: Netlify can host Next.js apps but requires their
+Next.js adapter. Railway or Vercel are simpler.
 
 ## Docker Deployment
 

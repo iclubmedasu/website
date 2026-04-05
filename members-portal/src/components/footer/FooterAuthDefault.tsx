@@ -1,3 +1,4 @@
+'use client';
 const FooterAuthDefault = () => {
     const year = new Date().getFullYear();
 

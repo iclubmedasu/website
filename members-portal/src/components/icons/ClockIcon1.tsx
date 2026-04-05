@@ -1,3 +1,4 @@
+'use client';
 const ClockIcon1 = () => {
   return (
     <svg

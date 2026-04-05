@@ -1,3 +1,4 @@
+'use client';
 import Card from "../card";
 
 import type { ReactNode } from "react";

@@ -1,5 +1,6 @@
+'use client';
 import { Calendar, User } from 'lucide-react';
-import { getProfilePhotoUrl } from '../../services/api';
+import { getProfilePhotoUrl } from '@/services/api';
 
 export interface ActivityTimelineContextEntity {
     label?: string | null;

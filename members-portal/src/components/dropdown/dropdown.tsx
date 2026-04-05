@@ -1,3 +1,4 @@
+'use client';
 import {
   useEffect,
   useRef,
@@ -42,14 +43,13 @@ interface MenuDropdownProps {
   headerClassName?: string;
   menuClassName?: string;
   openClassName?: string;
-  menuRole?: string;
   animation?: string;
   classNames?: string;
 }
 
 type DropdownProps = FilterDropdownProps | MenuDropdownProps;
 
-function useOutsideAlerter(ref: RefObject<HTMLElement>, setOpen: (open: boolean) => void): void {
+function useOutsideAlerter(ref: RefObject<HTMLElement | null>, setOpen: (open: boolean) => void): void {
   useEffect(() => {
     function handleClickOutside(event: MouseEvent): void {
       const target = event.target as Node | null;
@@ -142,7 +142,6 @@ function FilterDropdown({
           }}
           role="button"
           tabIndex={0}
-          aria-expanded={isOpen}
           aria-haspopup="listbox"
         >
           <span className="manage-combobox-label">{displayLabel}</span>
@@ -150,7 +149,11 @@ function FilterDropdown({
         </div>
       </div>
 
-      <div className={`manage-dropdown-menu ${isOpen ? 'open' : ''}`} role="listbox">
+      <div
+        className={`manage-dropdown-menu ${isOpen ? 'open' : ''}`}
+        role="listbox"
+        aria-label={triggerLabel ?? 'Filter options'}
+      >
         {options.map((option, index) => {
           const isSelected = String(option.value) === String(value);
 
@@ -159,7 +162,6 @@ function FilterDropdown({
               <button
                 type="button"
                 role="option"
-                aria-selected={isSelected}
                 className={`manage-dropdown-item ${isSelected ? 'active' : ''}`}
                 onClick={() => handleSelect(option.value)}
               >
@@ -182,7 +184,6 @@ function MenuDropdown({
   headerClassName = '',
   menuClassName = 'absolute z-10 origin-top-right transition-all duration-300 ease-in-out',
   openClassName = 'open',
-  menuRole,
 }: MenuDropdownProps) {
   const allowHoverOpen = ENABLE_HOVER_DROPDOWNS && hoverOpen;
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -242,8 +243,7 @@ function MenuDropdown({
       }}
       role="button"
       tabIndex={0}
-      aria-expanded={isOpen}
-      aria-haspopup="listbox"
+      aria-haspopup="menu"
       className="flex"
     >
       {button}
@@ -261,7 +261,6 @@ function MenuDropdown({
 
       <div
         className={`${menuClassName} ${isOpen ? openClassName : ''}`}
-        role={menuRole}
       >
         {renderedChildren}
       </div>

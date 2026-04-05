@@ -1,46 +1,46 @@
 # ============================================
-# iClub Members Portal - Dockerfile
-# Multi-stage build for Vite + React
+# iClub Members Portal - Dockerfile (Next.js)
 # ============================================
 
-# Stage 1: Build
-FROM node:20-alpine AS builder
-
-# Install pnpm
+FROM node:20-alpine AS base
 RUN npm install -g pnpm
 
+# Dependencies stage
+FROM base AS deps
 WORKDIR /app
-
-# Copy workspace files for pnpm
 COPY pnpm-workspace.yaml ./
 COPY package.json ./
 COPY pnpm-lock.yaml ./
-
-# Copy package.json files for all workspace packages
 COPY members-portal/package.json ./members-portal/
 COPY backend/package.json ./backend/
 COPY public-website/package.json ./public-website/
 COPY packages/shared/package.json ./packages/shared/
-
-# Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Copy source files
-COPY members-portal/ ./members-portal/
-COPY packages/ ./packages/
+# Build stage
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/members-portal/node_modules ./members-portal/node_modules
+COPY . .
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN pnpm --filter members-portal build
 
-# Build the app
-RUN pnpm --filter iclub-frontend build
+# Production stage
+FROM base AS runner
+WORKDIR /app/members-portal
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Stage 2: Serve
-FROM nginx:alpine AS runner
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-# Copy built files
-COPY --from=builder /app/members-portal/dist /usr/share/nginx/html
+COPY --from=builder /app/members-portal/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/members-portal/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/members-portal/.next/static ./.next/static
 
-# Copy nginx config for SPA routing
-COPY members-portal/nginx.conf /etc/nginx/conf.d/default.conf
+USER nextjs
+EXPOSE 3001
+ENV PORT=3001
 
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "server.js"]

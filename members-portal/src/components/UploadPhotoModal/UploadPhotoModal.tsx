@@ -1,3 +1,4 @@
+'use client';
 import {
     useState,
     useRef,
@@ -7,8 +8,8 @@ import {
     type KeyboardEvent,
 } from 'react';
 import { Upload, X } from 'lucide-react';
-import { membersAPI } from '../../services/api';
-import '../../components/modal/modal.css';
+import { membersAPI } from '@/services/api';
+import '@/components/modal/modal.css';
 import './UploadPhotoModal.css';
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];

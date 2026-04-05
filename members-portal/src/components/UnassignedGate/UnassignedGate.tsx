@@ -1,13 +1,14 @@
+'use client';
 import type { ReactNode } from "react";
 import { UserX } from "lucide-react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import "./UnassignedGate.css";
 
 interface UnassignedGateProps {
     children: ReactNode;
 }
 
-export default function UnassignedGate({ children }: UnassignedGateProps) {
+export function UnassignedGate({ children }: UnassignedGateProps) {
     const { user, logout } = useAuth();
 
     if (
@@ -40,3 +41,5 @@ export default function UnassignedGate({ children }: UnassignedGateProps) {
         </div>
     );
 }
+
+export default UnassignedGate;

@@ -1,8 +1,9 @@
+'use client';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { FileText, Image, File, Folder, FolderOpen, Upload, Check, X, RotateCcw, Trash2, Loader, Download, AlertTriangle, History, ArchiveRestore, Pencil, ChevronDown, ChevronRight, Plus, MessageCircle } from 'lucide-react';
-import { projectFilesAPI } from '../../services/api';
-import FileCommentsModal from '../../pages/Projects/modals/FileCommentsModal';
-import '../../components/modal/modal.css';
+import { projectFilesAPI } from '@/services/api';
+import FileCommentsModal from '../../features/Projects/modals/FileCommentsModal';
+import '@/components/modal/modal.css';
 import './FileUploadZone.css';
 import type { Id, ProjectFileRef, ProjectFolderRef } from '../../types/backend-contracts';
 
@@ -609,16 +610,15 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                         <span className="file-size">{formatSize(f.size)}</span>
                     </div>
                     {!f.done && !f.processing && (
-                        <div className="file-progress-bar-track">
-                            <div
-                                className={`file-progress-bar-fill${f.failed ? ' file-progress-bar-fill--failed' : ''}`}
-                                style={{ width: `${f.progress}%` }}
-                            />
-                        </div>
+                        <progress
+                            className={`file-progress${f.failed ? ' file-progress--failed' : ''}`}
+                            max={100}
+                            value={f.progress}
+                        />
                     )}
                     {f.processing && (
                         <div className="file-progress-bar-track">
-                            <div className="file-progress-bar-fill file-progress-bar-fill--processing" style={{ width: '100%' }} />
+                            <div className="file-progress-bar-fill file-progress-bar-fill--processing" />
                         </div>
                     )}
                 </div>
@@ -690,13 +690,14 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
             >
                 <div
                     className={`folder-row-header${dragOverFolderId === folder.id ? ' folder-row-header--drop-target' : ''}`}
-                    role="button"
-                    tabIndex={0}
-                    aria-expanded={isExpanded}
-                    onClick={() => toggleFolderExpanded(folder.id)}
-                    onKeyDown={(e) => e.key === 'Enter' && toggleFolderExpanded(folder.id)}
                 >
-                    <div className="folder-row-header-left">
+                    <button
+                        type="button"
+                        className="folder-row-toggle"
+                        onClick={() => toggleFolderExpanded(folder.id)}
+                        onKeyDown={(e) => e.key === 'Enter' && toggleFolderExpanded(folder.id)}
+                        aria-label={`Toggle folder ${folder.folderName}`}
+                    >
                         <span className="folder-card-chevron">{isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</span>
                         {isExpanded ? <FolderOpen size={16} /> : <Folder size={16} />}
                         <div className="folder-row-title-group">
@@ -704,8 +705,8 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                             <span className="folder-card-count">{folderFiles.length} files</span>
                         </div>
                         {!folder.isActive && <span className="folder-card-badge">Deleted</span>}
-                    </div>
-                    <div className="folder-row-header-actions" onClick={(e) => e.stopPropagation()}>
+                    </button>
+                    <div className="folder-row-header-actions">
                         {!disabled && folder.isActive ? (
                             <>
                                 <button type="button" className="folder-upload-btn" title="Upload to this folder" onClick={() => { setTargetFolderId(String(folder.id)); fileInputRef.current?.click(); }}>
@@ -760,8 +761,17 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
             >
                 <Upload size={24} className="file-drop-icon" />
                 <span className="file-drop-text">Drag &amp; drop files here or click to browse</span>
-                <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }} onChange={handleFileInput} disabled={disabled} />
             </div>
+            <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="file-input-hidden"
+                onChange={handleFileInput}
+                disabled={disabled}
+                aria-label="Select files to upload"
+                title="Select files to upload"
+            />
             <p className="file-drop-hint">Supported: all file types — Max 25 MB per file</p>
 
             {(uploadQueue.length > 0 || rootFiles.length > 0 || activeFolders.length > 0) && (
@@ -887,7 +897,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                                 <div className="modal-icon-danger"><AlertTriangle /></div>
                                 <h2 className="modal-title">Delete File</h2>
                             </div>
-                            <button className="modal-close-btn" type="button" onClick={closeDeleteModal} disabled={deleteLoading}><X /></button>
+                            <button className="modal-close-btn" type="button" onClick={closeDeleteModal} disabled={deleteLoading} aria-label="Close delete file modal" title="Close"><X /></button>
                         </div>
                         <div className="modal-body">
                             {deleteError && <div className="error-message">{deleteError}</div>}
@@ -911,10 +921,10 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                     <div className="modal-container">
                         <div className="modal-header">
                             <div className="modal-header-content">
-                                <History size={18} style={{ color: 'var(--purple-600)' }} />
+                                <History size={18} className="history-modal-icon" />
                                 <h2 className="modal-title">Version History</h2>
                             </div>
-                            <button className="modal-close-btn" type="button" onClick={closeHistory}><X /></button>
+                            <button className="modal-close-btn" type="button" onClick={closeHistory} aria-label="Close version history modal" title="Close"><X /></button>
                         </div>
                         <div className="modal-body">
                             <p className="history-file-name">{historyTarget.name}</p>
@@ -957,10 +967,10 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                     <div className="modal-container">
                         <div className="modal-header">
                             <div className="modal-header-content">
-                                <History size={18} style={{ color: 'var(--purple-600)' }} />
+                                <History size={18} className="history-modal-icon" />
                                 <h2 className="modal-title">Folder History</h2>
                             </div>
-                            <button className="modal-close-btn" type="button" onClick={closeFolderAction}><X /></button>
+                            <button className="modal-close-btn" type="button" onClick={closeFolderAction} aria-label="Close folder history modal" title="Close"><X /></button>
                         </div>
                         <div className="modal-body">
                             <p className="history-file-name">{folderAction.folder.folderName}</p>
@@ -996,7 +1006,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                                 <div className={folderAction.type === 'delete' ? 'modal-icon-danger' : 'modal-icon-info'}>{folderAction.type === 'delete' ? <Trash2 /> : <ArchiveRestore />}</div>
                                 <h2 className="modal-title">{folderAction.type === 'delete' ? 'Delete Folder' : 'Restore Folder'}</h2>
                             </div>
-                            <button className="modal-close-btn" type="button" onClick={closeFolderAction} disabled={folderActionLoading}><X /></button>
+                            <button className="modal-close-btn" type="button" onClick={closeFolderAction} disabled={folderActionLoading} aria-label="Close folder action modal" title="Close"><X /></button>
                         </div>
                         <div className="modal-body">
                             {folderActionError && <div className="error-message">{folderActionError}</div>}
@@ -1024,13 +1034,13 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                             <div className="modal-header-content">
                                 <h2 className="modal-title">Create Folder</h2>
                             </div>
-                            <button className="modal-close-btn" type="button" onClick={closeCreateFolder} disabled={folderCreateLoading}><X /></button>
+                            <button className="modal-close-btn" type="button" onClick={closeCreateFolder} disabled={folderCreateLoading} aria-label="Close create folder modal" title="Close"><X /></button>
                         </div>
                         <div className="modal-body">
                             {folderCreateError && <div className="error-message">{folderCreateError}</div>}
                             <label className="form-label" htmlFor="folder-name-input">Folder name</label>
                             <input id="folder-name-input" className="form-input" value={folderName} onChange={(e) => setFolderName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !folderCreateLoading && confirmCreateFolder()} autoFocus />
-                            <p className="form-hint" style={{ marginTop: '1rem' }}>A .gitkeep marker will be created automatically so the folder exists even when empty.</p>
+                            <p className="form-hint form-hint--spaced">A .gitkeep marker will be created automatically so the folder exists even when empty.</p>
                         </div>
                         <div className="modal-footer">
                             <button type="button" className="btn btn-secondary" onClick={closeCreateFolder} disabled={folderCreateLoading}>Cancel</button>
@@ -1048,7 +1058,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                             <div className="modal-header-content">
                                 <h2 className="modal-title">Rename {renameTarget.kind === 'folder' ? 'Folder' : 'File'}</h2>
                             </div>
-                            <button className="modal-close-btn" type="button" onClick={closeRename} disabled={renameLoading}><X /></button>
+                            <button className="modal-close-btn" type="button" onClick={closeRename} disabled={renameLoading} aria-label="Close rename modal" title="Close"><X /></button>
                         </div>
                         <div className="modal-body">
                             {renameError && <div className="error-message">{renameError}</div>}
@@ -1072,7 +1082,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                                 <div className="modal-icon-danger"><AlertTriangle /></div>
                                 <h2 className="modal-title">File Already Exists</h2>
                             </div>
-                            <button className="modal-close-btn" type="button" onClick={closeDuplicateConfirm}><X /></button>
+                            <button className="modal-close-btn" type="button" onClick={closeDuplicateConfirm} aria-label="Close duplicate file modal" title="Close"><X /></button>
                         </div>
                         <div className="modal-body">
                             <div className="warning-box">

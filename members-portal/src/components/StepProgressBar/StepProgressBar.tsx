@@ -1,3 +1,4 @@
+'use client';
 import { Check } from 'lucide-react';
 import './StepProgressBar.css';
 
@@ -21,7 +22,7 @@ function StepProgressBar({ steps, currentStep }: StepProgressBarProps) {
                 const isActive = idx === currentStep;
 
                 return (
-                    <div key={label} style={{ display: 'contents' }}>
+                    <div key={label} className="step-progress-fragment">
                         <div className="step-progress-item">
                             <div
                                 className={`step-progress-dot${isCompleted ? ' completed' : ''}${isActive ? ' active' : ''}`}

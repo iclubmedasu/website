@@ -1,3 +1,4 @@
+'use client';
 const ThemsIcon = () => {
   return (
     <span className="cursor-pointer">

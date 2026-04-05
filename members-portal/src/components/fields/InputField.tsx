@@ -1,3 +1,4 @@
+'use client';
 import type { HTMLInputTypeAttribute, ReactNode } from "react";
 
 type InputVariant = "auth" | "default";

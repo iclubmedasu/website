@@ -27,7 +27,7 @@ function buildMockUser(email: string) {
 function buildCorsHeaders(origin: string | null) {
     return {
         'content-type': 'application/json',
-        'access-control-allow-origin': origin ?? 'http://127.0.0.1:4173',
+        'access-control-allow-origin': origin ?? 'http://127.0.0.1:3001',
         'access-control-allow-credentials': 'true',
         'access-control-allow-headers': 'content-type,authorization',
         'access-control-allow-methods': 'GET,POST,OPTIONS'

@@ -1,3 +1,4 @@
+'use client'
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type {
     ApiErrorResponse,
@@ -61,7 +62,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 
 const NO_SETUP: CheckStudentIdResponse = { canSetup: false };
 
