@@ -31,6 +31,7 @@
         "test:ui": "vitest --ui",
         "test:run": "vitest run",
         "test:coverage": "vitest run --coverage",
+        "test:coverage:ci": "vitest run --config vitest.config.ci.ts --coverage",
         "test:backend": "vitest run backend",
         "test:frontend": "vitest run members-portal packages/shared",
         "test:e2e": "playwright test",
