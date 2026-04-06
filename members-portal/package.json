@@ -8,7 +8,8 @@
         "build": "next build",
         "start": "next start --port 3001",
         "lint": "next lint",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "pwa:screenshots": "npx tsx scripts/capture-pwa-screenshots.ts"
     },
     "dependencies": {
         "@iclub/shared": "workspace:*",
@@ -28,6 +29,7 @@
         "@types/node": "^20.0.0",
         "@types/react": "^19.0.0",
         "@types/react-dom": "^19.0.0",
+        "babel-loader": "^10.1.1",
         "typescript": "^5.0.0"
     }
 }

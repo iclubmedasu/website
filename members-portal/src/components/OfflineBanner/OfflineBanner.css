@@ -1,0 +1,43 @@
+/* ============================================
+   OFFLINE BANNER
+   ============================================ */
+.offline-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    border-bottom: 1px solid var(--warning-border);
+    padding: 0.6rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-family: var(--font-heading);
+    font-size: 0.875rem;
+    font-weight: 600;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.offline-banner-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.offline-banner-text {
+    text-align: center;
+}

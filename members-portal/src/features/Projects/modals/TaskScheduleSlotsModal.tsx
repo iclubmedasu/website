@@ -157,49 +157,41 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
                             <div className="form-section">
                                 <h3 className="form-section-title">Current Slots</h3>
                                 {slots.length > 0 ? (
-                                    <div style={{ display: 'grid', gap: '0.9rem' }}>
+                                    <div className="project-slot-grid">
                                         <ScheduleTimetable slots={slots} emptyMessage="No schedule slots available." />
 
                                         {slots.map((slot) => (
                                             <div
                                                 key={slot.id}
-                                                style={{
-                                                    border: '1px solid var(--gray-200)',
-                                                    borderRadius: 'var(--radius-md)',
-                                                    padding: '0.75rem',
-                                                    background: slot.isActive ? 'var(--gray-50)' : 'rgba(148, 163, 184, 0.08)',
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    gap: '0.75rem',
-                                                    alignItems: 'flex-start',
-                                                }}
+                                                className={`project-slot-card${slot.isActive ? '' : ' project-slot-card--inactive'}`}
                                             >
-                                                <div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.35rem' }}>
-                                                        <strong>{slot.title || 'Untitled slot'}</strong>
-                                                        <span className="project-slot-state">{slot.isActive ? 'Active' : 'Inactive'}</span>
+                                                <div className="project-slot-card-header">
+                                                    <div className="project-slot-card-title">
+                                                        <span>{slot.title || 'Untitled slot'}</span>
+                                                        <span className="project-slot-state">
+                                                            {slot.isActive ? 'Active' : 'Inactive'}
+                                                        </span>
                                                     </div>
-                                                    <div className="form-hint" style={{ margin: '0.25rem 0' }}>
-                                                        {slot.member?.fullName ?? 'Unknown member'}
-                                                    </div>
-                                                    <div className="form-hint" style={{ margin: 0 }}>
-                                                        {formatDateTime(slot.startDateTime)} → {formatDateTime(slot.endDateTime)}
-                                                    </div>
-                                                    {slot.notes && (
-                                                        <p style={{ margin: '0.45rem 0 0', whiteSpace: 'pre-wrap', color: 'var(--gray-700)' }}>
-                                                            {slot.notes}
-                                                        </p>
-                                                    )}
+                                                    <button
+                                                        className="btn btn-secondary"
+                                                        type="button"
+                                                        onClick={() => handleRemoveSlot(slot.id)}
+                                                        disabled={saving}
+                                                    >
+                                                        <Trash2 size={13} />
+                                                        Remove
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    className="btn btn-secondary"
-                                                    type="button"
-                                                    onClick={() => handleRemoveSlot(slot.id)}
-                                                    disabled={saving}
-                                                >
-                                                    <Trash2 size={13} />
-                                                    Remove
-                                                </button>
+
+                                                <p className="form-hint-inline">
+                                                    {slot.member?.fullName ?? 'Unknown member'}
+                                                </p>
+                                                <p className="form-hint-inline">
+                                                    {formatDateTime(slot.startDateTime)} → {formatDateTime(slot.endDateTime)}
+                                                </p>
+                                                {slot.notes && (
+                                                    <p className="project-slot-notes">{slot.notes}</p>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -212,8 +204,12 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
                                 <h3 className="form-section-title">Add Slot</h3>
                                 <div className="form-row">
                                     <div className="form-group">
-                                        <label className="form-label">Member</label>
+                                        <label className="form-label" htmlFor="task-slot-member">
+                                            Member
+                                        </label>
                                         <select
+                                            id="task-slot-member"
+                                            title="Select member"
                                             className="form-input"
                                             value={form.memberId}
                                             onChange={(e) => setForm((current) => ({ ...current, memberId: e.target.value }))}
@@ -227,8 +223,11 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
                                         </select>
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">Title</label>
+                                        <label className="form-label" htmlFor="task-slot-title">
+                                            Title
+                                        </label>
                                         <input
+                                            id="task-slot-title"
                                             className="form-input"
                                             value={form.title}
                                             onChange={(e) => setForm((current) => ({ ...current, title: e.target.value }))}
@@ -239,8 +238,12 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
 
                                 <div className="form-row">
                                     <div className="form-group">
-                                        <label className="form-label">Start</label>
+                                        <label className="form-label" htmlFor="task-slot-start">
+                                            Start
+                                        </label>
                                         <input
+                                            id="task-slot-start"
+                                            title="Start date and time"
                                             type="datetime-local"
                                             className="form-input"
                                             value={form.startDateTime}
@@ -248,8 +251,12 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
                                         />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">End</label>
+                                        <label className="form-label" htmlFor="task-slot-end">
+                                            End
+                                        </label>
                                         <input
+                                            id="task-slot-end"
+                                            title="End date and time"
                                             type="datetime-local"
                                             className="form-input"
                                             value={form.endDateTime}
@@ -259,8 +266,11 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label">Notes</label>
+                                    <label className="form-label" htmlFor="task-slot-notes">
+                                        Notes
+                                    </label>
                                     <textarea
+                                        id="task-slot-notes"
                                         className="form-input form-textarea"
                                         value={form.notes}
                                         onChange={(e) => setForm((current) => ({ ...current, notes: e.target.value }))}
@@ -269,7 +279,7 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
                                 </div>
 
                                 {!allMembers.length && (
-                                    <p className="form-hint" style={{ marginTop: '0.75rem' }}>
+                                    <p className="form-hint">
                                         No members available for this project.
                                     </p>
                                 )}

@@ -1,80 +1,180 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import './PWAInstallPrompt.css';
+import { useState, useEffect } from 'react'
+import './PWAInstallPrompt.css'
 
 interface BeforeInstallPromptEvent extends Event {
-    prompt: () => Promise<void>;
-    userChoice: Promise<{
-        outcome: 'accepted' | 'dismissed';
-        platform: string;
-    }>;
+    prompt: () => Promise<void>
+    userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
+function isIOS(): boolean {
+    if (typeof navigator === 'undefined') return false
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+        !(window as unknown as { MSStream?: unknown }).MSStream !== undefined
+}
+
+function isInStandaloneMode(): boolean {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+}
+
+type PromptState = 'hidden' | 'android' | 'ios'
+
 export function PWAInstallPrompt() {
-    const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-    const [visible, setVisible] = useState(false);
+    const [promptState, setPromptState] = useState<PromptState>('hidden')
+    const [installEvent, setInstallEvent] =
+        useState<BeforeInstallPromptEvent | null>(null)
+    const [iosStep, setIosStep] = useState(1)
 
     useEffect(() => {
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || ((window.navigator as Navigator & { standalone?: boolean }).standalone === true);
-        if (isStandalone) {
-            setVisible(false);
-            return;
+        // Already installed — never show
+        if (isInStandaloneMode()) return
+
+        // Already dismissed this session
+        if (sessionStorage.getItem('pwa-prompt-dismissed')) return
+
+        // iOS — show manual guide after a delay
+        if (isIOS()) {
+            const timer = setTimeout(() => {
+                setPromptState('ios')
+            }, 5000) // Show after 5 seconds
+            return () => clearTimeout(timer)
         }
 
-        const handleBeforeInstallPrompt = (event: Event) => {
-            event.preventDefault();
-            setDeferredPrompt(event as BeforeInstallPromptEvent);
-            setVisible(true);
-        };
+        // Android/Chrome — listen for native prompt
+        const handler = (e: Event) => {
+            e.preventDefault()
+            setInstallEvent(e as BeforeInstallPromptEvent)
+            setPromptState('android')
+        }
 
-        const handleAppInstalled = () => {
-            setVisible(false);
-            setDeferredPrompt(null);
-        };
+        window.addEventListener('beforeinstallprompt', handler)
+        return () => window.removeEventListener('beforeinstallprompt', handler)
+    }, [])
 
-        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-        window.addEventListener('appinstalled', handleAppInstalled);
-
-        return () => {
-            window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-            window.removeEventListener('appinstalled', handleAppInstalled);
-        };
-    }, []);
-
-    const handleDismiss = () => {
-        setVisible(false);
-    };
-
-    const handleInstall = async () => {
-        if (!deferredPrompt) return;
-
-        await deferredPrompt.prompt();
-        await deferredPrompt.userChoice;
-        setVisible(false);
-        setDeferredPrompt(null);
-    };
-
-    if (!visible || !deferredPrompt) {
-        return null;
+    const handleAndroidInstall = async () => {
+        if (!installEvent) return
+        await installEvent.prompt()
+        const { outcome } = await installEvent.userChoice
+        if (outcome === 'accepted') {
+            setPromptState('hidden')
+        }
+        setInstallEvent(null)
     }
 
-    return (
-        <div className="pwa-install-banner" role="dialog" aria-live="polite" aria-label="Install app prompt">
-            <div className="pwa-install-content">
-                <div className="pwa-install-text-block">
-                    <p className="pwa-install-title">Install iClub Members Portal</p>
-                    <p className="pwa-install-subtitle">Get faster access from your home screen.</p>
-                </div>
-                <div className="pwa-install-actions">
-                    <button type="button" className="pwa-install-btn pwa-install-btn-primary" onClick={handleInstall}>
-                        Install
-                    </button>
-                    <button type="button" className="pwa-install-btn pwa-install-btn-secondary" onClick={handleDismiss}>
-                        Not now
-                    </button>
+    const handleDismiss = () => {
+        setPromptState('hidden')
+        sessionStorage.setItem('pwa-prompt-dismissed', 'true')
+    }
+
+    if (promptState === 'hidden') return null
+
+    // Android prompt
+    if (promptState === 'android') {
+        return (
+            <div className="pwa-prompt pwa-prompt--android" role="dialog"
+                aria-label="Install iClub app">
+                <div className="pwa-prompt-content">
+                    <div className="pwa-prompt-icon">📱</div>
+                    <div className="pwa-prompt-text">
+                        <p className="pwa-prompt-title">Install iClub Portal</p>
+                        <p className="pwa-prompt-subtitle">
+                            Add to your home screen for quick access
+                        </p>
+                    </div>
+                    <div className="pwa-prompt-actions">
+                        <button
+                            className="pwa-btn pwa-btn--primary"
+                            onClick={handleAndroidInstall}
+                            type="button"
+                        >
+                            Install
+                        </button>
+                        <button
+                            className="pwa-btn pwa-btn--dismiss"
+                            onClick={handleDismiss}
+                            type="button"
+                        >
+                            Not now
+                        </button>
+                    </div>
                 </div>
             </div>
+        )
+    }
+
+    // iOS manual guide
+    return (
+        <div className="pwa-prompt pwa-prompt--ios" role="dialog"
+            aria-label="Add iClub to home screen">
+            <div className="pwa-prompt-ios-header">
+                <p className="pwa-prompt-title">Add to Home Screen</p>
+                <button
+                    className="pwa-prompt-close"
+                    onClick={handleDismiss}
+                    type="button"
+                    aria-label="Close"
+                >
+                    ✕
+                </button>
+            </div>
+
+            <div className="pwa-prompt-ios-steps">
+                <div
+                    className={`pwa-ios-step ${iosStep === 1 ? 'active' : ''}`}
+                    onClick={() => setIosStep(1)}
+                >
+                    <div className="pwa-ios-step-num">1</div>
+                    <div className="pwa-ios-step-content">
+                        <p className="pwa-ios-step-title">
+                            Tap the Share button
+                        </p>
+                        <p className="pwa-ios-step-hint">
+                            The <strong>□↑</strong> icon at the bottom of Safari
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    className={`pwa-ios-step ${iosStep === 2 ? 'active' : ''}`}
+                    onClick={() => setIosStep(2)}
+                >
+                    <div className="pwa-ios-step-num">2</div>
+                    <div className="pwa-ios-step-content">
+                        <p className="pwa-ios-step-title">
+                            Tap &ldquo;Add to Home Screen&rdquo;
+                        </p>
+                        <p className="pwa-ios-step-hint">
+                            Scroll down in the share menu to find it
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    className={`pwa-ios-step ${iosStep === 3 ? 'active' : ''}`}
+                    onClick={() => setIosStep(3)}
+                >
+                    <div className="pwa-ios-step-num">3</div>
+                    <div className="pwa-ios-step-content">
+                        <p className="pwa-ios-step-title">
+                            Tap &ldquo;Add&rdquo;
+                        </p>
+                        <p className="pwa-ios-step-hint">
+                            iClub Portal will appear on your home screen
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <button
+                className="pwa-btn pwa-btn--dismiss pwa-btn--full"
+                onClick={handleDismiss}
+                type="button"
+            >
+                Maybe later
+            </button>
         </div>
-    );
+    )
 }

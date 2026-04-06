@@ -66,3 +66,65 @@ Optional Playwright runtime overrides:
 
 - `PLAYWRIGHT_BASE_URL` (use an already-running frontend URL)
 - `PLAYWRIGHT_PORT` (port for auto-started frontend when base URL is not set)
+
+## PWA Development Notes
+
+### Testing PWA locally
+
+Service workers are disabled in development mode to avoid
+caching issues. To test PWA features locally:
+
+```bash
+# Build the production version
+pnpm --filter members-portal build
+
+# Preview the production build (service worker active)
+pnpm --filter members-portal start
+```
+
+Then visit http://localhost:3001 in Chrome.
+Open DevTools -> Application -> Service Workers
+to verify the service worker is registered.
+
+### Generating PWA icons
+
+1. Visit realfavicongenerator.net
+2. Upload your iclub logo (high resolution PNG)
+3. Download the generated package
+4. Rename files to match icon-[size]x[size].png format
+5. Place in members-portal/public/icons/
+
+### Capturing PWA screenshots
+
+```bash
+# Start the portal first
+pnpm dev:portal
+
+# In another terminal, run the screenshot script
+pnpm --filter members-portal pwa:screenshots
+```
+
+### Testing on mobile
+
+For real device testing over your local network:
+
+```bash
+# Find your local IP address
+# Windows: ipconfig
+# Mac: ifconfig | grep inet
+
+# Start portal accessible on network
+pnpm --filter members-portal dev -- --hostname 0.0.0.0
+```
+
+Then on your phone, visit http://[your-local-ip]:3001
+Note: Service worker requires HTTPS on real devices.
+Use a tool like ngrok for HTTPS tunnel during testing.
+
+### iOS install instructions for members
+
+Since iOS does not auto-prompt, share these steps with members:
+1. Open the portal in Safari (not Chrome)
+2. Tap the Share button (rectangle with arrow)
+3. Scroll down and tap "Add to Home Screen"
+4. Tap "Add" to confirm
