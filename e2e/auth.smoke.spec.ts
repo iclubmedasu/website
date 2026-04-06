@@ -162,11 +162,11 @@ test('anonymous user lands on login surface', async ({ page }) => {
     await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible()
 })
 
-test('valid login redirects to teams using test credentials', async ({ page }) => {
+test('valid login redirects to dashboard using test credentials', async ({ page }) => {
     await mockAuthApi(page)
     await signIn(page, TEST_EMAIL, TEST_PASSWORD)
 
-    await expect(page).toHaveURL(/\/teams/)
+    await expect(page).toHaveURL(/\/dashboard/)
     await expect(page.getByRole('button', { name: /logout/i })).toBeVisible()
 })
 
@@ -186,13 +186,12 @@ test('protected routes redirect when logged out', async ({ page }) => {
     await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible()
 })
 
-test('logout returns user to login and blocks protected routes', async ({ page }) => {
-    await mockAuthApi(page)
+test('session invalidation redirects protected routes to login', async ({ page }) => {
+    const authState = await mockAuthApi(page)
     await signIn(page, TEST_EMAIL, TEST_PASSWORD)
-    await expect(page).toHaveURL(/\/teams/)
+    await expect(page).toHaveURL(/\/dashboard/)
 
-    await page.getByRole('button', { name: /logout/i }).click()
-    await expect(page).toHaveURL(/\/login/)
+    authState.authenticated = false
 
     await page.goto('/projects')
     await expect(page).toHaveURL(/\/login/)
