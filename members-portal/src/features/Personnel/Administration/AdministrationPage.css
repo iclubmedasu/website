@@ -1,6 +1,6 @@
 ﻿/* ============================================
-   ADMINISTRATION PAGE â€“ 3 role sections
-   ============================================ */
+    ADMINISTRATION PAGE – 3 role sections
+    ============================================ */
 
 /* administration-page container: max-width/margin now in shared page.css */
 .administration-page {
@@ -31,15 +31,44 @@
     gap: 1rem;
     padding: 0.25rem 0;
     flex-wrap: wrap;
+    position: relative;
 }
 
 .administration-assignee .table-member-cell {
     flex: 1;
     min-width: 0;
+    padding-right: 6.5rem;
 }
 
 .administration-assignee .member-name-text {
     display: block;
+}
+
+.administration-assignee .action-buttons {
+    position: absolute;
+    top: 0;
+    right: 0;
+    opacity: 0;
+    transform: translateX(5px);
+    pointer-events: none;
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.administration-assignee:hover .action-buttons,
+.administration-assignee:focus-within .action-buttons,
+.administration-assignee:active .action-buttons {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+}
+
+.administration-assignee .table-action-btn {
+    background: var(--bg-card);
+    box-shadow: var(--shadow-sm);
+}
+
+.administration-assignee .table-action-btn:hover {
+    box-shadow: var(--shadow-md);
 }
 
 .administration-start-date {
@@ -91,16 +120,11 @@
 }
 
 /* ============================================
-   ASSIGN MODAL â€“ same structure as Add Members modal
-   (Button styles come from AddMembersModal.css: .btn .btn-primary .btn-secondary)
-   ============================================ */
+    ASSIGN MODAL – same structure as Add Members modal
+    (Button styles come from AddMembersModal.css: .btn .btn-primary .btn-secondary)
+    ============================================ */
 
-.administration-assign-modal .modal-container {
-    max-width: 35rem;
-    width: 90%;
-}
-
-/* â”€â”€ Responsive â”€â”€ */
+/* ── Responsive ── */
 @media (max-width: 768px) {
     .administration-assignee {
         flex-direction: column;

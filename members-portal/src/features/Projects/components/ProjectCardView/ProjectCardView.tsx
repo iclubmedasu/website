@@ -319,8 +319,16 @@ export function ProjectCardView({
                 <div className="project-card-header">
                     <span className="project-card-title">{project.title}</span>
                     <div className="project-card-meta">
-                        {collapsedMeta}
-                        {collapsedActions}
+                        {collapsedMeta && (
+                            <div className="project-card-meta-badges">
+                                {collapsedMeta}
+                            </div>
+                        )}
+                        {collapsedActions && (
+                            <div className="project-card-meta-actions">
+                                {collapsedActions}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -359,8 +367,10 @@ export function ProjectCardView({
                                 <h2 className="project-card-title" style={{ marginBottom: 0 }}>
                                     {currentDetail.title}
                                 </h2>
-                                {expandedMeta}
-                                {expandedActions}
+                                <div className="expanded-title-controls">
+                                    {expandedMeta}
+                                    {expandedActions}
+                                </div>
                             </div>
                             {currentDetail.description && (
                                 <div className="expanded-description" style={{ marginTop: '0.4rem' }}>

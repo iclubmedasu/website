@@ -391,12 +391,12 @@ const EditAdminMembersModal = ({
     return (
         <>
             <div className="modal-backdrop" onClick={handleClose} />
-            <div className="modal-container modal-large">
+            <div className="modal-container">
                 <div className="modal-header">
                     <div>
                         <h2 className="modal-title">{getTitle()}</h2>
                         <p className="modal-subtitle">
-                            {memberDisplayName} â€¢ {currentTeam?.name} â€¢ {currentRole?.roleName}
+                            {memberDisplayName} - {currentTeam?.name} - {currentRole?.roleName}
                         </p>
                     </div>
                     <button
@@ -439,7 +439,7 @@ const EditAdminMembersModal = ({
                                     <p className="info-value">
                                         {currentTeamAssignment.joinedDate && !Number.isNaN(new Date(currentTeamAssignment.joinedDate).getTime())
                                             ? new Date(currentTeamAssignment.joinedDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-                                            : 'â€”'}
+                                            : '-'}
                                     </p>
                                 </div>
                             </div>
@@ -530,7 +530,7 @@ const EditAdminMembersModal = ({
                                                 const effectiveCount = isOwnRole ? Math.max(0, count - 1) : count;
                                                 const isFull = role.maxCount != null && effectiveCount >= role.maxCount;
                                                 const label = role.maxCount != null
-                                                    ? `${role.roleName} (${effectiveCount}/${role.maxCount})${isFull ? ' â€” Full' : ''}`
+                                                    ? `${role.roleName} (${effectiveCount}/${role.maxCount})${isFull ? ' - Full' : ''}`
                                                     : role.roleName;
                                                 return <option key={role.id} value={role.id} disabled={isFull}>{label}</option>;
                                             })}

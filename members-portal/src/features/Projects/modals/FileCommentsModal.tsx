@@ -71,7 +71,7 @@ export default function FileCommentsModal({ file, onClose }: FileCommentsModalPr
     return (
         <>
             <div className="modal-backdrop" onClick={onClose} />
-            <div className="modal-container modal-large">
+            <div className="modal-container">
                 <div className="modal-header">
                     <div>
                         <h2 className="modal-title">File Comments</h2>

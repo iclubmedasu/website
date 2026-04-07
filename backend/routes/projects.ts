@@ -10,8 +10,6 @@ import {
 
 const router: any = express.Router();
 
-const ADMINISTRATION_TEAM_NAME = 'Administration';
-
 // Title-case utility for project titles
 function toTitleCase(str) {
     if (!str || typeof str !== 'string') return str;
@@ -49,18 +47,94 @@ function isPrivilegedUser(req) {
     return !!(req.user.isDeveloper || req.user.isOfficer || req.user.isAdmin || req.user.isLeadership);
 }
 
-/** Legacy isAdmin kept for backward-compat on list queries (non-admin visibility filter). */
-async function isAdmin(req) {
-    if (req.user.isDeveloper) return true;
+/**
+ * Roles with global project visibility.
+ * Leadership and special are intentionally excluded and remain team-scoped.
+ */
+function canUserViewAllProjects(req) {
+    return !!(req.user.isDeveloper || req.user.isOfficer || req.user.isAdmin);
+}
+
+/** Leadership and special roles are team-scoped for active projects. */
+function isLeadershipOrSpecial(req) {
+    return !!(req.user.isLeadership || req.user.isSpecial);
+}
+
+/**
+ * Active-project visibility matrix:
+ * - Developer/officer/administration: all active projects.
+ * - Leadership/special: projects linked to their teams.
+ *   Fallback: if no active team membership, allow all active projects.
+ * - Regular member: only projects with non-cancelled task assignments.
+ */
+async function buildActiveProjectVisibilityWhere(req) {
+    if (!req.user.memberId) return { id: -1 };
+    if (canUserViewAllProjects(req)) return null;
+
+    if (isLeadershipOrSpecial(req)) {
+        const myTeamIds = await getUserTeamIds(req.user.memberId);
+        if (myTeamIds.length === 0) return null;
+        return {
+            projectTeams: {
+                some: {
+                    teamId: { in: myTeamIds },
+                },
+            },
+        };
+    }
+
+    return {
+        tasks: {
+            some: {
+                isActive: true,
+                assignments: {
+                    some: {
+                        memberId: req.user.memberId,
+                        status: { not: 'CANCELLED' },
+                    },
+                },
+            },
+        },
+    };
+}
+
+/**
+ * Project detail visibility follows the same matrix as the list endpoint.
+ * Archived projects are readable by all authenticated users.
+ */
+async function canUserViewProject(req, projectId, isArchived) {
     if (!req.user.memberId) return false;
-    const adminMembership = await prisma.teamMember.findFirst({
+    if (isArchived) return true;
+    if (canUserViewAllProjects(req)) return true;
+
+    if (isLeadershipOrSpecial(req)) {
+        const myTeamIds = await getUserTeamIds(req.user.memberId);
+        if (myTeamIds.length === 0) return true;
+
+        const access = await prisma.projectTeam.findFirst({
+            where: {
+                projectId,
+                teamId: { in: myTeamIds },
+            },
+            select: { id: true },
+        });
+
+        return access !== null;
+    }
+
+    const assignment = await prisma.taskAssignment.findFirst({
         where: {
             memberId: req.user.memberId,
-            isActive: true,
-            team: { name: ADMINISTRATION_TEAM_NAME },
+            status: { not: 'CANCELLED' },
+            task: {
+                projectId,
+                isActive: true,
+            },
         },
+        select: { id: true },
     });
-    return adminMembership !== null;
+
+    return assignment !== null;
 }
 
 /**
@@ -153,40 +227,41 @@ function buildProjectInclude() {
 router.get('/', async (req, res) => {
     try {
         const { status, priority, teamId, createdByMe, isActive, archived } = req.query;
-        const admin = await isAdmin(req);
 
-        const where: any = {};
-        if (isActive !== undefined) where.isActive = isActive === 'true';
-        else where.isActive = true;
+        const whereAnd: any[] = [];
+        const isArchivedQuery = archived === 'true';
+        const parsedTeamId = teamId ? parseInt(String(teamId), 10) : null;
 
-        // archived=true → show only archived; default → exclude archived
-        if (archived === 'true') {
-            where.isArchived = true;
-            // Archived projects are inactive, so override isActive filter
-            delete where.isActive;
+        if (teamId && Number.isNaN(parsedTeamId)) {
+            return res.status(400).json({ error: 'Invalid teamId' });
+        }
+
+        if (isArchivedQuery) {
+            whereAnd.push({ isArchived: true });
         } else {
-            where.isArchived = false;
+            whereAnd.push({ isArchived: false });
+            if (isActive !== undefined) whereAnd.push({ isActive: isActive === 'true' });
+            else whereAnd.push({ isActive: true });
         }
 
-        if (status) where.status = status;
-        if (priority) where.priority = priority;
+        if (status) whereAnd.push({ status });
+        if (priority) whereAnd.push({ priority });
+
         if (createdByMe === 'true' && req.user.memberId) {
-            where.createdByMemberId = req.user.memberId;
+            whereAnd.push({ createdByMemberId: req.user.memberId });
         }
 
-        // Non-admins can only see projects they created or projects whose projectTeams overlap with their own teams
-        if (!admin && req.user.memberId) {
-            const myTeamIds = await getUserTeamIds(req.user.memberId);
-            const accessFilter = teamId
-                ? { teamId: parseInt(teamId) }
-                : { in: myTeamIds };
-            where.OR = [
-                { createdByMemberId: req.user.memberId },
-                { projectTeams: { some: { teamId: accessFilter } } },
-            ];
-        } else if (teamId) {
-            where.projectTeams = { some: { teamId: parseInt(teamId) } };
+        if (parsedTeamId) {
+            whereAnd.push({ projectTeams: { some: { teamId: parsedTeamId } } });
         }
+
+        // Active-project visibility is role-scoped; archived projects are visible to all authenticated users.
+        if (!isArchivedQuery) {
+            const visibilityWhere = await buildActiveProjectVisibilityWhere(req);
+            if (visibilityWhere) whereAnd.push(visibilityWhere);
+        }
+
+        const where: any = whereAnd.length ? { AND: whereAnd } : {};
 
         const projects = await prisma.project.findMany({
             where,
@@ -239,19 +314,14 @@ router.get('/:id', async (req, res) => {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid project ID' });
 
-        const admin = await isAdmin(req);
+        const projectAccess = await prisma.project.findUnique({
+            where: { id },
+            select: { id: true, isArchived: true },
+        });
+        if (!projectAccess) return res.status(404).json({ error: 'Project not found' });
 
-        // Access check for non-admins: must be a participant (creator or team member)
-        if (!admin && req.user.memberId) {
-            const myTeamIds = await getUserTeamIds(req.user.memberId);
-            const access = await prisma.projectTeam.findFirst({
-                where: { projectId: id, teamId: { in: myTeamIds } },
-            });
-            const createdByMe = await prisma.project.findFirst({
-                where: { id, createdByMemberId: req.user.memberId },
-                select: { id: true },
-            });
-            if (!access && !createdByMe) return res.status(403).json({ error: 'Access denied' });
+        if (!(await canUserViewProject(req, id, projectAccess.isArchived))) {
+            return res.status(403).json({ error: 'Access denied' });
         }
 
         const project = await prisma.project.findUnique({
@@ -293,8 +363,6 @@ router.get('/:id', async (req, res) => {
         });
 
         if (!project) return res.status(404).json({ error: 'Project not found' });
-        // Team access has already been verified above for non-admin users.
-        // Allow read-only viewing of inactive, aborted, and archived projects.
 
         // Attach edit permission flag for the requesting user
         const canEdit = await canUserEditProject(req, id);
@@ -817,7 +885,9 @@ router.patch('/:id/deactivate', async (req, res) => {
 router.patch('/:id/activate', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        if (!(await isAdmin(req))) return res.status(403).json({ error: 'Admin access required' });
+        if (!canUserManageProject(req)) {
+            return res.status(403).json({ error: 'Only developer, officer, administration and leadership can activate projects' });
+        }
         const project = await prisma.project.update({ where: { id }, data: { isActive: true } });
 
         await logProjectActivity({

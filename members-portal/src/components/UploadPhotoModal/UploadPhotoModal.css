@@ -1,11 +1,3 @@
-/* ============================================
-   UPLOAD PHOTO MODAL
-   ============================================ */
-
-.upload-photo-modal {
-    max-width: 30rem;
-}
-
 /* Preview area */
 .upload-photo-preview-area {
     display: flex;

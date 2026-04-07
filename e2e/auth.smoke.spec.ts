@@ -196,3 +196,21 @@ test('session invalidation redirects protected routes to login', async ({ page }
     await page.goto('/projects')
     await expect(page).toHaveURL(/\/login/)
 })
+
+test('mobile navigation opens, expands submenu, and auto-closes after route click', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await mockAuthApi(page)
+    await signIn(page, TEST_EMAIL, TEST_PASSWORD)
+
+    const openMenuButton = page.getByRole('button', { name: 'Open navigation menu' })
+    await expect(openMenuButton).toBeVisible()
+
+    await openMenuButton.click()
+    await expect(page.getByRole('button', { name: 'Close navigation menu' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Personnel' }).click()
+    await page.getByRole('link', { name: 'Members' }).click()
+
+    await expect(page).toHaveURL(/\/members/)
+    await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeVisible()
+})

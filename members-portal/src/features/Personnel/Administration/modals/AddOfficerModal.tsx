@@ -59,7 +59,7 @@ function AddOfficerModal({ isOpen, onClose, onSubmit }: AddOfficerModalProps) {
 
     return (
         <div className="modal-backdrop add-officer-modal" onClick={onClose}>
-            <div className="modal-container modal-large" onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}>
+            <div className="modal-container" onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}>
                 <div className="modal-header">
                     <h2 className="modal-title">Add Officer</h2>
                     <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">

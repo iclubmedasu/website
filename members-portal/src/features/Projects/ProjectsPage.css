@@ -144,6 +144,7 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 0.75rem;
+    flex-wrap: nowrap;
 }
 
 .project-card-title {
@@ -152,15 +153,43 @@
     font-weight: 600;
     color: var(--gray-900);
     line-height: 1.3;
-    flex: 1;
+    min-width: 0;
+}
+
+/* Collapsed card title stays readable while preserving right-side controls */
+.project-card-collapsed-content .project-card-title {
+    flex: 1 1 55%;
+    max-width: 55%;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
 }
 
 .project-card-meta {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0.4rem;
     align-items: center;
-    /* margin: 0.5rem; */
+    flex: 0 0 auto;
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+.project-card-meta-badges,
+.project-card-meta-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+}
+
+.project-card-meta-badges .badge {
+    white-space: nowrap;
 }
 
 .project-card-description {
@@ -424,15 +453,97 @@
 /* Title row with inline actions */
 .expanded-title-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
+    flex-wrap: nowrap;
+}
+
+.expanded-title-row .project-card-title {
+    flex: 1 1 55%;
+    max-width: 55%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.expanded-title-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    margin-left: auto;
+}
+
+.expanded-title-controls .badge {
+    white-space: nowrap;
 }
 
 .expanded-title-actions {
     display: flex;
+    align-items: center;
     gap: 0.5rem;
     flex-shrink: 0;
+    flex-wrap: nowrap;
+}
+
+@media (max-width: 900px) {
+    .expanded-title-actions .expanded-action-label {
+        display: none;
+    }
+
+    .expanded-title-actions .icon-btn.icon-btn--text {
+        padding-inline: 0.45rem;
+    }
+}
+
+@media (max-width: 640px) {
+
+    .project-card-header,
+    .expanded-title-row {
+        flex-wrap: wrap;
+        gap: 0.45rem;
+    }
+
+    .project-card-meta,
+    .expanded-title-controls {
+        order: 1;
+        flex: 1 1 100%;
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-end;
+        gap: 0.35rem;
+    }
+
+    .project-card-collapsed-content .project-card-title,
+    .expanded-title-row .project-card-title {
+        order: 2;
+        flex: 1 1 100%;
+        max-width: 100%;
+        width: 100%;
+        min-width: 0;
+        overflow-wrap: break-word;
+        word-break: normal;
+    }
+
+    .project-card-collapsed-content .project-card-title {
+        margin-top: 0.05rem;
+    }
+
+    .project-card-meta-actions,
+    .expanded-title-actions {
+        gap: 0.35rem;
+    }
+
+    .project-card-meta .icon-btn,
+    .expanded-title-actions .icon-btn.icon-btn--text {
+        width: 26px;
+        height: 26px;
+    }
+
+    .expanded-title-actions .icon-btn.icon-btn--text {
+        padding-inline: 0.32rem;
+    }
 }
 
 /* ── Expanded card task rows ── */
@@ -919,6 +1030,7 @@
     width: 28px;
     height: 28px;
     padding: 0;
+    flex-shrink: 0;
 }
 
 .project-card-meta .icon-btn svg {

@@ -223,7 +223,7 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
     return (
         <>
             <div className="modal-backdrop" onClick={onClose} />
-            <div className="modal-container modal-large">
+            <div className="modal-container">
                 <div className="modal-header">
                     <h2 className="modal-title">
                         {mode === 'create' ? 'Create Project' : 'Edit Project'}

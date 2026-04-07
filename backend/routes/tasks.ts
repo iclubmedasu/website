@@ -61,36 +61,77 @@ function isPrivilegedUser(req) {
 }
 
 /**
- * Is the user privileged OR has a special role?
- * Privileged + special roles can add/remove/edit phases/tasks/subtasks.
+ * Can the requesting user fully edit a task (create, update fields, delete, assign, etc.)?
+ * Privileged and special roles can fully manage tasks.
  */
-function isPrivilegedOrSpecialUser(req) {
+function canUserEditTask(req) {
+    if (!req.user.memberId) return false;
     return isPrivilegedUser(req) || !!req.user.isSpecial;
 }
 
 /**
- * Can the requesting user fully edit a task (create, update fields, delete, assign, etc.)?
- * Only privileged + special roles.
- */
-function canUserEditTask(req) {
-    if (!req.user.memberId) return false;
-    return isPrivilegedOrSpecialUser(req);
-}
-
-/**
  * Can the requesting user change a task's status?
- * Privileged + special roles can always change status.
+ * Elevated roles can always change status.
  * Regular members can only change status if they are assigned to the task.
  */
 async function canUserEditTaskStatus(req, taskId) {
     if (!req.user.memberId) return false;
-    if (isPrivilegedOrSpecialUser(req)) return true;
+    if (canUserEditTask(req)) return true;
 
     // Check if the user is assigned to this specific task
     const assignment = await prisma.taskAssignment.findFirst({
         where: { taskId, memberId: req.user.memberId },
     });
     return assignment !== null;
+}
+
+/**
+ * Can the requesting user collaborate on a task (status/comments/activity)?
+ */
+async function canUserCollaborateOnTask(req, taskId) {
+    return canUserEditTask(req) || (await canUserEditTaskStatus(req, taskId));
+}
+
+function parseIdArray(values: any) {
+    if (!Array.isArray(values)) return null;
+    const parsed = values.map((value) => parseInt(String(value), 10));
+    if (parsed.some((value) => Number.isNaN(value))) return null;
+    return [...new Set(parsed)];
+}
+
+async function getProjectTeamIds(projectId: number) {
+    const rows = await prisma.projectTeam.findMany({
+        where: { projectId },
+        select: { teamId: true },
+    });
+    return rows.map((row) => row.teamId);
+}
+
+async function getAssignableMemberIdsForProject(projectId: number, memberIds: number[]) {
+    if (memberIds.length === 0) return new Set<number>();
+    const projectTeamIds = await getProjectTeamIds(projectId);
+    if (projectTeamIds.length === 0) return new Set<number>();
+
+    const memberships = await prisma.teamMember.findMany({
+        where: {
+            memberId: { in: memberIds },
+            isActive: true,
+            teamId: { in: projectTeamIds },
+        },
+        select: { memberId: true },
+    });
+
+    return new Set(memberships.map((membership) => membership.memberId));
+}
+
+async function getInvalidAssigneeIds(projectId: number, memberIds: number[]) {
+    const assignableMemberIds = await getAssignableMemberIdsForProject(projectId, memberIds);
+    return memberIds.filter((memberId) => !assignableMemberIds.has(memberId));
+}
+
+async function isMemberAssignableToProject(projectId: number, memberId: number) {
+    const invalidAssigneeIds = await getInvalidAssigneeIds(projectId, [memberId]);
+    return invalidAssigneeIds.length === 0;
 }
 
 /**
@@ -309,7 +350,9 @@ router.get('/:id', async (req, res) => {
         if (!task || !task.isActive) return res.status(404).json({ error: 'Task not found' });
 
         const canEdit = canUserEditTask(req);
-        res.json({ ...task, canEdit });
+        const canEditStatus = await canUserEditTaskStatus(req, id);
+        const canCollaborate = canEdit || canEditStatus;
+        res.json({ ...task, canEdit, canEditStatus, canCollaborate });
     } catch (error) {
         console.error('GET /tasks/:id', error);
         res.status(500).json({ error: 'Failed to fetch task' });
@@ -340,17 +383,38 @@ router.post('/', async (req, res) => {
             assigneeIds = [],
         } = req.body;
 
-        if (!projectId) return res.status(400).json({ error: 'projectId is required' });
+        const projectIdInt = parseInt(String(projectId), 10);
+        if (Number.isNaN(projectIdInt)) return res.status(400).json({ error: 'projectId is required' });
         if (!title?.trim()) return res.status(400).json({ error: 'title is required' });
         if (!req.user.memberId) return res.status(400).json({ error: 'memberId required' });
 
-        // Only privileged + special roles can create tasks
+        // Only elevated roles can create tasks
         if (!canUserEditTask(req)) {
-            return res.status(403).json({ error: 'Only privileged and special roles can create tasks' });
+            return res.status(403).json({ error: 'Only developer, officer, administration, leadership, and special roles can create tasks' });
+        }
+
+        const parsedTeamIds = parseIdArray(teamIds);
+        if (parsedTeamIds === null) {
+            return res.status(400).json({ error: 'teamIds must be an array of numeric IDs' });
+        }
+
+        const parsedAssigneeIds = parseIdArray(assigneeIds);
+        if (parsedAssigneeIds === null) {
+            return res.status(400).json({ error: 'assigneeIds must be an array of numeric IDs' });
+        }
+
+        if (parsedAssigneeIds.length > 0) {
+            const invalidAssigneeIds = await getInvalidAssigneeIds(projectIdInt, parsedAssigneeIds);
+            if (invalidAssigneeIds.length > 0) {
+                return res.status(403).json({
+                    error: 'Assignees must belong to teams that are assigned to this project',
+                    invalidMemberIds: invalidAssigneeIds,
+                });
+            }
         }
 
         // Auto-assign next order value among siblings
-        const siblingWhere: any = { isActive: true, projectId: parseInt(projectId) };
+        const siblingWhere: any = { isActive: true, projectId: projectIdInt };
         if (parentTaskId) {
             siblingWhere.parentTaskId = parseInt(parentTaskId);
         } else {
@@ -366,7 +430,7 @@ router.post('/', async (req, res) => {
 
         const task = await prisma.task.create({
             data: {
-                projectId: parseInt(projectId),
+                projectId: projectIdInt,
                 parentTaskId: parentTaskId ? parseInt(parentTaskId) : null,
                 phaseId: phaseId ? parseInt(phaseId) : null,
                 order: nextOrder,
@@ -380,14 +444,14 @@ router.post('/', async (req, res) => {
                 dueDate: dueDate ? new Date(dueDate) : null,
                 estimatedHours: estimatedHours ? parseFloat(estimatedHours) : null,
                 taskTeams: {
-                    create: teamIds.map((tid) => ({
-                        teamId: parseInt(tid),
+                    create: parsedTeamIds.map((teamId) => ({
+                        teamId,
                         canEdit: true,
                     })),
                 },
                 assignments: {
-                    create: assigneeIds.map((mid) => ({
-                        memberId: parseInt(mid),
+                    create: parsedAssigneeIds.map((memberId) => ({
+                        memberId,
                         isSelfAssigned: false,
                         assignedBy: req.user.memberId,
                         status: 'ASSIGNED',
@@ -451,9 +515,12 @@ router.put('/:id', async (req, res) => {
                 completedDate: true,
                 estimatedHours: true,
                 actualHours: true,
+                projectId: true,
                 assignments: { select: { memberId: true } },
             },
         });
+
+        if (!before) return res.status(404).json({ error: 'Task not found' });
 
         const normalizedBefore = {
             ...before,
@@ -499,12 +566,27 @@ router.put('/:id', async (req, res) => {
         if (actualHours !== undefined) data.actualHours = actualHours !== '' && actualHours !== null ? parseFloat(actualHours) : null;
 
         if (assigneeIds !== undefined) {
+            const parsedAssigneeIds = parseIdArray(assigneeIds);
+            if (parsedAssigneeIds === null) {
+                return res.status(400).json({ error: 'assigneeIds must be an array of numeric IDs' });
+            }
+
+            if (parsedAssigneeIds.length > 0) {
+                const invalidAssigneeIds = await getInvalidAssigneeIds(before.projectId, parsedAssigneeIds);
+                if (invalidAssigneeIds.length > 0) {
+                    return res.status(403).json({
+                        error: 'Assignees must belong to teams that are assigned to this project',
+                        invalidMemberIds: invalidAssigneeIds,
+                    });
+                }
+            }
+
             await prisma.taskAssignment.deleteMany({ where: { taskId: id } });
-            if (assigneeIds.length > 0) {
+            if (parsedAssigneeIds.length > 0) {
                 await prisma.taskAssignment.createMany({
-                    data: assigneeIds.map((mid) => ({
+                    data: parsedAssigneeIds.map((memberId) => ({
                         taskId: id,
-                        memberId: parseInt(mid),
+                        memberId,
                         isSelfAssigned: false,
                         assignedBy: req.user.memberId,
                         status: 'ASSIGNED',
@@ -830,19 +912,33 @@ router.delete('/:id/teams/:teamId', async (req, res) => {
 // ============================================
 router.post('/:id/assign', async (req, res) => {
     try {
-        const taskId = parseInt(req.params.id);
+        const taskId = parseInt(req.params.id, 10);
+        if (Number.isNaN(taskId)) return res.status(400).json({ error: 'Invalid task ID' });
         if (!canUserEditTask(req)) {
             return res.status(403).json({ error: 'Edit access denied' });
         }
 
         const { memberId } = req.body;
         if (!memberId) return res.status(400).json({ error: 'memberId is required' });
+        const memberIdInt = parseInt(String(memberId), 10);
+        if (Number.isNaN(memberIdInt)) return res.status(400).json({ error: 'memberId must be numeric' });
+
+        const task = await prisma.task.findUnique({
+            where: { id: taskId },
+            select: { id: true, projectId: true, isActive: true },
+        });
+        if (!task || !task.isActive) return res.status(404).json({ error: 'Task not found' });
+
+        const canAssignMember = await isMemberAssignableToProject(task.projectId, memberIdInt);
+        if (!canAssignMember) {
+            return res.status(403).json({ error: 'Assignee must belong to a team that is assigned to this project' });
+        }
 
         const assignment = await prisma.taskAssignment.upsert({
-            where: { taskId_memberId: { taskId, memberId: parseInt(memberId) } },
+            where: { taskId_memberId: { taskId, memberId: memberIdInt } },
             create: {
                 taskId,
-                memberId: parseInt(memberId),
+                memberId: memberIdInt,
                 assignedBy: req.user.memberId,
                 isSelfAssigned: false,
                 status: 'ASSIGNED',
@@ -858,8 +954,8 @@ router.post('/:id/assign', async (req, res) => {
         });
 
         await logActivity(taskId, req.user.memberId, 'ASSIGNED', {
-            newValue: memberId,
-            description: `Member ${memberId} assigned to task`,
+            newValue: memberIdInt,
+            description: `Member ${memberIdInt} assigned to task`,
         });
 
         res.status(201).json(assignment);
@@ -874,8 +970,20 @@ router.post('/:id/assign', async (req, res) => {
 // ============================================
 router.post('/:id/self-assign', async (req, res) => {
     try {
-        const taskId = parseInt(req.params.id);
+        const taskId = parseInt(req.params.id, 10);
+        if (Number.isNaN(taskId)) return res.status(400).json({ error: 'Invalid task ID' });
         if (!req.user.memberId) return res.status(400).json({ error: 'memberId required' });
+
+        const task = await prisma.task.findUnique({
+            where: { id: taskId },
+            select: { id: true, projectId: true, isActive: true },
+        });
+        if (!task || !task.isActive) return res.status(404).json({ error: 'Task not found' });
+
+        const canSelfAssign = await isMemberAssignableToProject(task.projectId, req.user.memberId);
+        if (!canSelfAssign) {
+            return res.status(403).json({ error: 'You must belong to a team that is assigned to this project to self-assign' });
+        }
 
         const assignment = await prisma.taskAssignment.upsert({
             where: { taskId_memberId: { taskId, memberId: req.user.memberId } },
@@ -978,7 +1086,12 @@ router.delete('/:id/assign/:memberId', async (req, res) => {
 // ============================================
 router.get('/:id/comments', async (req, res) => {
     try {
-        const taskId = parseInt(req.params.id);
+        const taskId = parseInt(req.params.id, 10);
+        if (Number.isNaN(taskId)) return res.status(400).json({ error: 'Invalid task ID' });
+        if (!(await canUserCollaborateOnTask(req, taskId))) {
+            return res.status(403).json({ error: 'Task collaboration access denied' });
+        }
+
         const comments = await prisma.taskComment.findMany({
             where: { taskId },
             include: {
@@ -999,8 +1112,12 @@ router.get('/:id/comments', async (req, res) => {
 // ============================================
 router.post('/:id/comments', async (req, res) => {
     try {
-        const taskId = parseInt(req.params.id);
+        const taskId = parseInt(req.params.id, 10);
+        if (Number.isNaN(taskId)) return res.status(400).json({ error: 'Invalid task ID' });
         if (!req.user.memberId) return res.status(400).json({ error: 'memberId required' });
+        if (!(await canUserCollaborateOnTask(req, taskId))) {
+            return res.status(403).json({ error: 'Task collaboration access denied' });
+        }
 
         const { comment } = req.body;
         if (!comment?.trim()) return res.status(400).json({ error: 'comment is required' });
@@ -1039,8 +1156,8 @@ router.put('/:id/comments/:commentId', async (req, res) => {
         const existing = await prisma.taskComment.findUnique({ where: { id: commentId } });
         if (!existing) return res.status(404).json({ error: 'Comment not found' });
 
-        // Only the author (or admin) can edit
-        if (existing.memberId !== req.user.memberId && !(await isAdmin(req))) {
+        // Only the author or elevated users can edit
+        if (existing.memberId !== req.user.memberId && !canUserEditTask(req)) {
             return res.status(403).json({ error: 'Can only edit your own comments' });
         }
 
@@ -1078,7 +1195,7 @@ router.delete('/:id/comments/:commentId', async (req, res) => {
         const existing = await prisma.taskComment.findUnique({ where: { id: commentId } });
         if (!existing) return res.status(404).json({ error: 'Comment not found' });
 
-        if (existing.memberId !== req.user.memberId && !(await isAdmin(req))) {
+        if (existing.memberId !== req.user.memberId && !canUserEditTask(req)) {
             return res.status(403).json({ error: 'Can only delete your own comments' });
         }
 
@@ -1100,7 +1217,12 @@ router.delete('/:id/comments/:commentId', async (req, res) => {
 // ============================================
 router.get('/:id/activity', async (req, res) => {
     try {
-        const taskId = parseInt(req.params.id);
+        const taskId = parseInt(req.params.id, 10);
+        if (Number.isNaN(taskId)) return res.status(400).json({ error: 'Invalid task ID' });
+        if (!(await canUserCollaborateOnTask(req, taskId))) {
+            return res.status(403).json({ error: 'Task collaboration access denied' });
+        }
+
         const log = await prisma.taskActivityLog.findMany({
             where: { taskId },
             include: {

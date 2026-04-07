@@ -56,7 +56,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
     return fallback;
 }
 
-// Pagination helper â€“ produces [1, 2, '...', 5, 6, 7, '...', 10] style array
+// Pagination helper – produces [1, 2, '...', 5, 6, 7, '...', 10] style array
 function getPageNumbers(current: number, total: number): PageToken[] {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
     const pages: PageToken[] = [];
@@ -119,8 +119,8 @@ function AlumniPage() {
             memberId: alumni.memberId,
             name: alumni.member?.fullName || 'Unknown',
             email: alumni.member?.email || 'N/A',
-            teamName: alumni.team?.name ?? 'â€”',
-            role: alumni.role?.roleName ?? 'â€”',
+            teamName: alumni.team?.name ?? '—',
+            role: alumni.role?.roleName ?? '—',
             subteamName: alumni.subteam?.name ?? null,
             leaveType: alumni.leaveType,
             leftDate: alumni.leftDate ?? null,
@@ -141,7 +141,7 @@ function AlumniPage() {
     }, [rows, currentPage]);
 
     const formatDate = (d: string | null | undefined): string => {
-        if (!d || Number.isNaN(new Date(d).getTime())) return 'â€”';
+        if (!d || Number.isNaN(new Date(d).getTime())) return '—';
         return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
     };
 
@@ -214,7 +214,7 @@ function AlumniPage() {
                                             </td>
                                             <td>{row.teamName}</td>
                                             <td>{row.role}</td>
-                                            <td>{row.subteamName || 'â€”'}</td>
+                                            <td>{row.subteamName || '—'}</td>
                                             <td className="email-cell">{row.email}</td>
                                             <td>{row.leaveType}</td>
                                             <td>{formatDate(row.leftDate)}</td>
@@ -252,7 +252,7 @@ function AlumniPage() {
                         <div className="pagination-pages">
                             {getPageNumbers(currentPage, totalPages).map((pageNumber, index) =>
                                 pageNumber === '...' ? (
-                                    <span key={`ellipsis-${index}`} className="pagination-ellipsis">â€¦</span>
+                                    <span key={`ellipsis-${index}`} className="pagination-ellipsis">…</span>
                                 ) : (
                                     <button
                                         key={pageNumber}

@@ -247,16 +247,21 @@ const TitleDropdown = ({
                             key={team.id}
                             className={`dropdown-item-wrapper ${selectedTeam === team.id ? 'active' : ''}`}
                         >
-                            <button
+                            <div
                                 className={`dropdown-item ${selectedTeam === team.id ? 'active' : ''}`}
-                                onClick={() => {
-                                    onTeamChange(team.id);
-                                    closeMenu();
-                                }}
                             >
-                                <span className="dropdown-item-label">
-                                    {team.label}
-                                </span>
+                                <button
+                                    type="button"
+                                    className="dropdown-item-main"
+                                    onClick={() => {
+                                        onTeamChange(team.id);
+                                        closeMenu();
+                                    }}
+                                >
+                                    <span className="dropdown-item-label">
+                                        {team.label}
+                                    </span>
+                                </button>
                                 <div className="dropdown-item-right">
                                     {team.badge && (
                                         <span className="dropdown-badge">{team.badge}</span>
@@ -292,7 +297,7 @@ const TitleDropdown = ({
                                         </div>
                                     )}
                                 </div>
-                            </button>
+                            </div>
                         </div>
                     ))}
 
@@ -335,12 +340,16 @@ const RolesDropdown = ({ roles, onAddRole, onEditRole, onDeactivateRole, onActiv
                 <>
                     {roles.map((role) => (
                         <div key={role.id} className="manage-dropdown-item-wrapper">
-                            <button
-                                type="button"
+                            <div
                                 className="manage-dropdown-item"
-                                onClick={() => closeMenu()}
                             >
-                                <span className="manage-dropdown-item-label">{role.label}</span>
+                                <button
+                                    type="button"
+                                    className="manage-dropdown-item-main"
+                                    onClick={() => closeMenu()}
+                                >
+                                    <span className="manage-dropdown-item-label">{role.label}</span>
+                                </button>
                                 <div className="manage-dropdown-item-actions">
                                     {!role.isSystemRole && (
                                         <button
@@ -375,7 +384,7 @@ const RolesDropdown = ({ roles, onAddRole, onEditRole, onDeactivateRole, onActiv
                                         </button>
                                     )}
                                 </div>
-                            </button>
+                            </div>
                         </div>
                     ))}
                     <button
@@ -416,12 +425,16 @@ const SubteamsDropdown = ({ subteams, onAddSubteam, onEditSubteam, onDeactivateS
                 <>
                     {subteams.map((subteam) => (
                         <div key={subteam.id} className="manage-dropdown-item-wrapper">
-                            <button
-                                type="button"
+                            <div
                                 className="manage-dropdown-item"
-                                onClick={() => closeMenu()}
                             >
-                                <span className="manage-dropdown-item-label">{subteam.label}</span>
+                                <button
+                                    type="button"
+                                    className="manage-dropdown-item-main"
+                                    onClick={() => closeMenu()}
+                                >
+                                    <span className="manage-dropdown-item-label">{subteam.label}</span>
+                                </button>
                                 <div className="manage-dropdown-item-actions">
                                     <button
                                         type="button"
@@ -452,7 +465,7 @@ const SubteamsDropdown = ({ subteams, onAddSubteam, onEditSubteam, onDeactivateS
                                         {subteam.isActive !== false ? <PauseCircle /> : <PlayCircle />}
                                     </button>
                                 </div>
-                            </button>
+                            </div>
                         </div>
                     ))}
                     <button
@@ -615,7 +628,7 @@ const MembersTable = ({ members, onViewMember, onEditMember, onAddMember, canMan
                                             </div>
                                         </td>
                                         <td>{member.role || 'N/A'}</td>
-                                        <td>{member.subteamName || 'â€”'}</td>
+                                        <td>{member.subteamName || '\u2014'}</td>
                                         <td className="email-cell">{member.email || 'N/A'}</td>
                                         <td>
                                             <span className={`status-badge ${(member.status || 'Unknown').toLowerCase()}`}>

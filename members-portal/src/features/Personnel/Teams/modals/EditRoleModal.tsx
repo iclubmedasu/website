@@ -209,6 +209,8 @@ const EditRoleModal = ({ isOpen, onClose, onSubmit, teamId, initialRoleId }: Edi
                         className="modal-close-btn"
                         onClick={handleClose}
                         type="button"
+                        title="Close"
+                        aria-label="Close"
                     >
                         <X />
                     </button>
@@ -300,7 +302,7 @@ const EditRoleModal = ({ isOpen, onClose, onSubmit, teamId, initialRoleId }: Edi
                                         ))}
                                     </select>
                                     <p className="form-hint-small">
-                                        Leadership â†’ Leadership card. Special Roles â†’ Special card. Regular â†’ Team Members table.
+                                        Leadership → Leadership card. Special Roles → Special card. Regular → Team Members table.
                                     </p>
                                 </div>
 

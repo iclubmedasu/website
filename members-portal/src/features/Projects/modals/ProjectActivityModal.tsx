@@ -60,7 +60,7 @@ export default function ProjectActivityModal({ project, onClose }: ProjectActivi
     return (
         <>
             <div className="modal-backdrop" onClick={onClose} />
-            <div className="modal-container modal-large activity-history-modal project-activity-modal">
+            <div className="modal-container activity-history-modal project-activity-modal">
                 <div className="modal-header">
                     <div>
                         <h2 className="modal-title">Project Activity</h2>

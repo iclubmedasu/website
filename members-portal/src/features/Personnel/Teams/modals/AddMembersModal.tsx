@@ -325,7 +325,7 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
     return (
         <>
             <div className="modal-backdrop" onClick={handleClose}></div>
-            <div className="modal-container modal-large">
+            <div className="modal-container">
                 <div className="modal-header">
                     <h2 className="modal-title">Add New Member</h2>
                     <button
@@ -347,7 +347,7 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
                             </div>
                         )}
 
-                        {/* Personal Information â€“ Student ID required; official email = StudentID@med.asu.edu.eg (auto) */}
+                        {/* Personal Information - Student ID required; official email = StudentID@med.asu.edu.eg (auto) */}
                         <div className="form-section">
                             <h3 className="form-section-title">Personal Information</h3>
                             {/*  <p className="form-section-hint">
@@ -408,7 +408,7 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
                                 </div>
                             </div> */}
 
-                            {/* Full Name â€“ commented out
+                            {/* Full Name - commented out
                                 <div className="form-group">
                                     <label htmlFor="fullName" className="form-label">
                                         Full Name
@@ -420,7 +420,7 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
                                         className={`form-input ${errors.fullName ? 'error' : ''}`}
                                         value={formData.fullName}
                                         onChange={handleChange}
-                                        placeholder="Optional â€“ member completes at first sign-in"
+                                        placeholder="Optional - member completes at first sign-in"
                                         disabled={isSubmitting}
                                     />
                                     {errors.fullName && (
@@ -429,7 +429,7 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
                                 </div>
                                 */}
 
-                            {/* Phone Number & Additional email 2 â€“ commented out
+                            {/* Phone Number & Additional email 2 - commented out
                             <div className="form-row">
                                 <div className="form-group">
                                     <label htmlFor="phoneNumber" className="form-label">
@@ -442,7 +442,7 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
                                         className={`form-input ${errors.phoneNumber ? 'error' : ''}`}
                                         value={formData.phoneNumber}
                                         onChange={handleChange}
-                                        placeholder="Optional â€“ member completes at first sign-in"
+                                        placeholder="Optional - member completes at first sign-in"
                                         disabled={isSubmitting}
                                     />
                                     {errors.phoneNumber && (
@@ -578,7 +578,7 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
                                             const suffix = role.maxCount != null ? ` (${currentCount}/${role.maxCount})` : '';
                                             return (
                                                 <option key={role.id} value={role.id} disabled={isFull}>
-                                                    {role.roleName}{suffix}{isFull ? ' â€” Full' : ''}
+                                                    {role.roleName}{suffix}{isFull ? ' - Full' : ''}
                                                 </option>
                                             );
                                         })}

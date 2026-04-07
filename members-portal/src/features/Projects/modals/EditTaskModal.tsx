@@ -65,6 +65,8 @@ type TaskSummaryWithRelations = Omit<TaskSummary, 'dependencies' | 'dependsOn'> 
     dependencies?: TaskDependencyWithRelations[];
     dependsOn?: TaskDependencyWithRelations[];
     canEdit?: boolean;
+    canEditStatus?: boolean;
+    canCollaborate?: boolean;
 };
 
 interface EditTaskFormState {
@@ -255,7 +257,12 @@ export default function EditTaskModal({
     const handleSubmit = async () => {
         if (!task?.id) return;
 
-        if (!form.title.trim()) {
+        if (!canManageTask && !canUpdateStatus) {
+            setError('You do not have permission to update this task');
+            return;
+        }
+
+        if (canManageTask && !form.title.trim()) {
             setError('Title is required');
             return;
         }
@@ -264,22 +271,26 @@ export default function EditTaskModal({
         setError('');
 
         try {
-            const normalizedPriority: Priority = form.priority === 'URGENT' ? 'CRITICAL' : form.priority;
+            if (!canManageTask && canUpdateStatus) {
+                await tasksAPI.updateStatus(task.id, form.status);
+            } else {
+                const normalizedPriority: Priority = form.priority === 'URGENT' ? 'CRITICAL' : form.priority;
 
-            const payload: UpdateTaskPayload = {
-                title: form.title.trim(),
-                description: form.description.trim() || null,
-                status: form.status,
-                priority: normalizedPriority,
-                difficulty: form.difficulty,
-                startDate: form.startDate || null,
-                dueDate: form.dueDate || null,
-                estimatedHours: form.estimatedHours !== '' ? parseFloat(form.estimatedHours) : null,
-                actualHours: form.actualHours !== '' ? parseFloat(form.actualHours) : null,
-                assigneeIds: form.assigneeIds,
-            };
+                const payload: UpdateTaskPayload = {
+                    title: form.title.trim(),
+                    description: form.description.trim() || null,
+                    status: form.status,
+                    priority: normalizedPriority,
+                    difficulty: form.difficulty,
+                    startDate: form.startDate || null,
+                    dueDate: form.dueDate || null,
+                    estimatedHours: form.estimatedHours !== '' ? parseFloat(form.estimatedHours) : null,
+                    actualHours: form.actualHours !== '' ? parseFloat(form.actualHours) : null,
+                    assigneeIds: form.assigneeIds,
+                };
 
-            await tasksAPI.update(task.id, payload);
+                await tasksAPI.update(task.id, payload);
+            }
             onTaskUpdated();
             onClose();
         } catch (err: unknown) {
@@ -296,13 +307,15 @@ export default function EditTaskModal({
     const dependencies = currentTask?.dependencies || [];
     const dependsOn = currentTask?.dependsOn || [];
     const canManageTask = currentTask?.canEdit ?? task?.canEdit ?? true;
+    const canUpdateStatus = currentTask?.canEditStatus ?? task?.canEditStatus ?? canManageTask;
+    const isStatusOnlyMode = !canManageTask && canUpdateStatus;
 
     if (!task) return null;
 
     return (
         <>
             <div className="modal-backdrop" onClick={onClose} />
-            <div className="modal-container modal-large">
+            <div className="modal-container">
                 <div className="modal-header">
                     <h2 className="modal-title">{heading}</h2>
                     <button className="modal-close-btn" type="button" onClick={onClose} aria-label="Close">
@@ -312,6 +325,11 @@ export default function EditTaskModal({
 
                 <div className="modal-body">
                     {error && <div className="error-message">{error}</div>}
+                    {isStatusOnlyMode && (
+                        <div className="form-hint">
+                            You can update task status, but only project managers can change task structure, dependencies, or assignees.
+                        </div>
+                    )}
 
                     <div className="form-section">
                         <h3 className="form-section-title">Task Info</h3>
@@ -323,7 +341,8 @@ export default function EditTaskModal({
                                 value={form.title}
                                 onChange={setField('title')}
                                 onBlur={(e) => setForm((current) => ({ ...current, title: toTitleCase(e.target.value) }))}
-                                autoFocus
+                                autoFocus={!isStatusOnlyMode}
+                                disabled={!canManageTask}
                             />
                         </div>
                         <div className="form-group">
@@ -333,6 +352,7 @@ export default function EditTaskModal({
                                 placeholder="Optional description..."
                                 value={form.description}
                                 onChange={setField('description')}
+                                disabled={!canManageTask}
                             />
                         </div>
                     </div>
@@ -342,7 +362,13 @@ export default function EditTaskModal({
                         <div className="form-row">
                             <div className="form-group">
                                 <label className="form-label">Status</label>
-                                <select className="form-input" value={form.status} onChange={setField('status')}>
+                                <select
+                                    className="form-input"
+                                    value={form.status}
+                                    onChange={setField('status')}
+                                    disabled={!canUpdateStatus}
+                                    autoFocus={isStatusOnlyMode}
+                                >
                                     {STATUSES.map((status) => (
                                         <option key={status} value={status}>{STATUS_LABELS[status]}</option>
                                     ))}
@@ -350,7 +376,7 @@ export default function EditTaskModal({
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Priority</label>
-                                <select className="form-input" value={form.priority} onChange={setField('priority')}>
+                                <select className="form-input" value={form.priority} onChange={setField('priority')} disabled={!canManageTask}>
                                     {PRIORITIES.map((priority) => (
                                         <option key={priority} value={priority}>{PRIORITY_LABELS[priority]}</option>
                                     ))}
@@ -358,7 +384,7 @@ export default function EditTaskModal({
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Difficulty</label>
-                                <select className="form-input" value={form.difficulty} onChange={setField('difficulty')}>
+                                <select className="form-input" value={form.difficulty} onChange={setField('difficulty')} disabled={!canManageTask}>
                                     {DIFFICULTIES.map((difficulty) => (
                                         <option key={difficulty} value={difficulty}>{DIFFICULTY_LABELS[difficulty]}</option>
                                     ))}
@@ -374,6 +400,7 @@ export default function EditTaskModal({
                                     className="form-input"
                                     value={form.startDate}
                                     onChange={setField('startDate')}
+                                    disabled={!canManageTask}
                                 />
                             </div>
                             <div className="form-group">
@@ -383,6 +410,7 @@ export default function EditTaskModal({
                                     className="form-input"
                                     value={form.dueDate}
                                     onChange={setField('dueDate')}
+                                    disabled={!canManageTask}
                                 />
                             </div>
                         </div>
@@ -398,6 +426,7 @@ export default function EditTaskModal({
                                     step="0.5"
                                     value={form.estimatedHours}
                                     onChange={setField('estimatedHours')}
+                                    disabled={!canManageTask}
                                 />
                             </div>
                             <div className="form-group">
@@ -410,6 +439,7 @@ export default function EditTaskModal({
                                     step="0.5"
                                     value={form.actualHours}
                                     onChange={setField('actualHours')}
+                                    disabled={!canManageTask}
                                 />
                             </div>
                         </div>
@@ -426,6 +456,7 @@ export default function EditTaskModal({
                                         className="form-input"
                                         value={dependencyTaskId}
                                         onChange={(e) => setDependencyTaskId(e.target.value)}
+                                        disabled={!canManageTask}
                                     >
                                         <option value="">Select a task</option>
                                         {projectTasks.map((candidate) => (
@@ -442,6 +473,7 @@ export default function EditTaskModal({
                                         placeholder="Task ID"
                                         value={dependencyTaskId}
                                         onChange={(e) => setDependencyTaskId(e.target.value)}
+                                        disabled={!canManageTask}
                                     />
                                 )}
                             </div>
@@ -451,6 +483,7 @@ export default function EditTaskModal({
                                     className="form-input"
                                     value={dependencyType}
                                     onChange={(e) => setDependencyType(e.target.value as DependencyType)}
+                                    disabled={!canManageTask}
                                 >
                                     <option value="FINISH_TO_START">Finish to Start</option>
                                     <option value="START_TO_START">Start to Start</option>
@@ -521,6 +554,7 @@ export default function EditTaskModal({
                                             type="button"
                                             className={`team-badge-option${selected ? ' team-badge-option--selected' : ''}`}
                                             onClick={() => toggleAssignee(member.id)}
+                                            disabled={!canManageTask}
                                         >
                                             {member.fullName}
                                         </button>
@@ -537,7 +571,7 @@ export default function EditTaskModal({
                     <button className="btn btn-secondary" type="button" onClick={onClose} disabled={loading || actionLoading}>
                         Cancel
                     </button>
-                    <button className="btn btn-primary" type="button" onClick={handleSubmit} disabled={loading || actionLoading}>
+                    <button className="btn btn-primary" type="button" onClick={handleSubmit} disabled={loading || actionLoading || (!canManageTask && !canUpdateStatus)}>
                         {loading ? 'Saving...' : 'Save Changes'}
                     </button>
                 </div>

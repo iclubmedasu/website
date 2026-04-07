@@ -93,11 +93,11 @@ const ViewMemberModal = ({ isOpen, onClose, memberId }: ViewMemberModalProps) =>
     };
 
     const formatDate = (date: string | null | undefined): string => {
-        if (!date) return 'â€”';
+        if (!date) return '—';
 
         const parsedDate = new Date(date);
         if (Number.isNaN(parsedDate.getTime())) {
-            return 'â€”';
+            return '—';
         }
 
         return parsedDate.toLocaleDateString('en-US', {
@@ -122,7 +122,7 @@ const ViewMemberModal = ({ isOpen, onClose, memberId }: ViewMemberModalProps) =>
         if (duration === 0) return 'Less than a day';
         if (duration === 1) return '1 day';
         if (typeof duration === 'number') return `${duration} days`;
-        return 'â€”';
+        return '—';
     };
 
     if (!isOpen) return null;

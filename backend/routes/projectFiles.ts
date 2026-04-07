@@ -62,7 +62,11 @@ async function deleteFolderGitkeep(folder) {
 // ── Permission helpers ──────────────
 async function getUserTeamIds(memberId) {
     const rows = await prisma.teamMember.findMany({
-        where: { memberId, isActive: true },
+        where: {
+            memberId,
+            isActive: true,
+            team: { isActive: true },
+        },
         select: { teamId: true },
     });
     return rows.map((r) => r.teamId);
@@ -75,23 +79,84 @@ function isPrivilegedUser(req) {
     return !!(req.user.isDeveloper || req.user.isOfficer || req.user.isAdmin || req.user.isLeadership);
 }
 
+function canUserViewAllProjects(user) {
+    return !!(user?.isDeveloper || user?.isOfficer || user?.isAdmin);
+}
+
+function isLeadershipOrSpecial(user) {
+    return !!(user?.isLeadership || user?.isSpecial);
+}
+
+async function canUserViewProject(user, projectId, isArchived) {
+    if (!user?.memberId) return false;
+    if (isArchived) return true;
+    if (canUserViewAllProjects(user)) return true;
+
+    if (isLeadershipOrSpecial(user)) {
+        const teamIds = await getUserTeamIds(user.memberId);
+        // Leadership/special fallback: no active team membership means global active visibility.
+        if (teamIds.length === 0) return true;
+
+        const teamAccess = await prisma.projectTeam.findFirst({
+            where: {
+                projectId,
+                teamId: { in: teamIds },
+            },
+            select: { id: true },
+        });
+
+        return teamAccess !== null;
+    }
+
+    const assignment = await prisma.taskAssignment.findFirst({
+        where: {
+            memberId: user.memberId,
+            status: { not: 'CANCELLED' },
+            task: {
+                projectId,
+                isActive: true,
+            },
+        },
+        select: { id: true },
+    });
+
+    return assignment !== null;
+}
+
+async function ensureCanViewProject(res, user, projectId) {
+    const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { id: true, isArchived: true },
+    });
+
+    if (!project) {
+        res.status(404).json({ error: 'Project not found' });
+        return false;
+    }
+
+    const canView = await canUserViewProject(user, projectId, project.isArchived);
+    if (!canView) {
+        res.status(403).json({ error: 'Access denied' });
+        return false;
+    }
+
+    return true;
+}
+
 /**
  * Can the user upload files to a project?
  * ALL member types whose team is linked to the project can upload.
  * Privileged users can always upload.
  */
 async function canUserUploadToProject(req, projectId) {
-    if (!req.user.memberId) return false;
-    if (isPrivilegedUser(req)) return true;
-
-    // Check if user is in one of the project's teams (any role, doesn't need canEdit)
-    const teamIds = await getUserTeamIds(req.user.memberId);
-    if (teamIds.length === 0) return false;
-
-    const access = await prisma.projectTeam.findFirst({
-        where: { projectId, teamId: { in: teamIds } },
+    const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { id: true, isArchived: true },
     });
-    return access !== null;
+    if (!project) return false;
+
+    // Upload authorization follows project visibility scope.
+    return canUserViewProject(req.user, projectId, project.isArchived);
 }
 
 /**
@@ -112,8 +177,13 @@ router.get('/', async (req, res) => {
         const { projectId } = req.query;
         if (!projectId) return res.status(400).json({ error: 'projectId is required' });
 
+        const parsedProjectId = parseInt(projectId);
+        if (Number.isNaN(parsedProjectId)) return res.status(400).json({ error: 'Invalid project ID' });
+
+        if (!(await ensureCanViewProject(res, req.user, parsedProjectId))) return;
+
         const files = await prisma.projectFile.findMany({
-            where: { projectId: parseInt(projectId), isActive: true },
+            where: { projectId: parsedProjectId, isActive: true },
             orderBy: { createdAt: 'desc' },
             include: {
                 folder: {
@@ -141,9 +211,14 @@ router.get('/folders', async (req, res) => {
         const { projectId, includeDeleted } = req.query;
         if (!projectId) return res.status(400).json({ error: 'projectId is required' });
 
+        const parsedProjectId = parseInt(projectId);
+        if (Number.isNaN(parsedProjectId)) return res.status(400).json({ error: 'Invalid project ID' });
+
+        if (!(await ensureCanViewProject(res, req.user, parsedProjectId))) return;
+
         const folders = await prisma.projectFolder.findMany({
             where: {
-                projectId: parseInt(projectId),
+                projectId: parsedProjectId,
                 ...(String(includeDeleted).toLowerCase() === 'true' ? {} : { isActive: true }),
             },
             orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
@@ -235,6 +310,8 @@ router.get('/folders/:id/history', async (req, res) => {
 
         const folder = await getFolderById(id);
         if (!folder) return res.status(404).json({ error: 'Folder not found' });
+
+        if (!(await ensureCanViewProject(res, req.user, folder.projectId))) return;
 
         const history = await githubStorage.getFileHistory(`${folder.githubPath}/.gitkeep`);
         res.json(history);
@@ -381,6 +458,10 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
         // Permission check — all project team members can upload
         const parsedProjectId = parseInt(projectId);
+        if (Number.isNaN(parsedProjectId)) {
+            return res.status(400).json({ error: 'Invalid project ID' });
+        }
+
         if (!(await canUserUploadToProject(req, parsedProjectId))) {
             return res.status(403).json({ error: 'You do not have permission to upload files to this project' });
         }
@@ -481,6 +562,9 @@ router.get('/deleted', async (req, res) => {
         if (!projectId) return res.status(400).json({ error: 'projectId is required' });
 
         const parsedId = parseInt(projectId);
+        if (Number.isNaN(parsedId)) return res.status(400).json({ error: 'Invalid project ID' });
+
+        if (!(await ensureCanViewProject(res, req.user, parsedId))) return;
 
         // Get active file names to exclude deleted files that share a name
         // with a currently active file (those are version replacements, not true deletions)
@@ -538,6 +622,8 @@ router.get('/:id/download', async (req, res) => {
         const file = await prisma.projectFile.findUnique({ where: { id } });
         if (!file || !file.isActive) return res.status(404).json({ error: 'File not found' });
 
+        if (!(await ensureCanViewProject(res, user, file.projectId))) return;
+
         // Stream from GitHub
         const ghResponse = await githubStorage.downloadFile(file.githubPath);
 
@@ -568,6 +654,8 @@ router.get('/:id/history', async (req, res) => {
         });
         if (!file) return res.status(404).json({ error: 'File not found' });
 
+        if (!(await ensureCanViewProject(res, req.user, file.projectId))) return;
+
         const history = await githubStorage.getFileHistory(file.githubPath);
         res.json(history);
     } catch (error) {
@@ -587,9 +675,11 @@ router.get('/:id/comments', async (req, res) => {
 
         const file = await prisma.projectFile.findUnique({
             where: { id },
-            select: { id: true },
+            select: { id: true, projectId: true },
         });
         if (!file) return res.status(404).json({ error: 'File not found' });
+
+        if (!(await ensureCanViewProject(res, req.user, file.projectId))) return;
 
         const comments = await prisma.projectFileComment.findMany({
             where: { fileId: id },
@@ -620,6 +710,8 @@ router.post('/:id/comments', async (req, res) => {
             select: { id: true, projectId: true, fileName: true },
         });
         if (!file) return res.status(404).json({ error: 'File not found' });
+
+        if (!(await ensureCanViewProject(res, req.user, file.projectId))) return;
 
         if (!req.user.memberId) return res.status(400).json({ error: 'memberId required' });
 
@@ -669,6 +761,8 @@ router.put('/:id/comments/:commentId', async (req, res) => {
             select: { id: true, projectId: true, fileName: true },
         });
         if (!file) return res.status(404).json({ error: 'File not found' });
+
+        if (!(await ensureCanViewProject(res, req.user, file.projectId))) return;
 
         const existing = await prisma.projectFileComment.findFirst({
             where: { id: commentId, fileId: id },
@@ -723,6 +817,8 @@ router.delete('/:id/comments/:commentId', async (req, res) => {
         });
         if (!file) return res.status(404).json({ error: 'File not found' });
 
+        if (!(await ensureCanViewProject(res, req.user, file.projectId))) return;
+
         const existing = await prisma.projectFileComment.findFirst({
             where: { id: commentId, fileId: id },
         });
@@ -776,6 +872,8 @@ router.get('/:id/version/:commitSha', async (req, res) => {
             include: { folder: { select: { id: true, folderName: true, githubPath: true, isActive: true } } },
         });
         if (!file) return res.status(404).json({ error: 'File not found' });
+
+        if (!(await ensureCanViewProject(res, user, file.projectId))) return;
 
         const ghResponse = await githubStorage.downloadFileAtVersion(file.githubPath, commitSha);
 

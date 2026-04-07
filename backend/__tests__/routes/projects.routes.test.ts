@@ -5,6 +5,7 @@ import { buildRouteApp } from './testHarness'
 const prismaMocks = vi.hoisted(() => ({
     teamMemberFindFirst: vi.fn(),
     teamMemberFindMany: vi.fn(),
+    taskAssignmentFindFirst: vi.fn(),
     projectFindMany: vi.fn(),
     projectFindUnique: vi.fn(),
     projectFindFirst: vi.fn(),
@@ -73,6 +74,9 @@ vi.mock('../../db', () => ({
             update: prismaMocks.taskUpdate,
             updateMany: prismaMocks.taskUpdateMany
         },
+        taskAssignment: {
+            findFirst: prismaMocks.taskAssignmentFindFirst
+        },
         $transaction: prismaMocks.transaction
     }
 }))
@@ -96,9 +100,7 @@ describe('projects routes integration', () => {
         vi.clearAllMocks()
     })
 
-    it('lists projects with non-admin visibility filters', async () => {
-        prismaMocks.teamMemberFindFirst.mockResolvedValueOnce(null)
-        prismaMocks.teamMemberFindMany.mockResolvedValueOnce([{ teamId: 10 }])
+    it('lists active projects for regular members using assignment visibility', async () => {
         prismaMocks.projectFindMany.mockResolvedValueOnce([{ id: 1, title: 'Launch Portal' }])
 
         const response = await request(buildRouteApp(projectsRouter, { memberId: 7 }))
@@ -109,15 +111,67 @@ describe('projects routes integration', () => {
         expect(response.body).toEqual([{ id: 1, title: 'Launch Portal' }])
 
         const queryArg = prismaMocks.projectFindMany.mock.calls[0][0]
-        expect(queryArg.where).toEqual(expect.objectContaining({
-            createdByMemberId: 7,
-            isActive: true,
-            isArchived: false
-        }))
-        expect(queryArg.where.OR).toEqual([
+        expect(queryArg.where.AND).toEqual(expect.arrayContaining([
+            { isArchived: false },
+            { isActive: true },
             { createdByMemberId: 7 },
-            { projectTeams: { some: { teamId: { in: [10] } } } }
-        ])
+            {
+                tasks: {
+                    some: {
+                        isActive: true,
+                        assignments: {
+                            some: {
+                                memberId: 7,
+                                status: { not: 'CANCELLED' }
+                            }
+                        }
+                    }
+                }
+            }
+        ]))
+    })
+
+    it('lists archived projects for all authenticated members without active visibility filters', async () => {
+        prismaMocks.projectFindMany.mockResolvedValueOnce([{ id: 8, title: 'Archived Project' }])
+
+        const response = await request(buildRouteApp(projectsRouter, { memberId: 7 }))
+            .get('/')
+            .query({ archived: 'true' })
+
+        expect(response.status).toBe(200)
+
+        const queryArg = prismaMocks.projectFindMany.mock.calls[0][0]
+        expect(queryArg.where.AND).toEqual([{ isArchived: true }])
+        expect(prismaMocks.teamMemberFindMany).not.toHaveBeenCalled()
+    })
+
+    it('applies leadership no-team fallback to all active projects', async () => {
+        prismaMocks.teamMemberFindMany.mockResolvedValueOnce([])
+        prismaMocks.projectFindMany.mockResolvedValueOnce([{ id: 15, title: 'Cross-team Project' }])
+
+        const response = await request(buildRouteApp(projectsRouter, { memberId: 3, isLeadership: true }))
+            .get('/')
+
+        expect(response.status).toBe(200)
+
+        const queryArg = prismaMocks.projectFindMany.mock.calls[0][0]
+        expect(queryArg.where.AND).toEqual(expect.arrayContaining([
+            { isArchived: false },
+            { isActive: true }
+        ]))
+        const hasTeamScopedVisibility = queryArg.where.AND.some((entry: any) => entry.projectTeams)
+        expect(hasTeamScopedVisibility).toBe(false)
+    })
+
+    it('denies project detail access for regular members without assignments', async () => {
+        prismaMocks.projectFindUnique.mockResolvedValueOnce({ id: 11, isArchived: false })
+        prismaMocks.taskAssignmentFindFirst.mockResolvedValueOnce(null)
+
+        const response = await request(buildRouteApp(projectsRouter, { memberId: 2 }))
+            .get('/11')
+
+        expect(response.status).toBe(403)
+        expect(response.body.error).toContain('Access denied')
     })
 
     it('rejects project creation for non-privileged users', async () => {
@@ -202,6 +256,34 @@ describe('projects routes integration', () => {
                 isFinalized: true,
                 status: 'COMPLETED'
             })
+        }))
+        expect(activityMocks.logProjectActivity).toHaveBeenCalledTimes(1)
+    })
+
+    it('rejects activate for non-privileged users', async () => {
+        const response = await request(buildRouteApp(projectsRouter, { memberId: 2 }))
+            .patch('/11/activate')
+
+        expect(response.status).toBe(403)
+        expect(response.body.error).toContain('Only developer, officer, administration and leadership can activate projects')
+        expect(prismaMocks.projectUpdate).not.toHaveBeenCalled()
+    })
+
+    it('activates a project for leadership users', async () => {
+        prismaMocks.projectUpdate.mockResolvedValueOnce({
+            id: 11,
+            title: 'Ops Revamp',
+            isActive: true
+        })
+
+        const response = await request(buildRouteApp(projectsRouter, { memberId: 3, isLeadership: true }))
+            .patch('/11/activate')
+
+        expect(response.status).toBe(200)
+        expect(response.body.project).toEqual(expect.objectContaining({ id: 11, isActive: true }))
+        expect(prismaMocks.projectUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            where: { id: 11 },
+            data: { isActive: true }
         }))
         expect(activityMocks.logProjectActivity).toHaveBeenCalledTimes(1)
     })

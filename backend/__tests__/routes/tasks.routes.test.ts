@@ -5,6 +5,7 @@ import { buildRouteApp } from './testHarness'
 const prismaMocks = vi.hoisted(() => ({
     teamMemberFindFirst: vi.fn(),
     teamMemberFindMany: vi.fn(),
+    projectTeamFindMany: vi.fn(),
     taskFindMany: vi.fn(),
     taskFindUnique: vi.fn(),
     taskFindFirst: vi.fn(),
@@ -48,6 +49,9 @@ vi.mock('../../db', () => ({
         teamMember: {
             findFirst: prismaMocks.teamMemberFindFirst,
             findMany: prismaMocks.teamMemberFindMany
+        },
+        projectTeam: {
+            findMany: prismaMocks.projectTeamFindMany
         },
         task: {
             findMany: prismaMocks.taskFindMany,
@@ -113,8 +117,29 @@ describe('tasks routes integration', () => {
             .send({ projectId: 2, title: 'Task A' })
 
         expect(response.status).toBe(403)
-        expect(response.body.error).toContain('Only privileged and special roles can create tasks')
+        expect(response.body.error).toContain('Only developer, officer, administration, leadership, and special roles can create tasks')
         expect(prismaMocks.taskCreate).not.toHaveBeenCalled()
+    })
+
+    it('allows task creation for special roles under work-item policy', async () => {
+        prismaMocks.taskFindFirst.mockResolvedValueOnce({ order: 4 })
+        prismaMocks.taskCreate.mockResolvedValueOnce({
+            id: 81,
+            title: 'Task A',
+            project: { id: 22, title: 'Platform Upgrade' },
+            taskTeams: [],
+            assignments: [],
+            tags: []
+        })
+        prismaMocks.taskFindUnique.mockResolvedValueOnce({ projectId: 22, parentTaskId: null })
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 12, isSpecial: true }))
+            .post('/')
+            .send({ projectId: 22, title: 'Task A' })
+
+        expect(response.status).toBe(201)
+        expect(response.body.id).toBe(81)
+        expect(prismaMocks.taskCreate).toHaveBeenCalledTimes(1)
     })
 
     it('creates a task for privileged users with sibling ordering', async () => {
@@ -129,7 +154,7 @@ describe('tasks routes integration', () => {
         })
         prismaMocks.taskFindUnique.mockResolvedValueOnce({ projectId: 22, parentTaskId: null })
 
-        const response = await request(buildRouteApp(tasksRouter, { memberId: 12, isSpecial: true }))
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 12, isLeadership: true }))
             .post('/')
             .send({
                 projectId: 22,
@@ -192,5 +217,103 @@ describe('tasks routes integration', () => {
         expect(response.status).toBe(400)
         expect(response.body.error).toContain('A task cannot depend on itself')
         expect(prismaMocks.taskDependencyUpsert).not.toHaveBeenCalled()
+    })
+
+    it('rejects task assignment when member is outside project teams', async () => {
+        prismaMocks.taskFindUnique.mockResolvedValueOnce({ id: 77, projectId: 22, isActive: true })
+        prismaMocks.projectTeamFindMany.mockResolvedValueOnce([{ teamId: 5 }])
+        prismaMocks.teamMemberFindMany.mockResolvedValueOnce([])
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 3, isOfficer: true }))
+            .post('/77/assign')
+            .send({ memberId: 99 })
+
+        expect(response.status).toBe(403)
+        expect(response.body.error).toContain('Assignee must belong to a team that is assigned to this project')
+        expect(prismaMocks.taskAssignmentUpsert).not.toHaveBeenCalled()
+    })
+
+    it('allows task assignment when member belongs to a project team', async () => {
+        prismaMocks.taskFindUnique
+            .mockResolvedValueOnce({ id: 77, projectId: 22, isActive: true })
+            .mockResolvedValueOnce({ projectId: 22, parentTaskId: null })
+        prismaMocks.projectTeamFindMany.mockResolvedValueOnce([{ teamId: 5 }])
+        prismaMocks.teamMemberFindMany.mockResolvedValueOnce([{ memberId: 99 }])
+        prismaMocks.taskAssignmentUpsert.mockResolvedValueOnce({
+            taskId: 77,
+            memberId: 99,
+            status: 'ASSIGNED',
+            member: { id: 99, fullName: 'Assigned Member', profilePhotoUrl: null }
+        })
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 3, isOfficer: true }))
+            .post('/77/assign')
+            .send({ memberId: 99 })
+
+        expect(response.status).toBe(201)
+        expect(response.body.memberId).toBe(99)
+        expect(prismaMocks.taskAssignmentUpsert).toHaveBeenCalled()
+    })
+
+    it('rejects self-assignment when member is outside project teams', async () => {
+        prismaMocks.taskFindUnique.mockResolvedValueOnce({ id: 77, projectId: 22, isActive: true })
+        prismaMocks.projectTeamFindMany.mockResolvedValueOnce([{ teamId: 5 }])
+        prismaMocks.teamMemberFindMany.mockResolvedValueOnce([])
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 7 }))
+            .post('/77/self-assign')
+
+        expect(response.status).toBe(403)
+        expect(response.body.error).toContain('You must belong to a team that is assigned to this project to self-assign')
+        expect(prismaMocks.taskAssignmentUpsert).not.toHaveBeenCalled()
+    })
+
+    it('blocks task comments for unassigned non-elevated users', async () => {
+        prismaMocks.taskAssignmentFindFirst.mockResolvedValueOnce(null)
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 31 }))
+            .get('/99/comments')
+
+        expect(response.status).toBe(403)
+        expect(response.body.error).toContain('Task collaboration access denied')
+        expect(prismaMocks.taskCommentFindMany).not.toHaveBeenCalled()
+    })
+
+    it('allows assigned users to fetch task comments', async () => {
+        prismaMocks.taskAssignmentFindFirst.mockResolvedValueOnce({ taskId: 99, memberId: 31 })
+        prismaMocks.taskCommentFindMany.mockResolvedValueOnce([])
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 31 }))
+            .get('/99/comments')
+
+        expect(response.status).toBe(200)
+        expect(prismaMocks.taskCommentFindMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: { taskId: 99 }
+        }))
+    })
+
+    it('allows special role to edit non-owned comments', async () => {
+        prismaMocks.taskCommentFindUnique.mockResolvedValueOnce({
+            id: 7,
+            taskId: 77,
+            memberId: 44,
+            comment: 'Initial note'
+        })
+        prismaMocks.taskCommentUpdate.mockResolvedValueOnce({
+            id: 7,
+            taskId: 77,
+            memberId: 44,
+            comment: 'Updated by special role',
+            isEdited: true,
+            member: { id: 44, fullName: 'Comment Author', profilePhotoUrl: null }
+        })
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 12, isSpecial: true }))
+            .put('/77/comments/7')
+            .send({ comment: 'Updated by special role' })
+
+        expect(response.status).toBe(200)
+        expect(response.body.comment).toBe('Updated by special role')
+        expect(prismaMocks.taskCommentUpdate).toHaveBeenCalledTimes(1)
     })
 })

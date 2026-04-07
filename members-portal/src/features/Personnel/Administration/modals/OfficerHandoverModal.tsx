@@ -185,7 +185,7 @@ function OfficerHandoverModal({
                                         <p className="info-value">
                                             {!Number.isNaN(new Date(currentOfficerAssignee.joinedDate).getTime())
                                                 ? new Date(currentOfficerAssignee.joinedDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-                                                : 'â€”'}
+                                                : '—'}
                                         </p>
                                     </div>
                                 )}

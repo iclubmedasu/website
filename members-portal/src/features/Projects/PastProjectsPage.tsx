@@ -82,6 +82,7 @@ interface PastProjectCardProps {
     expanded: boolean;
     fullDetail: ProjectDetail | null;
     detailLoading: boolean;
+    canManageLifecycle: boolean;
     onToggle: (project: any) => void;
     onReactivate: (project: ProjectActionPayload) => void;
     onAbort: (project: ProjectActionPayload) => void;
@@ -90,7 +91,7 @@ interface PastProjectCardProps {
     onViewActivity: (project: ProjectActionPayload) => void;
 }
 
-function PastProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, onReactivate, onAbort, onFinalize, onArchive, onViewActivity }: PastProjectCardProps) {
+function PastProjectCard({ project, expanded, fullDetail, detailLoading, canManageLifecycle, onToggle, onReactivate, onAbort, onFinalize, onArchive, onViewActivity }: PastProjectCardProps) {
     const { user } = useAuth();
 
     const [projectFiles, setProjectFiles] = useState<ProjectFileRef[]>([]);
@@ -132,7 +133,11 @@ function PastProjectCard({ project, expanded, fullDetail, detailLoading, onToggl
                         <LifecycleIcon size={12} />
                         {lifecycleBadge.label}
                     </span>
-                    {inactive && (
+                </>
+            )}
+            collapsedActions={(
+                <>
+                    {canManageLifecycle && inactive && (
                         <>
                             <button className="icon-btn reactivate-btn" title="Reactivate project" onClick={(e) => { e.stopPropagation(); onReactivate({ id: project.id, title: project.title }); }}>
                                 <PlayCircle size={14} />
@@ -145,7 +150,7 @@ function PastProjectCard({ project, expanded, fullDetail, detailLoading, onToggl
                             </button>
                         </>
                     )}
-                    {aborted && !project.isArchived && (
+                    {canManageLifecycle && aborted && !project.isArchived && (
                         <button className="icon-btn archive-btn" title="Archive project" onClick={(e) => { e.stopPropagation(); onArchive({ id: project.id, title: project.title }); }}>
                             <Archive size={14} />
                         </button>
@@ -190,52 +195,58 @@ function PastProjectCard({ project, expanded, fullDetail, detailLoading, onToggl
                 </>
             )}
             expandedActions={(
-                <>
-                    {inactive ? (
-                        <div className="expanded-title-actions">
+                <div className="expanded-title-actions">
+                    {canManageLifecycle && inactive ? (
+                        <>
                             <button
                                 className="icon-btn reactivate-btn icon-btn--text"
+                                title="Reactivate"
+                                aria-label="Reactivate"
                                 onClick={(e) => { e.stopPropagation(); onReactivate(detailTarget); }}
                             >
                                 <PlayCircle size={13} />
-                                Reactivate
+                                <span className="expanded-action-label">Reactivate</span>
                             </button>
                             <button
                                 className="icon-btn finalize-btn icon-btn--text"
+                                title="Finalize"
+                                aria-label="Finalize"
                                 onClick={(e) => { e.stopPropagation(); onFinalize(detailTarget); }}
                             >
                                 <CheckSquare size={13} />
-                                Finalize
+                                <span className="expanded-action-label">Finalize</span>
                             </button>
                             <button
                                 className="icon-btn deactivate-btn icon-btn--text"
+                                title="Abort"
+                                aria-label="Abort"
                                 onClick={(e) => { e.stopPropagation(); onAbort(detailTarget); }}
                             >
                                 <AlertCircle size={13} />
-                                Abort
+                                <span className="expanded-action-label">Abort</span>
                             </button>
-                        </div>
-                    ) : aborted && !project.isArchived ? (
-                        <div className="expanded-title-actions">
-                            <button
-                                className="icon-btn archive-btn icon-btn--text"
-                                onClick={(e) => { e.stopPropagation(); onArchive(detailTarget); }}
-                            >
-                                <Archive size={13} />
-                                Archive
-                            </button>
-                        </div>
-                    ) : null}
-                    <div className="expanded-title-actions">
+                        </>
+                    ) : canManageLifecycle && aborted && !project.isArchived ? (
                         <button
-                            className="icon-btn activity-btn icon-btn--text"
-                            onClick={(e) => { e.stopPropagation(); onViewActivity(detail || project); }}
+                            className="icon-btn archive-btn icon-btn--text"
+                            title="Archive"
+                            aria-label="Archive"
+                            onClick={(e) => { e.stopPropagation(); onArchive(detailTarget); }}
                         >
-                            <History size={13} />
-                            View activity
+                            <Archive size={13} />
+                            <span className="expanded-action-label">Archive</span>
                         </button>
-                    </div>
-                </>
+                    ) : null}
+                    <button
+                        className="icon-btn activity-btn icon-btn--text"
+                        title="View activity"
+                        aria-label="View activity"
+                        onClick={(e) => { e.stopPropagation(); onViewActivity(detail || project); }}
+                    >
+                        <History size={13} />
+                        <span className="expanded-action-label">View activity</span>
+                    </button>
+                </div>
             )}
             detailExtra={detail?.completedDate ? (
                 <div className="exp-date-item">
@@ -310,6 +321,7 @@ function getPageNumbers(current: number, total: number): Array<number | '...'> {
 //  Main Page
 // ─────────────────────────────────────────────────────────
 export default function PastProjectsPage() {
+    const { user } = useAuth();
     const [projects, setProjects] = useState<PastProjectSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -332,6 +344,7 @@ export default function PastProjectsPage() {
     const [expandedProjectDetail, setExpandedProjectDetail] = useState<ProjectDetail | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
     const [actionProject, setActionProject] = useState<{ type: ProjectActionType; project: ProjectActionPayload } | null>(null);
+    const canManageProjectLifecycle = !!(user?.isDeveloper || user?.isOfficer || user?.isAdmin || user?.isLeadership);
 
     // Load supporting data
     useEffect(() => {
@@ -477,6 +490,7 @@ export default function PastProjectsPage() {
                                 expanded={expandedProjectId === p.id}
                                 fullDetail={expandedProjectId === p.id ? expandedProjectDetail : null}
                                 detailLoading={expandedProjectId === p.id && detailLoading}
+                                canManageLifecycle={canManageProjectLifecycle}
                                 onToggle={handleToggleExpand}
                                 onReactivate={(proj) => setActionProject({ type: 'reactivate', project: proj })}
                                 onAbort={(proj) => setActionProject({ type: 'abort', project: proj })}
@@ -529,7 +543,7 @@ export default function PastProjectsPage() {
                 </div>
             )}
 
-            {actionProject?.type === 'reactivate' && (
+            {canManageProjectLifecycle && actionProject?.type === 'reactivate' && (
                 <ReactivateProjectModal
                     project={actionProject.project}
                     onClose={() => setActionProject(null)}
@@ -540,7 +554,7 @@ export default function PastProjectsPage() {
                 />
             )}
 
-            {actionProject?.type === 'finalize' && (
+            {canManageProjectLifecycle && actionProject?.type === 'finalize' && (
                 <FinalizeProjectModal
                     project={actionProject.project}
                     onClose={() => setActionProject(null)}
@@ -551,7 +565,7 @@ export default function PastProjectsPage() {
                 />
             )}
 
-            {actionProject?.type === 'archive' && (
+            {canManageProjectLifecycle && actionProject?.type === 'archive' && (
                 <ArchiveProjectModal
                     project={actionProject.project}
                     onClose={() => setActionProject(null)}
@@ -569,7 +583,7 @@ export default function PastProjectsPage() {
                 />
             )}
 
-            {actionProject?.type === 'abort' && (
+            {canManageProjectLifecycle && actionProject?.type === 'abort' && (
                 <AbortProjectModal
                     project={actionProject.project}
                     onClose={() => setActionProject(null)}

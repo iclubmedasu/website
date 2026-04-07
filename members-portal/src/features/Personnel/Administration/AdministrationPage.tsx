@@ -285,7 +285,7 @@ function AssignAdministrationModal({ isOpen, onClose, onSubmit, members, teams, 
 
     return (
         <div className="modal-backdrop administration-assign-modal" onClick={onClose}>
-            <div className="modal-container modal-large" onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}>
+            <div className="modal-container" onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}>
                 <div className="modal-header">
                     <h2 className="modal-title">Assign {roleLabel}</h2>
                     <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close">
@@ -345,7 +345,7 @@ function AssignAdministrationModal({ isOpen, onClose, onSubmit, members, teams, 
                                 </select>
                             </div>
                             {memberId && loadingAssignments && (
-                                <p className="form-hint-text">Loading current assignmentâ€¦</p>
+                                <p className="form-hint-text">Loading current assignment...</p>
                             )}
                             {memberId && !loadingAssignments && memberAssignments.length === 0 && (
                                 <p className="form-hint-text" style={{ color: 'var(--error-text)' }}>
@@ -365,7 +365,7 @@ function AssignAdministrationModal({ isOpen, onClose, onSubmit, members, teams, 
                                         <option value="">Select which team they are leaving</option>
                                         {memberAssignments.map((assignment) => (
                                             <option key={assignment.id} value={assignment.id}>
-                                                {assignment.team?.name ?? 'Team'} â€¢ {assignment.role?.roleName ?? 'Role'}
+                                                {assignment.team?.name ?? 'Team'} - {assignment.role?.roleName ?? 'Role'}
                                             </option>
                                         ))}
                                     </select>
@@ -727,7 +727,7 @@ function AdministrationPage() {
     };
 
     const formatDate = (d: string | null | undefined): string => {
-        if (!d || Number.isNaN(new Date(d).getTime())) return 'â€”';
+        if (!d || Number.isNaN(new Date(d).getTime())) return '-';
         return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
     };
 

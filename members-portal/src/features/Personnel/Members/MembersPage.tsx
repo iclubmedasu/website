@@ -107,7 +107,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
     return fallback;
 }
 
-// Pagination helper â€“ produces [1, 2, '...', 5, 6, 7, '...', 10] style array
+// Pagination helper – produces [1, 2, '...', 5, 6, 7, '...', 10] style array
 function getPageNumbers(current: number, total: number): PageNumberToken[] {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
     const pages: PageNumberToken[] = [];
@@ -251,8 +251,8 @@ function MembersPage() {
             subteamId: tm.subteamId ?? null,
             name: tm.member?.fullName || 'Unknown',
             email: tm.member?.email || 'N/A',
-            role: tm.isUnassigned ? 'â€”' : (tm.role?.roleName || 'N/A'),
-            teamName: tm.isUnassigned ? 'â€”' : (tm.team?.name || 'N/A'),
+            role: tm.isUnassigned ? '—' : (tm.role?.roleName || 'N/A'),
+            teamName: tm.isUnassigned ? '—' : (tm.team?.name || 'N/A'),
             subteamName: tm.isUnassigned ? null : (tm.subteam?.name ?? null),
             status: tm.isUnassigned ? 'Unassigned' : (tm.isActive ? 'Active' : 'Inactive'),
             avatar: tm.member?.profilePhotoUrl ? getProfilePhotoUrl(tm.memberId) : null,
@@ -447,7 +447,7 @@ function MembersPage() {
                                             </td>
                                             <td>{row.teamName}</td>
                                             <td>{row.role}</td>
-                                            <td>{row.subteamName || 'â€”'}</td>
+                                            <td>{row.subteamName || '—'}</td>
                                             <td className="email-cell">{row.email}</td>
                                             <td>
                                                 <span className={`status-badge ${(row.status || 'Unknown').toLowerCase()}`}>
@@ -505,7 +505,7 @@ function MembersPage() {
                         <div className="pagination-pages">
                             {getPageNumbers(currentPage, totalPages).map((p, i) =>
                                 p === '...' ? (
-                                    <span key={`ellipsis-${i}`} className="pagination-ellipsis">â€¦</span>
+                                    <span key={`ellipsis-${i}`} className="pagination-ellipsis">…</span>
                                 ) : (
                                     <button
                                         key={p}

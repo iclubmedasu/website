@@ -330,6 +330,10 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
                         <LifecycleIcon size={12} />
                         {lifecycleBadge.label}
                     </span>
+                </>
+            )}
+            collapsedActions={(
+                <>
                     {project.isFinalized && canManage && (
                         <button
                             className="icon-btn archive-btn"
@@ -435,101 +439,115 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
                 </span>
             )}
             expandedActions={detail ? (
-                <>
+                <div className="expanded-title-actions">
                     {detail.isFinalized ? (
                         canManage && (
-                            <div className="expanded-title-actions">
-                                <button
-                                    className="icon-btn archive-btn icon-btn--text"
-                                    onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
-                                >
-                                    <Archive size={13} />
-                                    Archive
-                                </button>
-                            </div>
+                            <button
+                                className="icon-btn archive-btn icon-btn--text"
+                                title="Archive"
+                                aria-label="Archive"
+                                onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
+                            >
+                                <Archive size={13} />
+                                <span className="expanded-action-label">Archive</span>
+                            </button>
                         )
                     ) : detail.status === 'CANCELLED' ? (
                         canManage && !detail.isArchived && (
-                            <div className="expanded-title-actions">
-                                <button
-                                    className="icon-btn archive-btn icon-btn--text"
-                                    onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
-                                >
-                                    <Archive size={13} />
-                                    Archive
-                                </button>
-                            </div>
+                            <button
+                                className="icon-btn archive-btn icon-btn--text"
+                                title="Archive"
+                                aria-label="Archive"
+                                onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
+                            >
+                                <Archive size={13} />
+                                <span className="expanded-action-label">Archive</span>
+                            </button>
                         )
                     ) : detail.isActive === false ? (
                         canManage && !detail.isArchived && (
-                            <div className="expanded-title-actions">
+                            <>
                                 <button
                                     className="icon-btn reactivate-btn icon-btn--text"
+                                    title="Reactivate"
+                                    aria-label="Reactivate"
                                     onClick={(e) => { e.stopPropagation(); onReactivate(detail); }}
                                 >
                                     <PlayCircle size={13} />
-                                    Reactivate
+                                    <span className="expanded-action-label">Reactivate</span>
                                 </button>
                                 <button
                                     className="icon-btn deactivate-btn icon-btn--text"
+                                    title="Abort"
+                                    aria-label="Abort"
                                     onClick={(e) => { e.stopPropagation(); onAbort(detail); }}
                                 >
                                     <AlertCircle size={13} />
-                                    Abort
+                                    <span className="expanded-action-label">Abort</span>
                                 </button>
                                 <button
                                     className="icon-btn finalize-btn icon-btn--text"
+                                    title="Finalize"
+                                    aria-label="Finalize"
                                     onClick={(e) => { e.stopPropagation(); onFinalize(detail); }}
                                 >
                                     <CheckSquare size={13} />
-                                    Finalize
+                                    <span className="expanded-action-label">Finalize</span>
                                 </button>
-                            </div>
+                            </>
                         )
-                    ) : canEdit && (
-                        <div className="expanded-title-actions">
+                    ) : canEdit ? (
+                        <>
                             <button
                                 className="icon-btn edit-btn icon-btn--text"
+                                title="Edit project"
+                                aria-label="Edit project"
                                 onClick={(e) => { e.stopPropagation(); onEdit(detail); }}
                             >
                                 <Pencil size={13} />
-                                Edit Project
+                                <span className="expanded-action-label">Edit Project</span>
                             </button>
                             <button
                                 className="icon-btn hold-btn icon-btn--text"
+                                title="Hold"
+                                aria-label="Hold"
                                 onClick={(e) => { e.stopPropagation(); onDeactivate(detail); }}
                             >
                                 <PauseCircle size={13} />
-                                Hold
+                                <span className="expanded-action-label">Hold</span>
                             </button>
                             <button
                                 className="icon-btn deactivate-btn icon-btn--text"
+                                title="Abort"
+                                aria-label="Abort"
                                 onClick={(e) => { e.stopPropagation(); onAbort(detail); }}
                             >
                                 <AlertCircle size={13} />
-                                Abort
+                                <span className="expanded-action-label">Abort</span>
                             </button>
                             <button
                                 className="icon-btn finalize-btn icon-btn--text"
+                                title="Finalize"
+                                aria-label="Finalize"
                                 onClick={(e) => { e.stopPropagation(); onFinalize(detail); }}
                             >
                                 <CheckSquare size={13} />
-                                Finalize
+                                <span className="expanded-action-label">Finalize</span>
                             </button>
-                        </div>
-                    )}
+                        </>
+                    ) : null}
                     {onViewActivity && (
-                        <div className="expanded-title-actions">
-                            <button
-                                className="icon-btn activity-btn icon-btn--text"
-                                onClick={(e) => { e.stopPropagation(); onViewActivity(detail); }}
-                            >
-                                <History size={13} />
-                                View activity
-                            </button>
-                        </div>
+                        <button
+                            className="icon-btn activity-btn icon-btn--text"
+                            title="View activity"
+                            aria-label="View activity"
+                            onClick={(e) => { e.stopPropagation(); onViewActivity(detail); }}
+                        >
+                            <History size={13} />
+                            <span className="expanded-action-label">View activity</span>
+                        </button>
                     )}
-                </>
+                </div>
             ) : null}
             teamEmptyMessage="No teams assigned"
             formatAssignedTeamSuffix={(pt) => `${pt.isOwner ? ' ★' : ''}${!pt.canEdit ? ' (view)' : ''}`}
@@ -543,6 +561,7 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
                             projectDetail={detail}
                             projectStartDate={detail.startDate}
                             projectDueDate={detail.dueDate}
+                            currentMemberId={user?.id}
                             canEdit={canEditStructure}
                             canEditStatus={canEditStatus}
                             onAddPhase={() => setShowAddPhase(true)}
@@ -644,6 +663,7 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
                         <TaskScheduleSlotsModal
                             task={taskScheduleTarget}
                             allMembers={allMembers}
+                            currentMemberId={user?.id}
                             onClose={() => setTaskScheduleTarget(null)}
                         />
                     )}
@@ -869,8 +889,7 @@ export default function ProjectsPage() {
     // ── Permission helpers ──
     // Privileged roles: developer, officer, admin, leadership
     const isPrivileged = user?.isDeveloper || user?.isAdmin || user?.isOfficer || user?.isLeadership;
-    // Privileged + special roles can manage phases/tasks
-    const isPrivilegedOrSpecial = isPrivileged || user?.isSpecial;
+    const isElevatedWorkItemRole = isPrivileged || user?.isSpecial;
     // Only privileged roles can create/edit/manage projects
     const canCreateProject = isPrivileged;
 
@@ -879,14 +898,8 @@ export default function ProjectsPage() {
     // canManageProject: finalize, archive, hold, abort, publish, reactivate (NOT blocked by finalized)
     const canManageProject = () => isPrivileged;
 
-    // Can the user upload files? Any team member or privileged user
-    const canUploadToProject = (project: any) => {
-        if (isPrivileged) return true;
-        if (!user?.id) return false;
-        return (project.projectTeams ?? []).some(
-            (pt: any) => (user.teamIds ?? []).includes(pt.teamId)
-        );
-    };
+    // Upload follows backend visibility scope: if a project is visible to the user, upload is allowed.
+    const canUploadToProject = (_project: any) => !!user?.id;
 
     // Filter allMembers to only those in the project's teams
     const getProjectMembers = (project: any) => {
@@ -969,8 +982,8 @@ export default function ProjectsPage() {
                                 canEdit={canEditProject(p)}
                                 canManage={canManageProject()}
                                 canUpload={canUploadToProject(p)}
-                                canEditStructure={isPrivilegedOrSpecial && p.isActive && !p.isFinalized && p.status !== 'CANCELLED'}
-                                canEditStatus={isPrivilegedOrSpecial}
+                                canEditStructure={isElevatedWorkItemRole && p.isActive && !p.isFinalized && p.status !== 'CANCELLED'}
+                                canEditStatus={p.isActive && !p.isFinalized && p.status !== 'CANCELLED'}
                                 onReactivate={(proj: any) => setReactivatingProject(proj)}
                                 onAbort={(proj: any) => setAbortingProject(proj)}
                                 onPublish={(proj: any) => setPublishingProject(proj)}

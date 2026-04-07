@@ -10,6 +10,19 @@
     overflow: hidden;
 }
 
+.gantt-mobile-rotate-hint {
+    display: none;
+    padding: 0.6rem 0.9rem;
+    background: var(--error-bg);
+    color: var(--error-text);
+    border-bottom: 1px solid var(--error-border);
+    border-left: 4px solid #dc2626;
+    font-family: var(--font-heading);
+    font-size: 0.76rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
 .gantt--maximized {
     position: fixed;
     inset: 1rem;
@@ -70,11 +83,13 @@
 .gantt-export-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 0.28rem;
     font-family: var(--font-heading);
     font-size: 0.7rem;
     font-weight: 700;
-    padding: 0.3rem 0.58rem;
+    height: 28px;
+    padding: 0 0.58rem;
     border: none;
     border-right: 1px solid var(--gray-200);
     background: var(--bg-card);
@@ -89,8 +104,9 @@
 }
 
 .gantt-export-btn:hover:not(:disabled) {
-    background: var(--gray-100);
-    color: var(--gray-700);
+    background: var(--purple-50);
+    color: var(--purple-700);
+    box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.14);
 }
 
 .gantt-export-btn:disabled {
@@ -134,8 +150,9 @@
 }
 
 .gantt-utility-btn:hover:not(:disabled) {
-    background: #6b7280;
-    color: white;
+    background: var(--purple-50);
+    color: var(--purple-700);
+    box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.14);
 }
 
 .gantt-utility-btn:disabled,
@@ -154,10 +171,14 @@
 }
 
 .gantt-scale-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 28px;
     font-family: var(--font-heading);
     font-size: 0.7rem;
     font-weight: 600;
-    padding: 0.3rem 0.6rem;
+    padding: 0 0.6rem;
     background: var(--bg-card);
     border: none;
     border-right: 1px solid var(--gray-200);
@@ -171,9 +192,10 @@
     border-right: none;
 }
 
-.gantt-scale-btn:hover {
-    background: var(--gray-100);
-    color: var(--gray-700);
+.gantt-scale-btn:hover:not(.active) {
+    background: var(--purple-50);
+    color: var(--purple-700);
+    box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.14);
 }
 
 .gantt-scale-btn.active {
@@ -185,11 +207,13 @@
 .gantt-today-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    height: 28px;
     gap: 0.25rem;
     font-family: var(--font-heading);
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     font-weight: 600;
-    padding: 0.3rem 0.55rem;
+    padding: 0 0.58rem;
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-sm);
     background: var(--bg-card);
@@ -203,6 +227,7 @@
     border-color: var(--purple-400);
     color: var(--purple-700);
     background: var(--purple-50);
+    box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.14);
 }
 
 /* â”€â”€ Inline row action buttons (visible on hover) â”€â”€ */
@@ -328,6 +353,7 @@
     height: 420px;
     /* explicit height so flex children can calculate theirs */
     overflow: hidden;
+    overscroll-behavior: contain;
 }
 
 /* â”€â”€ Tree panel (left) â”€â”€ */
@@ -350,6 +376,7 @@
     position: relative;
     z-index: 6;
     transition: background 0.15s ease;
+    touch-action: none;
 }
 
 .gantt-resize-handle:hover,
@@ -379,7 +406,10 @@
     min-height: 0;
     /* scroll silently â€” driven by timeline via JS */
     overflow-y: scroll;
+    overflow-x: hidden;
     -ms-overflow-style: none;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
 }
 
 .gantt-tree-body::-webkit-scrollbar {
@@ -544,6 +574,8 @@
     /* allows the flex child to shrink and scroll */
     overflow: auto;
     min-width: 0;
+    overscroll-behavior: contain;
+    touch-action: pan-x pan-y;
 }
 
 /* â”€â”€ Timeline header â”€â”€ */
@@ -1140,7 +1172,8 @@
     font-family: var(--font-heading);
     font-size: 0.66rem;
     font-weight: 600;
-    padding: 0.25rem 0.5rem;
+    height: 28px;
+    padding: 0 0.5rem;
     background: var(--bg-card);
     border: none;
     border-right: 1px solid var(--gray-200);
@@ -1157,9 +1190,10 @@
     border-right: none;
 }
 
-.gantt-col-toggle-btn:hover {
-    background: var(--gray-100);
-    color: var(--gray-700);
+.gantt-col-toggle-btn:hover:not(.active) {
+    background: var(--purple-50);
+    color: var(--purple-700);
+    box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.14);
 }
 
 .gantt-col-toggle-btn.active {
@@ -1420,5 +1454,11 @@
 
     .gantt-preview-dates {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) and (orientation: portrait) and (hover: none) and (pointer: coarse) {
+    .gantt-mobile-rotate-hint {
+        display: block;
     }
 }

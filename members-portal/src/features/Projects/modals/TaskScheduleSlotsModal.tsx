@@ -16,6 +16,9 @@ interface TaskWithProject extends TaskSummary {
     project?: {
         id?: Id;
     } | null;
+    canEdit?: boolean;
+    canEditStatus?: boolean;
+    canCollaborate?: boolean;
 }
 
 interface TaskScheduleSlotFormState {
@@ -29,6 +32,7 @@ interface TaskScheduleSlotFormState {
 interface TaskScheduleSlotsModalProps {
     task: TaskWithProject | null;
     allMembers?: MemberSummary[];
+    currentMemberId?: Id | null;
     onClose: () => void;
 }
 
@@ -46,7 +50,7 @@ function formatDateTime(value: string | Date | null | undefined): string {
     return date.toLocaleString();
 }
 
-export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose }: TaskScheduleSlotsModalProps) {
+export default function TaskScheduleSlotsModal({ task, allMembers = [], currentMemberId = null, onClose }: TaskScheduleSlotsModalProps) {
     const [slots, setSlots] = useState<ScheduleSlotView[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -59,7 +63,15 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
         notes: '',
     });
 
-    const defaultMemberId = allMembers[0]?.id ? String(allMembers[0].id) : '';
+    const canManageSchedule = Boolean(task?.canEdit);
+    const canCollaborateOnSchedule = Boolean(task?.canCollaborate ?? task?.canEditStatus ?? task?.canEdit ?? false);
+    const canManageOwnSlotsOnly = !canManageSchedule && canCollaborateOnSchedule;
+    const availableMembers = canManageOwnSlotsOnly
+        ? allMembers.filter((member) => Number(member.id) === Number(currentMemberId))
+        : allMembers;
+    const defaultMemberId = availableMembers[0]?.id ? String(availableMembers[0].id) : '';
+
+    const isOwnSlot = (slot: ScheduleSlotView) => Number(slot.memberId ?? slot.member?.id) === Number(currentMemberId);
 
     const loadSlots = async () => {
         if (!task?.id) return;
@@ -86,15 +98,40 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
         }
     }, [defaultMemberId, form.memberId]);
 
+    useEffect(() => {
+        if (!canManageOwnSlotsOnly || !currentMemberId) return;
+        setForm((current) => {
+            const normalizedCurrentMemberId = String(currentMemberId);
+            if (current.memberId === normalizedCurrentMemberId) return current;
+            return { ...current, memberId: normalizedCurrentMemberId };
+        });
+    }, [canManageOwnSlotsOnly, currentMemberId]);
+
     const handleAddSlot = async () => {
-        if (!task?.id || !form.memberId || !form.startDateTime || !form.endDateTime) return;
+        if (!task?.id || !form.startDateTime || !form.endDateTime) return;
+        if (!canManageSchedule && !canManageOwnSlotsOnly) {
+            setError('You do not have permission to add schedule slots for this task');
+            return;
+        }
+
+        if (canManageOwnSlotsOnly && !currentMemberId) {
+            setError('Unable to verify your member account for schedule updates');
+            return;
+        }
+
+        const selectedMemberId = canManageOwnSlotsOnly ? Number(currentMemberId) : Number(form.memberId);
+        if (Number.isNaN(selectedMemberId) || selectedMemberId <= 0) {
+            setError('Please select a valid member');
+            return;
+        }
+
         try {
             setSaving(true);
             setError('');
             await scheduleSlotsAPI.create({
                 projectId: task.projectId ?? task.project?.id,
                 taskId: task.id,
-                memberId: Number(form.memberId),
+                memberId: selectedMemberId,
                 title: form.title.trim() || null,
                 notes: form.notes.trim() || null,
                 startDateTime: form.startDateTime,
@@ -116,6 +153,12 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
     };
 
     const handleRemoveSlot = async (slotId: Id | string) => {
+        const targetSlot = slots.find((slot) => String(slot.id) === String(slotId));
+        if (canManageOwnSlotsOnly && targetSlot && !isOwnSlot(targetSlot)) {
+            setError('You can only remove your own schedule slots');
+            return;
+        }
+
         try {
             setSaving(true);
             setError('');
@@ -133,7 +176,7 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
     return (
         <>
             <div className="modal-backdrop" onClick={onClose} />
-            <div className="modal-container modal-large">
+            <div className="modal-container">
                 <div className="modal-header">
                     <div>
                         <h2 className="modal-title">Task Time Slots</h2>
@@ -154,6 +197,11 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
                         <div className="error-message">{error}</div>
                     ) : (
                         <>
+                            {canManageOwnSlotsOnly && (
+                                <p className="form-hint">
+                                    You can add and remove your own schedule slots on this task. Managing other members' slots requires elevated access.
+                                </p>
+                            )}
                             <div className="form-section">
                                 <h3 className="form-section-title">Current Slots</h3>
                                 {slots.length > 0 ? (
@@ -176,7 +224,7 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
                                                         className="btn btn-secondary"
                                                         type="button"
                                                         onClick={() => handleRemoveSlot(slot.id)}
-                                                        disabled={saving}
+                                                        disabled={saving || (canManageOwnSlotsOnly && !isOwnSlot(slot))}
                                                     >
                                                         <Trash2 size={13} />
                                                         Remove
@@ -213,9 +261,10 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
                                             className="form-input"
                                             value={form.memberId}
                                             onChange={(e) => setForm((current) => ({ ...current, memberId: e.target.value }))}
+                                            disabled={canManageOwnSlotsOnly}
                                         >
                                             <option value="">Select a member</option>
-                                            {allMembers.map((member) => (
+                                            {availableMembers.map((member) => (
                                                 <option key={member.id} value={member.id}>
                                                     {member.fullName}
                                                 </option>
@@ -232,6 +281,7 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
                                             value={form.title}
                                             onChange={(e) => setForm((current) => ({ ...current, title: e.target.value }))}
                                             placeholder="Focus block, review, etc."
+                                            disabled={!canManageSchedule && !canManageOwnSlotsOnly}
                                         />
                                     </div>
                                 </div>
@@ -248,6 +298,7 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
                                             className="form-input"
                                             value={form.startDateTime}
                                             onChange={(e) => setForm((current) => ({ ...current, startDateTime: e.target.value }))}
+                                            disabled={!canManageSchedule && !canManageOwnSlotsOnly}
                                         />
                                     </div>
                                     <div className="form-group">
@@ -261,6 +312,7 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
                                             className="form-input"
                                             value={form.endDateTime}
                                             onChange={(e) => setForm((current) => ({ ...current, endDateTime: e.target.value }))}
+                                            disabled={!canManageSchedule && !canManageOwnSlotsOnly}
                                         />
                                     </div>
                                 </div>
@@ -275,12 +327,13 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
                                         value={form.notes}
                                         onChange={(e) => setForm((current) => ({ ...current, notes: e.target.value }))}
                                         placeholder="Optional notes"
+                                        disabled={!canManageSchedule && !canManageOwnSlotsOnly}
                                     />
                                 </div>
 
-                                {!allMembers.length && (
+                                {!availableMembers.length && (
                                     <p className="form-hint">
-                                        No members available for this project.
+                                        No members available for this schedule action.
                                     </p>
                                 )}
                             </div>
@@ -296,7 +349,7 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], onClose 
                         className="btn btn-primary"
                         type="button"
                         onClick={handleAddSlot}
-                        disabled={!form.memberId || !form.startDateTime || !form.endDateTime || saving}
+                        disabled={(!canManageSchedule && !canManageOwnSlotsOnly) || !form.memberId || !form.startDateTime || !form.endDateTime || saving}
                     >
                         {saving ? 'Saving…' : 'Add Time Slot'}
                     </button>

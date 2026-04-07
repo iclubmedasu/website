@@ -51,7 +51,7 @@ export default function TaskActivityModal({ task, onClose }: TaskActivityModalPr
     return (
         <>
             <div className="modal-backdrop" onClick={onClose} />
-            <div className="modal-container modal-large activity-history-modal">
+            <div className="modal-container activity-history-modal">
                 <div className="modal-header">
                     <div>
                         <h2 className="modal-title">Task Activity</h2>

@@ -13,7 +13,7 @@ function isPrivilegedUser(req) {
 
 /**
  * Can the user modify phases (add/edit/delete)?
- * Privileged + special roles only.
+ * Privileged and special roles can manage phases.
  */
 function canUserEditPhase(req) {
     if (!req.user.memberId) return false;
@@ -57,9 +57,9 @@ router.post('/', async (req, res) => {
         if (!projectId) return res.status(400).json({ error: 'projectId is required' });
         if (!title?.trim()) return res.status(400).json({ error: 'title is required' });
 
-        // Only privileged + special roles can create phases
+        // Only elevated roles can create phases
         if (!canUserEditPhase(req)) {
-            return res.status(403).json({ error: 'Only privileged and special roles can create phases' });
+            return res.status(403).json({ error: 'Only developer, officer, administration, leadership, and special roles can create phases' });
         }
 
         // Auto-set order to max existing order + 1 if not provided
@@ -114,9 +114,9 @@ router.patch('/:id', async (req, res) => {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid phase ID' });
 
-        // Only privileged + special roles can edit phases
+        // Only elevated roles can edit phases
         if (!canUserEditPhase(req)) {
-            return res.status(403).json({ error: 'Only privileged and special roles can edit phases' });
+            return res.status(403).json({ error: 'Only developer, officer, administration, leadership, and special roles can edit phases' });
         }
 
         const { title, description, order, isActive } = req.body;
@@ -164,9 +164,9 @@ router.delete('/:id', async (req, res) => {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid phase ID' });
 
-        // Only privileged + special roles can delete phases
+        // Only elevated roles can delete phases
         if (!canUserEditPhase(req)) {
-            return res.status(403).json({ error: 'Only privileged and special roles can delete phases' });
+            return res.status(403).json({ error: 'Only developer, officer, administration, leadership, and special roles can delete phases' });
         }
 
         // Fetch projectId before deleting so the project history keeps the removal event.
@@ -203,7 +203,7 @@ router.post('/:id/duplicate', async (req, res) => {
         const sourceId = parseInt(req.params.id);
         if (isNaN(sourceId)) return res.status(400).json({ error: 'Invalid phase ID' });
         if (!canUserEditPhase(req)) {
-            return res.status(403).json({ error: 'Only privileged and special roles can duplicate phases' });
+            return res.status(403).json({ error: 'Only developer, officer, administration, leadership, and special roles can duplicate phases' });
         }
 
         const source = await prisma.projectPhase.findUnique({

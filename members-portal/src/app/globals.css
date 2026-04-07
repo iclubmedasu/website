@@ -257,8 +257,61 @@ button,
 
 .protected-layout-content {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   padding: 1rem;
   overflow: auto;
+}
+
+@media (min-width: 641px) {
+  .protected-layout-shell {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .protected-layout-content {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+}
+
+.protected-mobile-nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(86, 23, 137, 0.2);
+  background: var(--bg-card);
+  color: var(--purple-900);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.protected-mobile-nav-toggle:focus-visible {
+  outline: 2px solid var(--purple-500);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .protected-layout-shell {
+    position: relative;
+  }
+
+  .protected-mobile-nav-toggle {
+    display: inline-flex;
+    position: fixed;
+    top: 0.875rem;
+    left: 0.875rem;
+    z-index: 130;
+  }
+
+  .protected-layout-content {
+    width: 100%;
+    padding: 4rem 0.75rem 0.75rem;
+  }
 }
 
 .not-found-page {

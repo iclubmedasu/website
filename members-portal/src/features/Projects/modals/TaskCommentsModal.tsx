@@ -63,7 +63,7 @@ export default function TaskCommentsModal({ task, onClose }: TaskCommentsModalPr
     return (
         <>
             <div className="modal-backdrop" onClick={onClose} />
-            <div className="modal-container modal-large">
+            <div className="modal-container">
                 <div className="modal-header">
                     <div>
                         <h2 className="modal-title">Task Comments</h2>

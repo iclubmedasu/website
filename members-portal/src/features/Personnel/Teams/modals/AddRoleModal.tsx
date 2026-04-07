@@ -135,6 +135,8 @@ const AddRoleModal = ({ isOpen, onClose, onSubmit }: AddRoleModalProps) => {
                         className="modal-close-btn"
                         onClick={handleClose}
                         type="button"
+                        title="Close"
+                        aria-label="Close"
                     >
                         <X />
                     </button>
@@ -187,7 +189,7 @@ const AddRoleModal = ({ isOpen, onClose, onSubmit }: AddRoleModalProps) => {
                                 ))}
                             </select>
                             <p className="form-hint-small">
-                                Leadership â†’ Leadership card (max 1). Special Roles â†’ Special card. Regular â†’ Team Members table.
+                                Leadership → Leadership card (max 1). Special Roles → Special card. Regular → Team Members table.
                             </p>
                         </div>
 

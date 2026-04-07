@@ -475,6 +475,40 @@ function downloadBlob(blob: Blob, filename: string) {
     setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
+function withFrozenPaneInWorksheetXml(
+    worksheetXml: string,
+    {
+        xSplit,
+        ySplit,
+        topLeftCell,
+        activePane = 'bottomRight',
+    }: {
+        xSplit: number;
+        ySplit: number;
+        topLeftCell: string;
+        activePane?: string;
+    },
+) {
+    const paneXml = `<pane xSplit="${xSplit}" ySplit="${ySplit}" topLeftCell="${topLeftCell}" activePane="${activePane}" state="frozen"/>`;
+
+    if (!/<sheetViews\b[^>]*>[\s\S]*<\/sheetViews>/.test(worksheetXml)) {
+        return worksheetXml.replace(
+            /<sheetData\b/,
+            `<sheetViews><sheetView workbookViewId="0">${paneXml}</sheetView></sheetViews><sheetData`,
+        );
+    }
+
+    if (/<sheetView\b[^>]*\/>/.test(worksheetXml)) {
+        return worksheetXml.replace(/<sheetView\b([^>]*)\/>/, `<sheetView$1>${paneXml}</sheetView>`);
+    }
+
+    if (/<pane\b[^>]*\/>/.test(worksheetXml)) {
+        return worksheetXml.replace(/<pane\b[^>]*\/>/, paneXml);
+    }
+
+    return worksheetXml.replace(/<sheetView\b([^>]*)>/, `<sheetView$1>${paneXml}`);
+}
+
 function formatExportDate(value: any) {
     if (!value) return '';
     const date = getDateOrNull(value);
@@ -934,7 +968,7 @@ function groupScheduleSlotsByMember(slots: any[] = []) {
                 return startA - startB;
             }),
         }))
-            .sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''));
+        .sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''));
 }
 
 function buildScheduleTimelineSheet(XLSX: any, slots: any[] = [], title = 'Schedule Timeline') {
@@ -1407,6 +1441,7 @@ export default function GanttChart({
     projectDetail,
     projectStartDate,
     projectDueDate,
+    currentMemberId,
     canEdit,
     canEditStatus,
     onAddPhase,
@@ -1541,11 +1576,23 @@ export default function GanttChart({
     const activeColumns = useMemo(() => ATTR_COLUMNS.filter((c) => visibleCols.has(c.key)), [visibleCols]);
     const columnsWidth = useMemo(() => activeColumns.reduce((sum, c) => sum + c.width, 0), [activeColumns]);
 
+    const isRowAssignedToCurrentUser = useCallback((row: any) => {
+        if (!currentMemberId || row.type === 'phase') return false;
+        return (row.data?.assignments || []).some((assignment: any) => {
+            const assignedMemberId = assignment?.member?.id ?? assignment?.memberId;
+            return Number(assignedMemberId) === Number(currentMemberId);
+        });
+    }, [currentMemberId]);
+
     // ── Inline cell update (status / priority / difficulty) ──
     const handleCellUpdate = useCallback(async (rowType: any, rowId: any, field: string, value: any) => {
         void rowType;
         try {
-            await tasksAPI.update(rowId, { [field]: value });
+            if (field === 'status') {
+                await tasksAPI.updateStatus(rowId, value);
+            } else {
+                await tasksAPI.update(rowId, { [field]: value });
+            }
             onRefresh();
         } catch (err) {
             console.error('Failed to update', field, err);
@@ -2134,9 +2181,11 @@ export default function GanttChart({
         event.stopPropagation();
         clearPreviewHoverTimer();
         const rowKey = `${row.type}-${row.id}`;
+        const element = event.currentTarget;
+        if (!element) return;
+        const position = getPreviewPosition(element.getBoundingClientRect());
         setPreview((current: any) => {
             if (current?.rowKey === rowKey && current.pinned) return null;
-            const position = getPreviewPosition(event.currentTarget.getBoundingClientRect());
             return { rowKey, pinned: true, position };
         });
     }, [clearPreviewHoverTimer]);
@@ -2665,7 +2714,27 @@ export default function GanttChart({
                 'Schedule Timeline'
             );
 
-            XLSX.writeFile(workbook, `${exportBaseName}-gantt.xlsx`, { cellStyles: true });
+            const jszipModule = await import('jszip');
+            const JSZip = jszipModule.default;
+            const workbookBytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array', cellStyles: true }) as ArrayBuffer;
+            const workbookZip = await JSZip.loadAsync(workbookBytes);
+
+            // `xlsx-js-style` does not emit freeze pane XML, so patch the first worksheet (`Gantt`) directly.
+            const ganttSheetPath = 'xl/worksheets/sheet1.xml';
+            const ganttSheetFile = workbookZip.file(ganttSheetPath);
+            if (ganttSheetFile) {
+                const ganttSheetXml = await ganttSheetFile.async('string');
+                const topLeftCell = XLSX.utils.encode_cell({ r: headerRows, c: 2 });
+                const patchedGanttSheetXml = withFrozenPaneInWorksheetXml(ganttSheetXml, {
+                    xSplit: 2,
+                    ySplit: headerRows,
+                    topLeftCell,
+                });
+                workbookZip.file(ganttSheetPath, patchedGanttSheetXml);
+            }
+
+            const workbookBlob = await workbookZip.generateAsync({ type: 'blob' });
+            downloadBlob(workbookBlob, `${exportBaseName}-gantt.xlsx`);
         } catch (error) {
             console.error('Excel export failed', error);
         } finally {
@@ -2845,10 +2914,17 @@ export default function GanttChart({
         return STATUS_PROGRESS[row.data.status] ?? 0;
     }, []);
 
+    const mobileRotateHint = (
+        <div className="gantt-mobile-rotate-hint" role="status" aria-live="polite">
+            Rotate your device to landscape for a better Gantt view.
+        </div>
+    );
+
     // ─── Empty state ───
     if (phases.length === 0 && !canEdit) {
         return (
             <div className="gantt">
+                {mobileRotateHint}
                 <div className="gantt-toolbar">
                     <div className="gantt-toolbar-left">
                         <span className="gantt-toolbar-title">Gantt Chart</span>
@@ -2863,6 +2939,7 @@ export default function GanttChart({
 
     return (
         <div className={`gantt${isMaximized ? ' gantt--maximized' : ''}`}>
+            {mobileRotateHint}
             {/* ── Confirm delete modal ── */}
             {confirmDelete && (
                 <DeletePhaseTaskModal
@@ -3175,7 +3252,14 @@ export default function GanttChart({
                                 ? STATUS_COLORS[getPhaseStatus(row.data)]
                                 : STATUS_COLORS[row.data.status];
 
-                            const rowCanEdit = row.type === 'phase' ? canEdit : (canEdit || canEditStatus);
+                            const rowIsTaskLike = row.type !== 'phase';
+                            const rowAssignedToCurrentUser = rowIsTaskLike && isRowAssignedToCurrentUser(row);
+                            const rowCanManageStructure = canEdit;
+                            const rowCanEditStatus = rowIsTaskLike && canEditStatus && (canEdit || rowAssignedToCurrentUser);
+                            const rowCanCollaborate = rowIsTaskLike && canEditStatus && (canEdit || rowAssignedToCurrentUser);
+                            const rowCanOpenActions = row.type === 'phase'
+                                ? rowCanManageStructure
+                                : (rowCanManageStructure || rowCanCollaborate || rowCanEditStatus);
                             const isCriticalRow = row.type === 'phase'
                                 ? criticalPhaseIds.has(row.id)
                                 : criticalNodeIds.has(row.id);
@@ -3233,34 +3317,45 @@ export default function GanttChart({
                                         </span>
                                     )}
                                     {/* Inline edit / delete actions */}
-                                    {rowCanEdit && (
+                                    {rowCanOpenActions && (
                                         <div className="gantt-row-actions" onClick={(e) => e.stopPropagation()}>
-                                            {row.type !== 'phase' && onOpenTaskComments && (
+                                            {row.type !== 'phase' && rowCanCollaborate && onOpenTaskComments && (
                                                 <button
                                                     className="gantt-row-btn gantt-row-btn--comment"
                                                     title="Task comments"
-                                                    onClick={() => onOpenTaskComments(row.data)}
+                                                    onClick={() => onOpenTaskComments({ ...row.data, canEdit: rowCanManageStructure, canEditStatus: rowCanEditStatus, canCollaborate: rowCanCollaborate })}
                                                 >
                                                     <MessageCircle size={12} />
                                                 </button>
                                             )}
-                                            {row.type !== 'phase' && onOpenTaskScheduleSlots && (
+                                            {row.type !== 'phase' && rowCanCollaborate && onOpenTaskScheduleSlots && (
                                                 <button
                                                     className="gantt-row-btn gantt-row-btn--schedule"
                                                     title="Task time slots"
-                                                    onClick={() => onOpenTaskScheduleSlots(row.data)}
+                                                    onClick={() => onOpenTaskScheduleSlots({ ...row.data, canEdit: rowCanManageStructure, canEditStatus: rowCanEditStatus, canCollaborate: rowCanCollaborate })}
                                                 >
                                                     <Calendar size={12} />
                                                 </button>
                                             )}
-                                            <button
-                                                className="gantt-row-btn gantt-row-btn--edit"
-                                                title={`Edit ${row.type}`}
-                                                onClick={() => row.type === 'phase' ? onEditPhase(row.data) : onEditTask(row.data)}
-                                            >
-                                                <Pencil size={12} />
-                                            </button>
-                                            {canEdit && (
+                                            {row.type === 'phase' && rowCanManageStructure && (
+                                                <button
+                                                    className="gantt-row-btn gantt-row-btn--edit"
+                                                    title={`Edit ${row.type}`}
+                                                    onClick={() => onEditPhase(row.data)}
+                                                >
+                                                    <Pencil size={12} />
+                                                </button>
+                                            )}
+                                            {row.type !== 'phase' && (rowCanManageStructure || rowCanEditStatus) && (
+                                                <button
+                                                    className="gantt-row-btn gantt-row-btn--edit"
+                                                    title={`Edit ${row.type}`}
+                                                    onClick={() => onEditTask({ ...row.data, canEdit: rowCanManageStructure, canEditStatus: rowCanEditStatus, canCollaborate: rowCanCollaborate })}
+                                                >
+                                                    <Pencil size={12} />
+                                                </button>
+                                            )}
+                                            {rowCanManageStructure && canEdit && (
                                                 <button
                                                     className="gantt-row-btn gantt-row-btn--danger"
                                                     title={`Delete ${row.type}`}
@@ -3269,11 +3364,11 @@ export default function GanttChart({
                                                     <Trash2 size={12} />
                                                 </button>
                                             )}
-                                            {row.type !== 'phase' && onOpenTaskActivity && (
+                                            {row.type !== 'phase' && rowCanCollaborate && onOpenTaskActivity && (
                                                 <button
                                                     className="gantt-row-btn gantt-row-btn--activity"
                                                     title="Task activity"
-                                                    onClick={() => onOpenTaskActivity(row.data)}
+                                                    onClick={() => onOpenTaskActivity({ ...row.data, canEdit: rowCanManageStructure, canEditStatus: rowCanEditStatus, canCollaborate: rowCanCollaborate })}
                                                 >
                                                     <History size={12} />
                                                 </button>
@@ -3330,7 +3425,12 @@ export default function GanttChart({
                                     >
                                         {!isAdd && activeColumns.map((col) => {
                                             const isEditing = editingCell?.rowId === row.id && editingCell?.rowType === row.type && editingCell?.colKey === col.key;
-                                            const cellEditable = row.type !== 'phase' && (canEdit || canEditStatus) && col.key !== 'assignees';
+                                            const rowAssignedToCurrentUser = isRowAssignedToCurrentUser(row);
+                                            const canEditStatusForRow = row.type !== 'phase' && canEditStatus && (canEdit || rowAssignedToCurrentUser);
+                                            const cellEditable = row.type !== 'phase' && (
+                                                (col.key === 'status' && canEditStatusForRow)
+                                                || (col.key !== 'assignees' && col.key !== 'status' && canEdit)
+                                            );
                                             return (
                                                 <div
                                                     key={col.key}

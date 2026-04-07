@@ -157,7 +157,7 @@ export default function AddTaskModal({
     return (
         <>
             <div className="modal-backdrop" onClick={onClose} />
-            <div className="modal-container modal-large">
+            <div className="modal-container">
                 <div className="modal-header">
                     <h2 className="modal-title">{heading}</h2>
                     <button className="modal-close-btn" type="button" onClick={onClose} aria-label="Close">
