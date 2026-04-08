@@ -362,6 +362,47 @@
     white-space: pre-wrap;
 }
 
+.expanded-description--spaced {
+    margin-top: 0.4rem;
+}
+
+.expanded-title-block {
+    margin-bottom: 0.25rem;
+}
+
+.project-card-title--flush {
+    margin-bottom: 0;
+}
+
+.exp-team-empty-message {
+    font-size: 0.82rem;
+    color: var(--gray-400);
+}
+
+.project-card-access-denied {
+    padding: 1.5rem;
+    border: 1px dashed var(--gray-300);
+    border-radius: var(--radius-md);
+    background: var(--gray-50);
+    color: var(--gray-600);
+    text-align: center;
+}
+
+.project-card-access-denied-icon {
+    margin-bottom: 0.5rem;
+}
+
+.project-card-access-denied-title {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+
+.project-card-access-denied-text {
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
 .exp-card-columns {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

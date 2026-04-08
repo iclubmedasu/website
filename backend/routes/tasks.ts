@@ -7,6 +7,12 @@ import {
     logTaskAndProjectActivity,
     summarizeChanges,
 } from '../services/activityLogService';
+import {
+    emitNotificationEvent,
+    resolveProjectTeamMemberIds,
+    resolveTaskAssigneeMemberIds,
+    resolveTaskCommenterMemberIds,
+} from '../services/notificationService';
 
 const router: any = express.Router();
 
@@ -29,6 +35,11 @@ function toTitleCase(str) {
         if (i !== 0 && i !== words.length - 1 && SMALL.has(lower)) return lower;
         return lower.charAt(0).toUpperCase() + lower.slice(1);
     }).join(' ');
+}
+
+function buildTaskAssignedBody(taskTitle: string, projectTitle?: string | null) {
+    const projectSuffix = projectTitle ? ` in project "${projectTitle}"` : '';
+    return `You were assigned to task "${taskTitle}"${projectSuffix}.`;
 }
 
 // â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -475,6 +486,41 @@ router.post('/', async (req, res) => {
             description: `Task "${task.title}" created`,
         });
 
+        if (parsedAssigneeIds.length > 0) {
+            try {
+                const emitResult = await emitNotificationEvent({
+                    eventType: 'TASK_ASSIGNED',
+                    audienceType: 'TASK',
+                    actorMemberId: req.user.memberId,
+                    includeActor: parsedAssigneeIds.includes(req.user.memberId),
+                    persistEventWhenNoRecipients: true,
+                    title: `Task Assigned: ${task.title}`,
+                    body: buildTaskAssignedBody(task.title, task.project?.title),
+                    metadata: {
+                        taskId: task.id,
+                        projectId: task.project.id,
+                        projectTitle: task.project.title,
+                        assignedMemberIds: parsedAssigneeIds,
+                    },
+                    audienceData: {
+                        taskId: task.id,
+                        recipientScope: 'member',
+                    },
+                    recipientMemberIds: parsedAssigneeIds,
+                });
+                if (process.env.NODE_ENV !== 'production') {
+                    console.info('[notifications] POST /tasks TASK_ASSIGNED emit result', {
+                        taskId: task.id,
+                        assignedMemberCount: parsedAssigneeIds.length,
+                        eventPersisted: !!emitResult,
+                        notificationCount: emitResult?.notificationCount ?? 0,
+                    });
+                }
+            } catch (notificationError) {
+                console.error('POST /tasks assignment notification emit failed', notificationError);
+            }
+        }
+
         // If this is a subtask, sync parent status (new subtask â†’ parent can't stay COMPLETED)
         if (parentTaskId) {
             await syncParentTaskStatus(task.id, req.user.memberId);
@@ -628,6 +674,10 @@ router.put('/:id', async (req, res) => {
             assigneeIds: (task.assignments || []).map((assignment) => assignment.memberId).sort((a, b) => a - b),
         };
 
+        const addedAssigneeIds = after.assigneeIds.filter(
+            (memberId) => !normalizedBefore.assigneeIds.includes(memberId),
+        );
+
         const changes = collectChangedFields(normalizedBefore || {}, after, {
             title: 'title',
             description: 'description',
@@ -653,6 +703,65 @@ router.put('/:id', async (req, res) => {
                 newValue,
                 description: summarizeChanges(changes) || `Task "${task.title}" updated`,
             });
+
+            const hasStatusChange = changes.some((change) => change.key === 'status');
+            if (hasStatusChange) {
+                const assigneeIds = await resolveTaskAssigneeMemberIds(id);
+                await emitNotificationEvent({
+                    eventType: 'TASK_STATUS_CHANGED',
+                    audienceType: 'TASK',
+                    actorMemberId: req.user.memberId,
+                    persistEventWhenNoRecipients: true,
+                    title: `Task Status Changed: ${task.title}`,
+                    body: `Task "${task.title}" status changed from ${normalizedBefore.status} to ${task.status}.`,
+                    metadata: {
+                        taskId: id,
+                        projectId: before.projectId,
+                        oldStatus: normalizedBefore.status,
+                        newStatus: task.status,
+                    },
+                    audienceData: {
+                        taskId: id,
+                        recipientScope: 'assignees',
+                    },
+                    recipientMemberIds: assigneeIds,
+                });
+            }
+        }
+
+        if (addedAssigneeIds.length > 0) {
+            try {
+                const emitResult = await emitNotificationEvent({
+                    eventType: 'TASK_ASSIGNED',
+                    audienceType: 'TASK',
+                    actorMemberId: req.user.memberId,
+                    includeActor: addedAssigneeIds.includes(req.user.memberId),
+                    persistEventWhenNoRecipients: true,
+                    title: `Task Assigned: ${task.title}`,
+                    body: buildTaskAssignedBody(task.title, task.project?.title),
+                    metadata: {
+                        taskId: id,
+                        projectId: before.projectId,
+                        projectTitle: task.project?.title || null,
+                        assignedMemberIds: addedAssigneeIds,
+                    },
+                    audienceData: {
+                        taskId: id,
+                        recipientScope: 'member',
+                    },
+                    recipientMemberIds: addedAssigneeIds,
+                });
+                if (process.env.NODE_ENV !== 'production') {
+                    console.info('[notifications] PUT /tasks/:id TASK_ASSIGNED emit result', {
+                        taskId: id,
+                        addedAssigneeCount: addedAssigneeIds.length,
+                        eventPersisted: !!emitResult,
+                        notificationCount: emitResult?.notificationCount ?? 0,
+                    });
+                }
+            } catch (notificationError) {
+                console.error('PUT /tasks/:id assignment notification emit failed', notificationError);
+            }
         }
 
         // Sync parent task status if this is a subtask
@@ -685,7 +794,10 @@ router.patch('/:id/status', async (req, res) => {
             return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` });
         }
 
-        const old = await prisma.task.findUnique({ where: { id }, select: { status: true } });
+        const old = await prisma.task.findUnique({
+            where: { id },
+            select: { status: true, title: true, projectId: true },
+        });
         const data: any = { status };
         if (status === 'COMPLETED') data.completedDate = new Date();
         else data.completedDate = null;
@@ -696,6 +808,27 @@ router.patch('/:id/status', async (req, res) => {
             oldValue: old?.status,
             newValue: status,
             description: `Status changed from ${old?.status} to ${status}`,
+        });
+
+        const assigneeIds = await resolveTaskAssigneeMemberIds(id);
+        await emitNotificationEvent({
+            eventType: 'TASK_STATUS_CHANGED',
+            audienceType: 'TASK',
+            actorMemberId: req.user.memberId,
+            persistEventWhenNoRecipients: true,
+            title: `Task Status Changed: ${old?.title || `Task #${id}`}`,
+            body: `Task "${old?.title || `#${id}`}" status changed from ${old?.status || 'UNKNOWN'} to ${status}.`,
+            metadata: {
+                taskId: id,
+                projectId: old?.projectId,
+                oldStatus: old?.status,
+                newStatus: status,
+            },
+            audienceData: {
+                taskId: id,
+                recipientScope: 'assignees',
+            },
+            recipientMemberIds: assigneeIds,
         });
 
         // Sync parent task status if this is a subtask
@@ -925,7 +1058,13 @@ router.post('/:id/assign', async (req, res) => {
 
         const task = await prisma.task.findUnique({
             where: { id: taskId },
-            select: { id: true, projectId: true, isActive: true },
+            select: {
+                id: true,
+                projectId: true,
+                title: true,
+                isActive: true,
+                project: { select: { id: true, title: true } },
+            },
         });
         if (!task || !task.isActive) return res.status(404).json({ error: 'Task not found' });
 
@@ -958,6 +1097,31 @@ router.post('/:id/assign', async (req, res) => {
             description: `Member ${memberIdInt} assigned to task`,
         });
 
+        try {
+            await emitNotificationEvent({
+                eventType: 'TASK_ASSIGNED',
+                audienceType: 'TASK',
+                actorMemberId: req.user.memberId,
+                includeActor: req.user.memberId === memberIdInt,
+                persistEventWhenNoRecipients: true,
+                title: `Task Assigned: ${task.title}`,
+                body: buildTaskAssignedBody(task.title, task.project?.title),
+                metadata: {
+                    taskId: task.id,
+                    projectId: task.projectId,
+                    projectTitle: task.project?.title || null,
+                    assignedMemberId: memberIdInt,
+                },
+                audienceData: {
+                    taskId: task.id,
+                    recipientScope: 'member',
+                },
+                recipientMemberIds: [memberIdInt],
+            });
+        } catch (notificationError) {
+            console.error('POST /tasks/:id/assign notification emit failed', notificationError);
+        }
+
         res.status(201).json(assignment);
     } catch (error) {
         console.error('POST /tasks/:id/assign', error);
@@ -976,7 +1140,7 @@ router.post('/:id/self-assign', async (req, res) => {
 
         const task = await prisma.task.findUnique({
             where: { id: taskId },
-            select: { id: true, projectId: true, isActive: true },
+            select: { id: true, projectId: true, title: true, isActive: true },
         });
         if (!task || !task.isActive) return res.status(404).json({ error: 'Task not found' });
 
@@ -1006,6 +1170,36 @@ router.post('/:id/self-assign', async (req, res) => {
         await logActivity(taskId, req.user.memberId, 'SELF_ASSIGNED', {
             description: `Member ${req.user.memberId} self-assigned to task`,
         });
+
+        const [projectTeamMemberIds, assigneeIds] = await Promise.all([
+            resolveProjectTeamMemberIds(task.projectId),
+            resolveTaskAssigneeMemberIds(taskId),
+        ]);
+
+        try {
+            await emitNotificationEvent({
+                eventType: 'TASK_SELF_ASSIGNED',
+                audienceType: 'TASK',
+                actorMemberId: req.user.memberId,
+                includeActor: true,
+                persistEventWhenNoRecipients: true,
+                title: `Task Self-Assigned: ${task.title}`,
+                body: `${assignment.member?.fullName || `Member #${req.user.memberId}`} self-assigned to task "${task.title}".`,
+                metadata: {
+                    taskId: task.id,
+                    projectId: task.projectId,
+                    memberId: req.user.memberId,
+                },
+                audienceData: {
+                    taskId: task.id,
+                    projectId: task.projectId,
+                    recipientScope: 'project-teams-and-assignees',
+                },
+                recipientMemberIds: [...projectTeamMemberIds, ...assigneeIds],
+            });
+        } catch (notificationError) {
+            console.error('POST /tasks/:id/self-assign notification emit failed', notificationError);
+        }
 
         res.status(201).json(assignment);
     } catch (error) {
@@ -1135,6 +1329,35 @@ router.post('/:id/comments', async (req, res) => {
 
         await logActivity(taskId, req.user.memberId, 'COMMENTED', {
             description: `Comment added by member ${req.user.memberId}`,
+        });
+
+        const taskMeta = await prisma.task.findUnique({
+            where: { id: taskId },
+            select: { id: true, title: true, projectId: true },
+        });
+
+        const [assigneeIds, commenterIds] = await Promise.all([
+            resolveTaskAssigneeMemberIds(taskId),
+            resolveTaskCommenterMemberIds(taskId),
+        ]);
+
+        await emitNotificationEvent({
+            eventType: 'TASK_COMMENTED',
+            audienceType: 'TASK',
+            actorMemberId: req.user.memberId,
+            persistEventWhenNoRecipients: true,
+            title: `Task Commented: ${taskMeta?.title || `Task #${taskId}`}`,
+            body: `${newComment.member?.fullName || `Member #${req.user.memberId}`} commented on task "${taskMeta?.title || `#${taskId}`}".`,
+            metadata: {
+                taskId,
+                projectId: taskMeta?.projectId,
+                commentId: newComment.id,
+            },
+            audienceData: {
+                taskId,
+                recipientScope: 'assignees-and-commenters',
+            },
+            recipientMemberIds: [...assigneeIds, ...commenterIds],
         });
 
         res.status(201).json(newComment);

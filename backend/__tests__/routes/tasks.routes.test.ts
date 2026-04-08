@@ -44,6 +44,13 @@ const wbsMocks = vi.hoisted(() => ({
     recomputeProjectWbs: vi.fn()
 }))
 
+const notificationMocks = vi.hoisted(() => ({
+    emitNotificationEvent: vi.fn(),
+    resolveProjectTeamMemberIds: vi.fn(),
+    resolveTaskAssigneeMemberIds: vi.fn(),
+    resolveTaskCommenterMemberIds: vi.fn()
+}))
+
 vi.mock('../../db', () => ({
     prisma: {
         teamMember: {
@@ -97,6 +104,7 @@ vi.mock('../../db', () => ({
 
 vi.mock('../../services/activityLogService', () => activityMocks)
 vi.mock('../../services/wbsService', () => wbsMocks)
+vi.mock('../../services/notificationService', () => notificationMocks)
 
 import tasksRouter from '../../routes/tasks'
 
@@ -105,6 +113,10 @@ describe('tasks routes integration', () => {
         activityMocks.collectChangedFields.mockReturnValue([])
         activityMocks.changesToPayload.mockReturnValue({ oldValue: {}, newValue: {} })
         activityMocks.summarizeChanges.mockReturnValue(null)
+        notificationMocks.emitNotificationEvent.mockResolvedValue(null)
+        notificationMocks.resolveProjectTeamMemberIds.mockResolvedValue([])
+        notificationMocks.resolveTaskAssigneeMemberIds.mockResolvedValue([])
+        notificationMocks.resolveTaskCommenterMemberIds.mockResolvedValue([])
     })
 
     afterEach(() => {
@@ -175,6 +187,65 @@ describe('tasks routes integration', () => {
         expect(activityMocks.logTaskAndProjectActivity).toHaveBeenCalledTimes(1)
     })
 
+    it('emits TASK_ASSIGNED when task creation includes assignees', async () => {
+        prismaMocks.taskFindFirst.mockResolvedValueOnce({ order: 2 })
+        prismaMocks.projectTeamFindMany.mockResolvedValueOnce([{ teamId: 5 }])
+        prismaMocks.teamMemberFindMany.mockResolvedValueOnce([{ memberId: 7 }])
+        prismaMocks.taskCreate.mockResolvedValueOnce({
+            id: 90,
+            title: 'Assigned Task',
+            project: { id: 22, title: 'Platform Upgrade' },
+            taskTeams: [],
+            assignments: [
+                { memberId: 7, member: { id: 7, fullName: 'Assigned Member', profilePhotoUrl: null } }
+            ],
+            tags: []
+        })
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 12, isLeadership: true }))
+            .post('/')
+            .send({
+                projectId: 22,
+                title: 'assigned task',
+                assigneeIds: [7],
+            })
+
+        expect(response.status).toBe(201)
+        expect(notificationMocks.emitNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'TASK_ASSIGNED',
+            recipientMemberIds: [7],
+            includeActor: false,
+            persistEventWhenNoRecipients: true,
+            body: 'You were assigned to task "Assigned Task" in project "Platform Upgrade".',
+            metadata: expect.objectContaining({
+                projectTitle: 'Platform Upgrade'
+            })
+        }))
+    })
+
+    it('does not emit TASK_ASSIGNED when task creation has no assignees', async () => {
+        prismaMocks.taskFindFirst.mockResolvedValueOnce({ order: 2 })
+        prismaMocks.taskCreate.mockResolvedValueOnce({
+            id: 91,
+            title: 'Unassigned Task',
+            project: { id: 22, title: 'Platform Upgrade' },
+            taskTeams: [],
+            assignments: [],
+            tags: []
+        })
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 12, isLeadership: true }))
+            .post('/')
+            .send({
+                projectId: 22,
+                title: 'unassigned task',
+                assigneeIds: [],
+            })
+
+        expect(response.status).toBe(201)
+        expect(notificationMocks.emitNotificationEvent).not.toHaveBeenCalled()
+    })
+
     it('blocks status change for regular users not assigned to task', async () => {
         prismaMocks.taskAssignmentFindFirst.mockResolvedValueOnce(null)
 
@@ -206,6 +277,10 @@ describe('tasks routes integration', () => {
                 status: 'COMPLETED'
             })
         }))
+        expect(notificationMocks.emitNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'TASK_STATUS_CHANGED',
+            persistEventWhenNoRecipients: true
+        }))
         expect(activityMocks.logTaskAndProjectActivity).toHaveBeenCalledTimes(1)
     })
 
@@ -235,7 +310,7 @@ describe('tasks routes integration', () => {
 
     it('allows task assignment when member belongs to a project team', async () => {
         prismaMocks.taskFindUnique
-            .mockResolvedValueOnce({ id: 77, projectId: 22, isActive: true })
+            .mockResolvedValueOnce({ id: 77, projectId: 22, title: 'Task A', isActive: true, project: { id: 22, title: 'Project A' } })
             .mockResolvedValueOnce({ projectId: 22, parentTaskId: null })
         prismaMocks.projectTeamFindMany.mockResolvedValueOnce([{ teamId: 5 }])
         prismaMocks.teamMemberFindMany.mockResolvedValueOnce([{ memberId: 99 }])
@@ -253,6 +328,163 @@ describe('tasks routes integration', () => {
         expect(response.status).toBe(201)
         expect(response.body.memberId).toBe(99)
         expect(prismaMocks.taskAssignmentUpsert).toHaveBeenCalled()
+        expect(notificationMocks.emitNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'TASK_ASSIGNED',
+            recipientMemberIds: [99],
+            includeActor: false,
+            persistEventWhenNoRecipients: true,
+            body: 'You were assigned to task "Task A" in project "Project A".',
+            metadata: expect.objectContaining({
+                projectTitle: 'Project A'
+            })
+        }))
+    })
+
+    it('keeps self target recipient when actor assigns themselves', async () => {
+        prismaMocks.taskFindUnique
+            .mockResolvedValueOnce({ id: 77, projectId: 22, title: 'Self Assignable', isActive: true, project: { id: 22, title: 'Project A' } })
+            .mockResolvedValueOnce({ projectId: 22, parentTaskId: null })
+        prismaMocks.projectTeamFindMany.mockResolvedValueOnce([{ teamId: 5 }])
+        prismaMocks.teamMemberFindMany.mockResolvedValueOnce([{ memberId: 3 }])
+        prismaMocks.taskAssignmentUpsert.mockResolvedValueOnce({
+            taskId: 77,
+            memberId: 3,
+            status: 'ASSIGNED',
+            member: { id: 3, fullName: 'Self Member', profilePhotoUrl: null }
+        })
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 3, isOfficer: true }))
+            .post('/77/assign')
+            .send({ memberId: 3 })
+
+        expect(response.status).toBe(201)
+        expect(notificationMocks.emitNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'TASK_ASSIGNED',
+            recipientMemberIds: [3],
+            includeActor: true,
+            persistEventWhenNoRecipients: true
+        }))
+    })
+
+    it('emits TASK_ASSIGNED when PUT update adds new assignees', async () => {
+        prismaMocks.taskFindUnique
+            .mockResolvedValueOnce({
+                title: 'Task With New Assignee',
+                description: null,
+                type: 'TASK',
+                priority: 'MEDIUM',
+                status: 'NOT_STARTED',
+                difficulty: 'MEDIUM',
+                phaseId: null,
+                parentTaskId: null,
+                order: 1,
+                startDate: null,
+                dueDate: null,
+                completedDate: null,
+                estimatedHours: null,
+                actualHours: null,
+                projectId: 22,
+                assignments: [{ memberId: 10 }]
+            })
+            .mockResolvedValueOnce({ parentTaskId: null })
+        prismaMocks.projectTeamFindMany.mockResolvedValueOnce([{ teamId: 5 }])
+        prismaMocks.teamMemberFindMany.mockResolvedValueOnce([{ memberId: 10 }, { memberId: 99 }])
+        prismaMocks.taskUpdate.mockResolvedValueOnce({
+            id: 77,
+            title: 'Task With New Assignee',
+            description: null,
+            type: 'TASK',
+            priority: 'MEDIUM',
+            status: 'NOT_STARTED',
+            difficulty: 'MEDIUM',
+            phaseId: null,
+            parentTaskId: null,
+            order: 1,
+            startDate: null,
+            dueDate: null,
+            completedDate: null,
+            estimatedHours: null,
+            actualHours: null,
+            project: { id: 22, title: 'Project A' },
+            taskTeams: [],
+            assignments: [
+                { memberId: 10, member: { id: 10, fullName: 'Existing Member', profilePhotoUrl: null } },
+                { memberId: 99, member: { id: 99, fullName: 'New Member', profilePhotoUrl: null } }
+            ],
+            tags: []
+        })
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 3, isOfficer: true }))
+            .put('/77')
+            .send({ assigneeIds: [10, 99] })
+
+        expect(response.status).toBe(200)
+        expect(notificationMocks.emitNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'TASK_ASSIGNED',
+            recipientMemberIds: [99],
+            includeActor: false,
+            persistEventWhenNoRecipients: true,
+            body: 'You were assigned to task "Task With New Assignee" in project "Project A".',
+            metadata: expect.objectContaining({
+                projectTitle: 'Project A'
+            })
+        }))
+    })
+
+    it('does not emit TASK_ASSIGNED when PUT update assignees are unchanged', async () => {
+        prismaMocks.taskFindUnique
+            .mockResolvedValueOnce({
+                title: 'Task Without Assignee Delta',
+                description: null,
+                type: 'TASK',
+                priority: 'MEDIUM',
+                status: 'NOT_STARTED',
+                difficulty: 'MEDIUM',
+                phaseId: null,
+                parentTaskId: null,
+                order: 1,
+                startDate: null,
+                dueDate: null,
+                completedDate: null,
+                estimatedHours: null,
+                actualHours: null,
+                projectId: 22,
+                assignments: [{ memberId: 10 }, { memberId: 99 }]
+            })
+            .mockResolvedValueOnce({ parentTaskId: null })
+        prismaMocks.projectTeamFindMany.mockResolvedValueOnce([{ teamId: 5 }])
+        prismaMocks.teamMemberFindMany.mockResolvedValueOnce([{ memberId: 10 }, { memberId: 99 }])
+        prismaMocks.taskUpdate.mockResolvedValueOnce({
+            id: 77,
+            title: 'Task Without Assignee Delta',
+            description: null,
+            type: 'TASK',
+            priority: 'MEDIUM',
+            status: 'NOT_STARTED',
+            difficulty: 'MEDIUM',
+            phaseId: null,
+            parentTaskId: null,
+            order: 1,
+            startDate: null,
+            dueDate: null,
+            completedDate: null,
+            estimatedHours: null,
+            actualHours: null,
+            project: { id: 22, title: 'Project A' },
+            taskTeams: [],
+            assignments: [
+                { memberId: 10, member: { id: 10, fullName: 'Existing Member', profilePhotoUrl: null } },
+                { memberId: 99, member: { id: 99, fullName: 'Existing Member Two', profilePhotoUrl: null } }
+            ],
+            tags: []
+        })
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 3, isOfficer: true }))
+            .put('/77')
+            .send({ assigneeIds: [10, 99] })
+
+        expect(response.status).toBe(200)
+        expect(notificationMocks.emitNotificationEvent).not.toHaveBeenCalled()
     })
 
     it('rejects self-assignment when member is outside project teams', async () => {
@@ -289,6 +521,30 @@ describe('tasks routes integration', () => {
         expect(response.status).toBe(200)
         expect(prismaMocks.taskCommentFindMany).toHaveBeenCalledWith(expect.objectContaining({
             where: { taskId: 99 }
+        }))
+    })
+
+    it('emits TASK_COMMENTED with persistence when adding a comment', async () => {
+        prismaMocks.taskAssignmentFindFirst.mockResolvedValueOnce({ taskId: 99, memberId: 31 })
+        prismaMocks.taskCommentCreate.mockResolvedValueOnce({
+            id: 15,
+            taskId: 99,
+            memberId: 31,
+            comment: 'Looks good',
+            member: { id: 31, fullName: 'Commenter', profilePhotoUrl: null }
+        })
+        prismaMocks.taskFindUnique.mockResolvedValueOnce({ id: 99, title: 'Task A', projectId: 22 })
+        notificationMocks.resolveTaskAssigneeMemberIds.mockResolvedValueOnce([31, 44])
+        notificationMocks.resolveTaskCommenterMemberIds.mockResolvedValueOnce([31])
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 31 }))
+            .post('/99/comments')
+            .send({ comment: 'Looks good' })
+
+        expect(response.status).toBe(201)
+        expect(notificationMocks.emitNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'TASK_COMMENTED',
+            persistEventWhenNoRecipients: true
         }))
     })
 

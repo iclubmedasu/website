@@ -7,6 +7,10 @@ import type {
     CreateScheduleSlotPayload,
     CreateTaskPayload,
     Id,
+    NotificationMarkAllReadResponse,
+    NotificationMarkReadResponse,
+    NotificationsListResponse,
+    NotificationUnreadCountResponse,
     PhaseSummary,
     Priority,
     ProjectActivityEntry,
@@ -65,6 +69,19 @@ function resolveApiBaseUrl(): string {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+export function getNotificationsWebSocketUrl(): string {
+    if (typeof window === 'undefined') {
+        return '';
+    }
+
+    const parsed = new URL(API_BASE_URL, window.location.origin);
+    parsed.protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+    parsed.pathname = `${parsed.pathname.replace(/\/$/, '')}/notifications/ws`;
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString();
+}
+
 type ApiNamespace = Record<string, (...args: any[]) => any>;
 type JsonHeaders = Record<string, string>;
 
@@ -89,6 +106,12 @@ interface ScheduleSlotQueryParams {
     taskId?: Id | string;
     memberId?: Id | string;
     includeInactive?: boolean;
+}
+
+interface NotificationQueryParams {
+    cursor?: Id | string;
+    limit?: number;
+    unreadOnly?: boolean;
 }
 
 // Helper function to get auth headers
@@ -962,6 +985,52 @@ export const scheduleSlotsAPI = {
             headers: getAuthHeaders(),
         });
         return handleResponse<{ success?: boolean; message?: string }>(response);
+    },
+};
+
+// ============================================
+// NOTIFICATIONS API
+// ============================================
+
+export const notificationsAPI = {
+    getAll: async ({ cursor, limit, unreadOnly }: NotificationQueryParams = {}): Promise<NotificationsListResponse> => {
+        const params = new URLSearchParams();
+        if (cursor) params.append('cursor', String(cursor));
+        if (limit) params.append('limit', String(limit));
+        if (unreadOnly) params.append('unreadOnly', 'true');
+
+        const qs = params.toString();
+        const response = await apiFetch(`${API_BASE_URL}/notifications${qs ? `?${qs}` : ''}`, {
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<NotificationsListResponse>(response);
+    },
+
+    getUnreadCount: async (): Promise<NotificationUnreadCountResponse> => {
+        const response = await apiFetch(`${API_BASE_URL}/notifications/unread-count`, {
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<NotificationUnreadCountResponse>(response);
+    },
+
+    markRead: async (id: Id | string): Promise<NotificationMarkReadResponse> => {
+        const response = await apiFetch(`${API_BASE_URL}/notifications/${id}/read`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<NotificationMarkReadResponse>(response);
+    },
+
+    markAllRead: async (): Promise<NotificationMarkAllReadResponse> => {
+        const response = await apiFetch(`${API_BASE_URL}/notifications/read-all`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<NotificationMarkAllReadResponse>(response);
     },
 };
 

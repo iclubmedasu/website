@@ -483,6 +483,105 @@
     line-height: 1.5;
 }
 
+.user-tab-empty-state-compact {
+    padding: 2rem 1rem;
+}
+
+.user-notifications-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.user-notifications-title {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--gray-900);
+}
+
+.user-notifications-subtitle {
+    margin: 0.35rem 0 0;
+    font-size: 0.85rem;
+    color: var(--gray-500);
+}
+
+.user-notifications-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.85rem;
+    color: var(--gray-700);
+    margin-bottom: 1rem;
+}
+
+.user-notifications-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.user-notification-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    border: 1px solid var(--gray-200);
+    border-left: 4px solid var(--purple-700);
+    border-radius: var(--radius-sm);
+    background: white;
+    padding: 0.9rem 1rem;
+}
+
+.user-notification-item.is-read {
+    border-left-color: var(--gray-300);
+    background: var(--gray-50);
+}
+
+.user-notification-content {
+    min-width: 0;
+    flex: 1;
+}
+
+.user-notification-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+}
+
+.user-notification-event {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--purple-700);
+}
+
+.user-notification-time {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    white-space: nowrap;
+}
+
+.user-notification-item-title {
+    margin: 0 0 0.3rem;
+    font-size: 0.95rem;
+    color: var(--gray-900);
+}
+
+.user-notification-item-body {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--gray-700);
+    line-height: 1.5;
+}
+
+.user-notification-read-btn {
+    white-space: nowrap;
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
     .user-page-header {
@@ -510,6 +609,19 @@
     .user-page-tab-btn {
         padding: 0.65rem 1rem;
         font-size: 0.8rem;
+    }
+
+    .user-notifications-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .user-notification-item {
+        flex-direction: column;
+    }
+
+    .user-notification-read-btn {
+        width: fit-content;
     }
 }
 

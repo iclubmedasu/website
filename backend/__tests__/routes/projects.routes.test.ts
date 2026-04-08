@@ -37,6 +37,11 @@ const activityMocks = vi.hoisted(() => ({
     logProjectActivity: vi.fn()
 }))
 
+const notificationMocks = vi.hoisted(() => ({
+    emitNotificationEvent: vi.fn(),
+    resolveTeamMemberIds: vi.fn()
+}))
+
 vi.mock('../../db', () => ({
     prisma: {
         teamMember: {
@@ -83,6 +88,7 @@ vi.mock('../../db', () => ({
 
 vi.mock('../../middleware/auth', () => authMocks)
 vi.mock('../../services/activityLogService', () => activityMocks)
+vi.mock('../../services/notificationService', () => notificationMocks)
 
 import projectsRouter from '../../routes/projects'
 
@@ -91,6 +97,8 @@ describe('projects routes integration', () => {
         activityMocks.collectChangedFields.mockReturnValue([])
         activityMocks.changesToPayload.mockReturnValue({ oldValue: {}, newValue: {} })
         activityMocks.summarizeChanges.mockReturnValue(null)
+        notificationMocks.emitNotificationEvent.mockResolvedValue(null)
+        notificationMocks.resolveTeamMemberIds.mockResolvedValue([])
 
         prismaMocks.projectTeamDeleteMany.mockResolvedValue({ count: 0 })
         prismaMocks.projectTeamUpsert.mockResolvedValue({})
@@ -213,6 +221,10 @@ describe('projects routes integration', () => {
                 createdByMemberId: 5
             })
         }))
+        expect(notificationMocks.emitNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'PROJECT_CREATED',
+            persistEventWhenNoRecipients: true
+        }))
         expect(activityMocks.logProjectActivity).toHaveBeenCalledTimes(1)
     })
 
@@ -256,6 +268,10 @@ describe('projects routes integration', () => {
                 isFinalized: true,
                 status: 'COMPLETED'
             })
+        }))
+        expect(notificationMocks.emitNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'PROJECT_STATUS_CHANGED',
+            persistEventWhenNoRecipients: true
         }))
         expect(activityMocks.logProjectActivity).toHaveBeenCalledTimes(1)
     })

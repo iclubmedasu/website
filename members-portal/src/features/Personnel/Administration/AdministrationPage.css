@@ -119,6 +119,10 @@
     max-width: 400px;
 }
 
+.administration-form-hint-error {
+    color: var(--error-text);
+}
+
 /* ============================================
     ASSIGN MODAL – same structure as Add Members modal
     (Button styles come from AddMembersModal.css: .btn .btn-primary .btn-secondary)

@@ -6,6 +6,7 @@ import {
     logProjectActivity,
     summarizeChanges,
 } from '../services/activityLogService';
+import { emitNotificationEvent } from '../services/notificationService';
 
 const router: any = express.Router();
 
@@ -180,6 +181,28 @@ router.post('/', async (req, res) => {
             description: `Schedule slot created for ${slot.member.fullName}`,
         });
 
+        await emitNotificationEvent({
+            eventType: 'SCHEDULE_SLOT_ASSIGNED',
+            audienceType: 'TASK',
+            actorMemberId: req.user.memberId,
+            persistEventWhenNoRecipients: true,
+            title: `Schedule Slot Assigned: ${slot.title || slot.task?.title || slot.project?.title || `Project #${slot.projectId}`}`,
+            body: `You were assigned a schedule slot from ${slot.startDateTime.toISOString()} to ${slot.endDateTime.toISOString()}.`,
+            metadata: {
+                scheduleSlotId: slot.id,
+                projectId: slot.projectId,
+                taskId: slot.taskId,
+                startDateTime: slot.startDateTime,
+                endDateTime: slot.endDateTime,
+            },
+            audienceData: {
+                projectId: slot.projectId,
+                taskId: slot.taskId,
+                recipientScope: 'member',
+            },
+            recipientMemberIds: [slot.memberId],
+        });
+
         res.status(201).json(slot);
     } catch (error) {
         console.error('POST /schedule-slots', error);
@@ -313,6 +336,30 @@ router.patch('/:id', async (req, res) => {
                 newValue,
                 description: summarizeChanges(changes) || 'Schedule slot updated',
             });
+
+            if (before.memberId !== slot.memberId) {
+                await emitNotificationEvent({
+                    eventType: 'SCHEDULE_SLOT_ASSIGNED',
+                    audienceType: 'TASK',
+                    actorMemberId: req.user.memberId,
+                    persistEventWhenNoRecipients: true,
+                    title: `Schedule Slot Assigned: ${slot.title || slot.task?.title || slot.project?.title || `Project #${slot.projectId}`}`,
+                    body: `You were assigned a schedule slot from ${slot.startDateTime.toISOString()} to ${slot.endDateTime.toISOString()}.`,
+                    metadata: {
+                        scheduleSlotId: slot.id,
+                        projectId: slot.projectId,
+                        taskId: slot.taskId,
+                        startDateTime: slot.startDateTime,
+                        endDateTime: slot.endDateTime,
+                    },
+                    audienceData: {
+                        projectId: slot.projectId,
+                        taskId: slot.taskId,
+                        recipientScope: 'member',
+                    },
+                    recipientMemberIds: [slot.memberId],
+                });
+            }
         }
 
         res.json(slot);

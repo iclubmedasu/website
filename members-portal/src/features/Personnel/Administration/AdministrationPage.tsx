@@ -348,7 +348,7 @@ function AssignAdministrationModal({ isOpen, onClose, onSubmit, members, teams, 
                                 <p className="form-hint-text">Loading current assignment...</p>
                             )}
                             {memberId && !loadingAssignments && memberAssignments.length === 0 && (
-                                <p className="form-hint-text" style={{ color: 'var(--error-text)' }}>
+                                <p className="form-hint-text administration-form-hint-error">
                                     This member is not in any team. They must be in a team to transfer to Administration.
                                 </p>
                             )}

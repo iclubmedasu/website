@@ -290,6 +290,83 @@ DELETE /api/role-history/:id
 
 ---
 
+## 6. NOTIFICATIONS API
+
+### List Notifications
+```
+GET /api/notifications
+Query Parameters:
+  - cursor (optional): notification ID cursor for pagination (returns items with id < cursor)
+  - limit (optional): page size (default 20, max 100)
+  - unreadOnly (optional): true/false
+
+Response:
+{
+  "notifications": [
+    {
+      "id": 14,
+      "memberId": 7,
+      "eventId": 12,
+      "eventType": "TASK_ASSIGNED",
+      "title": "Task Assigned: Build API",
+      "body": "You were assigned to task \"Build API\".",
+      "metadata": { "taskId": 22, "projectId": 5 },
+      "isRead": false,
+      "readAt": null,
+      "createdAt": "2026-04-08T09:00:00.000Z"
+    }
+  ],
+  "nextCursor": 14
+}
+```
+
+### Get Unread Count
+```
+GET /api/notifications/unread-count
+
+Response:
+{
+  "unreadCount": 5
+}
+```
+
+### Mark One Notification as Read
+```
+PATCH /api/notifications/:id/read
+
+Response:
+{
+  "notification": {
+    "id": 14,
+    "isRead": true,
+    "readAt": "2026-04-08T09:03:00.000Z"
+  }
+}
+```
+
+### Mark All Notifications as Read
+```
+PATCH /api/notifications/read-all
+
+Response:
+{
+  "updatedCount": 5
+}
+```
+
+### Notifications WebSocket
+```
+ws://localhost:3000/api/notifications/ws
+```
+
+Notes:
+- Connection uses the same authentication token cookie as REST APIs.
+- Server currently emits two message types:
+  - notification.ping
+  - notification.created
+
+---
+
 ## Common Response Formats
 
 ### Success Response

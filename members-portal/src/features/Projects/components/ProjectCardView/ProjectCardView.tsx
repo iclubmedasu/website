@@ -267,7 +267,7 @@ function ProjectTeamsSection({ detail, ownerTeam, teamEmptyMessage, formatAssign
                     </div>
                 </div>
             ) : teamEmptyMessage ? (
-                <span style={{ fontSize: '0.82rem', color: 'var(--gray-400)' }}>{teamEmptyMessage}</span>
+                <span className="exp-team-empty-message">{teamEmptyMessage}</span>
             ) : null}
             {teamExtra}
         </div>
@@ -362,9 +362,9 @@ export function ProjectCardView({
             {expanded && currentDetail && (
                 <div className="project-card-expanded-content">
                     <div className="expanded-content-wrapper">
-                        <div style={{ marginBottom: '0.25rem' }}>
+                        <div className="expanded-title-block">
                             <div className="expanded-title-row">
-                                <h2 className="project-card-title" style={{ marginBottom: 0 }}>
+                                <h2 className="project-card-title project-card-title--flush">
                                     {currentDetail.title}
                                 </h2>
                                 <div className="expanded-title-controls">
@@ -373,7 +373,7 @@ export function ProjectCardView({
                                 </div>
                             </div>
                             {currentDetail.description && (
-                                <div className="expanded-description" style={{ marginTop: '0.4rem' }}>
+                                <div className="expanded-description expanded-description--spaced">
                                     {currentDetail.description}
                                 </div>
                             )}
@@ -411,19 +411,12 @@ export function ProjectCardView({
             {accessDenied && (
                 <div className="project-card-expanded-content">
                     <div className="expanded-content-wrapper">
-                        <div style={{
-                            padding: '1.5rem',
-                            border: '1px dashed var(--gray-300)',
-                            borderRadius: 'var(--radius-md)',
-                            background: 'var(--gray-50)',
-                            color: 'var(--gray-600)',
-                            textAlign: 'center',
-                        }}>
-                            <AlertCircle size={18} style={{ marginBottom: '0.5rem' }} />
-                            <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, marginBottom: '0.35rem' }}>
+                        <div className="project-card-access-denied">
+                            <AlertCircle size={18} className="project-card-access-denied-icon" />
+                            <div className="project-card-access-denied-title">
                                 You do not have access to this project
                             </div>
-                            <div style={{ fontSize: '0.9rem', lineHeight: 1.5 }}>
+                            <div className="project-card-access-denied-text">
                                 This project can’t be opened with your current permissions.
                             </div>
                         </div>

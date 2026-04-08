@@ -241,8 +241,9 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                         <h3 className="form-section-title">Project Info</h3>
 
                         <div className="form-group">
-                            <label className="form-label">Title *</label>
+                            <label className="form-label" htmlFor="create-project-title">Title *</label>
                             <input
+                                id="create-project-title"
                                 className="form-input"
                                 placeholder="Project title"
                                 value={form.title}
@@ -253,8 +254,9 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                         </div>
 
                         <div className="form-group">
-                            <label className="form-label">Description</label>
+                            <label className="form-label" htmlFor="create-project-description">Description</label>
                             <textarea
+                                id="create-project-description"
                                 className="form-input form-textarea"
                                 placeholder="Optional description..."
                                 value={form.description}
@@ -270,8 +272,10 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                         {/* Row 1: Category | Type */}
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="form-label">Category</label>
+                                <label className="form-label" htmlFor="create-project-category">Category</label>
                                 <select
+                                    id="create-project-category"
+                                    title="Project category"
                                     className="form-input"
                                     value={selectedCategory}
                                     onChange={handleCategoryChange}
@@ -283,8 +287,10 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Type</label>
+                                <label className="form-label" htmlFor="create-project-type">Type</label>
                                 <select
+                                    id="create-project-type"
+                                    title="Project type"
                                     className="form-input"
                                     value={form.projectTypeId}
                                     onChange={setField('projectTypeId')}
@@ -301,14 +307,14 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                         {/* Row 2: Priority | Status */}
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="form-label">Priority</label>
-                                <select className="form-input" value={form.priority} onChange={setField('priority')}>
+                                <label className="form-label" htmlFor="create-project-priority">Priority</label>
+                                <select id="create-project-priority" title="Project priority" className="form-input" value={form.priority} onChange={setField('priority')}>
                                     {PRIORITIES.map((priority) => <option key={priority} value={priority}>{PRIORITY_LABELS[priority]}</option>)}
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Status</label>
-                                <select className="form-input" value={form.status} onChange={setField('status')}>
+                                <label className="form-label" htmlFor="create-project-status">Status</label>
+                                <select id="create-project-status" title="Project status" className="form-input" value={form.status} onChange={setField('status')}>
                                     {PROJECT_STATUSES.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
                                 </select>
                             </div>
@@ -317,12 +323,12 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                         {/* Row 3: Start Date | Due Date */}
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="form-label">Start Date</label>
-                                <input type="date" className="form-input" value={form.startDate} onChange={setField('startDate')} />
+                                <label className="form-label" htmlFor="create-project-start-date">Start Date</label>
+                                <input id="create-project-start-date" title="Project start date" type="date" className="form-input" value={form.startDate} onChange={setField('startDate')} />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Due Date</label>
-                                <input type="date" className="form-input" value={form.dueDate} onChange={setField('dueDate')} />
+                                <label className="form-label" htmlFor="create-project-due-date">Due Date</label>
+                                <input id="create-project-due-date" title="Project due date" type="date" className="form-input" value={form.dueDate} onChange={setField('dueDate')} />
                             </div>
                         </div>
                     </div>

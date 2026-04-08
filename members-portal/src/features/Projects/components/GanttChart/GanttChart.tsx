@@ -133,6 +133,9 @@ const PREVIEW_MAX_WIDTH = 440;
 const PREVIEW_PADDING = 12;
 const PREVIEW_ESTIMATED_HEIGHT = 360;
 const PREVIEW_HOVER_DELAY_MS = 900;
+const ASSIGNEE_VIEWER_MAX_WIDTH = 300;
+const ASSIGNEE_VIEWER_PADDING = 12;
+const ASSIGNEE_VIEWER_ESTIMATED_HEIGHT = 240;
 
 // ─────────────────────────────────────────────────────────
 //  Date helpers
@@ -591,6 +594,33 @@ function getPreviewPosition(rect: DOMRect | { left: number; top: number; width: 
         ? rect.top - popupHeight - PREVIEW_PADDING
         : rect.bottom + PREVIEW_PADDING;
     top = Math.max(PREVIEW_PADDING, Math.min(top, window.innerHeight - popupHeight - PREVIEW_PADDING));
+
+    return {
+        left,
+        top,
+        width: popupWidth,
+        placement: placeAbove ? 'above' : 'below',
+    };
+}
+
+function getAssigneeViewerPosition(rect: DOMRect | { left: number; top: number; width: number; bottom: number }) {
+    const popupWidth = Math.min(ASSIGNEE_VIEWER_MAX_WIDTH, window.innerWidth - ASSIGNEE_VIEWER_PADDING * 2);
+    const popupHeight = ASSIGNEE_VIEWER_ESTIMATED_HEIGHT;
+    const centeredLeft = rect.left + (rect.width / 2) - (popupWidth / 2);
+    const left = Math.max(
+        ASSIGNEE_VIEWER_PADDING,
+        Math.min(centeredLeft, window.innerWidth - popupWidth - ASSIGNEE_VIEWER_PADDING),
+    );
+    const spaceBelow = window.innerHeight - rect.bottom - ASSIGNEE_VIEWER_PADDING;
+    const spaceAbove = rect.top - ASSIGNEE_VIEWER_PADDING;
+    const placeAbove = spaceBelow < popupHeight && spaceAbove > spaceBelow;
+    let top = placeAbove
+        ? rect.top - popupHeight - ASSIGNEE_VIEWER_PADDING
+        : rect.bottom + ASSIGNEE_VIEWER_PADDING;
+    top = Math.max(
+        ASSIGNEE_VIEWER_PADDING,
+        Math.min(top, window.innerHeight - popupHeight - ASSIGNEE_VIEWER_PADDING),
+    );
 
     return {
         left,
@@ -1464,6 +1494,7 @@ export default function GanttChart({
     const [isMaximized, setIsMaximized] = useState(false);
     const [exportingFormat, setExportingFormat] = useState<'png' | 'xlsx' | null>(null);
     const [preview, setPreview] = useState<any>(null);
+    const [assigneeViewer, setAssigneeViewer] = useState<any>(null);
 
     // Clipboard: { mode: 'copy'|'cut', type: 'phase'|'task'|'subtask', id, data, phase?, parentTask? }
     const [clipboard, setClipboard] = useState<any>(null);
@@ -1485,8 +1516,11 @@ export default function GanttChart({
     const colsBodyRef = useRef<any>(null);
     const ganttMainRef = useRef<any>(null);
     const previewPopoverRef = useRef<any>(null);
+    const assigneeViewerPopoverRef = useRef<any>(null);
+    const assigneeTriggerRefs = useRef<Map<string, any>>(new Map());
     const barRefs = useRef<Map<string, any>>(new Map());
     const previewHoverTimerRef = useRef<number | null>(null);
+    const assigneeHoverTimerRef = useRef<number | null>(null);
 
     // ── Resizable tree panel ──
     const [treeWidth, setTreeWidth] = useState<number>(DEFAULT_TREE_WIDTH);
@@ -1968,7 +2002,26 @@ export default function GanttChart({
                 });
             }
         }
-    }, [preview?.rowKey]);
+        if (assigneeViewer?.rowKey) {
+            const trigger = assigneeTriggerRefs.current.get(assigneeViewer.rowKey);
+            if (trigger) {
+                const position = getAssigneeViewerPosition(trigger.getBoundingClientRect());
+                setAssigneeViewer((current: any) => {
+                    if (!current || current.rowKey !== assigneeViewer.rowKey) return current;
+                    if (
+                        current.position
+                        && current.position.left === position.left
+                        && current.position.top === position.top
+                        && current.position.width === position.width
+                        && current.position.placement === position.placement
+                    ) {
+                        return current;
+                    }
+                    return { ...current, position };
+                });
+            }
+        }
+    }, [assigneeViewer?.rowKey, preview?.rowKey]);
 
     // Toggle expand/collapse
     const togglePhase = useCallback((id: any) => {
@@ -2108,6 +2161,23 @@ export default function GanttChart({
         };
     }, [allTaskNodes, criticalNodeIds, criticalPhaseIds, previewRow, projectDetail]);
 
+    const assigneeViewerRow = useMemo(() => {
+        if (!assigneeViewer?.rowKey) return null;
+        const row = rows.find((entry) => `${entry.type}-${entry.id}` === assigneeViewer.rowKey) || null;
+        if (!row || row.type === 'phase' || row.type.startsWith('add-')) return null;
+        return row;
+    }, [assigneeViewer?.rowKey, rows]);
+
+    const assigneeViewerData = useMemo(() => {
+        if (!assigneeViewerRow) return null;
+        const assignments = assigneeViewerRow.data?.assignments || [];
+        if (assignments.length === 0) return null;
+        return {
+            title: assigneeViewerRow.data?.title || '',
+            assignments,
+        };
+    }, [assigneeViewerRow]);
+
     const refreshPreviewPosition = useCallback((rowKey?: string) => {
         const targetKey = rowKey || preview?.rowKey;
         if (!targetKey) return;
@@ -2134,10 +2204,43 @@ export default function GanttChart({
         });
     }, [preview?.rowKey]);
 
+    const refreshAssigneeViewerPosition = useCallback((rowKey?: string) => {
+        const targetKey = rowKey || assigneeViewer?.rowKey;
+        if (!targetKey) return;
+
+        const trigger = assigneeTriggerRefs.current.get(targetKey);
+        if (!trigger) {
+            setAssigneeViewer(null);
+            return;
+        }
+
+        const position = getAssigneeViewerPosition(trigger.getBoundingClientRect());
+        setAssigneeViewer((current: any) => {
+            if (!current || current.rowKey !== targetKey) return current;
+            if (
+                current.position
+                && current.position.left === position.left
+                && current.position.top === position.top
+                && current.position.width === position.width
+                && current.position.placement === position.placement
+            ) {
+                return current;
+            }
+            return { ...current, position };
+        });
+    }, [assigneeViewer?.rowKey]);
+
     const clearPreviewHoverTimer = useCallback(() => {
         if (previewHoverTimerRef.current) {
             window.clearTimeout(previewHoverTimerRef.current);
             previewHoverTimerRef.current = null;
+        }
+    }, []);
+
+    const clearAssigneeHoverTimer = useCallback(() => {
+        if (assigneeHoverTimerRef.current) {
+            window.clearTimeout(assigneeHoverTimerRef.current);
+            assigneeHoverTimerRef.current = null;
         }
     }, []);
 
@@ -2190,11 +2293,67 @@ export default function GanttChart({
         });
     }, [clearPreviewHoverTimer]);
 
+    const openAssigneeViewer = useCallback((rowKey: string, element: any, pinned = false) => {
+        if (!rowKey || !element) return;
+        const position = getAssigneeViewerPosition(element.getBoundingClientRect());
+
+        setAssigneeViewer((current: any) => {
+            if (current?.pinned && current.rowKey !== rowKey && !pinned) return current;
+            if (current?.pinned && current.rowKey === rowKey && !pinned) return current;
+            return {
+                rowKey,
+                pinned: pinned || (current?.pinned && current.rowKey === rowKey),
+                position,
+            };
+        });
+    }, []);
+
+    const handleAssigneeMouseEnter = useCallback((rowKey: string, event: any) => {
+        clearAssigneeHoverTimer();
+
+        if (assigneeViewer?.pinned && assigneeViewer.rowKey !== rowKey) return;
+
+        const element = event.currentTarget;
+        assigneeHoverTimerRef.current = window.setTimeout(() => {
+            openAssigneeViewer(rowKey, element, false);
+        }, PREVIEW_HOVER_DELAY_MS);
+    }, [assigneeViewer?.pinned, assigneeViewer?.rowKey, clearAssigneeHoverTimer, openAssigneeViewer]);
+
+    const handleAssigneeMouseLeave = useCallback((rowKey: string) => {
+        clearAssigneeHoverTimer();
+        setAssigneeViewer((current: any) => {
+            if (!current || current.rowKey !== rowKey || current.pinned) return current;
+            return null;
+        });
+    }, [clearAssigneeHoverTimer]);
+
+    const handleAssigneeClick = useCallback((rowKey: string, event: any) => {
+        event.stopPropagation();
+        clearAssigneeHoverTimer();
+
+        const element = event.currentTarget;
+        if (!element) return;
+
+        const position = getAssigneeViewerPosition(element.getBoundingClientRect());
+        setAssigneeViewer((current: any) => {
+            if (current?.rowKey === rowKey && current.pinned) return null;
+            return { rowKey, pinned: true, position };
+        });
+    }, [clearAssigneeHoverTimer]);
+
     const setBarRef = useCallback((rowKey: string) => (node: any) => {
         if (node) {
             barRefs.current.set(rowKey, node);
         } else {
             barRefs.current.delete(rowKey);
+        }
+    }, []);
+
+    const setAssigneeTriggerRef = useCallback((rowKey: string) => (node: any) => {
+        if (node) {
+            assigneeTriggerRefs.current.set(rowKey, node);
+        } else {
+            assigneeTriggerRefs.current.delete(rowKey);
         }
     }, []);
 
@@ -2238,7 +2397,38 @@ export default function GanttChart({
         };
     }, [preview?.rowKey, refreshPreviewPosition]);
 
+    useEffect(() => {
+        if (!assigneeViewer?.rowKey) return undefined;
+
+        const handleResize = () => refreshAssigneeViewerPosition(assigneeViewer.rowKey);
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setAssigneeViewer(null);
+            }
+        };
+
+        const handlePointerDown = (event: MouseEvent) => {
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+            if (assigneeViewerPopoverRef.current?.contains(target)) return;
+            if (target.closest('.gantt-col-assignees-trigger')) return;
+            setAssigneeViewer(null);
+        };
+
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('keydown', handleEscape);
+        document.addEventListener('mousedown', handlePointerDown);
+
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('keydown', handleEscape);
+            document.removeEventListener('mousedown', handlePointerDown);
+        };
+    }, [assigneeViewer?.rowKey, refreshAssigneeViewerPosition]);
+
     useEffect(() => () => clearPreviewHoverTimer(), [clearPreviewHoverTimer]);
+
+    useEffect(() => () => clearAssigneeHoverTimer(), [clearAssigneeHoverTimer]);
 
     // Clear selection if item no longer exists
     useEffect(() => {
@@ -2247,6 +2437,15 @@ export default function GanttChart({
             if (!exists) setSelected(null);
         }
     }, [rows, selected]);
+
+    useEffect(() => {
+        if (!assigneeViewer?.rowKey) return;
+        if (!assigneeViewerData) {
+            setAssigneeViewer(null);
+            return;
+        }
+        refreshAssigneeViewerPosition(assigneeViewer.rowKey);
+    }, [assigneeViewer?.rowKey, assigneeViewerData, refreshAssigneeViewerPosition]);
 
     // Compute timeline columns
     const { columns, topHeaders, colWidth, totalWidth } = useMemo(() => {
@@ -2960,84 +3159,88 @@ export default function GanttChart({
             <div className="gantt-toolbar">
                 {/* Left: utility buttons (closer to tree panel) */}
                 <div className="gantt-toolbar-left">
-                    {canEdit && (
+                    {(canEdit || canEditStatus) && (
                         <>
-                            <div className="gantt-toolbar-group">
-                                <div className="gantt-utility-group">
-                                    <button
-                                        className={`gantt-utility-btn${!hasUndo ? ' disabled' : ''}`}
-                                        title="Undo"
-                                        disabled={!hasUndo}
-                                        onClick={handleUndo}
-                                    >
-                                        <Undo2 size={14} />
-                                    </button>
-                                    <button
-                                        className={`gantt-utility-btn${!hasRedo ? ' disabled' : ''}`}
-                                        title="Redo"
-                                        disabled={!hasRedo}
-                                        onClick={handleRedo}
-                                    >
-                                        <Redo2 size={14} />
-                                    </button>
-                                </div>
-                            </div>
+                            {canEdit && (
+                                <>
+                                    <div className="gantt-toolbar-group">
+                                        <div className="gantt-utility-group">
+                                            <button
+                                                className={`gantt-utility-btn${!hasUndo ? ' disabled' : ''}`}
+                                                title="Undo"
+                                                disabled={!hasUndo}
+                                                onClick={handleUndo}
+                                            >
+                                                <Undo2 size={14} />
+                                            </button>
+                                            <button
+                                                className={`gantt-utility-btn${!hasRedo ? ' disabled' : ''}`}
+                                                title="Redo"
+                                                disabled={!hasRedo}
+                                                onClick={handleRedo}
+                                            >
+                                                <Redo2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
 
-                            <span className="gantt-toolbar-divider" aria-hidden="true" />
+                                    <span className="gantt-toolbar-divider" aria-hidden="true" />
 
-                            <div className="gantt-toolbar-group">
-                                <div className="gantt-utility-group">
-                                    <button
-                                        className={`gantt-utility-btn${!canMoveUp ? ' disabled' : ''}`}
-                                        title="Move up"
-                                        disabled={!canMoveUp}
-                                        onClick={handleMoveUp}
-                                    >
-                                        <ArrowUp size={14} />
-                                    </button>
-                                    <button
-                                        className={`gantt-utility-btn${!canMoveDown ? ' disabled' : ''}`}
-                                        title="Move down"
-                                        disabled={!canMoveDown}
-                                        onClick={handleMoveDown}
-                                    >
-                                        <ArrowDown size={14} />
-                                    </button>
-                                </div>
-                            </div>
+                                    <div className="gantt-toolbar-group">
+                                        <div className="gantt-utility-group">
+                                            <button
+                                                className={`gantt-utility-btn${!canMoveUp ? ' disabled' : ''}`}
+                                                title="Move up"
+                                                disabled={!canMoveUp}
+                                                onClick={handleMoveUp}
+                                            >
+                                                <ArrowUp size={14} />
+                                            </button>
+                                            <button
+                                                className={`gantt-utility-btn${!canMoveDown ? ' disabled' : ''}`}
+                                                title="Move down"
+                                                disabled={!canMoveDown}
+                                                onClick={handleMoveDown}
+                                            >
+                                                <ArrowDown size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
 
-                            <span className="gantt-toolbar-divider" aria-hidden="true" />
+                                    <span className="gantt-toolbar-divider" aria-hidden="true" />
 
-                            <div className="gantt-toolbar-group">
-                                <div className="gantt-utility-group">
-                                    <button
-                                        className={`gantt-utility-btn${!selected ? ' disabled' : ''}`}
-                                        title="Copy"
-                                        disabled={!selected}
-                                        onClick={handleCopy}
-                                    >
-                                        <Copy size={14} />
-                                    </button>
-                                    <button
-                                        className={`gantt-utility-btn${!selected ? ' disabled' : ''}`}
-                                        title="Cut"
-                                        disabled={!selected}
-                                        onClick={handleCut}
-                                    >
-                                        <Scissors size={14} />
-                                    </button>
-                                    <button
-                                        className={`gantt-utility-btn${!canPaste ? ' disabled' : ''}`}
-                                        title={clipboard ? `Paste "${clipboard.data?.title || ''}"` : 'Paste'}
-                                        disabled={!canPaste}
-                                        onClick={handlePaste}
-                                    >
-                                        <ClipboardPaste size={14} />
-                                    </button>
-                                </div>
-                            </div>
+                                    <div className="gantt-toolbar-group">
+                                        <div className="gantt-utility-group">
+                                            <button
+                                                className={`gantt-utility-btn${!selected ? ' disabled' : ''}`}
+                                                title="Copy"
+                                                disabled={!selected}
+                                                onClick={handleCopy}
+                                            >
+                                                <Copy size={14} />
+                                            </button>
+                                            <button
+                                                className={`gantt-utility-btn${!selected ? ' disabled' : ''}`}
+                                                title="Cut"
+                                                disabled={!selected}
+                                                onClick={handleCut}
+                                            >
+                                                <Scissors size={14} />
+                                            </button>
+                                            <button
+                                                className={`gantt-utility-btn${!canPaste ? ' disabled' : ''}`}
+                                                title={clipboard ? `Paste "${clipboard.data?.title || ''}"` : 'Paste'}
+                                                disabled={!canPaste}
+                                                onClick={handlePaste}
+                                            >
+                                                <ClipboardPaste size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
 
-                            <span className="gantt-toolbar-divider" aria-hidden="true" />
+                                    <span className="gantt-toolbar-divider" aria-hidden="true" />
+                                </>
+                            )}
 
                             <div className="gantt-toolbar-group">
                                 <div className="gantt-col-toggle-group">
@@ -3257,6 +3460,9 @@ export default function GanttChart({
                             const rowCanManageStructure = canEdit;
                             const rowCanEditStatus = rowIsTaskLike && canEditStatus && (canEdit || rowAssignedToCurrentUser);
                             const rowCanCollaborate = rowIsTaskLike && canEditStatus && (canEdit || rowAssignedToCurrentUser);
+                            // Keep previous behavior documented for future rollback if needed.
+                            // const showTaskEditAction = rowCanManageStructure || rowCanEditStatus;
+                            const showTaskEditAction = rowCanManageStructure;
                             const rowCanOpenActions = row.type === 'phase'
                                 ? rowCanManageStructure
                                 : (rowCanManageStructure || rowCanCollaborate || rowCanEditStatus);
@@ -3346,7 +3552,7 @@ export default function GanttChart({
                                                     <Pencil size={12} />
                                                 </button>
                                             )}
-                                            {row.type !== 'phase' && (rowCanManageStructure || rowCanEditStatus) && (
+                                            {row.type !== 'phase' && showTaskEditAction && (
                                                 <button
                                                     className="gantt-row-btn gantt-row-btn--edit"
                                                     title={`Edit ${row.type}`}
@@ -3410,6 +3616,7 @@ export default function GanttChart({
                         <div className="gantt-columns-body" ref={colsBodyRef}>
                             {rows.map((row) => {
                                 const isAdd = row.type === 'add-phase' || row.type === 'add-task' || row.type === 'add-subtask';
+                                const rowKey = `${row.type}-${row.id}`;
                                 const isColSelected = !isAdd && selected?.type === row.type && selected?.id === row.id;
                                 const rowPhaseId = row.type === 'phase' ? row.id : row.phase?.id || row.data?.phaseId || null;
                                 const inSelectedPhase = !!selectedPhaseId && rowPhaseId === selectedPhaseId;
@@ -3427,6 +3634,8 @@ export default function GanttChart({
                                             const isEditing = editingCell?.rowId === row.id && editingCell?.rowType === row.type && editingCell?.colKey === col.key;
                                             const rowAssignedToCurrentUser = isRowAssignedToCurrentUser(row);
                                             const canEditStatusForRow = row.type !== 'phase' && canEditStatus && (canEdit || rowAssignedToCurrentUser);
+                                            const assignments = row.type !== 'phase' ? (row.data.assignments || []) : [];
+                                            const assigneeViewerOpen = assigneeViewer?.rowKey === rowKey;
                                             const cellEditable = row.type !== 'phase' && (
                                                 (col.key === 'status' && canEditStatusForRow)
                                                 || (col.key !== 'assignees' && col.key !== 'status' && canEdit)
@@ -3445,24 +3654,42 @@ export default function GanttChart({
                                                 >
                                                     {/* Assignees */}
                                                     {col.key === 'assignees' && row.type !== 'phase' && (
-                                                        <div className="gantt-col-assignees">
-                                                            {(row.data.assignments || []).slice(0, 3).map((a: any) => (
-                                                                <span
-                                                                    key={a.member?.id || a.id}
-                                                                    className={`gantt-col-avatar${a.member?.profilePhotoUrl ? '' : ' gantt-col-avatar--solid'}`}
-                                                                    title={a.member?.fullName}
+                                                        <div className="gantt-col-assignees-wrap">
+                                                            {assignments.length > 0 ? (
+                                                                <button
+                                                                    type="button"
+                                                                    className="gantt-col-assignees-trigger"
+                                                                    aria-label={`View assignees for ${row.data.title}`}
+                                                                    aria-haspopup="dialog"
+                                                                    data-viewer-open={assigneeViewerOpen ? 'true' : 'false'}
+                                                                    ref={setAssigneeTriggerRef(rowKey)}
+                                                                    onMouseEnter={(event) => handleAssigneeMouseEnter(rowKey, event)}
+                                                                    onMouseLeave={() => handleAssigneeMouseLeave(rowKey)}
+                                                                    onClick={(event) => handleAssigneeClick(rowKey, event)}
                                                                 >
-                                                                    {a.member?.profilePhotoUrl ? (
-                                                                        <img src={getProfilePhotoUrl(a.member.id) || undefined} alt="" />
-                                                                    ) : (
-                                                                        (a.member?.fullName || '?').charAt(0).toUpperCase()
-                                                                    )}
-                                                                </span>
-                                                            ))}
-                                                            {(row.data.assignments || []).length > 3 && (
-                                                                <span className="gantt-col-avatar gantt-col-avatar--more">
-                                                                    +{row.data.assignments.length - 3}
-                                                                </span>
+                                                                    <div className="gantt-col-assignees">
+                                                                        {assignments.slice(0, 3).map((a: any) => (
+                                                                            <span
+                                                                                key={a.member?.id || a.id}
+                                                                                className={`gantt-col-avatar${a.member?.profilePhotoUrl ? '' : ' gantt-col-avatar--solid'}`}
+                                                                                title={a.member?.fullName}
+                                                                            >
+                                                                                {a.member?.profilePhotoUrl ? (
+                                                                                    <img src={getProfilePhotoUrl(a.member.id) || undefined} alt="" />
+                                                                                ) : (
+                                                                                    (a.member?.fullName || '?').charAt(0).toUpperCase()
+                                                                                )}
+                                                                            </span>
+                                                                        ))}
+                                                                        {assignments.length > 3 && (
+                                                                            <span className="gantt-col-avatar gantt-col-avatar--more">
+                                                                                +{assignments.length - 3}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </button>
+                                                            ) : (
+                                                                <span className="gantt-col-no-assignee">—</span>
                                                             )}
                                                         </div>
                                                     )}
@@ -3819,6 +4046,66 @@ export default function GanttChart({
                                 memberColumnWidth={PREVIEW_MEMBER_COLUMN_WIDTH}
                                 hourWidth={PREVIEW_HOUR_WIDTH}
                             />
+                        </div>
+                    </div>
+                )}
+
+                {assigneeViewer && assigneeViewerData && assigneeViewer.position && (
+                    <div
+                        ref={(node) => {
+                            assigneeViewerPopoverRef.current = node;
+                            applyElementStyles(node, {
+                                left: `${assigneeViewer.position.left}px`,
+                                top: `${assigneeViewer.position.top}px`,
+                                width: `${assigneeViewer.position.width}px`,
+                            });
+                        }}
+                        className={`gantt-preview-popover gantt-preview-popover--${assigneeViewer.position.placement} gantt-assignees-viewer`}
+                        role="dialog"
+                        aria-label="Task assignees"
+                        onClick={(event) => event.stopPropagation()}
+                        onMouseEnter={() => clearAssigneeHoverTimer()}
+                        onMouseLeave={() => {
+                            if (!assigneeViewer?.pinned) {
+                                setAssigneeViewer(null);
+                            }
+                        }}
+                    >
+                        <div className="gantt-preview-header gantt-assignees-viewer-header">
+                            <div className="gantt-preview-heading">
+                                <span className="gantt-preview-kind">Assignees</span>
+                                <h4 className="gantt-preview-title">{assigneeViewerData.title}</h4>
+                            </div>
+                            <button
+                                type="button"
+                                className="gantt-preview-close"
+                                onClick={() => setAssigneeViewer(null)}
+                                aria-label="Close assignee card"
+                            >
+                                <X size={12} />
+                            </button>
+                        </div>
+
+                        <div className="gantt-assignees-viewer-list">
+                            {assigneeViewerData.assignments.map((assignment: any, index: number) => {
+                                const member = assignment.member;
+                                const itemKey = `${member?.id ?? assignment.memberId ?? 'assignee'}-${index}`;
+
+                                return (
+                                    <div key={itemKey} className="gantt-assignees-viewer-item">
+                                        <span className={`gantt-col-avatar gantt-assignees-viewer-avatar${member?.profilePhotoUrl ? '' : ' gantt-col-avatar--solid'}`}>
+                                            {member?.profilePhotoUrl ? (
+                                                <img src={getProfilePhotoUrl(member.id) || undefined} alt="" />
+                                            ) : (
+                                                (member?.fullName || '?').charAt(0).toUpperCase()
+                                            )}
+                                        </span>
+                                        <div className="gantt-assignees-viewer-name" title={member?.fullName || 'Unknown member'}>
+                                            {member?.fullName || 'Unknown member'}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 )}

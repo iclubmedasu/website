@@ -22,11 +22,11 @@ import {
     MessageCircle,
     RefreshCw,
 } from 'lucide-react';
-import { membersAPI, authAPI, roleHistoryAPI, getProfilePhotoUrl } from '@/services/api';
+import { membersAPI, authAPI, roleHistoryAPI, getProfilePhotoUrl, notificationsAPI } from '@/services/api';
 import { PhoneInput } from '@/components/PhoneInput/PhoneInput';
 import UploadPhotoModal from '@/components/UploadPhotoModal/UploadPhotoModal';
 import '@/components/modal/modal.css';
-import type { Id } from '@/types/backend-contracts';
+import type { Id, NotificationItem } from '@/types/backend-contracts';
 
 import './UserPage.css';
 
@@ -109,6 +109,14 @@ function UserPage() {
     const [historyError, setHistoryError] = useState('');
     const [historyFetched, setHistoryFetched] = useState(false);
 
+    const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+    const [notificationsLoading, setNotificationsLoading] = useState(false);
+    const [notificationsError, setNotificationsError] = useState('');
+    const [notificationsFetched, setNotificationsFetched] = useState(false);
+    const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+    const [markingAllRead, setMarkingAllRead] = useState(false);
+    const [markingIds, setMarkingIds] = useState<Set<Id>>(new Set());
+
     const [pwdForm, setPwdForm] = useState<PasswordFormData>({ current: '', newPwd: '', confirm: '' });
     const [pwdSaving, setPwdSaving] = useState(false);
     const [pwdError, setPwdError] = useState('');
@@ -132,11 +140,79 @@ function UserPage() {
         }
     };
 
+    const fetchNotifications = async (unreadOnly = showUnreadOnly) => {
+        if (!user?.id) return;
+
+        setNotificationsLoading(true);
+        setNotificationsError('');
+        try {
+            const result = await notificationsAPI.getAll({ limit: 50, unreadOnly });
+            setNotifications(result.notifications || []);
+            setNotificationsFetched(true);
+        } catch {
+            setNotificationsError('Failed to load notifications.');
+        } finally {
+            setNotificationsLoading(false);
+        }
+    };
+
+    const handleMarkNotificationRead = async (notificationId: Id) => {
+        setMarkingIds((previous) => new Set(previous).add(notificationId));
+        try {
+            await notificationsAPI.markRead(notificationId);
+            setNotifications((previous) =>
+                previous.map((notification) =>
+                    notification.id === notificationId
+                        ? { ...notification, isRead: true, readAt: new Date().toISOString() }
+                        : notification,
+                ),
+            );
+        } catch {
+            setNotificationsError('Failed to mark notification as read.');
+        } finally {
+            setMarkingIds((previous) => {
+                const next = new Set(previous);
+                next.delete(notificationId);
+                return next;
+            });
+        }
+    };
+
+    const handleMarkAllRead = async () => {
+        setMarkingAllRead(true);
+        try {
+            await notificationsAPI.markAllRead();
+            setNotifications((previous) =>
+                previous.map((notification) => ({
+                    ...notification,
+                    isRead: true,
+                    readAt: notification.readAt || new Date().toISOString(),
+                })),
+            );
+        } catch {
+            setNotificationsError('Failed to mark all notifications as read.');
+        } finally {
+            setMarkingAllRead(false);
+        }
+    };
+
     useEffect(() => {
         if (activeTab === 'history' && !historyFetched && user?.id) {
             void fetchHistory();
         }
     }, [activeTab, historyFetched, user?.id]);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && window.location.hash === '#notifications') {
+            setActiveTab('notifications');
+        }
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'notifications' && !notificationsFetched && user?.id) {
+            void fetchNotifications(showUnreadOnly);
+        }
+    }, [activeTab, notificationsFetched, showUnreadOnly, user?.id]);
 
     if (!user) return null;
 
@@ -845,14 +921,89 @@ function UserPage() {
 
                     {activeTab === 'notifications' && (
                         <div className="user-page-section-card">
-                            <div className="user-tab-empty-state">
-                                <Bell size={40} strokeWidth={1.5} />
-                                <h3 className="user-tab-empty-title">Notifications & Announcements</h3>
-                                <p className="user-tab-empty-sub">
-                                    You&apos;ll see club announcements and activity notifications here. This feature is
-                                    coming soon.
-                                </p>
+                            <div className="user-notifications-header">
+                                <div>
+                                    <h3 className="user-notifications-title">Notifications & Announcements</h3>
+                                    <p className="user-notifications-subtitle">
+                                        Stay up to date with assignments, project updates, and system announcements.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={handleMarkAllRead}
+                                    disabled={markingAllRead || notifications.length === 0}
+                                >
+                                    {markingAllRead ? 'Marking...' : 'Mark all as read'}
+                                </button>
                             </div>
+
+                            <label className="user-notifications-filter">
+                                <input
+                                    type="checkbox"
+                                    checked={showUnreadOnly}
+                                    onChange={(e) => {
+                                        const nextValue = e.target.checked;
+                                        setShowUnreadOnly(nextValue);
+                                        void fetchNotifications(nextValue);
+                                    }}
+                                />
+                                Show unread only
+                            </label>
+
+                            {notificationsError && <div className="error-message">{notificationsError}</div>}
+
+                            {notificationsLoading ? (
+                                <div className="loading-state">
+                                    <div className="spinner" />
+                                    <p>Loading notifications…</p>
+                                </div>
+                            ) : notifications.length === 0 ? (
+                                <div className="user-tab-empty-state user-tab-empty-state-compact">
+                                    <Bell size={32} strokeWidth={1.5} />
+                                    <h3 className="user-tab-empty-title">No Notifications Yet</h3>
+                                    <p className="user-tab-empty-sub">
+                                        New updates and announcements will appear here as they happen.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="user-notifications-list">
+                                    {notifications.map((notification) => (
+                                        <article
+                                            key={notification.id}
+                                            className={`user-notification-item${notification.isRead ? ' is-read' : ''}`}
+                                        >
+                                            <div className="user-notification-content">
+                                                <div className="user-notification-meta">
+                                                    <span className="user-notification-event">{notification.eventType.replaceAll('_', ' ')}</span>
+                                                    <span className="user-notification-time">
+                                                        {new Date(notification.createdAt).toLocaleString('en-GB', {
+                                                            day: '2-digit',
+                                                            month: 'short',
+                                                            year: 'numeric',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                        })}
+                                                    </span>
+                                                </div>
+                                                <h4 className="user-notification-item-title">{notification.title}</h4>
+                                                <p className="user-notification-item-body">{notification.body}</p>
+                                            </div>
+
+                                            {!notification.isRead && (
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-secondary user-notification-read-btn"
+                                                    disabled={markingIds.has(notification.id)}
+                                                    onClick={() => void handleMarkNotificationRead(notification.id)}
+                                                >
+                                                    {markingIds.has(notification.id) ? 'Saving...' : 'Mark as read'}
+                                                </button>
+                                            )}
+                                        </article>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 

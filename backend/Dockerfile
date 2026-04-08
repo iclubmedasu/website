@@ -1,65 +1,52 @@
-# ============================================
-# iClub Backend API - Dockerfile
-# Express + TypeScript + Prisma
-# ============================================
+FROM node:20-alpine AS build
 
-FROM node:20-alpine AS builder
-
-# Install pnpm
 RUN npm install -g pnpm
 
 WORKDIR /app
 
-# Copy workspace files
+# Copy workspace metadata first for better layer caching.
 COPY pnpm-workspace.yaml ./
 COPY package.json ./
 COPY pnpm-lock.yaml ./
+COPY backend/package.json ./backend/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
 
-# Copy package.json files
-COPY backend/package.json ./backend/
-COPY packages/shared/package.json ./packages/shared/
+# Install all deps needed to build TypeScript and Prisma artifacts.
+RUN pnpm install --frozen-lockfile --filter backend...
 
-# Install dependencies (build requires TypeScript toolchain)
-RUN pnpm install --frozen-lockfile
-
-# Copy source
-COPY backend/ ./backend/
-COPY packages/ ./packages/
-
-# Build TypeScript
-RUN pnpm --filter backend build
-
-FROM node:20-alpine AS runner
-
-# Install pnpm
-RUN npm install -g pnpm
-
-WORKDIR /app
-
-# Copy workspace files
-COPY pnpm-workspace.yaml ./
-COPY package.json ./
-COPY pnpm-lock.yaml ./
-
-# Copy package.json files
-COPY backend/package.json ./backend/
-COPY packages/shared/package.json ./packages/shared/
-
-# Install production dependencies only
-RUN pnpm install --frozen-lockfile --prod
-
-# Copy runtime artifacts
-COPY --from=builder /app/backend/dist ./backend/dist
-COPY --from=builder /app/backend/prisma ./backend/prisma
-COPY --from=builder /app/backend/prisma.config.ts ./backend/prisma.config.ts
-COPY --from=builder /app/packages ./packages
-
-# Generate Prisma client in runtime image
-RUN pnpm --filter backend prisma generate
+# Copy source files.
+COPY backend ./backend
+COPY packages/shared ./packages/shared
 
 WORKDIR /app/backend
+RUN npx prisma generate
+RUN npx tsc -p tsconfig.json
 
-EXPOSE 3000
+FROM node:20-alpine AS runtime
 
-# Run database migrations then start server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+RUN npm install -g pnpm
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=8080
+
+COPY pnpm-workspace.yaml ./
+COPY package.json ./
+COPY pnpm-lock.yaml ./
+COPY backend/package.json ./backend/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
+
+# Install production-only dependencies.
+RUN pnpm install --frozen-lockfile --filter backend... --prod
+
+COPY --from=build /app/backend/dist /app/backend/dist
+COPY --from=build /app/backend/prisma /app/backend/prisma
+COPY --from=build /app/packages/shared /app/packages/shared
+
+WORKDIR /app/backend
+RUN npx prisma generate
+
+EXPOSE 8080
+
+CMD ["npm", "start"]

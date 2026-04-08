@@ -171,8 +171,9 @@ export default function AddTaskModal({
                     <div className="form-section">
                         <h3 className="form-section-title">Task Info</h3>
                         <div className="form-group">
-                            <label className="form-label">Title *</label>
+                            <label className="form-label" htmlFor="add-task-title">Title *</label>
                             <input
+                                id="add-task-title"
                                 className="form-input"
                                 placeholder="Task title"
                                 value={form.title}
@@ -182,8 +183,9 @@ export default function AddTaskModal({
                             />
                         </div>
                         <div className="form-group">
-                            <label className="form-label">Description</label>
+                            <label className="form-label" htmlFor="add-task-description">Description</label>
                             <textarea
+                                id="add-task-description"
                                 className="form-input form-textarea"
                                 placeholder="Optional description..."
                                 value={form.description}
@@ -196,24 +198,24 @@ export default function AddTaskModal({
                         <h3 className="form-section-title">Details</h3>
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="form-label">Status</label>
-                                <select className="form-input" value={form.status} onChange={setField('status')}>
+                                <label className="form-label" htmlFor="add-task-status">Status</label>
+                                <select id="add-task-status" title="Task status" className="form-input" value={form.status} onChange={setField('status')}>
                                     {STATUSES.map((status) => (
                                         <option key={status} value={status}>{STATUS_LABELS[status]}</option>
                                     ))}
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Priority</label>
-                                <select className="form-input" value={form.priority} onChange={setField('priority')}>
+                                <label className="form-label" htmlFor="add-task-priority">Priority</label>
+                                <select id="add-task-priority" title="Task priority" className="form-input" value={form.priority} onChange={setField('priority')}>
                                     {PRIORITIES.map((priority) => (
                                         <option key={priority} value={priority}>{PRIORITY_LABELS[priority]}</option>
                                     ))}
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Difficulty</label>
-                                <select className="form-input" value={form.difficulty} onChange={setField('difficulty')}>
+                                <label className="form-label" htmlFor="add-task-difficulty">Difficulty</label>
+                                <select id="add-task-difficulty" title="Task difficulty" className="form-input" value={form.difficulty} onChange={setField('difficulty')}>
                                     {DIFFICULTIES.map((difficulty) => (
                                         <option key={difficulty} value={difficulty}>{DIFFICULTY_LABELS[difficulty]}</option>
                                     ))}
@@ -223,18 +225,22 @@ export default function AddTaskModal({
 
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="form-label">Start Date</label>
+                                <label className="form-label" htmlFor="add-task-start-date">Start Date</label>
                                 <input
+                                    id="add-task-start-date"
                                     type="date"
+                                    title="Task start date"
                                     className="form-input"
                                     value={form.startDate}
                                     onChange={setField('startDate')}
                                 />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Due Date</label>
+                                <label className="form-label" htmlFor="add-task-due-date">Due Date</label>
                                 <input
+                                    id="add-task-due-date"
                                     type="date"
+                                    title="Task due date"
                                     className="form-input"
                                     value={form.dueDate}
                                     onChange={setField('dueDate')}
@@ -244,8 +250,9 @@ export default function AddTaskModal({
 
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="form-label">Estimated Hours</label>
+                                <label className="form-label" htmlFor="add-task-estimated-hours">Estimated Hours</label>
                                 <input
+                                    id="add-task-estimated-hours"
                                     type="number"
                                     className="form-input"
                                     placeholder="0"
@@ -256,8 +263,9 @@ export default function AddTaskModal({
                                 />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Actual Hours</label>
+                                <label className="form-label" htmlFor="add-task-actual-hours">Actual Hours</label>
                                 <input
+                                    id="add-task-actual-hours"
                                     type="number"
                                     className="form-input"
                                     placeholder="0"

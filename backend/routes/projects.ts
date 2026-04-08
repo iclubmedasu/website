@@ -7,6 +7,7 @@ import {
     logProjectActivity,
     summarizeChanges,
 } from '../services/activityLogService';
+import { emitNotificationEvent, resolveTeamMemberIds } from '../services/notificationService';
 
 const router: any = express.Router();
 
@@ -218,6 +219,45 @@ function buildProjectInclude() {
         projectType: { select: { id: true, name: true, category: true } },
         tags: true,
     };
+}
+
+async function emitProjectStatusNotification({
+    projectId,
+    title,
+    actorMemberId,
+    teamIds,
+    oldStatus,
+    newStatus,
+    action,
+}: {
+    projectId: number;
+    title: string;
+    actorMemberId?: number;
+    teamIds: number[];
+    oldStatus: string | null;
+    newStatus: string | null;
+    action: string;
+}) {
+    const teamMemberIds = await resolveTeamMemberIds(teamIds);
+    await emitNotificationEvent({
+        eventType: 'PROJECT_STATUS_CHANGED',
+        audienceType: 'PROJECT',
+        actorMemberId,
+        persistEventWhenNoRecipients: true,
+        title: `Project Updated: ${title}`,
+        body: `Project "${title}" ${action}.`,
+        metadata: {
+            projectId,
+            oldStatus,
+            newStatus,
+        },
+        audienceData: {
+            projectId,
+            teamIds,
+            recipientScope: 'project-teams',
+        },
+        recipientMemberIds: teamMemberIds,
+    });
 }
 
 // ============================================
@@ -453,6 +493,29 @@ router.post('/', async (req, res) => {
             description: `Project "${project.title}" created`,
         });
 
+        const createdProjectTeamIds = (project.projectTeams || []).map((projectTeam) => projectTeam.teamId);
+        const createdProjectMemberIds = await resolveTeamMemberIds(createdProjectTeamIds);
+
+        await emitNotificationEvent({
+            eventType: 'PROJECT_CREATED',
+            audienceType: 'PROJECT',
+            actorMemberId: req.user.memberId,
+            persistEventWhenNoRecipients: true,
+            title: `Project Created: ${project.title}`,
+            body: `Project "${project.title}" was created.`,
+            metadata: {
+                projectId: project.id,
+                status: project.status,
+                priority: project.priority,
+            },
+            audienceData: {
+                projectId: project.id,
+                teamIds: createdProjectTeamIds,
+                recipientScope: 'project-teams',
+            },
+            recipientMemberIds: createdProjectMemberIds,
+        });
+
         res.status(201).json(project);
     } catch (error) {
         console.error('POST /projects', error);
@@ -597,6 +660,19 @@ router.put('/:id', async (req, res) => {
                 newValue,
                 description: summarizeChanges(changes) || `Project "${project.title}" updated`,
             });
+
+            const hasStatusChange = changes.some((change) => change.key === 'status');
+            if (hasStatusChange) {
+                await emitProjectStatusNotification({
+                    projectId: id,
+                    title: project.title,
+                    actorMemberId: req.user.memberId,
+                    teamIds: (project.projectTeams || []).map((projectTeam) => projectTeam.teamId),
+                    oldStatus: normalizedBefore.status ?? null,
+                    newStatus: project.status ?? null,
+                    action: `status changed from ${normalizedBefore.status ?? 'UNKNOWN'} to ${project.status ?? 'UNKNOWN'}`,
+                });
+            }
         }
 
         res.json(project);
@@ -669,6 +745,16 @@ router.patch('/:id/finalize', async (req, res) => {
             description: `Project "${project.title}" finalized`,
         });
 
+        await emitProjectStatusNotification({
+            projectId: id,
+            title: project.title,
+            actorMemberId: req.user.memberId,
+            teamIds: (project.projectTeams || []).map((projectTeam) => projectTeam.teamId),
+            oldStatus: current.status ?? null,
+            newStatus: project.status ?? null,
+            action: 'was finalized',
+        });
+
         res.json(project);
     } catch (error) {
         console.error('PATCH /projects/:id/finalize', error);
@@ -712,6 +798,16 @@ router.patch('/:id/archive', async (req, res) => {
             description: `Project "${project.title}" archived`,
         });
 
+        await emitProjectStatusNotification({
+            projectId: id,
+            title: project.title,
+            actorMemberId: req.user.memberId,
+            teamIds: (project.projectTeams || []).map((projectTeam) => projectTeam.teamId),
+            oldStatus: current.status ?? null,
+            newStatus: project.status ?? null,
+            action: 'was archived',
+        });
+
         res.json(project);
     } catch (error) {
         console.error('PATCH /projects/:id/archive', error);
@@ -751,6 +847,16 @@ router.patch('/:id/reactivate', async (req, res) => {
             oldValue: { isActive: current.isActive, status: current.status },
             newValue: { isActive: true, status: current.status === 'CANCELLED' ? 'NOT_STARTED' : current.status },
             description: `Project "${project.title}" reactivated`,
+        });
+
+        await emitProjectStatusNotification({
+            projectId: id,
+            title: project.title,
+            actorMemberId: req.user.memberId,
+            teamIds: (project.projectTeams || []).map((projectTeam) => projectTeam.teamId),
+            oldStatus: current.status ?? null,
+            newStatus: project.status ?? null,
+            action: 'was reactivated',
         });
 
         res.json(project);
@@ -796,6 +902,16 @@ router.patch('/:id/abort', async (req, res) => {
             description: `Project "${project.title}" aborted`,
         });
 
+        await emitProjectStatusNotification({
+            projectId: id,
+            title: project.title,
+            actorMemberId: req.user.memberId,
+            teamIds: (project.projectTeams || []).map((projectTeam) => projectTeam.teamId),
+            oldStatus: current.status ?? null,
+            newStatus: project.status ?? null,
+            action: 'was aborted',
+        });
+
         res.json(project);
     } catch (error) {
         console.error('PATCH /projects/:id/abort', error);
@@ -837,6 +953,16 @@ router.patch('/:id/publish', async (req, res) => {
             oldValue: { isFinalized: current.isFinalized, isArchived: current.isArchived },
             newValue: { isFinalized: false, isArchived: false, status: 'NOT_STARTED' },
             description: `Project "${project.title}" published`,
+        });
+
+        await emitProjectStatusNotification({
+            projectId: id,
+            title: project.title,
+            actorMemberId: req.user.memberId,
+            teamIds: (project.projectTeams || []).map((projectTeam) => projectTeam.teamId),
+            oldStatus: current.status ?? null,
+            newStatus: project.status ?? null,
+            action: 'was published',
         });
 
         res.json(project);

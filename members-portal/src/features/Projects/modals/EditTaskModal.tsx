@@ -334,8 +334,9 @@ export default function EditTaskModal({
                     <div className="form-section">
                         <h3 className="form-section-title">Task Info</h3>
                         <div className="form-group">
-                            <label className="form-label">Title *</label>
+                            <label className="form-label" htmlFor="edit-task-title">Title *</label>
                             <input
+                                id="edit-task-title"
                                 className="form-input"
                                 placeholder="Task title"
                                 value={form.title}
@@ -346,8 +347,9 @@ export default function EditTaskModal({
                             />
                         </div>
                         <div className="form-group">
-                            <label className="form-label">Description</label>
+                            <label className="form-label" htmlFor="edit-task-description">Description</label>
                             <textarea
+                                id="edit-task-description"
                                 className="form-input form-textarea"
                                 placeholder="Optional description..."
                                 value={form.description}
@@ -361,8 +363,10 @@ export default function EditTaskModal({
                         <h3 className="form-section-title">Details</h3>
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="form-label">Status</label>
+                                <label className="form-label" htmlFor="edit-task-status">Status</label>
                                 <select
+                                    id="edit-task-status"
+                                    title="Task status"
                                     className="form-input"
                                     value={form.status}
                                     onChange={setField('status')}
@@ -375,16 +379,16 @@ export default function EditTaskModal({
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Priority</label>
-                                <select className="form-input" value={form.priority} onChange={setField('priority')} disabled={!canManageTask}>
+                                <label className="form-label" htmlFor="edit-task-priority">Priority</label>
+                                <select id="edit-task-priority" title="Task priority" className="form-input" value={form.priority} onChange={setField('priority')} disabled={!canManageTask}>
                                     {PRIORITIES.map((priority) => (
                                         <option key={priority} value={priority}>{PRIORITY_LABELS[priority]}</option>
                                     ))}
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Difficulty</label>
-                                <select className="form-input" value={form.difficulty} onChange={setField('difficulty')} disabled={!canManageTask}>
+                                <label className="form-label" htmlFor="edit-task-difficulty">Difficulty</label>
+                                <select id="edit-task-difficulty" title="Task difficulty" className="form-input" value={form.difficulty} onChange={setField('difficulty')} disabled={!canManageTask}>
                                     {DIFFICULTIES.map((difficulty) => (
                                         <option key={difficulty} value={difficulty}>{DIFFICULTY_LABELS[difficulty]}</option>
                                     ))}
@@ -394,9 +398,11 @@ export default function EditTaskModal({
 
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="form-label">Start Date</label>
+                                <label className="form-label" htmlFor="edit-task-start-date">Start Date</label>
                                 <input
+                                    id="edit-task-start-date"
                                     type="date"
+                                    title="Task start date"
                                     className="form-input"
                                     value={form.startDate}
                                     onChange={setField('startDate')}
@@ -404,9 +410,11 @@ export default function EditTaskModal({
                                 />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Due Date</label>
+                                <label className="form-label" htmlFor="edit-task-due-date">Due Date</label>
                                 <input
+                                    id="edit-task-due-date"
                                     type="date"
+                                    title="Task due date"
                                     className="form-input"
                                     value={form.dueDate}
                                     onChange={setField('dueDate')}
@@ -417,8 +425,9 @@ export default function EditTaskModal({
 
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="form-label">Estimated Hours</label>
+                                <label className="form-label" htmlFor="edit-task-estimated-hours">Estimated Hours</label>
                                 <input
+                                    id="edit-task-estimated-hours"
                                     type="number"
                                     className="form-input"
                                     placeholder="0"
@@ -430,8 +439,9 @@ export default function EditTaskModal({
                                 />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Actual Hours</label>
+                                <label className="form-label" htmlFor="edit-task-actual-hours">Actual Hours</label>
                                 <input
+                                    id="edit-task-actual-hours"
                                     type="number"
                                     className="form-input"
                                     placeholder="0"
@@ -450,9 +460,11 @@ export default function EditTaskModal({
 
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="form-label">Depends on</label>
+                                <label className="form-label" htmlFor="edit-task-dependency-target">Depends on</label>
                                 {projectDetail ? (
                                     <select
+                                        id="edit-task-dependency-target"
+                                        title="Dependency task"
                                         className="form-input"
                                         value={dependencyTaskId}
                                         onChange={(e) => setDependencyTaskId(e.target.value)}
@@ -467,6 +479,7 @@ export default function EditTaskModal({
                                     </select>
                                 ) : (
                                     <input
+                                        id="edit-task-dependency-target"
                                         className="form-input"
                                         type="number"
                                         min="1"
@@ -478,8 +491,10 @@ export default function EditTaskModal({
                                 )}
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Dependency Type</label>
+                                <label className="form-label" htmlFor="edit-task-dependency-type">Dependency Type</label>
                                 <select
+                                    id="edit-task-dependency-type"
+                                    title="Dependency type"
                                     className="form-input"
                                     value={dependencyType}
                                     onChange={(e) => setDependencyType(e.target.value as DependencyType)}
@@ -496,20 +511,20 @@ export default function EditTaskModal({
                             Add Dependency
                         </button>
 
-                        <div style={{ display: 'grid', gap: '0.9rem', marginTop: '1rem' }}>
+                        <div className="edit-task-dependency-columns">
                             <div>
-                                <p className="form-hint" style={{ marginBottom: '0.45rem' }}>This task depends on</p>
+                                <p className="form-hint edit-task-dependency-heading">This task depends on</p>
                                 {dependencies.length > 0 ? dependencies.map((dependency) => {
                                     const dependsOnId = dependency.dependsOnTask?.id ?? dependency.dependsOnTaskId;
                                     const dependencyKey = dependency.id ?? `${dependsOnId ?? 'unknown'}-${dependency.dependencyType ?? 'type'}`;
                                     return (
                                         <div
                                             key={dependencyKey}
-                                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', padding: '0.6rem 0.75rem', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-sm)', marginBottom: '0.45rem' }}
+                                            className="edit-task-dependency-card"
                                         >
                                             <div>
                                                 <strong>{dependency.dependsOnTask?.title ?? 'Unknown task'}</strong>
-                                                <div className="form-hint" style={{ margin: 0 }}>{dependency.dependencyType}</div>
+                                                <div className="form-hint edit-task-dependency-meta">{dependency.dependencyType}</div>
                                             </div>
                                             <button className="btn btn-secondary" type="button" onClick={() => handleRemoveDependency(dependsOnId)} disabled={!canManageTask || actionLoading}>
                                                 <Trash2 size={13} />
@@ -523,16 +538,16 @@ export default function EditTaskModal({
                             </div>
 
                             <div>
-                                <p className="form-hint" style={{ marginBottom: '0.45rem' }}>Tasks depending on this task</p>
+                                <p className="form-hint edit-task-dependency-heading">Tasks depending on this task</p>
                                 {dependsOn.length > 0 ? dependsOn.map((dependency) => {
                                     const reverseDependencyKey = dependency.id ?? `${dependency.task?.id ?? 'unknown'}-${dependency.dependencyType ?? 'type'}`;
                                     return (
                                         <div
                                             key={reverseDependencyKey}
-                                            style={{ padding: '0.6rem 0.75rem', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-sm)', marginBottom: '0.45rem' }}
+                                            className="edit-task-dependency-card edit-task-dependency-card--compact"
                                         >
                                             <strong>{dependency.task?.title ?? 'Unknown task'}</strong>
-                                            <div className="form-hint" style={{ margin: 0 }}>{dependency.dependencyType}</div>
+                                            <div className="form-hint edit-task-dependency-meta">{dependency.dependencyType}</div>
                                         </div>
                                     );
                                 }) : (

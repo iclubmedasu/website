@@ -480,6 +480,7 @@ export const SidebarNavigationSlim = ({
                       <div className="sidebar-slim-item-content">
                         <Icon className="sidebar-slim-icon" />
                         <span className="sidebar-slim-label">{item.label}</span>
+                        {item.badge && <span className="sidebar-slim-badge sidebar-slim-badge--alert sidebar-slim-badge--footer">{item.badge}</span>}
                       </div>
                     </Link>
                   );

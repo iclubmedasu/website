@@ -1,5 +1,5 @@
 import request from 'supertest'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { buildRouteApp } from './testHarness'
 
 const prismaMocks = vi.hoisted(() => ({
@@ -19,6 +19,10 @@ const activityMocks = vi.hoisted(() => ({
     changesToPayload: vi.fn(),
     summarizeChanges: vi.fn(),
     logProjectActivity: vi.fn()
+}))
+
+const notificationMocks = vi.hoisted(() => ({
+    emitNotificationEvent: vi.fn()
 }))
 
 vi.mock('../../db', () => ({
@@ -46,10 +50,18 @@ vi.mock('../../db', () => ({
 }))
 
 vi.mock('../../services/activityLogService', () => activityMocks)
+vi.mock('../../services/notificationService', () => notificationMocks)
 
 import scheduleSlotsRouter from '../../routes/scheduleSlots'
 
 describe('schedule slots routes', () => {
+    beforeEach(() => {
+        notificationMocks.emitNotificationEvent.mockResolvedValue(null)
+        activityMocks.collectChangedFields.mockReturnValue([])
+        activityMocks.changesToPayload.mockReturnValue({ oldValue: {}, newValue: {} })
+        activityMocks.summarizeChanges.mockReturnValue(null)
+    })
+
     afterEach(() => {
         vi.clearAllMocks()
     })
@@ -125,7 +137,58 @@ describe('schedule slots routes', () => {
         expect(response.status).toBe(201)
         expect(response.body.id).toBe(100)
         expect(prismaMocks.projectScheduleSlotCreate).toHaveBeenCalledTimes(1)
+        expect(notificationMocks.emitNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'SCHEDULE_SLOT_ASSIGNED',
+            persistEventWhenNoRecipients: true
+        }))
         expect(activityMocks.logProjectActivity).toHaveBeenCalledTimes(1)
+    })
+
+    it('emits SCHEDULE_SLOT_ASSIGNED when slot assignee changes', async () => {
+        prismaMocks.projectScheduleSlotFindUnique.mockResolvedValueOnce({
+            projectId: 22,
+            taskId: 44,
+            memberId: 19,
+            title: 'Pairing block',
+            notes: null,
+            startDateTime: new Date('2026-01-01T10:00:00.000Z'),
+            endDateTime: new Date('2026-01-01T11:00:00.000Z'),
+            isActive: true
+        })
+        prismaMocks.projectTeamFindMany.mockResolvedValueOnce([{ teamId: 5 }])
+        prismaMocks.teamMemberFindFirst.mockResolvedValueOnce({ id: 1 })
+        prismaMocks.projectScheduleSlotUpdate.mockResolvedValueOnce({
+            id: 77,
+            projectId: 22,
+            taskId: 44,
+            memberId: 22,
+            title: 'Pairing block',
+            notes: null,
+            startDateTime: new Date('2026-01-01T10:00:00.000Z'),
+            endDateTime: new Date('2026-01-01T11:00:00.000Z'),
+            isActive: true,
+            project: { id: 22, title: 'Project A' },
+            task: { id: 44, title: 'Task A', parentTaskId: null },
+            member: { id: 22, fullName: 'Member 22', profilePhotoUrl: null },
+            createdBy: { id: 12, fullName: 'Manager' }
+        })
+        activityMocks.collectChangedFields.mockReturnValueOnce([{ key: 'memberId' }])
+        activityMocks.changesToPayload.mockReturnValueOnce({
+            oldValue: { memberId: 19 },
+            newValue: { memberId: 22 }
+        })
+        activityMocks.summarizeChanges.mockReturnValueOnce('Schedule slot updated')
+
+        const response = await request(buildRouteApp(scheduleSlotsRouter, { memberId: 12, isSpecial: true }))
+            .patch('/77')
+            .send({ memberId: 22 })
+
+        expect(response.status).toBe(200)
+        expect(notificationMocks.emitNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'SCHEDULE_SLOT_ASSIGNED',
+            persistEventWhenNoRecipients: true,
+            recipientMemberIds: [22]
+        }))
     })
 
     it('blocks assigned non-elevated users from deleting other members slots', async () => {

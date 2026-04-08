@@ -86,51 +86,35 @@ export default function TaskCommentsModal({ task, onClose }: TaskCommentsModalPr
                         <>
                             <div className="form-section">
                                 <h3 className="form-section-title">Discussion</h3>
-                                <div style={{ display: 'grid', gap: '0.75rem' }}>
+                                <div className="modal-comment-list">
                                     {comments.length > 0 ? comments.map((comment) => (
                                         <div
                                             key={comment.id}
-                                            style={{
-                                                border: '1px solid var(--gray-200)',
-                                                borderRadius: 'var(--radius-md)',
-                                                padding: '0.85rem',
-                                                background: 'var(--gray-50)',
-                                            }}
+                                            className="modal-comment-card"
                                         >
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.45rem' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                                            <div className="modal-comment-header">
+                                                <div className="modal-comment-author">
                                                     {comment.member?.profilePhotoUrl ? (
                                                         <img
                                                             src={getProfilePhotoUrl(comment.member.id) ?? undefined}
                                                             alt={comment.member.fullName}
-                                                            style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover' }}
+                                                            className="modal-comment-avatar-image"
                                                         />
                                                     ) : (
                                                         <span
-                                                            style={{
-                                                                width: 24,
-                                                                height: 24,
-                                                                borderRadius: '50%',
-                                                                display: 'inline-flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                background: 'var(--purple-100)',
-                                                                color: 'var(--purple-700)',
-                                                                fontSize: '0.75rem',
-                                                                fontWeight: 700,
-                                                            }}
+                                                            className="modal-comment-avatar-fallback"
                                                         >
                                                             {(comment.member?.fullName ?? '?').charAt(0).toUpperCase()}
                                                         </span>
                                                     )}
                                                     <strong>{comment.member?.fullName ?? 'Unknown'}</strong>
                                                 </div>
-                                                <span className="form-hint" style={{ margin: 0 }}>
+                                                <span className="form-hint modal-comment-meta">
                                                     {comment.createdAt ? new Date(comment.createdAt).toLocaleString() : 'Unknown date'}
                                                     {comment.isEdited ? ' · edited' : ''}
                                                 </span>
                                             </div>
-                                            <p style={{ margin: 0, whiteSpace: 'pre-wrap', color: 'var(--gray-800)' }}>
+                                            <p className="modal-comment-body">
                                                 {comment.comment}
                                             </p>
                                         </div>

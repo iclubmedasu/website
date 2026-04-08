@@ -263,6 +263,27 @@
         transform 0.22s var(--sidebar-ease) var(--sidebar-content-collapse-delay);
 }
 
+.sidebar-slim-badge--alert {
+    background: #dc2626;
+    border: 1px solid #b91c1c;
+}
+
+.sidebar-slim-badge--footer {
+    opacity: 1;
+    transform: scale(1);
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    margin-left: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.sidebar-slim.expanded .sidebar-slim-badge--footer,
+.sidebar-slim.mobile .sidebar-slim-badge--footer {
+    position: static;
+    margin-left: auto;
+}
+
 /* ── Footer ── */
 .sidebar-slim-footer {
     display: flex;

@@ -1,15 +1,18 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AuthGuard } from '@/components/AuthGuard/AuthGuard'
 import { UnassignedGate } from '@/components/UnassignedGate/UnassignedGate'
 import { AlumniGate } from '@/components/AlumniGate/AlumniGate'
 import { SideBarNavigationSlim } from '@/components/SideBarNavigationSlim/SideBarNavigationSlim'
 import { useAuth } from '@/context/AuthContext'
+import { getNotificationsWebSocketUrl, notificationsAPI } from '@/services/api'
+import type { NotificationRealtimeMessage } from '@/types/backend-contracts'
 import {
     Users,
     FolderKanban,
     UserCircle,
+    Bell,
     HelpCircle,
     GraduationCap,
     Shield,
@@ -50,19 +53,26 @@ const NAV_ITEMS = [
     }
 ]
 
-const FOOTER_ITEMS: Array<{
-    label: string
-    href: string
-    icon: typeof UserCircle
-}> = [
-        // { label: 'My Profile', href: '/user', icon: UserCircle }
-    ]
-
 function PortalLayout({ children }: { children: React.ReactNode }) {
     const { user, logout } = useAuth()
     const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
+    const [unreadCount, setUnreadCount] = useState(0)
     const mobileNavTriggerRef = useRef<HTMLButtonElement | null>(null)
     const wasMobileNavOpenRef = useRef(false)
+
+    const refreshUnreadCount = useCallback(async () => {
+        if (!user?.id) {
+            setUnreadCount(0)
+            return
+        }
+
+        try {
+            const result = await notificationsAPI.getUnreadCount()
+            setUnreadCount(Math.max(0, Number(result.unreadCount || 0)))
+        } catch {
+            // Keep previous value when refresh fails.
+        }
+    }, [user?.id])
 
     useEffect(() => {
         const mediaQuery = window.matchMedia('(min-width: 641px)')
@@ -92,6 +102,74 @@ function PortalLayout({ children }: { children: React.ReactNode }) {
         wasMobileNavOpenRef.current = isMobileNavOpen
     }, [isMobileNavOpen])
 
+    useEffect(() => {
+        void refreshUnreadCount()
+    }, [refreshUnreadCount])
+
+    useEffect(() => {
+        if (!user?.id) {
+            return
+        }
+
+        let isDisposed = false
+        let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+        let socket: WebSocket | null = null
+
+        const connect = () => {
+            if (isDisposed) return
+
+            socket = new WebSocket(getNotificationsWebSocketUrl())
+
+            socket.onopen = () => {
+                void refreshUnreadCount()
+            }
+
+            socket.onmessage = (event) => {
+                try {
+                    const payload = JSON.parse(String(event.data)) as NotificationRealtimeMessage
+                    if (payload.type === 'notification.created') {
+                        void refreshUnreadCount()
+                    }
+                } catch {
+                    // Ignore malformed websocket payloads.
+                }
+            }
+
+            socket.onerror = () => {
+                socket?.close()
+            }
+
+            socket.onclose = () => {
+                if (isDisposed) return
+                reconnectTimer = setTimeout(connect, 2000)
+            }
+        }
+
+        connect()
+
+        return () => {
+            isDisposed = true
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer)
+            }
+            socket?.close()
+        }
+    }, [refreshUnreadCount, user?.id])
+
+    const footerItems = [
+        {
+            label: 'Notifications',
+            href: '/user#notifications',
+            icon: Bell,
+            badge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
+        },
+        {
+            label: 'My Profile',
+            href: '/user',
+            icon: UserCircle,
+        },
+    ]
+
     return (
         <AlumniGate>
             <UnassignedGate>
@@ -107,7 +185,7 @@ function PortalLayout({ children }: { children: React.ReactNode }) {
                     </button>
                     <SideBarNavigationSlim
                         items={NAV_ITEMS}
-                        footerItems={FOOTER_ITEMS}
+                        footerItems={footerItems}
                         user={user}
                         onLogout={logout}
                         isMobileOpen={isMobileNavOpen}

@@ -1117,6 +1117,99 @@
     margin-left: 0.3rem;
 }
 
+/* ============================================
+   PROJECT/TASK COMMENT MODALS
+   ============================================ */
+
+.modal-comment-list {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.modal-comment-card {
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 0.85rem;
+    background: var(--gray-50);
+}
+
+.modal-comment-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.45rem;
+}
+
+.modal-comment-author {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.modal-comment-avatar-image {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.modal-comment-avatar-fallback {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--purple-100);
+    color: var(--purple-700);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.modal-comment-meta {
+    margin: 0;
+}
+
+.modal-comment-body {
+    margin: 0;
+    white-space: pre-wrap;
+    color: var(--gray-800);
+}
+
+/* ============================================
+   EDIT TASK MODAL — Dependency blocks
+   ============================================ */
+
+.edit-task-dependency-columns {
+    display: grid;
+    gap: 0.9rem;
+    margin-top: 1rem;
+}
+
+.edit-task-dependency-heading {
+    margin-bottom: 0.45rem;
+}
+
+.edit-task-dependency-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    margin-bottom: 0.45rem;
+}
+
+.edit-task-dependency-card--compact {
+    display: block;
+}
+
+.edit-task-dependency-meta {
+    margin: 0;
+}
+
 
 /* ============================================
    VIEW MEMBER — Member info card + timeline

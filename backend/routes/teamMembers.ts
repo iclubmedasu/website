@@ -1,6 +1,8 @@
-const express: any = require('express');
+import express from 'express';
+import { prisma } from '../db';
+import { emitNotificationEvent, resolveTeamMemberIds } from '../services/notificationService';
+
 const router: any = express.Router();
-const { prisma }: { prisma: any } = require('../db'); // Change from '../server' to '../prisma'
 
 // ============================================
 // TEAM MEMBER ASSIGNMENT ENDPOINTS
@@ -169,6 +171,31 @@ router.post('/assign', async (req, res) => {
 
             return { assignment, historyEntry };
         });
+
+        const recipientMemberIds = await resolveTeamMemberIds([teamIdInt]);
+        try {
+            await emitNotificationEvent({
+                eventType: 'TEAM_MEMBER_JOINED',
+                audienceType: 'TEAM',
+                actorMemberId: req.user?.memberId,
+                includeActor: req.user?.memberId === memberIdInt,
+                persistEventWhenNoRecipients: true,
+                title: `Team Member Joined: ${team.name}`,
+                body: `${member.fullName} joined ${team.name} as ${role.roleName}.`,
+                metadata: {
+                    teamId: teamIdInt,
+                    memberId: memberIdInt,
+                    roleId: roleIdInt
+                },
+                audienceData: {
+                    teamId: teamIdInt,
+                    recipientScope: 'team-members'
+                },
+                recipientMemberIds
+            });
+        } catch (notificationError) {
+            console.error('POST /team-members/assign notification emit failed', notificationError);
+        }
 
         res.status(201).json(result);
     } catch (error) {

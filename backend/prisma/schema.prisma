@@ -41,6 +41,8 @@ model Member {
   createdScheduleSlots ProjectScheduleSlot[]   @relation("ProjectScheduleSlotCreatedBy")
   uploadedFiles       ProjectFile[]           // Files uploaded by this member
   createdFolders      ProjectFolder[]         // Folders created by this member
+  notificationEventsAuthored NotificationEvent[] @relation("NotificationEventActor")
+  notifications      Notification[]
 }
 
 // ============================================
@@ -219,6 +221,55 @@ model User {
   
   @@index([memberId])
 }
+
+  // ============================================
+  // NOTIFICATION EVENTS - Canonical event records
+  // ============================================
+  model NotificationEvent {
+    id            Int       @id @default(autoincrement())
+    eventType     String
+    audienceType  String
+    actorMemberId Int?
+    title         String
+    body          String
+    metadata      Json?
+    audienceData  Json?
+    createdAt     DateTime  @default(now())
+
+    actor         Member?   @relation("NotificationEventActor", fields: [actorMemberId], references: [id], onDelete: SetNull)
+    notifications Notification[]
+
+    @@index([eventType])
+    @@index([audienceType])
+    @@index([actorMemberId])
+    @@index([createdAt])
+  }
+
+  // ============================================
+  // NOTIFICATIONS - Per-member delivery and read state
+  // ============================================
+  model Notification {
+    id         Int       @id @default(autoincrement())
+    memberId   Int
+    eventId    Int?
+    eventType  String
+    title      String
+    body       String
+    metadata   Json?
+    isRead     Boolean   @default(false)
+    readAt     DateTime?
+    createdAt  DateTime  @default(now())
+
+    member     Member             @relation(fields: [memberId], references: [id], onDelete: Cascade)
+    event      NotificationEvent? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+    @@unique([memberId, eventId])
+    @@index([memberId])
+    @@index([eventId])
+    @@index([eventType])
+    @@index([memberId, isRead, createdAt])
+    @@index([memberId, createdAt])
+  }
 
 // ============================================
 // PROJECTS - Main project entity

@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import express, { NextFunction, Request, Response } from "express";
 import routes from "./routes";
 import { prisma } from "./db";
+import { attachNotificationsWebSocketServer } from "./services/notificationsRealtime";
 
 console.log("DATABASE_URL:", process.env.DATABASE_URL ? "loaded" : "NOT LOADED");
 console.log("JWT_SECRET:", process.env.JWT_SECRET ? "loaded" : "NOT LOADED");
@@ -100,14 +101,17 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     res.status(500).json({ error: message });
 });
 
-const PORT = Number(process.env.PORT ?? 3000);
+const PORT = Number(process.env.PORT ?? 8080);
 const server = app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`CORS enabled for ${frontendOrigins.join(", ")}`);
     if (isDevelopment) {
         console.log("CORS also allows private-network origins in development mode.");
     }
+    console.log(`Notifications websocket: ws://localhost:${PORT}/api/notifications/ws`);
 });
+
+attachNotificationsWebSocketServer(server);
 
 server.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EADDRINUSE") {
