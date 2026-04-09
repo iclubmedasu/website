@@ -899,7 +899,7 @@ export default function ProjectsPage() {
     const canManageProject = () => isPrivileged;
 
     // Upload follows backend visibility scope: if a project is visible to the user, upload is allowed.
-    const canUploadToProject = (_project: any) => !!user?.id;
+    const canUploadToProject = () => !!user?.id;
 
     // Filter allMembers to only those in the project's teams
     const getProjectMembers = (project: any) => {
@@ -981,7 +981,7 @@ export default function ProjectsPage() {
                                 allMembers={getProjectMembers(p)}
                                 canEdit={canEditProject(p)}
                                 canManage={canManageProject()}
-                                canUpload={canUploadToProject(p)}
+                                canUpload={canUploadToProject()}
                                 canEditStructure={isElevatedWorkItemRole && p.isActive && !p.isFinalized && p.status !== 'CANCELLED'}
                                 canEditStatus={p.isActive && !p.isFinalized && p.status !== 'CANCELLED'}
                                 onReactivate={(proj: any) => setReactivatingProject(proj)}
