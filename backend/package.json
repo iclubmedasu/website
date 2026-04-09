@@ -9,12 +9,10 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "start": "node -e \"process.env.PORT = process.env.PORT || '8080'; require('./dist/server.js');\"",
-    "start:prod": "npm run prisma:migrate:deploy && npm start",
     "test": "vitest run --config ./vitest.config.ts",
     "test:watch": "vitest --config ./vitest.config.ts",
     "prisma:generate": "npx prisma generate",
     "prisma:migrate": "npx prisma migrate dev",
-    "prisma:migrate:deploy": "npx prisma migrate deploy",
     "prisma:studio": "npx prisma studio"
   },
   "keywords": [],

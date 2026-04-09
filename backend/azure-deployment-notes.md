@@ -34,13 +34,6 @@ Scope used for discovery:
 
 ## Optional app-specific variables
 
-### AUTH_COOKIE_DOMAIN
-- Purpose: Optional cookie domain override for auth cookie scope.
-- Referenced in: `backend/routes/auth.ts`
-- Recommendation:
-  - Leave unset when backend and frontend are on different hostnames.
-  - Set only when both apps intentionally share a parent domain (example: `.example.com`).
-
 ### FRONTEND_URL
 - Purpose: Adds a single allowed frontend origin for CORS.
 - Referenced in: `backend/server.ts`
@@ -86,10 +79,26 @@ Set these values in Azure App Service under:
 
 After updating settings, restart the app service to apply changes.
 
-## Production Startup Behavior
 
-- Backend container startup runs Prisma migrations automatically before the API starts.
-- Startup flow uses:
-  - `npm run prisma:migrate:deploy`
-  - then `npm start`
-- Ensure `DATABASE_URL` is valid before deployment, otherwise startup will fail fast.
+az webapp config appsettings set \
+  --name iclubmedasu-backend \
+  --resource-group iclubmedasu-website \
+  --settings \
+    DATABASE_URL="postgresql://postgres.ojnvasgdhfgrssoouuuf:YwIyiasWpMCUmtJB@aws-0-eu-west-1.pooler.supabase.com:5432/postgres" \
+    JWT_SECRET="bcos8e7tfg97e8iosruhjcn09oehg98ojspouhj0mxnw87ceyo9ncrh0j9jpwonych0gm847w9xo8pouk2q90p" \
+    JWT_EXPIRES_IN="7d" \
+    PORT="8080" \
+    NODE_ENV="production" \
+    GITHUB_STORAGE_OWNER="iclubmedasu" \
+    GITHUB_STORAGE_REPO="file-storage" \
+    GITHUB_STORAGE_TOKEN="[TOKEN]" \
+    GITHUB_USER_DATA_OWNER="iclubmedasu" \
+    GITHUB_USER_DATA_REPO="user-data" \
+    GITHUB_USER_DATA_TOKEN="[TOKEN]" \
+    SUPABASE_PROJECT_NAME="members-portal" \
+    SUPABASE_PROJECT_ID="ojnvasgdhfgrssoouuuf" \
+    SUPABASE_PROJECT_URL="https://ojnvasgdhfgrssoouuuf.supabase.co" \
+    SUPABASE_DB_PASSWORD="YwIyiasWpMCUmtJB" \
+    SUPABASE_DB_URL="postgresql://postgres:YwIyiasWpMCUmtJB@db.ojnvasgdhfgrssoouuuf.supabase.co:5432/postgres" \
+    CORS_ORIGIN="https://happy-cliff-0ac6f2f1e.6.azurestaticapps.net" \
+    WEBSITE_NODE_DEFAULT_VERSION="~20"
