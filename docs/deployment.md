@@ -27,32 +27,16 @@ Both backend and members-portal deploy as Docker containers through GitHub Actio
 Workflow:
 - .github/workflows/deploy.yml
 
-Required GitHub secrets:
 - AZURE_CREDENTIALS
 - AZURE_CONTAINER_REGISTRY_LOGIN_SERVER
-- AZURE_CONTAINER_REGISTRY_USERNAME
-- AZURE_CONTAINER_REGISTRY_PASSWORD
-- AZURE_BACKEND_APP_NAME
-- AZURE_PORTAL_APP_NAME
-
-Required backend app settings:
 - DATABASE_URL (Supabase connection string with sslmode=require and schema=public)
 - JWT_SECRET
-- NODE_ENV=production
-- FRONTEND_ORIGINS (portal URL)
-- FRONTEND_URL (optional single-origin alias)
-
-Required members-portal app settings:
 - NEXT_PUBLIC_API_URL (example: https://your-backend-app.azurewebsites.net/api)
 
-Backend startup behavior:
 - Container startup runs prisma migrate deploy before starting the API process.
 
-Cross-domain auth note:
 - Backend production cookies are configured for cross-site portal/backend domains.
 - Keep HTTPS enabled for both apps.
- 
-## Members Portal Deployment (Next.js)
  
 1. Build command: pnpm --filter members-portal build
 2. Runtime: Node.js process (Next.js server)
@@ -100,6 +84,5 @@ The docker-compose.yml uses these values automatically.
  
 - [ ] Database migrations ran successfully
 - [ ] Environment variables set correctly
-- [ ] CORS configured for production domains
-- [ ] JWT_SECRET is a strong random string
-- [ ] HTTPS enabled on all services
+
+```bash
