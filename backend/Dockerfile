@@ -19,8 +19,8 @@ COPY backend ./backend
 COPY packages/shared ./packages/shared
 
 WORKDIR /app/backend
-RUN npx prisma generate
-RUN npx tsc -p tsconfig.json
+RUN pnpm exec prisma generate
+RUN pnpm run build
 
 FROM node:20-alpine AS runtime
 
@@ -45,7 +45,7 @@ COPY --from=build /app/backend/prisma /app/backend/prisma
 COPY --from=build /app/packages/shared /app/packages/shared
 
 WORKDIR /app/backend
-RUN npx prisma generate
+RUN pnpm exec prisma generate
 
 EXPOSE 8080
 
