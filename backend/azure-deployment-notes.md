@@ -34,6 +34,13 @@ Scope used for discovery:
 
 ## Optional app-specific variables
 
+### AUTH_COOKIE_DOMAIN
+- Purpose: Optional cookie domain override for auth cookie scope.
+- Referenced in: `backend/routes/auth.ts`
+- Recommendation:
+  - Leave unset when backend and frontend are on different hostnames.
+  - Set only when both apps intentionally share a parent domain (example: `.example.com`).
+
 ### FRONTEND_URL
 - Purpose: Adds a single allowed frontend origin for CORS.
 - Referenced in: `backend/server.ts`
@@ -78,3 +85,11 @@ Set these values in Azure App Service under:
 - App Service -> Configuration -> Application settings
 
 After updating settings, restart the app service to apply changes.
+
+## Production Startup Behavior
+
+- Backend container startup runs Prisma migrations automatically before the API starts.
+- Startup flow uses:
+  - `npm run prisma:migrate:deploy`
+  - then `npm start`
+- Ensure `DATABASE_URL` is valid before deployment, otherwise startup will fail fast.

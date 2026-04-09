@@ -42,10 +42,10 @@ function isLoopbackHost(hostname: string): boolean {
 }
 
 function resolveApiBaseUrl(): string {
-    const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL;
+    const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
 
     if (configuredApiUrl) {
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
             try {
                 const parsed = new URL(configuredApiUrl);
                 if (isLoopbackHost(parsed.hostname) && !isLoopbackHost(window.location.hostname)) {
@@ -57,10 +57,14 @@ function resolveApiBaseUrl(): string {
             }
         }
 
-        return configuredApiUrl;
+        return configuredApiUrl.replace(/\/$/, '');
     }
 
     if (typeof window !== 'undefined') {
+        if (process.env.NODE_ENV === 'production' && !isLoopbackHost(window.location.hostname)) {
+            throw new Error('NEXT_PUBLIC_API_URL is required in production for members-portal deployment.');
+        }
+
         return `${window.location.protocol}//${window.location.hostname}:3000/api`;
     }
 

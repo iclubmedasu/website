@@ -5,6 +5,8 @@ declare namespace NodeJS {
         DEVELOPER_EMAIL?: string;
         DEVELOPER_PASSWORD?: string;
         AUTH_COOKIE_NAME?: string;
+        AUTH_COOKIE_DOMAIN?: string;
+        FRONTEND_URL?: string;
         FRONTEND_ORIGINS?: string;
         GITHUB_USER_DATA_TOKEN?: string;
         GITHUB_USER_DATA_OWNER?: string;

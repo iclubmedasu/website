@@ -36,21 +36,28 @@ const officialEmail = (studentId) => `${studentId}${OFFICIAL_EMAIL_DOMAIN}`;
 
 const AUTH_COOKIE_NAME = 'token';
 const AUTH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const AUTH_COOKIE_DOMAIN = process.env.AUTH_COOKIE_DOMAIN;
+
+function getAuthCookieOptions() {
+    return {
+        httpOnly: true,
+        secure: IS_PRODUCTION,
+        sameSite: IS_PRODUCTION ? 'none' : 'strict',
+        ...(AUTH_COOKIE_DOMAIN ? { domain: AUTH_COOKIE_DOMAIN } : {})
+    } as const;
+}
 
 function setAuthCookie(res, token) {
     res.cookie(AUTH_COOKIE_NAME, token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        ...getAuthCookieOptions(),
         maxAge: AUTH_COOKIE_MAX_AGE_MS
     });
 }
 
 function clearAuthCookie(res) {
     res.clearCookie(AUTH_COOKIE_NAME, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
+        ...getAuthCookieOptions()
     });
 }
 
