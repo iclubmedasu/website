@@ -78,7 +78,9 @@ jobs:
           api = HfApi(token=os.environ["HF_TOKEN"])
           repo_id = os.environ["HF_SPACE"]
 
-          # Ensure the Space exists (no-op if it already does)
+          # Ensure the Space exists (no-op if it already does).
+          # Must be done before upload_large_folder to avoid the internal
+          # create_repo call that omits space_sdk and crashes.
           api.create_repo(
               repo_id=repo_id,
               repo_type="space",
@@ -90,6 +92,9 @@ jobs:
               folder_path=".",
               repo_id=repo_id,
               repo_type="space",
+              # Pass space_sdk so the internal create_repo call inside
+              # upload_large_folder_internal does not crash on older library versions.
+              space_sdk="docker",
               ignore_patterns=[
                   # Version control
                   ".git",
