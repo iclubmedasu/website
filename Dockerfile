@@ -1,17 +1,25 @@
+# Root-level Dockerfile used by Hugging Face Spaces.
+# This is the same logic as backend/Dockerfile but:
+#   1. Listens on port 7860 (required by HF Spaces)
+#   2. Lives at the monorepo root so HF can find it
+
 FROM node:20-alpine AS build
 
 RUN npm install -g pnpm
 
 WORKDIR /app
 
+# Copy workspace manifests first for better layer caching
 COPY pnpm-workspace.yaml ./
 COPY package.json ./
 COPY pnpm-lock.yaml ./
 COPY backend/package.json ./backend/package.json
 COPY packages/shared/package.json ./packages/shared/package.json
 
+# Install only backend and its workspace deps
 RUN pnpm install --frozen-lockfile --filter backend...
 
+# Copy all source files
 COPY backend ./backend
 COPY packages/shared ./packages/shared
 
@@ -19,6 +27,7 @@ WORKDIR /app/backend
 RUN pnpm exec prisma generate
 RUN pnpm run build
 
+# ── Runtime stage ───────────────────────────────
 FROM node:20-alpine AS runtime
 
 RUN npm install -g pnpm

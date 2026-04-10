@@ -1,4 +1,4 @@
-name: Deploy to Back4App
+name: Deploy — Supabase + Hugging Face + Netlify
 
 on:
   push:
@@ -6,22 +6,124 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-backend-image:
-    name: Build Backend Docker Image
+  # ─────────────────────────────────────────────────────────────
+  # JOB 1 — Run Prisma migrations against Supabase
+  # Runs first. If migrations fail, nothing else deploys.
+  # ─────────────────────────────────────────────────────────────
+  migrate:
+    name: Run Database Migrations
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10
 
-      - name: Build Docker image (backend)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install backend dependencies
+        run: pnpm install --frozen-lockfile --filter backend...
+
+      - name: Generate Prisma client
+        run: pnpm --filter backend exec prisma generate
+
+      - name: Run Prisma migrations (production-safe deploy mode)
+        working-directory: backend
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2 — Push code to Hugging Face Space
+  #
+  # How it works:
+  #   - We push the full monorepo to the HF Space git repo.
+  #   - HF detects the Dockerfile at the repo root and builds it.
+  #   - The Dockerfile (backend/Dockerfile) already builds the app.
+  #   - Environment variables (secrets) are set in HF Space settings.
+  #
+  # Required GitHub secrets:
+  #   HF_TOKEN  — Hugging Face User Access Token (write access)
+  #   HF_SPACE  — Space path e.g. "your-username/iclub-backend"
+  # ─────────────────────────────────────────────────────────────
+  deploy-backend:
+    name: Deploy Backend to Hugging Face
+    runs-on: ubuntu-latest
+    needs: migrate
+
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ secrets.HF_SPACE }}
         run: |
-          docker build -t backend-test -f backend/Dockerfile .
+          git config --global user.email "deploy-bot@iclub.local"
+          git config --global user.name "iClub Deploy Bot"
 
-      # If Back4App requires pushing to a registry, add steps here.
-      # Otherwise, Back4App will build from the repo or Dockerfile directly.
+          # Add HF remote using token authentication
+          git remote add hf https://iclub-bot:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}
 
-      - name: Show Docker images
-        run: docker images
+          # Push main branch to HF Space — HF rebuilds the Docker container on every push
+          git push hf HEAD:main --force
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 3 — Deploy frontend to Netlify
+  # CURRENTLY DISABLED — uncomment when frontend is ready.
+  #
+  # Required GitHub secrets (when enabled):
+  #   NETLIFY_AUTH_TOKEN — Netlify personal access token
+  #   NETLIFY_SITE_ID    — found in Netlify site settings
+  #   HF_SPACE_URL       — your HF space URL without https://
+  #                        e.g. "your-username-iclub-backend.hf.space"
+  # ─────────────────────────────────────────────────────────────
+  # deploy-frontend:
+  #   name: Deploy Frontend to Netlify
+  #   runs-on: ubuntu-latest
+  #   needs: migrate
+  #
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Setup pnpm
+  #       uses: pnpm/action-setup@v3
+  #       with:
+  #         version: 10
+  #
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "20"
+  #         cache: "pnpm"
+  #
+  #     - name: Install all dependencies
+  #       run: pnpm install --frozen-lockfile
+  #
+  #     - name: Build members portal
+  #       run: pnpm --filter members-portal build
+  #       env:
+  #         VITE_API_URL: https://${{ secrets.HF_SPACE_URL }}/api
+  #
+  #     - name: Deploy to Netlify
+  #       uses: nwtgck/actions-netlify@v3
+  #       with:
+  #         publish-dir: members-portal/dist
+  #         production-deploy: true
+  #         github-token: ${{ secrets.GITHUB_TOKEN }}
+  #         deploy-message: "Deploy from GitHub Actions — ${{ github.sha }}"
+  #       env:
+  #         NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+  #         NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
