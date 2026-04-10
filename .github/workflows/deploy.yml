@@ -61,9 +61,10 @@ jobs:
       - name: Clean workspace before upload
         run: |
           # Remove frontend packages — not needed by HF
-          rm -rf members-portal public-website packages
+          # NOTE: packages/shared is kept — Dockerfile depends on it
+          rm -rf members-portal public-website
 
-          # Remove all node_modules and cache folders (the .cache crash culprit)
+          # Remove all node_modules and cache folders
           find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name ".cache" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
