@@ -8,7 +8,6 @@ on:
 jobs:
   # ─────────────────────────────────────────────────────────────
   # JOB 1 — Run Prisma migrations against Supabase
-  # Runs first. If migrations fail, nothing else deploys.
   # ─────────────────────────────────────────────────────────────
   migrate:
     name: Run Database Migrations
@@ -35,20 +34,16 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter backend exec prisma generate
 
-      - name: Run Prisma migrations (production-safe deploy mode)
+      - name: Run Prisma migrations
         working-directory: backend
         run: npx prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   # ─────────────────────────────────────────────────────────────
-  # JOB 2 — Push code to Hugging Face Space
-  #
-  # How it works:
-  #   - We push the full monorepo to the HF Space git repo.
-  #   - HF detects the Dockerfile at the repo root and builds it.
-  #   - The Dockerfile (backend/Dockerfile) already builds the app.
-  #   - Environment variables (secrets) are set in HF Space settings.
+  # JOB 2 — Build backend and upload to Hugging Face Space
+  # Uses huggingface_hub with Xet support to handle binary files
+  # correctly. Only backend-relevant files are uploaded.
   #
   # Required GitHub secrets:
   #   HF_TOKEN  — Hugging Face User Access Token (write access)
@@ -60,35 +55,91 @@ jobs:
     needs: migrate
 
     steps:
-      - name: Checkout full history
+      - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
         with:
-          fetch-depth: 0
+          version: 10
 
-      - name: Install Git LFS
-        run: |
-          sudo apt-get update
-          sudo apt-get install git-lfs
-          git lfs install
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
 
-      - name: Track binary files with Git LFS
-        run: |
-          git lfs track "*.pdf" "*.png" "*.jpg" "*.jpeg" "*.gif" "*.ico" "*.webp"
-          git add .gitattributes
-          # Only needed if you want to migrate existing files
-          # git lfs migrate import --include="*.pdf,*.png,*.jpg,*.jpeg,*.gif,*.ico,*.webp"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter backend...
 
-      - name: Push to Hugging Face Space
+      - name: Generate Prisma client
+        run: pnpm --filter backend exec prisma generate
+
+      - name: Build backend
+        run: pnpm --filter backend build
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install huggingface_hub with Xet support
+        run: pip install "huggingface_hub[hf_xet]"
+
+      - name: Upload to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE: ${{ secrets.HF_SPACE }}
         run: |
-          git config --global user.email "deploy-bot@iclub.local"
-          git config --global user.name "iClub Deploy Bot"
-          # Add HF remote using token authentication
-          git remote add hf https://iclub-bot:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}
-          # Push main branch to HF Space — HF rebuilds the Docker container on every push
-          git push hf HEAD:main --force
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo_id = os.environ["HF_SPACE"]
+
+          api.upload_folder(
+              folder_path=".",
+              repo_id=repo_id,
+              repo_type="space",
+              ignore_patterns=[
+                  # Version control
+                  ".git",
+                  ".github",
+                  # Frontend packages (have their own deploy job)
+                  "members-portal",
+                  "public-website",
+                  # Shared packages source (backend bundles what it needs)
+                  "packages",
+                  # Dependencies (HF rebuilds from package.json via Dockerfile)
+                  "node_modules",
+                  "*/node_modules",
+                  # Binary assets (not needed by backend)
+                  "*.pdf",
+                  "*.png",
+                  "*.jpg",
+                  "*.jpeg",
+                  "*.gif",
+                  "*.ico",
+                  "*.webp",
+                  # Build artifacts from other packages
+                  "members-portal/dist",
+                  "public-website/dist",
+                  # Test and coverage output
+                  "coverage",
+                  "playwright-report",
+                  "test-results",
+                  # Environment files
+                  ".env",
+                  ".env.*",
+                  # Misc
+                  "__pycache__",
+                  "*.log",
+              ],
+              commit_message="Deploy from GitHub Actions",
+          )
+          print("Upload complete")
+          EOF
 
   # ─────────────────────────────────────────────────────────────
   # JOB 3 — Deploy frontend to Netlify
@@ -98,7 +149,6 @@ jobs:
   #   NETLIFY_AUTH_TOKEN — Netlify personal access token
   #   NETLIFY_SITE_ID    — found in Netlify site settings
   #   HF_SPACE_URL       — your HF space URL without https://
-  #                        e.g. "your-username-iclub-backend.hf.space"
   # ─────────────────────────────────────────────────────────────
   # deploy-frontend:
   #   name: Deploy Frontend to Netlify
