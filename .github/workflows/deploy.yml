@@ -65,6 +65,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup HF Xet
+        run: |
+          curl -fsSL https://huggingface.co/hf-xet/download/latest/xet-linux-x64_64-unknown-linux-gnu.tar.gz | tar xz
+          sudo mv xet /usr/local/bin/
+
       - name: Push to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -72,11 +77,11 @@ jobs:
         run: |
           git config --global user.email "deploy-bot@iclub.local"
           git config --global user.name "iClub Deploy Bot"
-
-          # Add HF remote using token authentication
+          # Initialize Xet
+          xet login --token ${HF_TOKEN}
+          # Add HF remote
           git remote add hf https://iclub-bot:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}
-
-          # Push main branch to HF Space — HF rebuilds the Docker container on every push
+          # Push with Xet enabled
           git push hf HEAD:main --force
 
   # ─────────────────────────────────────────────────────────────

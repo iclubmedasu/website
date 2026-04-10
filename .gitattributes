@@ -1,0 +1,12 @@
+# Use Xet storage for binary files
+*.pdf filter=xet -text
+*.png filter=xet -text
+*.jpg filter=xet -text
+*.jpeg filter=xet -text
+*.gif filter=xet -text
+*.ico filter=xet -text
+*.webp filter=xet -text
+*.zip filter=xet -text
+*.tar.gz filter=xet -text
+*.mp4 filter=xet -text
+*.mp3 filter=xet -text
