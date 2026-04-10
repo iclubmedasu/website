@@ -41,9 +41,9 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   # ─────────────────────────────────────────────────────────────
-  # JOB 2 — Build backend and upload to Hugging Face Space
-  # Uses huggingface_hub with Xet support to handle binary files
-  # correctly. Only backend-relevant files are uploaded.
+  # JOB 2 — Upload to Hugging Face Space
+  # Uses huggingface_hub with Xet support — handles binary files
+  # correctly and skips all frontend/asset files automatically.
   #
   # Required GitHub secrets:
   #   HF_TOKEN  — Hugging Face User Access Token (write access)
@@ -58,84 +58,74 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          version: 10
+          python-version: "3.11"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "pnpm"
+      - name: Install huggingface_hub with Xet support
+        run: pip install "huggingface_hub[hf_xet]"
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter backend...
-
-      - name: Generate Prisma client
-        run: pnpm --filter backend exec prisma generate
-
-      - name: Build backend
-        run: pnpm --filter backend build
-
-      - name: Create clean HF deployment
-        run: |
-          # Create a temporary directory for clean deployment
-          mkdir hf-deploy
-
-          # Copy backend and necessary files
-          cp -r backend hf-deploy/
-          cp package.json pnpm-lock.yaml pnpm-workspace.yaml hf-deploy/ 2>/dev/null || true
-
-          # If you have a Dockerfile at root, copy it
-          cp Dockerfile hf-deploy/ 2>/dev/null || true
-
-          # If your Dockerfile expects backend to be at root, move files
-          cd hf-deploy
-          if [ -d "backend" ] && [ -f "backend/Dockerfile" ]; then
-            # Move backend contents to root if needed
-            cp -r backend/* .
-            cp backend/.* . 2>/dev/null || true
-          fi
-
-          # Remove any binary files and frontend code
-          find . -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" -o -name "*.pdf" -o -name "*.ico" -o -name "*.webp" \) -delete
-          rm -rf members-portal public-website packages 2>/dev/null || true
-
-          # Create .gitignore
-          cat > .gitignore << 'EOL'
-          node_modules/
-          .env
-          .env.*
-          *.log
-          dist/
-          EOL
-
-          # Initialize git repository
-          git init
-          git config --local user.email "deploy-bot@iclub.local"
-          git config --local user.name "iClub Deploy Bot"
-
-          # Add all files and commit
-          git add .
-          git commit -m "Deploy backend to HF Space - ${{ github.sha }}"
-
-          # Verify no binary files are present
-          if git ls-files | grep -E '\.(png|jpg|jpeg|gif|pdf|ico|webp)$' | grep -q .; then
-            echo "ERROR: Binary files still present in deployment!"
-            git ls-files | grep -E '\.(png|jpg|jpeg|gif|pdf|ico|webp)$'
-            exit 1
-          fi
-          echo "✓ No binary files found - ready for HF deployment"
-
-      - name: Push to Hugging Face Space
+      - name: Upload to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE: ${{ secrets.HF_SPACE }}
         run: |
-          cd hf-deploy
-          git remote add hf https://iclub-bot:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}
-          git push hf main --force
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo_id = os.environ["HF_SPACE"]
+
+          api.upload_large_folder(
+              folder_path=".",
+              repo_id=repo_id,
+              repo_type="space",
+              space_sdk="docker",
+              ignore_patterns=[
+                  # Version control
+                  ".git",
+                  ".github",
+                  # Frontend packages
+                  "members-portal",
+                  "public-website",
+                  # Shared packages source
+                  "packages",
+                  # Dependencies and caches
+                  "node_modules",
+                  "*/node_modules",
+                  "**/node_modules",
+                  ".cache",
+                  "*/.cache",
+                  "**/.cache",
+                  # Binary assets
+                  "*.pdf",
+                  "*.png",
+                  "*.jpg",
+                  "*.jpeg",
+                  "*.gif",
+                  "*.ico",
+                  "*.webp",
+                  # Build artifacts
+                  "*/dist",
+                  "**/dist",
+                  # Test output
+                  "coverage",
+                  "playwright-report",
+                  "test-results",
+                  # Environment files
+                  ".env",
+                  ".env.*",
+                  # Misc
+                  "__pycache__",
+                  "**/__pycache__",
+                  "*.log",
+                  "*.tsbuildinfo",
+              ],
+          )
+          print("Upload complete")
+          EOF
 
   # ─────────────────────────────────────────────────────────────
   # JOB 3 — Deploy frontend to Netlify
