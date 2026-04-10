@@ -42,6 +42,12 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────
   # JOB 2 — Upload to Hugging Face Space
+  # Uses huggingface_hub with Xet support — handles binary files
+  # correctly and skips all frontend/asset files automatically.
+  #
+  # Required GitHub secrets:
+  #   HF_TOKEN  — Hugging Face User Access Token (write access)
+  #   HF_SPACE  — Space path e.g. "your-username/iclub-backend"
   # ─────────────────────────────────────────────────────────────
   deploy-backend:
     name: Deploy Backend to Hugging Face
@@ -52,16 +58,39 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Clean workspace before upload
+        run: |
+          # Remove frontend packages — not needed by HF
+          rm -rf members-portal public-website packages
+
+          # Remove all node_modules and cache folders (the .cache crash culprit)
+          find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name ".cache" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+
+          # Remove binary assets — backend doesn't need them
+          find . -type f \( \
+            -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \
+            -o -name "*.gif" -o -name "*.ico" -o -name "*.webp" \
+            -o -name "*.pdf" \
+          \) -delete
+
+          # Remove test and build output
+          find . -type d -name "dist" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "coverage" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "playwright-report" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "test-results" -exec rm -rf {} + 2>/dev/null || true
+
+          echo "Workspace cleaned. Remaining files:"
+          find . -not -path "./.git/*" -type f | head -50
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install huggingface_hub
-        # Older versions always call create_repo internally in upload_large_folder
-        # without passing space_sdk, which crashes even if the Space already exists.
-        # v0.26.0 fixed this. Pin to that version or newer.
-        run: pip install "huggingface_hub[hf_xet]>=0.26.0"
+      - name: Install huggingface_hub with Xet support
+        run: pip install "huggingface_hub[hf_xet]"
 
       - name: Upload to Hugging Face Space
         env:
@@ -75,50 +104,27 @@ jobs:
           api = HfApi(token=os.environ["HF_TOKEN"])
           repo_id = os.environ["HF_SPACE"]
 
-          api.upload_large_folder(
+          # Ensure the Space exists (no-op if it already does)
+          api.create_repo(
+              repo_id=repo_id,
+              repo_type="space",
+              space_sdk="docker",
+              exist_ok=True,
+          )
+
+          api.upload_folder(
               folder_path=".",
               repo_id=repo_id,
               repo_type="space",
               ignore_patterns=[
-                  # Version control
                   ".git",
                   ".github",
-                  # Frontend packages
-                  "members-portal",
-                  "public-website",
-                  # Shared packages source
-                  "packages",
-                  # Dependencies and caches
-                  "node_modules",
-                  "*/node_modules",
-                  "**/node_modules",
-                  ".cache",
-                  "*/.cache",
-                  "**/.cache",
-                  # Binary assets
-                  "*.pdf",
-                  "*.png",
-                  "*.jpg",
-                  "*.jpeg",
-                  "*.gif",
-                  "*.ico",
-                  "*.webp",
-                  # Build artifacts
-                  "*/dist",
-                  "**/dist",
-                  # Test output
-                  "coverage",
-                  "playwright-report",
-                  "test-results",
-                  # Environment files
                   ".env",
                   ".env.*",
-                  # Misc
-                  "__pycache__",
-                  "**/__pycache__",
                   "*.log",
                   "*.tsbuildinfo",
               ],
+              commit_message="Deploy from GitHub Actions",
           )
           print("Upload complete")
           EOF
@@ -126,6 +132,11 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   # JOB 3 — Deploy frontend to Netlify
   # CURRENTLY DISABLED — uncomment when frontend is ready.
+  #
+  # Required GitHub secrets (when enabled):
+  #   NETLIFY_AUTH_TOKEN — Netlify personal access token
+  #   NETLIFY_SITE_ID    — found in Netlify site settings
+  #   HF_SPACE_URL       — your HF space URL without https://
   # ─────────────────────────────────────────────────────────────
   # deploy-frontend:
   #   name: Deploy Frontend to Netlify
