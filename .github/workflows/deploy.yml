@@ -98,51 +98,52 @@ jobs:
           api = HfApi(token=os.environ["HF_TOKEN"])
           repo_id = os.environ["HF_SPACE"]
 
-          api.upload_large_folder(
+            api.upload_large_folder(
               folder_path=".",
               repo_id=repo_id,
               repo_type="space",
+              space_sdk="docker",
               ignore_patterns=[
-                  # Version control
-                  ".git",
-                  ".github",
-                  # Frontend packages
-                  "members-portal",
-                  "public-website",
-                  # Shared packages source
-                  "packages",
-                  # Dependencies and caches
-                  "node_modules",
-                  "*/node_modules",
-                  "**/node_modules",
-                  ".cache",
-                  "*/.cache",
-                  "**/.cache",
-                  # Binary assets
-                  "*.pdf",
-                  "*.png",
-                  "*.jpg",
-                  "*.jpeg",
-                  "*.gif",
-                  "*.ico",
-                  "*.webp",
-                  # Build artifacts
-                  "*/dist",
-                  "**/dist",
-                  # Test output
-                  "coverage",
-                  "playwright-report",
-                  "test-results",
-                  # Environment files
-                  ".env",
-                  ".env.*",
-                  # Misc
-                  "__pycache__",
-                  "**/__pycache__",
-                  "*.log",
-                  "*.tsbuildinfo",
+                # Version control
+                ".git",
+                ".github",
+                # Frontend packages
+                "members-portal",
+                "public-website",
+                # Shared packages source
+                "packages",
+                # Dependencies and caches
+                "node_modules",
+                "*/node_modules",
+                "**/node_modules",
+                ".cache",
+                "*/.cache",
+                "**/.cache",
+                # Binary assets
+                "*.pdf",
+                "*.png",
+                "*.jpg",
+                "*.jpeg",
+                "*.gif",
+                "*.ico",
+                "*.webp",
+                # Build artifacts
+                "*/dist",
+                "**/dist",
+                # Test output
+                "coverage",
+                "playwright-report",
+                "test-results",
+                # Environment files
+                ".env",
+                ".env.*",
+                # Misc
+                "__pycache__",
+                "**/__pycache__",
+                "*.log",
+                "*.tsbuildinfo",
               ],
-          )
+            )
           print("Upload complete")
           EOF
 
