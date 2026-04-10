@@ -1,64 +1,61 @@
 # Deployment Guide
- 
-## Services Required
- 
-| Service | Purpose | Provider |
-|---------|---------|---------|
-| Backend + Database | API and PostgreSQL | Azure App Service + Supabase |
-| Members Portal | Next.js Node.js app | Azure App Service (container) |
-| Public Website | Public Next.js site | Netlify or Railway |
- 
+
+## Overview
+
+This project is deployed using GitHub Actions, with the following services:
+
+| Service           | Purpose                | Provider/URL |
+|-------------------|------------------------|--------------|
+| Backend API       | Node.js API            | [Hugging Face Spaces](https://huggingface.co/spaces/iclubmedasu/backend) ([API test](https://iclubmedasu-backend.hf.space/api), [Health check](https://iclubmedasu-backend.hf.space/health)) |
+| Database          | PostgreSQL             | [Supabase](https://supabase.com/) |
+| Members Portal    | Next.js Node.js app    | [Netlify](https://69d96de0a0d4b29ccf1ca911--luxury-jelly-b24265.netlify.app) |
+
+## Deployment Flow
+
+1. **GitHub Actions**: CI/CD pipeline builds and deploys both backend and frontend on push to main.
+2. **Backend**: Deployed as a Hugging Face Space (Docker container). API and health endpoints:
+	- [API test](https://iclubmedasu-backend.hf.space/api)
+	- [Health check](https://iclubmedasu-backend.hf.space/health)
+3. **Database**: Managed by Supabase. Connection string is set via environment variables.
+4. **Frontend (Members Portal)**: Deployed to Netlify as a Next.js app:
+	- [Live site](https://69d96de0a0d4b29ccf1ca911--luxury-jelly-b24265.netlify.app)
+
 ## Environment Variables
- 
-See .env.example for all required variables with descriptions.
- 
-## Railway Deployment (Backend)
- 
-1. Create a new Railway project
-2. Add a PostgreSQL database service
-3. Deploy the backend service from the /backend folder
-4. Set all environment variables from .env.example
-5. Run database migrations: prisma migrate deploy
 
-## Azure App Service Deployment (Backend + Members Portal)
+See `.env.example` for all required variables and descriptions. Set these in GitHub repository secrets and in Hugging Face/Supabase/Netlify dashboards as needed.
 
-Both backend and members-portal deploy as Docker containers through GitHub Actions.
+Key variables:
+- `DATABASE_URL` (Supabase connection string, use `sslmode=require` and `schema=public`)
+- `JWT_SECRET`
+- `NEXT_PUBLIC_API_URL` (e.g., https://iclubmedasu-backend.hf.space/api)
 
-Workflow:
-- .github/workflows/deploy.yml
+## Backend Deployment (Hugging Face Spaces)
 
-- AZURE_CREDENTIALS
-- AZURE_CONTAINER_REGISTRY_LOGIN_SERVER
-- DATABASE_URL (Supabase connection string with sslmode=require and schema=public)
-- JWT_SECRET
-- NEXT_PUBLIC_API_URL (example: https://your-backend-app.azurewebsites.net/api)
+1. The backend is deployed as a Docker container to Hugging Face Spaces: [Space link](https://huggingface.co/spaces/iclubmedasu/backend)
+2. Environment variables are set in the Hugging Face Space settings.
+3. On startup, the container runs `prisma migrate deploy` before starting the API process.
+4. API endpoints:
+	- [API test](https://iclubmedasu-backend.hf.space/api)
+	- [Health check](https://iclubmedasu-backend.hf.space/health)
 
-- Container startup runs prisma migrate deploy before starting the API process.
+## Database (Supabase)
 
-- Backend production cookies are configured for cross-site portal/backend domains.
-- Keep HTTPS enabled for both apps.
- 
-1. Build command: pnpm --filter members-portal build
-2. Runtime: Node.js process (Next.js server)
-3. App port: 3001
-4. This app is not static files; it must run as a server process
+1. Create a new Supabase project and PostgreSQL database.
+2. Set the `DATABASE_URL` in Hugging Face and local `.env` files.
+3. Run migrations using `prisma migrate deploy`.
 
-## Members Portal Deployment Note
+## Frontend Deployment (Netlify)
 
-The members portal is now a Next.js app (not static files).
-This means it requires a Node.js server to run.
+1. The members portal (Next.js app) is deployed to Netlify: [Live site](https://69d96de0a0d4b29ccf1ca911--luxury-jelly-b24265.netlify.app)
+2. Environment variables are set in the Netlify dashboard.
+3. Build command: `pnpm --filter members-portal build`
+4. Publish directory: `members-portal/.next`
+5. Runtime: Node.js (Next.js server, not static export)
 
-Recommended deployment options:
-1. Railway - supports Node.js apps natively (recommended)
-2. Vercel - made by the Next.js team, zero config
-3. Docker - use the provided Dockerfile
+## Local Docker Testing
 
-Note: Netlify can host Next.js apps but requires their
-Next.js adapter. Railway or Vercel are simpler.
+You can still use Docker Compose for local development:
 
-## Docker Deployment
-
-### Local Docker Testing
 ```bash
 # Start database and API
 docker-compose up db api
@@ -67,7 +64,8 @@ docker-compose up db api
 docker-compose up portal
 ```
 
-### Production Docker Build
+## Production Docker Build (optional)
+
 ```bash
 # Build backend image
 docker build -f backend/Dockerfile -t iclub-api .
@@ -76,13 +74,9 @@ docker build -f backend/Dockerfile -t iclub-api .
 docker build -f members-portal/Dockerfile -t iclub-portal .
 ```
 
-### Environment Variables for Docker
-Copy .env.example to .env and fill in values before running.
-The docker-compose.yml uses these values automatically.
- 
 ## Post-Deployment Checklist
- 
+
 - [ ] Database migrations ran successfully
 - [ ] Environment variables set correctly
-
-```bash
+- [ ] API health endpoint returns 200 ([check here](https://iclubmedasu-backend.hf.space/health))
+- [ ] Frontend loads ([check here](https://69d96de0a0d4b29ccf1ca911--luxury-jelly-b24265.netlify.app))
