@@ -98,7 +98,7 @@ jobs:
           api = HfApi(token=os.environ["HF_TOKEN"])
           repo_id = os.environ["HF_SPACE"]
 
-          api.upload_folder(
+          api.upload_large_folder(
               folder_path=".",
               repo_id=repo_id,
               repo_type="space",
@@ -106,15 +106,19 @@ jobs:
                   # Version control
                   ".git",
                   ".github",
-                  # Frontend packages (have their own deploy job)
+                  # Frontend packages
                   "members-portal",
                   "public-website",
-                  # Shared packages source (backend bundles what it needs)
+                  # Shared packages source
                   "packages",
-                  # Dependencies (HF rebuilds from package.json via Dockerfile)
+                  # Dependencies and caches
                   "node_modules",
                   "*/node_modules",
-                  # Binary assets (not needed by backend)
+                  "**/node_modules",
+                  ".cache",
+                  "*/.cache",
+                  "**/.cache",
+                  # Binary assets
                   "*.pdf",
                   "*.png",
                   "*.jpg",
@@ -122,10 +126,10 @@ jobs:
                   "*.gif",
                   "*.ico",
                   "*.webp",
-                  # Build artifacts from other packages
-                  "members-portal/dist",
-                  "public-website/dist",
-                  # Test and coverage output
+                  # Build artifacts
+                  "*/dist",
+                  "**/dist",
+                  # Test output
                   "coverage",
                   "playwright-report",
                   "test-results",
@@ -134,9 +138,10 @@ jobs:
                   ".env.*",
                   # Misc
                   "__pycache__",
+                  "**/__pycache__",
                   "*.log",
+                  "*.tsbuildinfo",
               ],
-              commit_message="Deploy from GitHub Actions",
           )
           print("Upload complete")
           EOF
