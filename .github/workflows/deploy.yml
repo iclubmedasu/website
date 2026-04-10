@@ -78,11 +78,18 @@ jobs:
           api = HfApi(token=os.environ["HF_TOKEN"])
           repo_id = os.environ["HF_SPACE"]
 
+          # Ensure the Space exists (no-op if it already does)
+          api.create_repo(
+              repo_id=repo_id,
+              repo_type="space",
+              space_sdk="docker",
+              exist_ok=True,
+          )
+
           api.upload_large_folder(
               folder_path=".",
               repo_id=repo_id,
               repo_type="space",
-              space_sdk="docker",
               ignore_patterns=[
                   # Version control
                   ".git",
