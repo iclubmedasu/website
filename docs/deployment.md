@@ -6,7 +6,7 @@ This project is deployed using GitHub Actions, with the following services:
 
 | Service           | Purpose                | Provider/URL |
 |-------------------|------------------------|--------------|
-| Backend API       | Node.js API            | [Hugging Face Spaces](https://huggingface.co/spaces/iclubmedasu/backend) ([API test](https://iclubmedasu-backend.hf.space/api), [Health check](https://iclubmedasu-backend.hf.space/health)) |
+| Backend API       | Node.js API            | [Hugging Face Spaces](https://huggingface.co/spaces/iclubmedasu/backend) ([API test](https://your-hf-space-url.hf.space/api), [Health check](https://iclubmedasu-backend.hf.space/health)) |
 | Database          | PostgreSQL             | [Supabase](https://supabase.com/) |
 | Members Portal    | Next.js Node.js app    | [Netlify](https://69d96de0a0d4b29ccf1ca911--luxury-jelly-b24265.netlify.app) |
 
@@ -14,7 +14,7 @@ This project is deployed using GitHub Actions, with the following services:
 
 1. **GitHub Actions**: CI/CD pipeline builds and deploys both backend and frontend on push to main.
 2. **Backend**: Deployed as a Hugging Face Space (Docker container). API and health endpoints:
-	- [API test](https://iclubmedasu-backend.hf.space/api)
+	- [API test](https://your-hf-space-url.hf.space/api)
 	- [Health check](https://iclubmedasu-backend.hf.space/health)
 3. **Database**: Managed by Supabase. Connection string is set via environment variables.
 4. **Frontend (Members Portal)**: Deployed to Netlify as a Next.js app:
@@ -27,7 +27,7 @@ See `.env.example` for all required variables and descriptions. Set these in Git
 Key variables:
 - `DATABASE_URL` (Supabase connection string, use `sslmode=require` and `schema=public`)
 - `JWT_SECRET`
-- `NEXT_PUBLIC_API_URL`
+- `NEXT_PUBLIC_API_URL` (e.g., https://your-hf-space-url.hf.space/api)
 
 ## Backend Deployment (Hugging Face Spaces)
 
@@ -35,7 +35,7 @@ Key variables:
 2. Environment variables are set in the Hugging Face Space settings.
 3. On startup, the container runs `prisma migrate deploy` before starting the API process.
 4. API endpoints:
-	- [API test](https://iclubmedasu-backend.hf.space/api)
+	- [API test](https://your-hf-space-url.hf.space/api)
 	- [Health check](https://iclubmedasu-backend.hf.space/health)
 5. **Keep-alive Monitoring:**
 	- The Hugging Face Space is kept alive using [UptimeRobot](https://dashboard.uptimerobot.com/monitors/802817894), which regularly pings the health endpoint to prevent the space from sleeping.
@@ -48,8 +48,8 @@ Key variables:
 
 ## Frontend Deployment (Netlify)
 
-1. The members portal (Next.js app) is deployed to Netlify: [Live site](https://69d96de0a0d4b29ccf1ca911--luxury-jelly-b24265.netlify.app)
-2. Environment variables are set in the Netlify dashboard. Set NEXT_PUBLIC_API_URL
+1. The members portal (Next.js app) is deployed to Netlify: [Live site](https://iclubmedasu-members-portal.netlify.app/)
+2. Environment variables are set in the Netlify dashboard. Set NEXT_PUBLIC_API_URL = https://your-hf-space-url.hf.space/api
 3. Build command: `pnpm --filter members-portal build`
 4. Publish directory: `members-portal/.next`
 5. Runtime: Node.js (Next.js server, not static export)
