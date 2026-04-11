@@ -51,7 +51,7 @@ Set these in Netlify → Site configuration → Environment variables. These are
 
 | Variable             | Value                                      |
 |----------------------|---------------------------------------------|
-| NEXT_PUBLIC_API_URL  | https://iclubmedasu-backend.hf.space/api    |
+| NEXT_PUBLIC_API_URL  | https://your-hf-space-url.hf.space/api    |
 
 That's genuinely the only one the frontend needs.
 
