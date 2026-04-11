@@ -1,6 +1,7 @@
 'use client'
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { setToken, clearToken as clearTokenUtil, initToken } from '../services/api';
+import { apiFetch } from '../services/api';
 import type {
     ApiErrorResponse,
     AuthMeResponse,
@@ -141,9 +142,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const checkAuth = async (): Promise<void> => {
         try {
-            const response = await fetch(`${API_URL}/auth/me`, {
-                credentials: "include",
-            });
+            const response = await apiFetch(`${API_URL}/auth/me`);
 
             if (response.ok) {
                 const data = (await response.json()) as AuthMeResponse;
@@ -173,9 +172,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const refreshUser = async (): Promise<void> => {
         try {
-            const response = await fetch(`${API_URL}/auth/me`, {
-                credentials: "include",
-            });
+            const response = await apiFetch(`${API_URL}/auth/me`);
 
             if (response.ok) {
                 const data = (await response.json()) as AuthMeResponse;

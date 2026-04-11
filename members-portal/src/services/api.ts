@@ -114,7 +114,7 @@ export function initToken() {
 }
 
 // Base fetch function that always includes the token
-const apiFetch = (input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> => {
+export const apiFetch = (input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> => {
     const headers: Record<string, string> = {
         ...(init.headers as Record<string, string>),
     };
