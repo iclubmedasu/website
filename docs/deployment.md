@@ -6,7 +6,7 @@ This project is deployed using GitHub Actions, with the following services:
 
 | Service           | Purpose                | Provider/URL |
 |-------------------|------------------------|--------------|
-| Backend API       | Node.js API            | [Hugging Face Spaces](https://huggingface.co/spaces/iclubmedasu/backend) ([API test](https://your-hf-space-url.hf.space/api), [Health check](https://iclubmedasu-backend.hf.space/health)) |
+| Backend API       | Node.js API            | [Hugging Face Spaces](https://huggingface.co/spaces/iclubmedasu/backend) ([API test](https://your-hf-space-url.hf.space/api), [Health check](https://your-hf-space-url.hf.space/health)) |
 | Database          | PostgreSQL             | [Supabase](https://supabase.com/) |
 | Members Portal    | Next.js Node.js app    | [Netlify](https://69d96de0a0d4b29ccf1ca911--luxury-jelly-b24265.netlify.app) |
 
@@ -15,7 +15,7 @@ This project is deployed using GitHub Actions, with the following services:
 1. **GitHub Actions**: CI/CD pipeline builds and deploys both backend and frontend on push to main.
 2. **Backend**: Deployed as a Hugging Face Space (Docker container). API and health endpoints:
 	- [API test](https://your-hf-space-url.hf.space/api)
-	- [Health check](https://iclubmedasu-backend.hf.space/health)
+	- [Health check](https://your-hf-space-url.hf.space/health)
 3. **Database**: Managed by Supabase. Connection string is set via environment variables.
 4. **Frontend (Members Portal)**: Deployed to Netlify as a Next.js app:
 	- [Live site](https://69d96de0a0d4b29ccf1ca911--luxury-jelly-b24265.netlify.app)
@@ -89,7 +89,7 @@ Set these in GitHub → repo Settings → Secrets and variables → Actions. The
 3. On startup, the container runs `prisma migrate deploy` before starting the API process.
 4. API endpoints:
 	- [API test](https://your-hf-space-url.hf.space/api)
-	- [Health check](https://iclubmedasu-backend.hf.space/health)
+	- [Health check](https://your-hf-space-url.hf.space/health)
 5. **Keep-alive Monitoring:**
 	- The Hugging Face Space is kept alive using [UptimeRobot](https://dashboard.uptimerobot.com/monitors/802817894), which regularly pings the health endpoint to prevent the space from sleeping.
 
@@ -133,5 +133,5 @@ docker build -f members-portal/Dockerfile -t iclub-portal .
 
 - [ ] Database migrations ran successfully
 - [ ] Environment variables set correctly
-- [ ] API health endpoint returns 200 ([check here](https://iclubmedasu-backend.hf.space/health))
+- [ ] API health endpoint returns 200 ([check here](https://your-hf-space-url.hf.space/health))
 - [ ] Frontend loads ([check here](https://69d96de0a0d4b29ccf1ca911--luxury-jelly-b24265.netlify.app))
