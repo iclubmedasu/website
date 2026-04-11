@@ -620,7 +620,8 @@ router.post('/complete-profile', async (req, res) => {
                 isAdmin: !!isAdmin,
                 isLeadership: !!isLeadership,
                 isSpecial: !!isSpecial
-            }
+            },
+            token
         });
     } catch (error) {
         console.error('Complete profile error:', error);
@@ -855,7 +856,8 @@ router.post('/complete-officer-profile', async (req, res) => {
                 isAdmin: !!isAdmin,
                 isLeadership: !!isLeadership,
                 isSpecial: !!isSpecial
-            }
+            },
+            token
         });
     } catch (error) {
         console.error('Complete officer profile error:', error);
@@ -988,7 +990,8 @@ router.post('/login', async (req, res) => {
                 isAdmin: !!isAdmin,
                 isLeadership: !!isLeadership,
                 isSpecial: !!isSpecial
-            }
+            },
+            token
         });
     } catch (error) {
         console.error('Login error:', error);
