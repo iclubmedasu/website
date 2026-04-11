@@ -1,5 +1,6 @@
 'use client'
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { setToken, clearToken as clearTokenUtil, initToken } from '../services/api';
 import type {
     ApiErrorResponse,
     AuthMeResponse,
@@ -128,6 +129,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const [isAlumni, setIsAlumni] = useState(false);
 
     useEffect(() => {
+        // Restore token from storage before checking session
+        const token = initToken();
+        if (!token) {
+            setUser(null);
+            setLoading(false);
+            return;
+        }
         void checkAuth();
     }, []);
 
@@ -264,11 +272,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 }),
             });
 
-            const data = (await response.json()) as { user: AuthUser } & ApiErrorResponse;
+            const data = (await response.json()) as { user: AuthUser, token?: string } & ApiErrorResponse;
             if (!response.ok) {
                 throw new Error(readApiError(data, "Failed to complete profile"));
             }
-
+            if (data.token) setToken(data.token);
             setUser(data.user);
             await refreshUser();
             return { success: true };
@@ -311,11 +319,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 }),
             });
 
-            const data = (await response.json()) as { user: AuthUser } & ApiErrorResponse;
+            const data = (await response.json()) as { user: AuthUser, token?: string } & ApiErrorResponse;
             if (!response.ok) {
                 throw new Error(readApiError(data, "Failed to complete officer profile"));
             }
-
+            if (data.token) setToken(data.token);
             setUser(data.user);
             await refreshUser();
             return { success: true };
@@ -377,11 +385,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 body: JSON.stringify({ email, password }),
             });
 
-            const data = (await response.json()) as { user: AuthUser } & ApiErrorResponse;
+            const data = (await response.json()) as { user: AuthUser, token?: string } & ApiErrorResponse;
             if (!response.ok) {
                 throw new Error(readApiError(data, "Setup failed"));
             }
-
+            if (data.token) setToken(data.token);
             setUser(data.user);
             await refreshUser();
             return { success: true };
@@ -404,7 +412,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 body: JSON.stringify({ email, password }),
             });
 
-            const data = (await response.json()) as { user: AuthUser } & ApiErrorResponse;
+            const data = (await response.json()) as { user: AuthUser, token?: string } & ApiErrorResponse;
             if (!response.ok) {
                 if (response.status === 403 && isAlumniAccess(data)) {
                     setIsAlumni(true);
@@ -417,7 +425,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
                 throw new Error(readApiError(data, "Login failed"));
             }
-
+            if (data.token) setToken(data.token);
             setUser(data.user);
             setIsAlumni(false);
             await refreshUser();
@@ -437,6 +445,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }).catch((error) => {
             console.error("Logout request failed:", error);
         });
+        clearTokenUtil();
         setUser(null);
         setIsAlumni(false);
     };

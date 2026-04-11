@@ -85,10 +85,46 @@ export function getNotificationsWebSocketUrl(): string {
 type ApiNamespace = Record<string, (...args: any[]) => any>;
 type JsonHeaders = Record<string, string>;
 
+
+// Auth token management
+let authToken: string | null = null;
+
+export function setToken(token: string) {
+    authToken = token;
+    try {
+        localStorage.setItem('auth_token', token);
+    } catch { }
+}
+
+export function clearToken() {
+    authToken = null;
+    try {
+        localStorage.removeItem('auth_token');
+    } catch { }
+}
+
+export function initToken() {
+    try {
+        const stored = localStorage.getItem('auth_token');
+        if (stored) authToken = stored;
+        return stored;
+    } catch {
+        return null;
+    }
+}
+
+// Base fetch function that always includes the token
 const apiFetch = (input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> => {
+    const headers: Record<string, string> = {
+        ...(init.headers as Record<string, string>),
+    };
+    if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+    }
     return globalThis.fetch(input, {
         ...init,
-        credentials: 'include',
+        credentials: 'include', // keep for desktop browsers
+        headers,
     });
 };
 
