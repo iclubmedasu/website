@@ -27,7 +27,7 @@ See `.env.example` for all required variables and descriptions. Set these in Git
 Key variables:
 - `DATABASE_URL` (Supabase connection string, use `sslmode=require` and `schema=public`)
 - `JWT_SECRET`
-- `NEXT_PUBLIC_API_URL` (e.g., https://iclubmedasu-backend.hf.space/api)
+- `NEXT_PUBLIC_API_URL` (e.g., https://your-hf-space-url.hf.space/api)
 
 ## Backend Deployment (Hugging Face Spaces)
 
@@ -37,6 +37,8 @@ Key variables:
 4. API endpoints:
 	- [API test](https://iclubmedasu-backend.hf.space/api)
 	- [Health check](https://iclubmedasu-backend.hf.space/health)
+5. **Keep-alive Monitoring:**
+	- The Hugging Face Space is kept alive using [UptimeRobot](https://dashboard.uptimerobot.com/monitors/802817894), which regularly pings the health endpoint to prevent the space from sleeping.
 
 ## Database (Supabase)
 
@@ -47,7 +49,7 @@ Key variables:
 ## Frontend Deployment (Netlify)
 
 1. The members portal (Next.js app) is deployed to Netlify: [Live site](https://69d96de0a0d4b29ccf1ca911--luxury-jelly-b24265.netlify.app)
-2. Environment variables are set in the Netlify dashboard.
+2. Environment variables are set in the Netlify dashboard. Set NEXT_PUBLIC_API_URL = https://your-hf-space-url.hf.space/api
 3. Build command: `pnpm --filter members-portal build`
 4. Publish directory: `members-portal/.next`
 5. Runtime: Node.js (Next.js server, not static export)

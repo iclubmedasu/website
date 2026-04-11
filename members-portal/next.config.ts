@@ -2,20 +2,10 @@ import type { NextConfig } from 'next'
 import withPWA from 'next-pwa'
 
 const nextConfig: NextConfig = {
-    output: 'standalone',
+    output: 'export',
     images: {
-        remotePatterns: [
-            {
-                protocol: 'http',
-                hostname: 'localhost',
-                port: '3000',
-                pathname: '/api/**',
-            },
-            {
-                protocol: 'https',
-                hostname: '**',
-            }
-        ]
+        unoptimized: true, // required for static export
+        // remotePatterns removed for static export
     },
 }
 

@@ -1,3 +1,4 @@
+
 ## Project Structure (Filtered)
 
 ```text
@@ -14,17 +15,22 @@ website/
 │   │   ├── routes/
 │   │   │   ├── auth.routes.cookies.test.ts
 │   │   │   ├── members.routes.test.ts
+│   │   │   ├── notifications.routes.test.ts
 │   │   │   ├── projects.routes.test.ts
+│   │   │   ├── scheduleSlots.routes.test.ts
 │   │   │   ├── tasks.routes.test.ts
+│   │   │   ├── teamMembers.routes.test.ts
 │   │   │   └── testHarness.ts
 │   │   ├── services/
 │   │   │   ├── activityLogService.test.ts
+│   │   │   ├── notificationService.test.ts
 │   │   │   └── wbsService.test.ts
 │   │   └── utils.test.ts
 │   ├── config/
 │   ├── middleware/
 │   │   └── auth.ts
 │   ├── prisma/
+│   │   ├── migrations/  # excluded
 │   │   └── schema.prisma
 │   ├── routes/
 │   │   ├── administration.ts
@@ -33,6 +39,7 @@ website/
 │   │   ├── auth.ts
 │   │   ├── index.ts
 │   │   ├── members.ts
+│   │   ├── notifications.ts
 │   │   ├── phases.ts
 │   │   ├── projectFiles.ts
 │   │   ├── projects.ts
@@ -49,6 +56,8 @@ website/
 │   │   ├── activityLogService.ts
 │   │   ├── githubStorage.ts
 │   │   ├── githubStorageService.ts
+│   │   ├── notificationService.ts
+│   │   ├── notificationsRealtime.ts
 │   │   └── wbsService.ts
 │   ├── types/
 │   │   ├── auth.ts
@@ -69,6 +78,7 @@ website/
 ├── docs/
 │   ├── .gitignore
 │   ├── api.md
+│   ├── architectural_summary.md
 │   ├── architecture.md
 │   ├── common git commands.md
 │   ├── css-standards.md
@@ -81,9 +91,12 @@ website/
 │   └── auth.smoke.spec.ts
 ├── members-portal/
 │   ├── public/
+│   │   ├── fallback-7rrQ5r1-LlbkAiq4qhBwk.js
 │   │   ├── manifest.json
+│   │   ├── offline.html
+│   │   ├── screenshots/  # excluded
 │   │   ├── sw.js
-│   │   └── workbox-0f7cba1c.js
+│   │   └── workbox-3a9bdd4e.js
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── (protected)/
@@ -110,20 +123,17 @@ website/
 │   │   │   │   ├── layout.tsx
 │   │   │   │   └── loading.tsx
 │   │   │   ├── (public)/
-│   │   │   │   ├── login/
-│   │   │   │   │   ├── LoginPage.css
-│   │   │   │   │   ├── page.client.tsx
-│   │   │   │   │   └── page.tsx
-│   │   │   │   └── layout.tsx
+│   │   │   │   ├── layout.tsx
+│   │   │   │   └── login/
+│   │   │   │       ├── LoginPage.css
+│   │   │   │       ├── page.client.tsx
+│   │   │   │       └── page.tsx
 │   │   │   ├── favicon.ico
 │   │   │   ├── globals.css
 │   │   │   ├── layout.tsx
 │   │   │   ├── not-found.tsx
 │   │   │   └── page.tsx
 │   │   ├── components/
-│   │   │   ├── __tests__/
-│   │   │   │   ├── ProtectedRoute.integration.test.tsx
-│   │   │   │   └── RouteGuards.test.tsx
 │   │   │   ├── ActivityTimeline/
 │   │   │   │   └── ActivityTimeline.tsx
 │   │   │   ├── AlumniGate/
@@ -227,66 +237,24 @@ website/
 │   │   │   │   └── HelpAndSupportPage.tsx
 │   │   │   ├── Personnel/
 │   │   │   │   ├── Administration/
-│   │   │   │   │   ├── modals/
-│   │   │   │   │   │   ├── AddOfficerModal.tsx
-│   │   │   │   │   │   ├── EditAdminMembersModal.tsx
-│   │   │   │   │   │   └── OfficerHandoverModal.tsx
 │   │   │   │   │   ├── AdministrationPage.css
-│   │   │   │   │   └── AdministrationPage.tsx
+│   │   │   │   │   ├── AdministrationPage.tsx
+│   │   │   │   │   └── modals/
 │   │   │   │   ├── Alumni/
 │   │   │   │   │   └── AlumniPage.tsx
 │   │   │   │   ├── Members/
-│   │   │   │   │   ├── modals/
-│   │   │   │   │   │   └── AssignToTeamModal.tsx
-│   │   │   │   │   └── MembersPage.tsx
+│   │   │   │   │   ├── MembersPage.tsx
+│   │   │   │   │   └── modals/
 │   │   │   │   └── Teams/
-│   │   │   │       ├── modals/
-│   │   │   │       │   ├── ActivateRoleModal.tsx
-│   │   │   │       │   ├── ActivateSubteamModal.tsx
-│   │   │   │       │   ├── ActivateTeamModal.tsx
-│   │   │   │       │   ├── AddMembersModal.tsx
-│   │   │   │       │   ├── AddRoleModal.tsx
-│   │   │   │       │   ├── AddSubteamModal.tsx
-│   │   │   │       │   ├── AddTeamModal.tsx
-│   │   │   │       │   ├── DeactivateRoleModal.tsx
-│   │   │   │       │   ├── DeactivateSubteamModal.tsx
-│   │   │   │       │   ├── DeactivateTeamModal.tsx
-│   │   │   │       │   ├── EditMembersModal.tsx
-│   │   │   │       │   ├── EditRoleModal.tsx
-│   │   │   │       │   ├── EditSubteamModal.tsx
-│   │   │   │       │   ├── EditTeamModal.tsx
-│   │   │   │       │   └── ViewMemberModal.tsx
-│   │   │   │       └── TeamsPage.tsx
+│   │   │   │       ├── TeamsPage.tsx
+│   │   │   │       └── modals/
 │   │   │   ├── Projects/
 │   │   │   │   ├── components/
 │   │   │   │   │   ├── GanttChart/
-│   │   │   │   │   │   ├── GanttChart.css
-│   │   │   │   │   │   └── GanttChart.tsx
 │   │   │   │   │   ├── PhaseRow/
-│   │   │   │   │   │   ├── PhaseRow.css
-│   │   │   │   │   │   └── PhaseRow.tsx
 │   │   │   │   │   ├── ProjectCardView/
-│   │   │   │   │   │   └── ProjectCardView.tsx
 │   │   │   │   │   └── ScheduleTimetable/
-│   │   │   │   │       ├── ScheduleTimetable.css
-│   │   │   │   │       └── ScheduleTimetable.tsx
 │   │   │   │   ├── modals/
-│   │   │   │   │   ├── AbortProjectModal.tsx
-│   │   │   │   │   ├── AddPhaseModal.tsx
-│   │   │   │   │   ├── AddTaskModal.tsx
-│   │   │   │   │   ├── ArchiveProjectModal.tsx
-│   │   │   │   │   ├── CreateProjectModal.tsx
-│   │   │   │   │   ├── DeletePhaseTaskModal.tsx
-│   │   │   │   │   ├── EditPhaseModal.tsx
-│   │   │   │   │   ├── EditTaskModal.tsx
-│   │   │   │   │   ├── FileCommentsModal.tsx
-│   │   │   │   │   ├── FinalizeProjectModal.tsx
-│   │   │   │   │   ├── HoldProjectModal.tsx
-│   │   │   │   │   ├── ProjectActivityModal.tsx
-│   │   │   │   │   ├── ReactivateProjectModal.tsx
-│   │   │   │   │   ├── TaskActivityModal.tsx
-│   │   │   │   │   ├── TaskCommentsModal.tsx
-│   │   │   │   │   └── TaskScheduleSlotsModal.tsx
 │   │   │   │   ├── PastProjectsPage.tsx
 │   │   │   │   ├── ProjectsPage.css
 │   │   │   │   └── ProjectsPage.tsx
@@ -307,25 +275,29 @@ website/
 │   ├── .env.local
 │   ├── .env.local.example
 │   ├── Dockerfile
+│   ├── lighthouse-pwa-v11.json
+│   ├── lighthouse-pwa.json
 │   ├── next.config.ts
 │   ├── next-env.d.ts
 │   ├── next-pwa.d.ts
 │   ├── package.json
 │   ├── tsconfig.json
-│   └── tsconfig.tsbuildinfo
+│   ├── tsconfig.tsbuildinfo
+│   └── utils/
 ├── packages/
 │   └── shared/
 │       ├── src/
-│       │   └── types/
-│       │       ├── __tests__/
-│       │       │   └── types.test.ts
-│       │       ├── auth.ts
-│       │       ├── index.ts
-│       │       ├── member.ts
-│       │       ├── phase.ts
-│       │       ├── project.ts
-│       │       ├── task.ts
-│       │       └── team.ts
+│       │   ├── types/
+│       │   │   ├── __tests__/
+│       │   │   │   └── types.test.ts
+│       │   │   ├── auth.ts
+│       │   │   ├── index.ts
+│       │   │   ├── member.ts
+│       │   │   ├── notification.ts
+│       │   │   ├── phase.ts
+│       │   │   ├── project.ts
+│       │   │   ├── task.ts
+│       │   │   └── team.ts
 │       ├── package.json
 │       └── tsconfig.json
 ├── public-website/
@@ -364,8 +336,10 @@ website/
 ├── playwright.config.ts
 ├── pnpm-lock.yaml
 ├── pnpm-workspace.yaml
+├── pwa-devtools-check.json
 ├── test-setup.ts
-└── vitest.config.ts
+├── vitest.config.ci.ts
+├── vitest.config.ts
 ```
 
 Excluded directories: .git, node_modules, .next, dist, cache, logs, migrations, assets, icons, generated, coverage, test-results.
