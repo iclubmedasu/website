@@ -89,6 +89,10 @@ type JsonHeaders = Record<string, string>;
 // Auth token management
 let authToken: string | null = null;
 
+export function getAuthToken(): string | null {
+    return authToken;
+}
+
 export function setToken(token: string) {
     authToken = token;
     try {
@@ -127,6 +131,49 @@ export const apiFetch = (input: RequestInfo | URL, init: RequestInit = {}): Prom
         headers,
     });
 };
+
+async function getDownloadFileName(response: Response, fallbackName: string): Promise<string> {
+    const contentDisposition = response.headers.get('content-disposition');
+    if (!contentDisposition) return fallbackName;
+
+    const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition);
+    if (utf8Match?.[1]) {
+        try {
+            return decodeURIComponent(utf8Match[1]);
+        } catch {
+            return utf8Match[1];
+        }
+    }
+
+    const plainMatch = /filename="?([^";]+)"?/i.exec(contentDisposition);
+    if (plainMatch?.[1]) return plainMatch[1];
+
+    return fallbackName;
+}
+
+export async function downloadProtectedFile(url: string, fallbackName: string): Promise<void> {
+    const response = await apiFetch(url, { method: 'GET' });
+    if (!response.ok) {
+        const error = (await response.json().catch(() => ({ error: 'Failed to download file' }))) as ApiErrorResponse;
+        throw new Error(error.error || `HTTP error! status: ${response.status}`);
+    }
+
+    const fileName = await getDownloadFileName(response, fallbackName);
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+
+    try {
+        const anchor = document.createElement('a');
+        anchor.href = blobUrl;
+        anchor.download = fileName;
+        anchor.rel = 'noopener noreferrer';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+    } finally {
+        URL.revokeObjectURL(blobUrl);
+    }
+}
 
 interface TaskQueryParams {
     projectId?: Id | string;
@@ -640,7 +687,10 @@ export const projectsAPI = {
     },
 
     getById: async (id: Id | string): Promise<ProjectDetail> => {
-        const response = await apiFetch(`${API_BASE_URL}/projects/${id}`, { headers: getAuthHeaders() });
+        const response = await apiFetch(`${API_BASE_URL}/projects/${id}`, {
+            headers: getAuthHeaders(),
+            cache: 'no-store',
+        });
         return handleResponse<ProjectDetail>(response);
     },
 
@@ -1222,6 +1272,10 @@ export const projectFilesAPI = {
         return `${API_BASE_URL}/project-files/${fileId}/download`;
     },
 
+    download: async (fileId: Id | string, fileName: string): Promise<void> => {
+        await downloadProtectedFile(`${API_BASE_URL}/project-files/${fileId}/download`, fileName);
+    },
+
     upload: (
         projectId: Id | string,
         uploadedByMemberId: Id | string,
@@ -1259,6 +1313,10 @@ export const projectFilesAPI = {
             xhr.onerror = () => reject(new Error('Network error during upload'));
 
             xhr.open('POST', `${API_BASE_URL}/project-files/upload`);
+            const token = getAuthToken();
+            if (token) {
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            }
             xhr.withCredentials = true;
             xhr.send(formData);
         });
@@ -1316,6 +1374,10 @@ export const projectFilesAPI = {
     /** Build a URL to download a specific version of a file using cookie auth. */
     getVersionDownloadUrl: (fileId: Id | string, commitSha: string): string => {
         return `${API_BASE_URL}/project-files/${fileId}/version/${commitSha}`;
+    },
+
+    downloadVersion: async (fileId: Id | string, commitSha: string, fileName: string): Promise<void> => {
+        await downloadProtectedFile(`${API_BASE_URL}/project-files/${fileId}/version/${commitSha}`, fileName);
     },
 
     /** Rename a file (display name only). */

@@ -88,6 +88,7 @@ interface EditTaskModalProps {
     allMembers?: MemberSummary[];
     onClose: () => void;
     onTaskUpdated: () => void;
+    onDependenciesChanged?: () => void | Promise<void>;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -103,19 +104,28 @@ function toLegacyPriority(priority?: Priority | null): LegacyTaskPriority {
     return 'MEDIUM';
 }
 
-function flattenProjectTasks(projectDetail: ProjectDetail | null): TaskSummary[] {
-    const flattened: TaskSummary[] = [];
+type FlattenedProjectTask = TaskSummary & { depth: number };
 
-    const visitTask = (taskNode: TaskSummary) => {
-        flattened.push(taskNode);
-        (taskNode.subtasks || []).forEach(visitTask);
+function flattenProjectTasks(projectDetail: ProjectDetail | null): FlattenedProjectTask[] {
+    const flattened: FlattenedProjectTask[] = [];
+
+    const visitTask = (taskNode: TaskSummary, depth: number) => {
+        flattened.push({ ...taskNode, depth });
+        (taskNode.subtasks || []).forEach((subtask) => visitTask(subtask, depth + 1));
     };
 
     (projectDetail?.phases || []).forEach((phase) => {
-        (phase.tasks || []).forEach(visitTask);
+        (phase.tasks || []).forEach((task) => visitTask(task, 0));
     });
 
     return flattened;
+}
+
+function formatDependencyTaskLabel(taskNode: FlattenedProjectTask) {
+    if (!taskNode.depth) return taskNode.title;
+
+    const indent = `${'|   '.repeat(Math.max(0, taskNode.depth - 1))}|-- `;
+    return `${indent}${taskNode.title}`;
 }
 
 export default function EditTaskModal({
@@ -124,6 +134,7 @@ export default function EditTaskModal({
     allMembers = [],
     onClose,
     onTaskUpdated,
+    onDependenciesChanged,
 }: EditTaskModalProps) {
     const [form, setForm] = useState<EditTaskFormState>({
         title: '',
@@ -231,6 +242,7 @@ export default function EditTaskModal({
             setDependencyTaskId('');
             setDependencyType('FINISH_TO_START');
             await refreshTaskDetail();
+            await onDependenciesChanged?.();
         } catch (err: unknown) {
             setError(getErrorMessage(err, 'Failed to add dependency'));
         } finally {
@@ -247,6 +259,7 @@ export default function EditTaskModal({
         try {
             await tasksAPI.removeDependency(task.id, dependsOnTaskId);
             await refreshTaskDetail();
+            await onDependenciesChanged?.();
         } catch (err: unknown) {
             setError(getErrorMessage(err, 'Failed to remove dependency'));
         } finally {
@@ -473,7 +486,7 @@ export default function EditTaskModal({
                                         <option value="">Select a task</option>
                                         {projectTasks.map((candidate) => (
                                             <option key={candidate.id} value={candidate.id}>
-                                                {candidate.title}
+                                                {formatDependencyTaskLabel(candidate)}
                                             </option>
                                         ))}
                                     </select>

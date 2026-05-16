@@ -2,10 +2,10 @@ const express: any = require('express');
 const router: any = express.Router();
 const multer = require('multer');
 const { Readable } = require('stream');
-const jwt = require('jsonwebtoken');
 const { prisma }: { prisma: any } = require('../db');
 const githubStorage = require('../services/githubStorageService');
 const { logProjectActivity } = require('../services/activityLogService');
+const { extractAuthToken, JWT_SECRET } = require('../middleware/auth');
 
 // Multer: memory storage, 25MB limit (GitHub Contents API limit)
 const upload = multer({
@@ -608,13 +608,16 @@ router.get('/:id/download', async (req, res) => {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid file ID' });
 
-        // Auth: prefer header, fall back to query param
+        // Auth: prefer header/cookie, fall back to query token for legacy browser links
         let user = req.user; // set by authenticateToken middleware
-        if (!user && req.query.token) {
-            try {
-                user = jwt.verify(req.query.token, process.env.JWT_SECRET);
-            } catch {
-                return res.status(401).json({ error: 'Invalid token' });
+        if (!user) {
+            const token = extractAuthToken(req, { allowQueryToken: true });
+            if (token) {
+                try {
+                    user = require('jsonwebtoken').verify(token, JWT_SECRET);
+                } catch {
+                    return res.status(401).json({ error: 'Invalid token' });
+                }
             }
         }
         if (!user) return res.status(401).json({ error: 'Authentication required' });
@@ -856,13 +859,16 @@ router.get('/:id/version/:commitSha', async (req, res) => {
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid file ID' });
         if (!commitSha) return res.status(400).json({ error: 'commitSha is required' });
 
-        // Auth: prefer header, fall back to query param
+        // Auth: prefer header/cookie, fall back to query token for legacy browser links
         let user = req.user;
-        if (!user && req.query.token) {
-            try {
-                user = jwt.verify(req.query.token, process.env.JWT_SECRET);
-            } catch {
-                return res.status(401).json({ error: 'Invalid token' });
+        if (!user) {
+            const token = extractAuthToken(req, { allowQueryToken: true });
+            if (token) {
+                try {
+                    user = require('jsonwebtoken').verify(token, JWT_SECRET);
+                } catch {
+                    return res.status(401).json({ error: 'Invalid token' });
+                }
             }
         }
         if (!user) return res.status(401).json({ error: 'Authentication required' });

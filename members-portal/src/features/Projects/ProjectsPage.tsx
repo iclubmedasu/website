@@ -649,6 +649,7 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
                             allMembers={allMembers}
                             onClose={() => setEditTaskTarget(null)}
                             onTaskUpdated={() => { setEditTaskTarget(null); onRefreshDetail(detail.id); }}
+                            onDependenciesChanged={() => onRefreshDetail(detail.id)}
                         />
                     )}
 

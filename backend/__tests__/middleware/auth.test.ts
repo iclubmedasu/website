@@ -14,7 +14,7 @@ vi.mock('../../db', () => ({
     }
 }))
 
-import { authenticateToken, requireAdmin, JWT_SECRET } from '../../middleware/auth'
+import { authenticateToken, requireAdmin, JWT_SECRET, extractAuthToken } from '../../middleware/auth'
 
 function createMockResponse(): Response {
     const res = {
@@ -115,6 +115,34 @@ describe('auth middleware', () => {
             expect(res.status).toHaveBeenCalledWith(403)
             expect(res.json).toHaveBeenCalledWith({ error: 'Invalid or expired token' })
             expect(next).not.toHaveBeenCalled()
+        })
+    })
+
+    describe('extractAuthToken', () => {
+        it('reads token from cookie header when cookie parser is unavailable', () => {
+            const token = jwt.sign({ memberId: 44 }, JWT_SECRET)
+            const req = {
+                headers: {
+                    cookie: `foo=bar; token=${token}; theme=dark`
+                },
+                query: {}
+            } as unknown as Request
+
+            expect(extractAuthToken(req)).toBe(token)
+        })
+
+        it('allows query token when explicitly enabled', () => {
+            const token = jwt.sign({ memberId: 55 }, JWT_SECRET)
+            const req = {
+                headers: {},
+                query: {
+                    token
+                },
+                url: `/api/project-files/123/download?token=${token}`
+            } as unknown as Request
+
+            expect(extractAuthToken(req, { allowQueryToken: true })).toBe(token)
+            expect(extractAuthToken(req)).toBeUndefined()
         })
     })
 

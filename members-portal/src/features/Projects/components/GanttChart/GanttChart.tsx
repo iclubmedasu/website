@@ -137,6 +137,16 @@ const ASSIGNEE_VIEWER_MAX_WIDTH = 300;
 const ASSIGNEE_VIEWER_PADDING = 12;
 const ASSIGNEE_VIEWER_ESTIMATED_HEIGHT = 240;
 
+const EXPANDED_STATE_BY_PROJECT = new Map<string, { phases: Set<any>; tasks: Set<any> }>();
+
+function persistExpandedState(projectId: any, expandedPhases: Set<any>, expandedTasks: Set<any>) {
+    if (projectId == null) return;
+    EXPANDED_STATE_BY_PROJECT.set(String(projectId), {
+        phases: new Set(expandedPhases),
+        tasks: new Set(expandedTasks),
+    });
+}
+
 // ─────────────────────────────────────────────────────────
 //  Date helpers
 // ─────────────────────────────────────────────────────────
@@ -193,8 +203,9 @@ function flattenTaskNodes(phases: any[] = []) {
 }
 
 function getTaskDurationDays(task: any) {
-    const startDate = task?.startDate ? new Date(task.startDate) : null;
-    const dueDate = task?.dueDate ? new Date(task.dueDate) : null;
+    const range = getTaskRange(task);
+    const startDate = range.start;
+    const dueDate = range.end;
 
     if (startDate && dueDate) {
         const span = Math.ceil((dueDate.getTime() - startDate.getTime()) / DAY_MS);
@@ -221,6 +232,34 @@ function getPhaseDurationDays(phase: any) {
 
 function getDependencyEdgeKey(edge: any) {
     return `${edge.sourceType || 'task'}:${edge.sourceId}->${edge.targetType || 'task'}:${edge.targetId}`;
+}
+
+function getTaskRange(task: any) {
+    let minTime: number | null = null;
+    let maxTime: number | null = null;
+
+    for (const sub of (task?.subtasks || [])) {
+        const ss = sub.startDate ? new Date(sub.startDate) : null;
+        const sd = sub.dueDate ? new Date(sub.dueDate) : null;
+        if (ss && (minTime == null || ss.getTime() < minTime)) minTime = ss.getTime();
+        if (sd && (maxTime == null || sd.getTime() > maxTime)) maxTime = sd.getTime();
+        if (!ss && sd && (minTime == null || sd.getTime() < minTime)) minTime = sd.getTime();
+        if (!sd && ss && (maxTime == null || ss.getTime() > maxTime)) maxTime = ss.getTime();
+    }
+
+    if (minTime == null && maxTime == null) {
+        const taskStart = task?.startDate ? new Date(task.startDate) : null;
+        const taskEnd = task?.dueDate ? new Date(task.dueDate) : null;
+        if (taskStart && (minTime == null || taskStart.getTime() < minTime)) minTime = taskStart.getTime();
+        if (taskEnd && (maxTime == null || taskEnd.getTime() > maxTime)) maxTime = taskEnd.getTime();
+        if (!taskStart && taskEnd && (minTime == null || taskEnd.getTime() < minTime)) minTime = taskEnd.getTime();
+        if (!taskEnd && taskStart && (maxTime == null || taskStart.getTime() > maxTime)) maxTime = taskStart.getTime();
+    }
+
+    return {
+        start: minTime != null ? new Date(minTime) : null,
+        end: maxTime != null ? new Date(maxTime) : null,
+    };
 }
 
 function getOrderedPhases(phases: any[] = []) {
@@ -636,6 +675,27 @@ function getPreviewKindLabel(rowType: any) {
     return 'Task';
 }
 
+function formatEstimatedHoursLabel(value: any) {
+    if (value == null || value === '') return '—';
+
+    const parsed = Number(value);
+    if (Number.isNaN(parsed)) return '—';
+    return `${parsed}h`;
+}
+
+function getDependencyLabels(dependencies: any[] = []) {
+    return dependencies
+        .map((dependency: any) => dependency.dependsOnTask?.title || dependency.dependsOnTask?.fileName || dependency.dependsOnTaskId)
+        .filter(Boolean);
+}
+
+function formatDependencySummary(dependencies: any[] = []) {
+    const labels = getDependencyLabels(dependencies);
+    if (labels.length === 0) return 'None';
+    if (labels.length <= 2) return labels.join(', ');
+    return `${labels.slice(0, 2).join(', ')} +${labels.length - 2} more`;
+}
+
 function collectPreviewSlots(row: any, allTaskNodes: any[] = [], projectDetail: any = null) {
     if (!row) return [];
 
@@ -692,10 +752,7 @@ function getExportRowRange(row: any) {
         };
     }
 
-    return {
-        start: getDateOrNull(row.data?.startDate),
-        end: getDateOrNull(row.data?.dueDate),
-    };
+    return getTaskRange(row.data);
 }
 
 function buildExportRows(phases: any[] = []) {
@@ -1001,53 +1058,41 @@ function groupScheduleSlotsByMember(slots: any[] = []) {
         .sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''));
 }
 
-function buildScheduleTimelineSheet(XLSX: any, slots: any[] = [], title = 'Schedule Timeline') {
+function buildScheduleTimelineSheet(XLSX: any, slots: any[] = []) {
     const timeline = buildScheduleTimelineExport(slots);
-    const sheetTitle = title || 'Schedule Timeline';
 
     if (!timeline) {
         const sheet = XLSX.utils.aoa_to_sheet([
-            [sheetTitle],
             ['No schedule slots available.'],
         ]);
 
-        sheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }];
-        sheet['!cols'] = [{ wch: 28 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }];
-        sheet['!rows'] = [{ hpt: 24 }, { hpt: 22 }];
+        sheet['!merges'] = [];
+        sheet['!cols'] = [{ wch: 34 }];
+        sheet['!rows'] = [{ hpt: 24 }];
 
         applySheetCellStyle(sheet.A1, {
-            fill: '#5b21b6',
+            fill: '#4c1d95',
             fontColor: '#ffffff',
             bold: true,
             align: 'left',
             wrapText: true,
         });
 
-        applySheetCellStyle(sheet.A2, {
-            fill: '#f8fafc',
-            fontColor: '#475569',
-            align: 'left',
-            wrapText: true,
-        });
 
         return sheet;
     }
 
     const groupedSlots = groupScheduleSlotsByMember(slots);
     const totalColumns = 1 + timeline.columns.length;
-    const totalRows = 3 + groupedSlots.length;
+    const totalRows = 2 + groupedSlots.length;
     const matrix = Array.from({ length: totalRows }, () => Array(totalColumns).fill(''));
     const merges = [];
-    const titleRow = 0;
-    const dayRow = 1;
-    const hourRow = 2;
-    const dataRowStart = 3;
-
-    matrix[titleRow][0] = sheetTitle;
-    merges.push({ s: { r: titleRow, c: 0 }, e: { r: titleRow, c: totalColumns - 1 } });
+    const dayRow = 0;
+    const hourRow = 1;
+    const dataRowStart = 2;
 
     matrix[dayRow][0] = 'Member Name';
-    matrix[hourRow][0] = 'Time';
+    merges.push({ s: { r: dayRow, c: 0 }, e: { r: hourRow, c: 0 } });
 
     timeline.dayGroups.forEach((group) => {
         const startCol = 1 + group.startIndex;
@@ -1111,7 +1156,6 @@ function buildScheduleTimelineSheet(XLSX: any, slots: any[] = [], title = 'Sched
     sheet['!rows'] = [
         { hpt: 24 },
         { hpt: 20 },
-        { hpt: 20 },
         ...groupedSlots.map(() => ({ hpt: 48 })),
     ];
 
@@ -1122,21 +1166,9 @@ function buildScheduleTimelineSheet(XLSX: any, slots: any[] = [], title = 'Sched
         return cell;
     };
 
-    const titleFill = '#5b21b6';
     const dayFill = '#6d28d9';
     const hourFill = '#ede9fe';
     const memberFill = '#f8fafc';
-
-    for (let col = 0; col < totalColumns; col++) {
-        styleCell(titleRow, col, {
-            fill: titleFill,
-            fontColor: '#ffffff',
-            bold: true,
-            align: 'center',
-            wrapText: true,
-            border: cellBorder,
-        });
-    }
 
     styleCell(dayRow, 0, {
         fill: '#4c1d95',
@@ -1147,12 +1179,12 @@ function buildScheduleTimelineSheet(XLSX: any, slots: any[] = [], title = 'Sched
         border: cellBorder,
     });
     styleCell(hourRow, 0, {
-        fill: '#ede9fe',
-        fontColor: '#4c1d95',
+        fill: '#4c1d95',
+        fontColor: '#ffffff',
         bold: true,
         align: 'center',
         wrapText: true,
-        border: dayHeaderBorder,
+        border: cellBorder,
     });
 
     timeline.dayGroups.forEach((group) => {
@@ -1233,6 +1265,15 @@ function buildScheduleTimelineSheet(XLSX: any, slots: any[] = [], title = 'Sched
                 }
             }
         }
+    });
+
+    applySheetCellStyle(sheet.A1, {
+        fill: '#4c1d95',
+        fontColor: '#ffffff',
+        bold: true,
+        align: 'center',
+        wrapText: true,
+        border: cellBorder,
     });
 
     return sheet;
@@ -1488,8 +1529,13 @@ export default function GanttChart({
     void onDeletePhase;
     const [scale, setScale] = useState<ScaleKey>('week');
     const [selected, setSelected] = useState<any>(null); // { type, id, data, phase?, parentTask? }
-    const [expandedPhases, setExpandedPhases] = useState<Set<any>>(() => new Set(phases.map((p: any) => p.id)));
-    const [expandedTasks, setExpandedTasks] = useState<Set<any>>(new Set());
+    const savedExpansionState = projectId != null ? EXPANDED_STATE_BY_PROJECT.get(String(projectId)) : null;
+    const [expandedPhases, setExpandedPhases] = useState<Set<any>>(() => savedExpansionState
+        ? new Set(savedExpansionState.phases)
+        : new Set(phases.map((p: any) => p.id)));
+    const [expandedTasks, setExpandedTasks] = useState<Set<any>>(() => savedExpansionState
+        ? new Set(savedExpansionState.tasks)
+        : new Set());
     const [confirmDelete, setConfirmDelete] = useState<any>(null); // { type, id, title }
     const [isMaximized, setIsMaximized] = useState(false);
     const [exportingFormat, setExportingFormat] = useState<'png' | 'xlsx' | null>(null);
@@ -1521,6 +1567,9 @@ export default function GanttChart({
     const barRefs = useRef<Map<string, any>>(new Map());
     const previewHoverTimerRef = useRef<number | null>(null);
     const assigneeHoverTimerRef = useRef<number | null>(null);
+    const scrollSyncLockRef = useRef(false);
+    const scrollSyncFrameRef = useRef<number | null>(null);
+    const previousPhaseIdsRef = useRef<Set<any>>(new Set(phases.map((phase: any) => phase.id)));
 
     // ── Resizable tree panel ──
     const [treeWidth, setTreeWidth] = useState<number>(DEFAULT_TREE_WIDTH);
@@ -1976,22 +2025,62 @@ export default function GanttChart({
 
     // Auto-expand newly added phases
     useEffect(() => {
+        const currentPhaseIds = new Set(phases.map((phase: any) => phase.id));
         setExpandedPhases((prev) => {
-            const next = new Set(prev);
-            for (const p of phases) {
-                if (!prev.has(p.id)) next.add(p.id);
+            let changed = false;
+            const next = new Set<any>();
+            const previousPhaseIds = previousPhaseIdsRef.current;
+
+            for (const phaseId of prev) {
+                if (currentPhaseIds.has(phaseId)) {
+                    next.add(phaseId);
+                } else {
+                    changed = true;
+                }
             }
+
+            for (const phase of phases) {
+                if (!previousPhaseIds.has(phase.id)) {
+                    next.add(phase.id);
+                    changed = true;
+                }
+            }
+
+            previousPhaseIdsRef.current = currentPhaseIds;
+            if (!changed) return prev;
             return next;
         });
-    }, [phases]);
+    }, [phases, projectId]);
 
-    // Sync vertical scroll: timeline drives tree + columns
-    const handleTimelineScroll = useCallback(() => {
-        if (timelineRef.current) {
-            const top = timelineRef.current.scrollTop;
-            if (treeBodyRef.current) treeBodyRef.current.scrollTop = top;
-            if (colsBodyRef.current) colsBodyRef.current.scrollTop = top;
+    useEffect(() => {
+        persistExpandedState(projectId, expandedPhases, expandedTasks);
+    }, [expandedPhases, expandedTasks, projectId]);
+
+    useEffect(() => () => {
+        if (scrollSyncFrameRef.current != null) {
+            window.cancelAnimationFrame(scrollSyncFrameRef.current);
         }
+    }, []);
+
+    // Sync vertical scroll across all three panes.
+    const handlePaneScroll = useCallback((source: 'tree' | 'columns' | 'timeline') => {
+        if (scrollSyncLockRef.current) return;
+
+        const sourceRef = source === 'timeline'
+            ? timelineRef.current
+            : source === 'tree'
+                ? treeBodyRef.current
+                : colsBodyRef.current;
+
+        if (!sourceRef) return;
+
+        const top = sourceRef.scrollTop;
+        scrollSyncLockRef.current = true;
+
+        if (treeBodyRef.current && treeBodyRef.current !== sourceRef) treeBodyRef.current.scrollTop = top;
+        if (colsBodyRef.current && colsBodyRef.current !== sourceRef) colsBodyRef.current.scrollTop = top;
+        if (timelineRef.current && timelineRef.current !== sourceRef) timelineRef.current.scrollTop = top;
+
         if (preview?.rowKey) {
             const bar = barRefs.current.get(preview.rowKey);
             if (bar) {
@@ -2021,6 +2110,14 @@ export default function GanttChart({
                 });
             }
         }
+
+        if (scrollSyncFrameRef.current != null) {
+            window.cancelAnimationFrame(scrollSyncFrameRef.current);
+        }
+        scrollSyncFrameRef.current = window.requestAnimationFrame(() => {
+            scrollSyncLockRef.current = false;
+            scrollSyncFrameRef.current = null;
+        });
     }, [assigneeViewer?.rowKey, preview?.rowKey]);
 
     // Toggle expand/collapse
@@ -2128,28 +2225,25 @@ export default function GanttChart({
         const slots = collectPreviewSlots(previewRow, allTaskNodes, projectDetail);
         const baseRange = previewRow.type === 'phase'
             ? getPhaseRange(previewRow.data)
-            : {
-                start: getDateOrNull(previewRow.data?.startDate),
-                end: getDateOrNull(previewRow.data?.dueDate),
-            };
+            : getTaskRange(previewRow.data);
         const window = getPreviewWindow(slots, baseRange.start, baseRange.end);
-        const status = previewRow.type === 'phase'
-            ? getPhaseStatus(previewRow.data)
-            : previewRow.data?.status;
-        const priority = previewRow.type === 'phase'
+        const dependencies = previewRow.type === 'phase'
+            ? []
+            : Array.isArray(previewRow.data?.dependencies)
+                ? previewRow.data.dependencies
+                : [];
+        const estimatedHours = previewRow.type === 'phase'
             ? null
-            : previewRow.data?.priority;
+            : previewRow.data?.estimatedHours;
 
         return {
             row: previewRow,
             kindLabel: getPreviewKindLabel(previewRow.type),
             title: previewRow.data?.title || '',
-            status,
-            statusLabel: STATUS_LABELS[status] || status || '—',
-            statusColor: status ? STATUS_COLORS[status] : null,
-            priority,
-            priorityLabel: previewRow.type === 'phase' ? '—' : (PRIORITY_LABELS[priority] || priority || '—'),
-            priorityColor: priority ? PRIORITY_COLORS[priority] : null,
+            estimatedHours,
+            estimatedHoursLabel: formatEstimatedHoursLabel(estimatedHours),
+            dependencyLabels: getDependencyLabels(dependencies),
+            dependencySummary: formatDependencySummary(dependencies),
             isCritical: previewRow.type === 'phase'
                 ? criticalPhaseIds.has(previewRow.id)
                 : criticalNodeIds.has(previewRow.id),
@@ -2521,8 +2615,9 @@ export default function GanttChart({
             barEnd = range.end;
             status = getPhaseStatus(row.data);
         } else {
-            barStart = row.data.startDate ? new Date(row.data.startDate) : null;
-            barEnd = row.data.dueDate ? new Date(row.data.dueDate) : null;
+            const range = getTaskRange(row.data);
+            barStart = range.start;
+            barEnd = range.end;
             status = row.data.status;
         }
 
@@ -2909,7 +3004,7 @@ export default function GanttChart({
             XLSX.utils.book_append_sheet(workbook, sheet, 'Gantt');
             XLSX.utils.book_append_sheet(
                 workbook,
-                buildScheduleTimelineSheet(XLSX, collectScheduleTimelineSlots(projectDetail, allTaskNodes), projectTitle || 'Schedule Timeline'),
+                buildScheduleTimelineSheet(XLSX, collectScheduleTimelineSlots(projectDetail, allTaskNodes)),
                 'Schedule Timeline'
             );
 
@@ -2930,6 +3025,19 @@ export default function GanttChart({
                     topLeftCell,
                 });
                 workbookZip.file(ganttSheetPath, patchedGanttSheetXml);
+            }
+
+            const scheduleSheetPath = 'xl/worksheets/sheet2.xml';
+            const scheduleSheetFile = workbookZip.file(scheduleSheetPath);
+            if (scheduleSheetFile) {
+                const scheduleSheetXml = await scheduleSheetFile.async('string');
+                const topLeftCell = XLSX.utils.encode_cell({ r: 2, c: 1 });
+                const patchedScheduleSheetXml = withFrozenPaneInWorksheetXml(scheduleSheetXml, {
+                    xSplit: 1,
+                    ySplit: 2,
+                    topLeftCell,
+                });
+                workbookZip.file(scheduleSheetPath, patchedScheduleSheetXml);
             }
 
             const workbookBlob = await workbookZip.generateAsync({ type: 'blob' });
@@ -3384,7 +3492,7 @@ export default function GanttChart({
                         <span className="gantt-tree-header-wbs">WBS</span>
                         <span>Task Name</span>
                     </div>
-                    <div className="gantt-tree-body" ref={treeBodyRef}>
+                    <div className="gantt-tree-body" ref={treeBodyRef} onScroll={() => handlePaneScroll('tree')}>
                         {rows.map((row) => {
                             const rowKey = `${row.type}-${row.id}`;
                             const rowPhaseId = row.type === 'phase' ? row.id : row.phase?.id || row.data?.phaseId || null;
@@ -3613,7 +3721,7 @@ export default function GanttChart({
                                 </div>
                             ))}
                         </div>
-                        <div className="gantt-columns-body" ref={colsBodyRef}>
+                        <div className="gantt-columns-body" ref={colsBodyRef} onScroll={() => handlePaneScroll('columns')}>
                             {rows.map((row) => {
                                 const isAdd = row.type === 'add-phase' || row.type === 'add-task' || row.type === 'add-subtask';
                                 const rowKey = `${row.type}-${row.id}`;
@@ -3799,7 +3907,7 @@ export default function GanttChart({
                 )}
 
                 {/* Right: Timeline panel */}
-                <div className="gantt-timeline-panel" ref={timelineRef} onScroll={handleTimelineScroll}>
+                <div className="gantt-timeline-panel" ref={timelineRef} onScroll={() => handlePaneScroll('timeline')}>
                     <div ref={(node) => applyElementStyles(node, { minWidth: `${totalWidth}px` })}>
                         {/* Header */}
                         <div
@@ -4003,21 +4111,13 @@ export default function GanttChart({
                         <div className="gantt-preview-meta">
                             <span
                                 className="gantt-preview-pill"
-                                ref={(node) => applyElementStyles(node, {
-                                    backgroundColor: previewData.statusColor || '',
-                                    color: previewData.statusColor ? '#fff' : '',
-                                })}
                             >
-                                {previewData.statusLabel}
+                                Est. hours: {previewData.estimatedHoursLabel}
                             </span>
                             <span
                                 className="gantt-preview-pill"
-                                ref={(node) => applyElementStyles(node, {
-                                    backgroundColor: previewData.priorityColor || '',
-                                    color: previewData.priorityColor ? '#fff' : '',
-                                })}
                             >
-                                Priority: {previewData.priorityLabel}
+                                Dependencies: {previewData.dependencySummary}
                             </span>
                             {previewData.isCritical && (
                                 <span className="gantt-preview-pill gantt-preview-pill--critical">Critical path</span>

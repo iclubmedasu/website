@@ -585,8 +585,25 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         }
     };
 
+    const handleDownloadFile = useCallback(async (file: UploadFileEntry) => {
+        try {
+            await projectFilesAPI.download(file.id, file.name);
+        } catch (err) {
+            console.error('Download failed:', err);
+            alert(getErrorMessage(err, 'Failed to download file'));
+        }
+    }, []);
+
+    const handleDownloadVersion = useCallback(async (fileId: Id | string, fileName: string, commitSha: string) => {
+        try {
+            await projectFilesAPI.downloadVersion(fileId, commitSha, fileName);
+        } catch (err) {
+            console.error('Version download failed:', err);
+            alert(getErrorMessage(err, 'Failed to download file version'));
+        }
+    }, []);
+
     const renderFileItem = (f: UploadFileEntry, { nested = false }: { nested?: boolean } = {}) => {
-        const downloadUrl = f.done ? projectFilesAPI.getDownloadUrl(f.id) : null;
         return (
             <div
                 key={f.id}
@@ -600,10 +617,10 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                 </div>
                 <div className="file-info">
                     <div className="file-name-row">
-                        {f.done && downloadUrl ? (
-                            <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="file-name file-name--link">
+                        {f.done ? (
+                            <button type="button" className="file-name file-name--link" onClick={() => { void handleDownloadFile(f); }}>
                                 {f.name}
-                            </a>
+                            </button>
                         ) : (
                             <span className="file-name">{f.name}</span>
                         )}
@@ -641,10 +658,10 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                             <MessageCircle size={12} />
                         </button>
                     )}
-                    {f.done && downloadUrl && (
-                        <a href={downloadUrl} className="file-download-btn" title="Download" download>
+                    {f.done && (
+                        <button type="button" className="file-download-btn" title="Download" onClick={() => { void handleDownloadFile(f); }}>
                             <Download size={14} />
-                        </a>
+                        </button>
                     )}
                     {!disabled && f.done && (
                         <button className="file-rename-btn" title="Rename" onClick={() => openRename(f)}>
@@ -656,7 +673,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                             {f.done ? <Trash2 size={14} /> : <X size={14} />}
                         </button>
                     )}
-                    {f.done && downloadUrl && (
+                    {f.done && (
                         <button className="file-history-btn" title="Version history" onClick={() => openHistory(f)}>
                             <History size={14} />
                         </button>
@@ -941,9 +958,14 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                                                 <span className="history-item-date">{formatHistoryDate(commit.date)}</span>
                                                 <span className="history-item-message">{commit.message}</span>
                                             </div>
-                                            <a href={projectFilesAPI.getVersionDownloadUrl(historyTarget.id, commit.sha)} className="file-download-btn" title={idx === 0 ? 'Download current' : 'Download this version'} download>
+                                            <button
+                                                type="button"
+                                                className="file-download-btn"
+                                                title={idx === 0 ? 'Download current' : 'Download this version'}
+                                                onClick={() => { void handleDownloadVersion(historyTarget.id, historyTarget.name, commit.sha); }}
+                                            >
                                                 <Download size={14} />
-                                            </a>
+                                            </button>
                                         </div>
                                     ))}
                                 </div>

@@ -2,11 +2,10 @@ import type { IncomingMessage } from 'http';
 import type { Duplex } from 'stream';
 import jwt from 'jsonwebtoken';
 import { WebSocketServer, WebSocket } from 'ws';
-import { JWT_SECRET } from '../middleware/auth';
+import { JWT_SECRET, extractAuthToken } from '../middleware/auth';
 import type { NotificationEventType, NotificationRealtimeMessage } from '../types/contracts';
 import type { RequestUser } from '../types/auth';
 
-const AUTH_COOKIE_NAME = 'token';
 const WS_PATH = '/api/notifications/ws';
 
 const socketsByMember = new Map<number, Set<WebSocket>>();
@@ -27,32 +26,9 @@ function removeSocket(memberId: number, socket: WebSocket): void {
     }
 }
 
-function parseCookies(cookieHeader: string | undefined): Record<string, string> {
-    if (!cookieHeader) return {};
-
-    return cookieHeader
-        .split(';')
-        .map((entry) => entry.trim())
-        .filter(Boolean)
-        .reduce<Record<string, string>>((acc, entry) => {
-            const index = entry.indexOf('=');
-            if (index <= 0) return acc;
-            const key = entry.slice(0, index).trim();
-            const value = entry.slice(index + 1).trim();
-            if (!key) return acc;
-            acc[key] = decodeURIComponent(value);
-            return acc;
-        }, {});
-}
-
 function getMemberIdFromRequest(req: IncomingMessage): number | null {
     try {
-        const origin = req.headers.origin ?? 'http://localhost';
-        const url = new URL(req.url ?? '', origin);
-
-        const tokenFromQuery = url.searchParams.get('token');
-        const cookieToken = parseCookies(req.headers.cookie)[AUTH_COOKIE_NAME];
-        const token = tokenFromQuery || cookieToken;
+        const token = extractAuthToken(req, { allowQueryToken: true });
         if (!token) return null;
 
         const decoded = jwt.verify(token, JWT_SECRET) as RequestUser;
