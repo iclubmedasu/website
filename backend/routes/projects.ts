@@ -166,6 +166,9 @@ function canUserManageProject(req) {
 
 function buildTaskHierarchyInclude(depth = 0) {
     const include: any = {
+        leader: {
+            select: { id: true, fullName: true, profilePhotoUrl: true },
+        },
         dependencies: {
             include: {
                 dependsOnTask: { select: { id: true, title: true, status: true, parentTaskId: true, phaseId: true } },

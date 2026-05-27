@@ -98,6 +98,8 @@ Set these in GitHub → repo Settings → Secrets and variables → Actions. The
 1. Create a new Supabase project and PostgreSQL database.
 2. Set the `DATABASE_URL` in Hugging Face and local `.env` files.
 3. Run migrations using `prisma migrate deploy`.
+4. The Prisma migration set enables Row-Level Security on every app table so Supabase's public REST API cannot read or modify data directly.
+5. If you need to edit data manually as the project owner, use the Supabase SQL editor or dashboard with a privileged account rather than the public anon API.
 
 ## Frontend Deployment (Netlify)
 

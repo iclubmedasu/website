@@ -114,11 +114,11 @@ const STATUS_PROGRESS: Record<string, number> = {
 
 // Toggleable attribute columns (order: leader, assignees, status, priority, difficulty)
 const ATTR_COLUMNS: Array<{ key: string; label: string; width: number }> = [
-    { key: 'leader', label: 'Leader', width: 140 },
+    { key: 'leader', label: 'Leader', width: 80 },
     { key: 'assignees', label: 'Assignees', width: 100 },
     { key: 'status', label: 'Status', width: 120 },
-    { key: 'priority', label: 'Priority', width: 75 },
-    { key: 'difficulty', label: 'Difficulty', width: 75 },
+    { key: 'priority', label: 'Priority', width: 90 },
+    { key: 'difficulty', label: 'Difficulty', width: 90 },
 ];
 
 const SCALES: ScaleKey[] = ['quarter', 'month', 'week', 'day'];
@@ -1496,6 +1496,7 @@ export default function GanttChart({
     const [exportingFormat, setExportingFormat] = useState<'png' | 'xlsx' | null>(null);
     const [preview, setPreview] = useState<any>(null);
     const [assigneeViewer, setAssigneeViewer] = useState<any>(null);
+    const [leaderViewer, setLeaderViewer] = useState<any>(null);
 
     // Clipboard: { mode: 'copy'|'cut', type: 'phase'|'task'|'subtask', id, data, phase?, parentTask? }
     const [clipboard, setClipboard] = useState<any>(null);
@@ -1518,10 +1519,13 @@ export default function GanttChart({
     const ganttMainRef = useRef<any>(null);
     const previewPopoverRef = useRef<any>(null);
     const assigneeViewerPopoverRef = useRef<any>(null);
+    const leaderViewerPopoverRef = useRef<any>(null);
     const assigneeTriggerRefs = useRef<Map<string, any>>(new Map());
+    const leaderTriggerRefs = useRef<Map<string, any>>(new Map());
     const barRefs = useRef<Map<string, any>>(new Map());
     const previewHoverTimerRef = useRef<number | null>(null);
     const assigneeHoverTimerRef = useRef<number | null>(null);
+    const leaderHoverTimerRef = useRef<number | null>(null);
     const scrollSyncLockRef = useRef(false);
     const scrollSyncFrameRef = useRef<number | null>(null);
     const previousPhaseIdsRef = useRef<Set<any>>(new Set(phases.map((phase: any) => phase.id)));
@@ -2231,6 +2235,23 @@ export default function GanttChart({
         };
     }, [assigneeViewerRow]);
 
+    const leaderViewerRow = useMemo(() => {
+        if (!leaderViewer?.rowKey) return null;
+        const row = rows.find((entry) => `${entry.type}-${entry.id}` === leaderViewer.rowKey) || null;
+        if (!row || row.type === 'phase' || row.type.startsWith('add-')) return null;
+        return row;
+    }, [leaderViewer?.rowKey, rows]);
+
+    const leaderViewerData = useMemo(() => {
+        if (!leaderViewerRow) return null;
+        const leader = leaderViewerRow.data?.leader || null;
+        if (!leader) return null;
+        return {
+            title: leaderViewerRow.data?.title || '',
+            leader,
+        };
+    }, [leaderViewerRow]);
+
     const refreshPreviewPosition = useCallback((rowKey?: string) => {
         const targetKey = rowKey || preview?.rowKey;
         if (!targetKey) return;
@@ -2283,6 +2304,32 @@ export default function GanttChart({
         });
     }, [assigneeViewer?.rowKey]);
 
+    const refreshLeaderViewerPosition = useCallback((rowKey?: string) => {
+        const targetKey = rowKey || leaderViewer?.rowKey;
+        if (!targetKey) return;
+
+        const trigger = leaderTriggerRefs.current.get(targetKey);
+        if (!trigger) {
+            setLeaderViewer(null);
+            return;
+        }
+
+        const position = getAssigneeViewerPosition(trigger.getBoundingClientRect());
+        setLeaderViewer((current: any) => {
+            if (!current || current.rowKey !== targetKey) return current;
+            if (
+                current.position
+                && current.position.left === position.left
+                && current.position.top === position.top
+                && current.position.width === position.width
+                && current.position.placement === position.placement
+            ) {
+                return current;
+            }
+            return { ...current, position };
+        });
+    }, [leaderViewer?.rowKey]);
+
     const clearPreviewHoverTimer = useCallback(() => {
         if (previewHoverTimerRef.current) {
             window.clearTimeout(previewHoverTimerRef.current);
@@ -2294,6 +2341,13 @@ export default function GanttChart({
         if (assigneeHoverTimerRef.current) {
             window.clearTimeout(assigneeHoverTimerRef.current);
             assigneeHoverTimerRef.current = null;
+        }
+    }, []);
+
+    const clearLeaderHoverTimer = useCallback(() => {
+        if (leaderHoverTimerRef.current) {
+            window.clearTimeout(leaderHoverTimerRef.current);
+            leaderHoverTimerRef.current = null;
         }
     }, []);
 
@@ -2361,6 +2415,21 @@ export default function GanttChart({
         });
     }, []);
 
+    const openLeaderViewer = useCallback((rowKey: string, element: any, pinned = false) => {
+        if (!rowKey || !element) return;
+        const position = getAssigneeViewerPosition(element.getBoundingClientRect());
+
+        setLeaderViewer((current: any) => {
+            if (current?.pinned && current.rowKey !== rowKey && !pinned) return current;
+            if (current?.pinned && current.rowKey === rowKey && !pinned) return current;
+            return {
+                rowKey,
+                pinned: pinned || (current?.pinned && current.rowKey === rowKey),
+                position,
+            };
+        });
+    }, []);
+
     const handleAssigneeMouseEnter = useCallback((rowKey: string, event: any) => {
         clearAssigneeHoverTimer();
 
@@ -2372,6 +2441,17 @@ export default function GanttChart({
         }, PREVIEW_HOVER_DELAY_MS);
     }, [assigneeViewer?.pinned, assigneeViewer?.rowKey, clearAssigneeHoverTimer, openAssigneeViewer]);
 
+    const handleLeaderMouseEnter = useCallback((rowKey: string, event: any) => {
+        clearLeaderHoverTimer();
+
+        if (leaderViewer?.pinned && leaderViewer.rowKey !== rowKey) return;
+
+        const element = event.currentTarget;
+        leaderHoverTimerRef.current = window.setTimeout(() => {
+            openLeaderViewer(rowKey, element, false);
+        }, PREVIEW_HOVER_DELAY_MS);
+    }, [leaderViewer?.pinned, leaderViewer?.rowKey, clearLeaderHoverTimer, openLeaderViewer]);
+
     const handleAssigneeMouseLeave = useCallback((rowKey: string) => {
         clearAssigneeHoverTimer();
         setAssigneeViewer((current: any) => {
@@ -2379,6 +2459,14 @@ export default function GanttChart({
             return null;
         });
     }, [clearAssigneeHoverTimer]);
+
+    const handleLeaderMouseLeave = useCallback((rowKey: string) => {
+        clearLeaderHoverTimer();
+        setLeaderViewer((current: any) => {
+            if (!current || current.rowKey !== rowKey || current.pinned) return current;
+            return null;
+        });
+    }, [clearLeaderHoverTimer]);
 
     const handleAssigneeClick = useCallback((rowKey: string, event: any) => {
         event.stopPropagation();
@@ -2394,6 +2482,20 @@ export default function GanttChart({
         });
     }, [clearAssigneeHoverTimer]);
 
+    const handleLeaderClick = useCallback((rowKey: string, event: any) => {
+        event.stopPropagation();
+        clearLeaderHoverTimer();
+
+        const element = event.currentTarget;
+        if (!element) return;
+
+        const position = getAssigneeViewerPosition(element.getBoundingClientRect());
+        setLeaderViewer((current: any) => {
+            if (current?.rowKey === rowKey && current.pinned) return null;
+            return { rowKey, pinned: true, position };
+        });
+    }, [clearLeaderHoverTimer]);
+
     const setBarRef = useCallback((rowKey: string) => (node: any) => {
         if (node) {
             barRefs.current.set(rowKey, node);
@@ -2407,6 +2509,14 @@ export default function GanttChart({
             assigneeTriggerRefs.current.set(rowKey, node);
         } else {
             assigneeTriggerRefs.current.delete(rowKey);
+        }
+    }, []);
+
+    const setLeaderTriggerRef = useCallback((rowKey: string) => (node: any) => {
+        if (node) {
+            leaderTriggerRefs.current.set(rowKey, node);
+        } else {
+            leaderTriggerRefs.current.delete(rowKey);
         }
     }, []);
 
@@ -2479,9 +2589,40 @@ export default function GanttChart({
         };
     }, [assigneeViewer?.rowKey, refreshAssigneeViewerPosition]);
 
+    useEffect(() => {
+        if (!leaderViewer?.rowKey) return undefined;
+
+        const handleResize = () => refreshLeaderViewerPosition(leaderViewer.rowKey);
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setLeaderViewer(null);
+            }
+        };
+
+        const handlePointerDown = (event: MouseEvent) => {
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+            if (leaderViewerPopoverRef.current?.contains(target)) return;
+            if (target.closest('.gantt-col-leader-trigger')) return;
+            setLeaderViewer(null);
+        };
+
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('keydown', handleEscape);
+        document.addEventListener('mousedown', handlePointerDown);
+
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('keydown', handleEscape);
+            document.removeEventListener('mousedown', handlePointerDown);
+        };
+    }, [leaderViewer?.rowKey, refreshLeaderViewerPosition]);
+
     useEffect(() => () => clearPreviewHoverTimer(), [clearPreviewHoverTimer]);
 
     useEffect(() => () => clearAssigneeHoverTimer(), [clearAssigneeHoverTimer]);
+
+    useEffect(() => () => clearLeaderHoverTimer(), [clearLeaderHoverTimer]);
 
     // Clear selection if item no longer exists
     useEffect(() => {
@@ -2499,6 +2640,15 @@ export default function GanttChart({
         }
         refreshAssigneeViewerPosition(assigneeViewer.rowKey);
     }, [assigneeViewer?.rowKey, assigneeViewerData, refreshAssigneeViewerPosition]);
+
+    useEffect(() => {
+        if (!leaderViewer?.rowKey) return;
+        if (!leaderViewerData) {
+            setLeaderViewer(null);
+            return;
+        }
+        refreshLeaderViewerPosition(leaderViewer.rowKey);
+    }, [leaderViewer?.rowKey, leaderViewerData, refreshLeaderViewerPosition]);
 
     // Compute timeline columns
     const { columns, topHeaders, colWidth, totalWidth } = useMemo(() => {
@@ -3705,6 +3855,7 @@ export default function GanttChart({
                                             const assignments = row.type !== 'phase' ? (row.data.assignments || []) : [];
                                             const leader = row.type !== 'phase' ? row.data.leader : null;
                                             const assigneeViewerOpen = assigneeViewer?.rowKey === rowKey;
+                                            const leaderViewerOpen = leaderViewer?.rowKey === rowKey;
                                             const cellEditable = row.type !== 'phase' && (
                                                 (col.key === 'status' && canEditStatusForRow)
                                                 || (col.key !== 'leader' && col.key !== 'assignees' && col.key !== 'status' && canEdit)
@@ -3725,7 +3876,18 @@ export default function GanttChart({
                                                     {col.key === 'leader' && row.type !== 'phase' && (
                                                         <div className="gantt-col-leader-wrap">
                                                             {leader ? (
-                                                                <div className="gantt-col-leader" title={leader.fullName || 'Unknown member'}>
+                                                                <button
+                                                                    type="button"
+                                                                    className="gantt-col-leader-trigger"
+                                                                    aria-label={`View leader for ${row.data.title}`}
+                                                                    aria-haspopup="dialog"
+                                                                    data-viewer-open={leaderViewerOpen ? 'true' : 'false'}
+                                                                    ref={setLeaderTriggerRef(rowKey)}
+                                                                    onMouseEnter={(event) => handleLeaderMouseEnter(rowKey, event)}
+                                                                    onMouseLeave={() => handleLeaderMouseLeave(rowKey)}
+                                                                    onClick={(event) => handleLeaderClick(rowKey, event)}
+                                                                    title={leader.fullName || 'Unknown member'}
+                                                                >
                                                                     <span className={`gantt-col-avatar gantt-col-leader-avatar${leader.profilePhotoUrl ? '' : ' gantt-col-avatar--solid'}`}>
                                                                         {leader.profilePhotoUrl ? (
                                                                             <img src={getProfilePhotoUrl(leader.id) || undefined} alt="" />
@@ -3733,8 +3895,7 @@ export default function GanttChart({
                                                                             (leader.fullName || '?').charAt(0).toUpperCase()
                                                                         )}
                                                                     </span>
-                                                                    <span className="gantt-col-leader-name">{leader.fullName || 'Unknown member'}</span>
-                                                                </div>
+                                                                </button>
                                                             ) : (
                                                                 <span className="gantt-col-no-assignee">—</span>
                                                             )}
@@ -4194,6 +4355,59 @@ export default function GanttChart({
                                     </div>
                                 );
                             })}
+                        </div>
+                    </div>
+                )}
+
+                {leaderViewer && leaderViewerData && leaderViewer.position && (
+                    <div
+                        ref={(node) => {
+                            leaderViewerPopoverRef.current = node;
+                            applyElementStyles(node, {
+                                left: `${leaderViewer.position.left}px`,
+                                top: `${leaderViewer.position.top}px`,
+                                width: `${leaderViewer.position.width}px`,
+                            });
+                        }}
+                        className={`gantt-preview-popover gantt-preview-popover--${leaderViewer.position.placement} gantt-leader-viewer`}
+                        role="dialog"
+                        aria-label="Task leader"
+                        onClick={(event) => event.stopPropagation()}
+                        onMouseEnter={() => clearLeaderHoverTimer()}
+                        onMouseLeave={() => {
+                            if (!leaderViewer?.pinned) {
+                                setLeaderViewer(null);
+                            }
+                        }}
+                    >
+                        <div className="gantt-preview-header gantt-leader-viewer-header">
+                            <div className="gantt-preview-heading">
+                                <span className="gantt-preview-kind">Leader</span>
+                                <h4 className="gantt-preview-title">{leaderViewerData.title}</h4>
+                            </div>
+                            <button
+                                type="button"
+                                className="gantt-preview-close"
+                                onClick={() => setLeaderViewer(null)}
+                                aria-label="Close leader card"
+                            >
+                                <X size={12} />
+                            </button>
+                        </div>
+
+                        <div className="gantt-assignees-viewer-list">
+                            <div className="gantt-assignees-viewer-item">
+                                <span className={`gantt-col-avatar gantt-assignees-viewer-avatar${leaderViewerData.leader.profilePhotoUrl ? '' : ' gantt-col-avatar--solid'}`}>
+                                    {leaderViewerData.leader.profilePhotoUrl ? (
+                                        <img src={getProfilePhotoUrl(leaderViewerData.leader.id) || undefined} alt="" />
+                                    ) : (
+                                        (leaderViewerData.leader.fullName || '?').charAt(0).toUpperCase()
+                                    )}
+                                </span>
+                                <div className="gantt-assignees-viewer-name" title={leaderViewerData.leader.fullName || 'Unknown member'}>
+                                    {leaderViewerData.leader.fullName || 'Unknown member'}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
