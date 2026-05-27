@@ -28,6 +28,11 @@ import {
 import { tasksAPI, phasesAPI, getProfilePhotoUrl } from '../../../../services/api';
 import DeletePhaseTaskModal from '../../modals/DeletePhaseTaskModal';
 import ScheduleTimetable from '../ScheduleTimetable/ScheduleTimetable';
+import {
+    collectScheduleTimelineSlots,
+    getScheduleSlotLabel,
+    groupScheduleSlotsByMember,
+} from './scheduleTimelineExport';
 import './GanttChart.css';
 
 type ScaleKey = 'quarter' | 'month' | 'week' | 'day';
@@ -107,8 +112,9 @@ const STATUS_PROGRESS: Record<string, number> = {
     CANCELLED: 0,
 };
 
-// Toggleable attribute columns (order: assignees, status, priority, difficulty)
+// Toggleable attribute columns (order: leader, assignees, status, priority, difficulty)
 const ATTR_COLUMNS: Array<{ key: string; label: string; width: number }> = [
+    { key: 'leader', label: 'Leader', width: 140 },
     { key: 'assignees', label: 'Assignees', width: 100 },
     { key: 'status', label: 'Status', width: 120 },
     { key: 'priority', label: 'Priority', width: 75 },
@@ -579,10 +585,10 @@ function formatPreviewDateLabel(value: any) {
     const date = getDateOrNull(value);
     if (!date) return '—';
 
-    return date.toLocaleDateString([], {
-        month: 'short',
-        day: '2-digit',
-    });
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear()).slice(-2);
+    return `${day}/${month}/${year}`;
 }
 
 function uniqueSlots(slots: any[] = []) {
@@ -794,6 +800,9 @@ function buildExportRows(phases: any[] = []) {
                 .map((dependency: any) => dependency.dependsOnTask?.title || dependency.dependsOnTask?.fileName || dependency.dependsOnTaskId)
                 .filter(Boolean)
                 .join(', '),
+            leader: type === 'phase'
+                ? ''
+                : (data?.leader?.fullName || data?.leader?.name || data?.leaderName || ''),
             assignees: assignments
                 .map((assignment: any) => assignment.member?.fullName || assignment.fullName || assignment.name || assignment.memberName)
                 .filter(Boolean)
@@ -916,15 +925,6 @@ function buildExportTimeline(rangeStart: any, rangeEnd: any) {
     };
 }
 
-function collectScheduleTimelineSlots(projectDetail: any, allTaskNodes: any[] = []) {
-    const slotSources = [
-        ...(projectDetail?.scheduleSlots || []),
-        ...allTaskNodes.flatMap((node) => node.data?.scheduleSlots || []),
-    ];
-
-    return uniqueSlots(slotSources).filter((slot) => getDateOrNull(slot?.startDateTime) && getDateOrNull(slot?.endDateTime));
-}
-
 function formatScheduleClock(date: any) {
     const value = getDateOrNull(date);
     if (!value) return '—';
@@ -948,20 +948,6 @@ function getScheduleTimelineMinuteOffset(date: any, timelineStart: Date | null) 
     const current = getDateOrNull(date);
     if (!current || !timelineStart) return null;
     return (current.getTime() - timelineStart.getTime()) / 60000;
-}
-
-function getScheduleMemberLabel(slot: any) {
-    const fullName = String(slot?.member?.fullName || '').trim();
-    if (fullName) return fullName;
-
-    const fallbackId = slot?.member?.id ?? slot?.memberId ?? slot?.createdBy?.id ?? slot?.createdByMemberId ?? null;
-    if (fallbackId != null) return `Member #${fallbackId}`;
-
-    return 'Member';
-}
-
-function getScheduleSlotLabel(slot: any) {
-    return String(slot?.title || slot?.task?.title || 'Time slot').trim();
 }
 
 function buildScheduleTimelineExport(slots: any[] = []) {
@@ -1025,37 +1011,6 @@ function buildScheduleTimelineExport(slots: any[] = []) {
         timelineStart: startOfDay(timelineStart),
         timelineEnd: startOfDay(timelineEnd),
     };
-}
-
-function groupScheduleSlotsByMember(slots: any[] = []) {
-    const groups = new Map<any, any>();
-
-    for (const slot of slots) {
-        const key = slot?.member?.id ?? slot?.memberId ?? slot?.createdBy?.id ?? slot?.createdByMemberId ?? slot?.id ?? `slot-${slot?.id}`;
-        const label = getScheduleMemberLabel(slot);
-
-        if (!groups.has(key)) {
-            groups.set(key, { key, label, slots: [] });
-        }
-
-        const group = groups.get(key);
-        if (!group.label || group.label === 'Member') {
-            group.label = label;
-        }
-
-        group.slots.push(slot);
-    }
-
-    return [...groups.values()]
-        .map((group) => ({
-            ...group,
-            slots: group.slots.sort((a: any, b: any) => {
-                const startA = getDateOrNull(a.startDateTime)?.getTime() ?? 0;
-                const startB = getDateOrNull(b.startDateTime)?.getTime() ?? 0;
-                return startA - startB;
-            }),
-        }))
-        .sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''));
 }
 
 function buildScheduleTimelineSheet(XLSX: any, slots: any[] = []) {
@@ -1156,7 +1111,7 @@ function buildScheduleTimelineSheet(XLSX: any, slots: any[] = []) {
     sheet['!rows'] = [
         { hpt: 24 },
         { hpt: 20 },
-        ...groupedSlots.map(() => ({ hpt: 48 })),
+        ...groupedSlots.map(() => ({ hpt: 60 })),
     ];
 
     const styleCell = (rowIndex: number, colIndex: number, styles: any, value = '') => {
@@ -2235,11 +2190,15 @@ export default function GanttChart({
         const estimatedHours = previewRow.type === 'phase'
             ? null
             : previewRow.data?.estimatedHours;
+        const description = typeof previewRow.data?.description === 'string'
+            ? previewRow.data.description.trim()
+            : '';
 
         return {
             row: previewRow,
             kindLabel: getPreviewKindLabel(previewRow.type),
             title: previewRow.data?.title || '',
+            description,
             estimatedHours,
             estimatedHoursLabel: formatEstimatedHoursLabel(estimatedHours),
             dependencyLabels: getDependencyLabels(dependencies),
@@ -2789,7 +2748,7 @@ export default function GanttChart({
             const exportRange = getExportDateRange(phases, projectStartDate, projectDueDate);
             const timeline = buildExportTimeline(exportRange.start, exportRange.end);
 
-            const metaHeaders = ['WBS', 'Name', 'Type', 'Dependencies', 'Assignees', 'Priority', 'Difficulty', 'Status', 'Start', 'Due', 'Duration'];
+            const metaHeaders = ['WBS', 'Name', 'Type', 'Dependencies', 'Leader', 'Assignees', 'Priority', 'Difficulty', 'Status', 'Start', 'Due', 'Duration'];
             const headerRows = 5;
             const metaColumnCount = metaHeaders.length;
             const dateColumnStart = metaColumnCount;
@@ -2838,13 +2797,14 @@ export default function GanttChart({
                 matrix[sheetRow][1] = `${'  '.repeat(row.depth)}${row.name}`;
                 matrix[sheetRow][2] = row.type.charAt(0).toUpperCase() + row.type.slice(1);
                 matrix[sheetRow][3] = row.dependencies;
-                matrix[sheetRow][4] = row.assignees;
-                matrix[sheetRow][5] = row.priority;
-                matrix[sheetRow][6] = row.difficulty;
-                matrix[sheetRow][7] = row.status;
-                matrix[sheetRow][8] = formatExportDate(row.start);
-                matrix[sheetRow][9] = formatExportDate(row.end);
-                matrix[sheetRow][10] = row.durationDays;
+                matrix[sheetRow][4] = row.leader;
+                matrix[sheetRow][5] = row.assignees;
+                matrix[sheetRow][6] = row.priority;
+                matrix[sheetRow][7] = row.difficulty;
+                matrix[sheetRow][8] = row.status;
+                matrix[sheetRow][9] = formatExportDate(row.start);
+                matrix[sheetRow][10] = formatExportDate(row.end);
+                matrix[sheetRow][11] = row.durationDays;
 
                 const rowStart = row.start || row.end;
                 const rowEnd = row.end || row.start;
@@ -3743,10 +3703,11 @@ export default function GanttChart({
                                             const rowAssignedToCurrentUser = isRowAssignedToCurrentUser(row);
                                             const canEditStatusForRow = row.type !== 'phase' && canEditStatus && (canEdit || rowAssignedToCurrentUser);
                                             const assignments = row.type !== 'phase' ? (row.data.assignments || []) : [];
+                                            const leader = row.type !== 'phase' ? row.data.leader : null;
                                             const assigneeViewerOpen = assigneeViewer?.rowKey === rowKey;
                                             const cellEditable = row.type !== 'phase' && (
                                                 (col.key === 'status' && canEditStatusForRow)
-                                                || (col.key !== 'assignees' && col.key !== 'status' && canEdit)
+                                                || (col.key !== 'leader' && col.key !== 'assignees' && col.key !== 'status' && canEdit)
                                             );
                                             return (
                                                 <div
@@ -3761,6 +3722,25 @@ export default function GanttChart({
                                                     }}
                                                 >
                                                     {/* Assignees */}
+                                                    {col.key === 'leader' && row.type !== 'phase' && (
+                                                        <div className="gantt-col-leader-wrap">
+                                                            {leader ? (
+                                                                <div className="gantt-col-leader" title={leader.fullName || 'Unknown member'}>
+                                                                    <span className={`gantt-col-avatar gantt-col-leader-avatar${leader.profilePhotoUrl ? '' : ' gantt-col-avatar--solid'}`}>
+                                                                        {leader.profilePhotoUrl ? (
+                                                                            <img src={getProfilePhotoUrl(leader.id) || undefined} alt="" />
+                                                                        ) : (
+                                                                            (leader.fullName || '?').charAt(0).toUpperCase()
+                                                                        )}
+                                                                    </span>
+                                                                    <span className="gantt-col-leader-name">{leader.fullName || 'Unknown member'}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="gantt-col-no-assignee">—</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+
                                                     {col.key === 'assignees' && row.type !== 'phase' && (
                                                         <div className="gantt-col-assignees-wrap">
                                                             {assignments.length > 0 ? (
@@ -4109,11 +4089,13 @@ export default function GanttChart({
                         </div>
 
                         <div className="gantt-preview-meta">
+                            {/**
                             <span
                                 className="gantt-preview-pill"
                             >
                                 Est. hours: {previewData.estimatedHoursLabel}
                             </span>
+                            */}
                             <span
                                 className="gantt-preview-pill"
                             >
@@ -4124,16 +4106,22 @@ export default function GanttChart({
                             )}
                         </div>
 
-                        <div className="gantt-preview-dates">
-                            <div className="gantt-preview-date-card">
-                                <span>Start</span>
-                                <strong>{formatPreviewDateLabel(previewData.baseRange.start || previewData.window?.start)}</strong>
-                            </div>
-                            <div className="gantt-preview-date-card">
-                                <span>End</span>
-                                <strong>{formatPreviewDateLabel(previewData.baseRange.end || previewData.window?.end)}</strong>
-                            </div>
+                        <div className="gantt-preview-range">
+                            <span className="gantt-preview-range-label">Dates</span>
+                            <strong className="gantt-preview-range-value">
+                                {formatPreviewDateLabel(previewData.baseRange.start || previewData.window?.start)}
+                                {'    →    '}
+                                {formatPreviewDateLabel(previewData.baseRange.end || previewData.window?.end)}
+                            </strong>
                         </div>
+
+                        {previewData.description && (
+                            <div className="gantt-preview-description">
+                                <span className="gantt-preview-description-label">Description</span>
+                                <p className="gantt-preview-description-text">{previewData.description}</p>
+                            </div>
+                        )}
+
 
                         <div className="gantt-preview-summary">
                             {previewData.slots.length} slot{previewData.slots.length === 1 ? '' : 's'} across {previewData.memberCount} member{previewData.memberCount === 1 ? '' : 's'}

@@ -32,6 +32,7 @@ model Member {
   roleHistory     MemberRoleHistory[]
   alumniRecords   Alumni[]
   createdProjects     Project[]               // Projects created by this member
+  leadingTasks        Task[]                  // Tasks where this member is the optional leader
   taskAssignments     TaskAssignment[]        // Tasks assigned to this member
   taskComments        TaskComment[]           // Comments on tasks
   projectFileComments ProjectFileComment[]    // Comments on project files
@@ -404,6 +405,7 @@ model Task {
   projectId       Int
   parentTaskId    Int?      // For subtasks - null if top-level task
   phaseId         Int?      // Optional: which phase this task belongs to
+  leaderId        Int?      // Optional ownership lead for the task
   type            String
   title           String
   description     String?
@@ -428,6 +430,7 @@ model Task {
   parentTask      Task?              @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
   subtasks        Task[]             @relation("TaskSubtasks")
   phase           ProjectPhase?      @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  leader          Member?            @relation(fields: [leaderId], references: [id], onDelete: SetNull)
   taskTeams       TaskTeam[]         // Teams assigned to this task
   assignments     TaskAssignment[]   // Individual members assigned
   comments        TaskComment[]      // Comments/discussion
@@ -440,6 +443,7 @@ model Task {
   
   @@index([projectId])
   @@index([parentTaskId])
+  @@index([leaderId])
   @@index([status])
   @@index([dueDate])
   @@index([priority])

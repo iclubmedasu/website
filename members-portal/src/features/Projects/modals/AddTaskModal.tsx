@@ -54,6 +54,7 @@ interface TaskFormState {
     dueDate: string;
     estimatedHours: string;
     actualHours: string;
+    leaderId: Id | null;
     assigneeIds: Id[];
 }
 
@@ -91,6 +92,7 @@ export default function AddTaskModal({
         dueDate: '',
         estimatedHours: '',
         actualHours: '',
+        leaderId: null,
         assigneeIds: [],
     });
     const [loading, setLoading] = useState(false);
@@ -113,6 +115,13 @@ export default function AddTaskModal({
                     : [...current.assigneeIds, memberId],
             };
         });
+    };
+
+    const toggleLeader = (memberId: Id) => {
+        setForm((current) => ({
+            ...current,
+            leaderId: current.leaderId === memberId ? null : memberId,
+        }));
     };
 
     const handleSubmit = async () => {
@@ -139,6 +148,7 @@ export default function AddTaskModal({
                 startDate: form.startDate || null,
                 dueDate: form.dueDate || null,
                 estimatedHours: form.estimatedHours ? parseFloat(form.estimatedHours) : null,
+                leaderId: form.leaderId,
                 assigneeIds: form.assigneeIds,
             };
 
@@ -277,6 +287,37 @@ export default function AddTaskModal({
                             </div>
                         </div>
                     </div>
+
+                    {allMembers.length > 0 && (
+                        <div className="form-section">
+                            <h3 className="form-section-title">Task Leader</h3>
+                            <p className="form-hint">Optional. Choose one member to represent ownership for this task.</p>
+                            {form.leaderId ? (
+                                <div className="form-group">
+                                    <button className="btn btn-secondary" type="button" onClick={() => setForm((current) => ({ ...current, leaderId: null }))}>
+                                        Clear Leader
+                                    </button>
+                                </div>
+                            ) : (
+                                <p className="form-hint">No leader selected.</p>
+                            )}
+                            <div className="team-badge-picker">
+                                {allMembers.map((member) => {
+                                    const selected = form.leaderId === member.id;
+                                    return (
+                                        <button
+                                            key={member.id}
+                                            type="button"
+                                            className={`team-badge-option${selected ? ' team-badge-option--selected' : ''}`}
+                                            onClick={() => toggleLeader(member.id)}
+                                        >
+                                            {member.fullName}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     {allMembers.length > 0 && (
                         <div className="form-section">

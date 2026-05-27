@@ -79,6 +79,7 @@ interface EditTaskFormState {
     dueDate: string;
     estimatedHours: string;
     actualHours: string;
+    leaderId: Id | null;
     assigneeIds: Id[];
 }
 
@@ -146,6 +147,7 @@ export default function EditTaskModal({
         dueDate: '',
         estimatedHours: '',
         actualHours: '',
+        leaderId: null,
         assigneeIds: [],
     });
     const [loading, setLoading] = useState(false);
@@ -167,6 +169,7 @@ export default function EditTaskModal({
                 dueDate: task.dueDate ? task.dueDate.slice(0, 10) : '',
                 estimatedHours: task.estimatedHours != null ? String(task.estimatedHours) : '',
                 actualHours: task.actualHours != null ? String(task.actualHours) : '',
+                leaderId: task.leader?.id ?? task.leaderId ?? null,
                 assigneeIds: (task.assignments || [])
                     .map((assignment) => assignment.member?.id ?? assignment.memberId)
                     .filter((memberId): memberId is Id => memberId != null),
@@ -216,6 +219,13 @@ export default function EditTaskModal({
                     : [...current.assigneeIds, memberId],
             };
         });
+    };
+
+    const toggleLeader = (memberId: Id) => {
+        setForm((current) => ({
+            ...current,
+            leaderId: current.leaderId === memberId ? null : memberId,
+        }));
     };
 
     const refreshTaskDetail = async () => {
@@ -299,6 +309,7 @@ export default function EditTaskModal({
                     dueDate: form.dueDate || null,
                     estimatedHours: form.estimatedHours !== '' ? parseFloat(form.estimatedHours) : null,
                     actualHours: form.actualHours !== '' ? parseFloat(form.actualHours) : null,
+                    leaderId: form.leaderId,
                     assigneeIds: form.assigneeIds,
                 };
 
@@ -568,6 +579,40 @@ export default function EditTaskModal({
                                 )}
                             </div>
                         </div>
+                    </div>
+
+                    <div className="form-section">
+                        <h3 className="form-section-title">Task Leader</h3>
+                        <p className="form-hint">Optional. Choose one member to represent ownership for this task.</p>
+                        {form.leaderId ? (
+                            <div className="form-group">
+                                <button className="btn btn-secondary" type="button" onClick={() => setForm((current) => ({ ...current, leaderId: null }))} disabled={!canManageTask}>
+                                    Clear Leader
+                                </button>
+                            </div>
+                        ) : (
+                            <p className="form-hint">No leader selected.</p>
+                        )}
+                        {allMembers.length > 0 ? (
+                            <div className="team-badge-picker">
+                                {allMembers.map((member) => {
+                                    const selected = form.leaderId === member.id;
+                                    return (
+                                        <button
+                                            key={member.id}
+                                            type="button"
+                                            className={`team-badge-option${selected ? ' team-badge-option--selected' : ''}`}
+                                            onClick={() => toggleLeader(member.id)}
+                                            disabled={!canManageTask}
+                                        >
+                                            {member.fullName}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p className="form-hint">No members available.</p>
+                        )}
                     </div>
 
                     <div className="form-section">

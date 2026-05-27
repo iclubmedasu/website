@@ -89,6 +89,7 @@ export interface TaskSummary {
     projectId: Id;
     phaseId?: Id | null;
     parentTaskId?: Id | null;
+    leaderId?: Id | null;
     title: string;
     description?: string | null;
     status: TaskStatus;
@@ -101,6 +102,7 @@ export interface TaskSummary {
     completedDate?: ISODateTime | null;
     estimatedHours?: number | null;
     actualHours?: number | null;
+    leader?: MemberSummary | null;
     assignments?: Array<{
         memberId: Id;
         status?: TaskAssignmentStatus;
@@ -132,6 +134,7 @@ export interface Task {
     baselineDueDate: ISODateTime | null;
     estimatedHours: number | null;
     actualHours: number | null;
+    leaderId: Id | null;
     isActive: boolean;
     createdAt: ISODateTime;
     updatedAt: ISODateTime;
@@ -150,6 +153,7 @@ export interface CreateTaskPayload {
     startDate?: ISODateTime | null;
     dueDate?: ISODateTime | null;
     estimatedHours?: number | null;
+    leaderId?: Id | null;
     teamIds?: Id[];
     assigneeIds?: Id[];
 }
@@ -169,6 +173,7 @@ export interface UpdateTaskPayload {
     phaseId?: Id | null;
     parentTaskId?: Id | null;
     order?: number;
+    leaderId?: Id | null;
     assigneeIds?: Id[];
 }
 

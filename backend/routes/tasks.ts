@@ -110,6 +110,18 @@ function parseIdArray(values: any) {
     return [...new Set(parsed)];
 }
 
+function parseNullableIdField(value: any) {
+    if (value === undefined) return { provided: false, valid: true, value: null };
+    if (value === null || value === '') return { provided: true, valid: true, value: null };
+
+    const parsed = parseInt(String(value), 10);
+    if (Number.isNaN(parsed)) {
+        return { provided: true, valid: false, value: null };
+    }
+
+    return { provided: true, valid: true, value: parsed };
+}
+
 async function getProjectTeamIds(projectId: number) {
     const rows = await prisma.projectTeam.findMany({
         where: { projectId },
@@ -266,6 +278,9 @@ router.get('/', async (req, res) => {
             where,
             include: {
                 project: { select: { id: true, title: true } },
+                leader: {
+                    select: { id: true, fullName: true, profilePhotoUrl: true },
+                },
                 assignments: {
                     include: {
                         member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
@@ -301,6 +316,9 @@ router.get('/:id', async (req, res) => {
                 project: { select: { id: true, title: true } },
                 parentTask: { select: { id: true, title: true } },
                 phase: { select: { id: true, title: true } },
+                leader: {
+                    select: { id: true, fullName: true, profilePhotoUrl: true },
+                },
                 subtasks: {
                     where: { isActive: true },
                     orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
@@ -373,7 +391,7 @@ router.get('/:id', async (req, res) => {
 // ============================================
 // POST /api/tasks  â€“  create task (or subtask)
 // Body: { projectId, parentTaskId?, title, description, type, priority, status,
-//          startDate, dueDate, estimatedHours, teamIds, assigneeIds }
+//          startDate, dueDate, estimatedHours, teamIds, leaderId, assigneeIds }
 // ============================================
 router.post('/', async (req, res) => {
     try {
@@ -391,6 +409,7 @@ router.post('/', async (req, res) => {
             dueDate,
             estimatedHours,
             teamIds = [],
+            leaderId = null,
             assigneeIds = [],
         } = req.body;
 
@@ -420,6 +439,20 @@ router.post('/', async (req, res) => {
                 return res.status(403).json({
                     error: 'Assignees must belong to teams that are assigned to this project',
                     invalidMemberIds: invalidAssigneeIds,
+                });
+            }
+        }
+
+        const parsedLeaderId = parseNullableIdField(leaderId);
+        if (!parsedLeaderId.valid) {
+            return res.status(400).json({ error: 'leaderId must be a numeric ID or null' });
+        }
+        if (parsedLeaderId.value !== null) {
+            const invalidLeaderIds = await getInvalidAssigneeIds(projectIdInt, [parsedLeaderId.value]);
+            if (invalidLeaderIds.length > 0) {
+                return res.status(403).json({
+                    error: 'Leader must belong to teams that are assigned to this project',
+                    invalidMemberIds: invalidLeaderIds,
                 });
             }
         }
@@ -454,6 +487,7 @@ router.post('/', async (req, res) => {
                 startDate: startDate ? new Date(startDate) : null,
                 dueDate: dueDate ? new Date(dueDate) : null,
                 estimatedHours: estimatedHours ? parseFloat(estimatedHours) : null,
+                leaderId: parsedLeaderId.value,
                 taskTeams: {
                     create: parsedTeamIds.map((teamId) => ({
                         teamId,
@@ -471,6 +505,9 @@ router.post('/', async (req, res) => {
             },
             include: {
                 project: { select: { id: true, title: true } },
+                leader: {
+                    select: { id: true, fullName: true, profilePhotoUrl: true },
+                },
                 taskTeams: { include: { team: { select: { id: true, name: true } } } },
                 assignments: {
                     include: {
@@ -556,6 +593,7 @@ router.put('/:id', async (req, res) => {
                 phaseId: true,
                 parentTaskId: true,
                 order: true,
+                leaderId: true,
                 startDate: true,
                 dueDate: true,
                 completedDate: true,
@@ -585,6 +623,7 @@ router.put('/:id', async (req, res) => {
             completedDate,
             estimatedHours,
             actualHours,
+            leaderId,
             assigneeIds,
         } = req.body;
 
@@ -610,6 +649,25 @@ router.put('/:id', async (req, res) => {
         if (completedDate !== undefined) data.completedDate = completedDate ? new Date(completedDate) : null;
         if (estimatedHours !== undefined) data.estimatedHours = estimatedHours !== '' && estimatedHours !== null ? parseFloat(estimatedHours) : null;
         if (actualHours !== undefined) data.actualHours = actualHours !== '' && actualHours !== null ? parseFloat(actualHours) : null;
+
+        if (leaderId !== undefined) {
+            const parsedLeaderId = parseNullableIdField(leaderId);
+            if (!parsedLeaderId.valid) {
+                return res.status(400).json({ error: 'leaderId must be a numeric ID or null' });
+            }
+
+            if (parsedLeaderId.value !== null) {
+                const invalidLeaderIds = await getInvalidAssigneeIds(before.projectId, [parsedLeaderId.value]);
+                if (invalidLeaderIds.length > 0) {
+                    return res.status(403).json({
+                        error: 'Leader must belong to teams that are assigned to this project',
+                        invalidMemberIds: invalidLeaderIds,
+                    });
+                }
+            }
+
+            data.leaderId = parsedLeaderId.value;
+        }
 
         if (assigneeIds !== undefined) {
             const parsedAssigneeIds = parseIdArray(assigneeIds);
@@ -646,6 +704,9 @@ router.put('/:id', async (req, res) => {
             data,
             include: {
                 project: { select: { id: true, title: true } },
+                leader: {
+                    select: { id: true, fullName: true, profilePhotoUrl: true },
+                },
                 taskTeams: { include: { team: { select: { id: true, name: true } } } },
                 assignments: {
                     include: {
@@ -666,6 +727,7 @@ router.put('/:id', async (req, res) => {
             phaseId: task.phaseId,
             parentTaskId: task.parentTaskId,
             order: task.order,
+            leaderId: task.leaderId,
             startDate: task.startDate,
             dueDate: task.dueDate,
             completedDate: task.completedDate,
@@ -688,6 +750,7 @@ router.put('/:id', async (req, res) => {
             phaseId: 'phase',
             parentTaskId: 'parent task',
             order: 'order',
+            leaderId: 'leader',
             startDate: 'start date',
             dueDate: 'due date',
             completedDate: 'completed date',

@@ -246,6 +246,144 @@ describe('tasks routes integration', () => {
         expect(notificationMocks.emitNotificationEvent).not.toHaveBeenCalled()
     })
 
+    it('persists an optional task leader during creation', async () => {
+        prismaMocks.taskFindFirst.mockResolvedValueOnce({ order: 2 })
+        prismaMocks.projectTeamFindMany.mockResolvedValueOnce([{ teamId: 5 }])
+        prismaMocks.teamMemberFindMany.mockResolvedValueOnce([{ memberId: 7 }])
+        prismaMocks.taskCreate.mockResolvedValueOnce({
+            id: 92,
+            title: 'Leader Task',
+            leaderId: 7,
+            leader: { id: 7, fullName: 'Task Leader', profilePhotoUrl: null },
+            project: { id: 22, title: 'Platform Upgrade' },
+            taskTeams: [],
+            assignments: [],
+            tags: []
+        })
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 12, isLeadership: true }))
+            .post('/')
+            .send({
+                projectId: 22,
+                title: 'leader task',
+                leaderId: 7,
+                assigneeIds: [],
+            })
+
+        expect(response.status).toBe(201)
+        expect(prismaMocks.taskCreate).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({
+                leaderId: 7,
+            })
+        }))
+        expect(response.body.leaderId).toBe(7)
+    })
+
+    it('updates task leader independently of assignees', async () => {
+        prismaMocks.taskFindUnique
+            .mockResolvedValueOnce({
+                title: 'Task With Leader Change',
+                description: null,
+                type: 'TASK',
+                priority: 'MEDIUM',
+                status: 'NOT_STARTED',
+                difficulty: 'MEDIUM',
+                phaseId: null,
+                parentTaskId: null,
+                order: 1,
+                leaderId: null,
+                startDate: null,
+                dueDate: null,
+                completedDate: null,
+                estimatedHours: null,
+                actualHours: null,
+                projectId: 22,
+                assignments: []
+            })
+            .mockResolvedValueOnce({ parentTaskId: null })
+        prismaMocks.projectTeamFindMany.mockResolvedValueOnce([{ teamId: 5 }])
+        prismaMocks.teamMemberFindMany.mockResolvedValueOnce([{ memberId: 14 }])
+        prismaMocks.taskUpdate.mockResolvedValueOnce({
+            id: 77,
+            title: 'Task With Leader Change',
+            description: null,
+            type: 'TASK',
+            priority: 'MEDIUM',
+            status: 'NOT_STARTED',
+            difficulty: 'MEDIUM',
+            phaseId: null,
+            parentTaskId: null,
+            order: 1,
+            leaderId: 14,
+            leader: { id: 14, fullName: 'Lead Member', profilePhotoUrl: null },
+            startDate: null,
+            dueDate: null,
+            completedDate: null,
+            estimatedHours: null,
+            actualHours: null,
+            project: { id: 22, title: 'Project A' },
+            taskTeams: [],
+            assignments: [],
+            tags: []
+        })
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 3, isOfficer: true }))
+            .put('/77')
+            .send({ leaderId: 14 })
+
+        expect(response.status).toBe(200)
+        expect(prismaMocks.taskUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.objectContaining({
+                leaderId: 14,
+            })
+        }))
+        expect(activityMocks.collectChangedFields).toHaveBeenCalledWith(
+            expect.any(Object),
+            expect.objectContaining({ leaderId: 14 }),
+            expect.objectContaining({ leaderId: 'leader' }),
+        )
+    })
+
+    it('does not copy task leader when duplicating a task', async () => {
+        prismaMocks.taskFindFirst.mockResolvedValueOnce({ order: 2 })
+        prismaMocks.taskFindUnique.mockResolvedValueOnce({
+            id: 77,
+            projectId: 22,
+            parentTaskId: null,
+            phaseId: null,
+            title: 'Leader Template',
+            description: 'Template task',
+            type: 'TASK',
+            status: 'IN_PROGRESS',
+            difficulty: 'MEDIUM',
+            priority: 'HIGH',
+            startDate: null,
+            dueDate: null,
+            estimatedHours: null,
+            leaderId: 14,
+            subtasks: [],
+            taskTeams: [{ teamId: 5, canEdit: true }],
+        })
+        prismaMocks.taskTeamCreate.mockResolvedValueOnce({})
+        prismaMocks.taskCreate.mockResolvedValueOnce({
+            id: 78,
+            title: 'Leader Template (Copy)',
+            projectId: 22,
+            taskTeams: [],
+            assignments: [],
+            tags: []
+        })
+
+        const response = await request(buildRouteApp(tasksRouter, { memberId: 3, isOfficer: true }))
+            .post('/77/duplicate')
+            .send({})
+
+        expect(response.status).toBe(201)
+        expect(prismaMocks.taskCreate).toHaveBeenCalledWith(expect.objectContaining({
+            data: expect.not.objectContaining({ leaderId: expect.anything() })
+        }))
+    })
+
     it('blocks status change for regular users not assigned to task', async () => {
         prismaMocks.taskAssignmentFindFirst.mockResolvedValueOnce(null)
 
