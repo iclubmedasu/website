@@ -3,6 +3,7 @@ import type { Id, ISODateTime } from "./member";
 export type NotificationEventType =
     | "TASK_ASSIGNED"
     | "TASK_SELF_ASSIGNED"
+    | "TASK_LEADER_ASSIGNED"
     | "TASK_STATUS_CHANGED"
     | "TASK_COMMENTED"
     | "PROJECT_CREATED"

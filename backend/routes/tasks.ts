@@ -42,6 +42,11 @@ function buildTaskAssignedBody(taskTitle: string, projectTitle?: string | null) 
     return `You were assigned to task "${taskTitle}"${projectSuffix}.`;
 }
 
+function buildTaskLeaderAssignedBody(taskTitle: string, projectTitle?: string | null) {
+    const projectSuffix = projectTitle ? ` in project "${projectTitle}"` : '';
+    return `You were assigned as the leader for task "${taskTitle}"${projectSuffix}.`;
+}
+
 // â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function getUserTeamIds(memberId) {
     const rows = await prisma.teamMember.findMany({
@@ -523,6 +528,41 @@ router.post('/', async (req, res) => {
             description: `Task "${task.title}" created`,
         });
 
+        if (parsedLeaderId.value !== null) {
+            try {
+                const emitResult = await emitNotificationEvent({
+                    eventType: 'TASK_LEADER_ASSIGNED',
+                    audienceType: 'TASK',
+                    actorMemberId: req.user.memberId,
+                    includeActor: parsedLeaderId.value === req.user.memberId,
+                    persistEventWhenNoRecipients: true,
+                    title: `Task Leader Assigned: ${task.title}`,
+                    body: buildTaskLeaderAssignedBody(task.title, task.project?.title),
+                    metadata: {
+                        taskId: task.id,
+                        projectId: task.project.id,
+                        projectTitle: task.project.title,
+                        leaderMemberId: parsedLeaderId.value,
+                    },
+                    audienceData: {
+                        taskId: task.id,
+                        recipientScope: 'member',
+                    },
+                    recipientMemberIds: [parsedLeaderId.value],
+                });
+                if (process.env.NODE_ENV !== 'production') {
+                    console.info('[notifications] POST /tasks TASK_LEADER_ASSIGNED emit result', {
+                        taskId: task.id,
+                        leaderMemberId: parsedLeaderId.value,
+                        eventPersisted: !!emitResult,
+                        notificationCount: emitResult?.notificationCount ?? 0,
+                    });
+                }
+            } catch (notificationError) {
+                console.error('POST /tasks leader assignment notification emit failed', notificationError);
+            }
+        }
+
         if (parsedAssigneeIds.length > 0) {
             try {
                 const emitResult = await emitNotificationEvent({
@@ -789,6 +829,44 @@ router.put('/:id', async (req, res) => {
                     },
                     recipientMemberIds: assigneeIds,
                 });
+            }
+        }
+
+        const leaderChanged = leaderId !== undefined && task.leaderId !== before.leaderId;
+        if (leaderChanged && task.leaderId !== null) {
+            try {
+                const emitResult = await emitNotificationEvent({
+                    eventType: 'TASK_LEADER_ASSIGNED',
+                    audienceType: 'TASK',
+                    actorMemberId: req.user.memberId,
+                    includeActor: task.leaderId === req.user.memberId,
+                    persistEventWhenNoRecipients: true,
+                    title: `Task Leader Assigned: ${task.title}`,
+                    body: buildTaskLeaderAssignedBody(task.title, task.project?.title),
+                    metadata: {
+                        taskId: id,
+                        projectId: before.projectId,
+                        projectTitle: task.project?.title || null,
+                        leaderMemberId: task.leaderId,
+                        previousLeaderMemberId: before.leaderId,
+                    },
+                    audienceData: {
+                        taskId: id,
+                        recipientScope: 'member',
+                    },
+                    recipientMemberIds: [task.leaderId],
+                });
+                if (process.env.NODE_ENV !== 'production') {
+                    console.info('[notifications] PUT /tasks/:id TASK_LEADER_ASSIGNED emit result', {
+                        taskId: id,
+                        leaderMemberId: task.leaderId,
+                        previousLeaderMemberId: before.leaderId,
+                        eventPersisted: !!emitResult,
+                        notificationCount: emitResult?.notificationCount ?? 0,
+                    });
+                }
+            } catch (notificationError) {
+                console.error('PUT /tasks/:id leader assignment notification emit failed', notificationError);
             }
         }
 

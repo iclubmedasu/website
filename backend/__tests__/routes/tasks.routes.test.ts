@@ -277,6 +277,17 @@ describe('tasks routes integration', () => {
             })
         }))
         expect(response.body.leaderId).toBe(7)
+        expect(notificationMocks.emitNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'TASK_LEADER_ASSIGNED',
+            recipientMemberIds: [7],
+            includeActor: false,
+            persistEventWhenNoRecipients: true,
+            body: 'You were assigned as the leader for task "Leader Task" in project "Platform Upgrade".',
+            metadata: expect.objectContaining({
+                projectTitle: 'Platform Upgrade',
+                leaderMemberId: 7,
+            }),
+        }))
     })
 
     it('updates task leader independently of assignees', async () => {
@@ -342,6 +353,18 @@ describe('tasks routes integration', () => {
             expect.objectContaining({ leaderId: 14 }),
             expect.objectContaining({ leaderId: 'leader' }),
         )
+        expect(notificationMocks.emitNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'TASK_LEADER_ASSIGNED',
+            recipientMemberIds: [14],
+            includeActor: false,
+            persistEventWhenNoRecipients: true,
+            body: 'You were assigned as the leader for task "Task With Leader Change" in project "Project A".',
+            metadata: expect.objectContaining({
+                projectTitle: 'Project A',
+                leaderMemberId: 14,
+                previousLeaderMemberId: null,
+            }),
+        }))
     })
 
     it('does not copy task leader when duplicating a task', async () => {
