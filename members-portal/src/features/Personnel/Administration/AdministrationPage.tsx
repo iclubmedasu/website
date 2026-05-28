@@ -8,6 +8,7 @@ import ViewMemberModal from '../Teams/modals/ViewMemberModal';
 import EditAdminMembersModal from './modals/EditAdminMembersModal';
 import AddOfficerModal from './modals/AddOfficerModal';
 import OfficerHandoverModal from './modals/OfficerHandoverModal';
+import LeadershipHandoverModal from './modals/LeadershipHandoverModal';
 import type { Id } from '../../../types/backend-contracts';
 
 import './AdministrationPage.css';
@@ -109,11 +110,14 @@ interface RoleSectionProps {
     assignee: TeamMemberAssignment | null;
     isOfficer: boolean;
     canEdit: boolean;
+    canBootstrapOfficer: boolean;
+    canManageLeadership: boolean;
     onAssign: (name: AdminRoleName) => void;
     onAddOfficer: () => void;
     onView: (memberId: Id) => void;
     onEdit: (assignee: TeamMemberAssignment) => void;
     onOfficerManage: (assignee: TeamMemberAssignment) => void;
+    onLeadershipManage: (assignee: TeamMemberAssignment) => void;
     onRemove: (assignmentId: Id | string) => Promise<void> | void;
     formatDate: (d: string | null | undefined) => string;
 }
@@ -144,6 +148,19 @@ interface OfficerRetirePayload {
 
 interface OfficerCreatePayload {
     identifier: string;
+}
+
+interface LeadershipHandoverSubmitPayload {
+    memberId: number;
+    targetAssignmentId?: Id | string | null;
+    changeReason?: string | null;
+    notes?: string | null;
+    outgoingDisposition: 'leave' | 'transfer';
+    outgoingChangeType: 'Retirement' | 'Resignation' | 'Expulsion' | 'Graduation';
+    outgoingTransferTeamId?: Id | string | null;
+    outgoingTransferRoleId?: Id | string | null;
+    outgoingChangeReason?: string | null;
+    outgoingNotes?: string | null;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -439,8 +456,9 @@ function AssignAdministrationModal({ isOpen, onClose, onSubmit, members, teams, 
     );
 }
 
-function RoleSection({ roleName, roleLabel, assignee, isOfficer, canEdit, onAssign, onAddOfficer, onView, onEdit, onOfficerManage, onRemove, formatDate }: RoleSectionProps) {
+function RoleSection({ roleName, roleLabel, assignee, isOfficer, canEdit, canBootstrapOfficer, canManageLeadership, onAssign, onAddOfficer, onView, onEdit, onOfficerManage, onLeadershipManage, onRemove, formatDate }: RoleSectionProps) {
     void onRemove;
+    const canManageThisLeadershipRole = canManageLeadership && (roleName === 'President' || roleName === 'Vice President');
     return (
         <div className="card administration-role-section">
             <div className="card-header card-header-with-action">
@@ -475,7 +493,7 @@ function RoleSection({ roleName, roleLabel, assignee, isOfficer, canEdit, onAssi
                             >
                                 <Eye />
                             </button>
-                            {canEdit && (isOfficer ? (
+                            {isOfficer && canEdit ? (
                                 <button
                                     type="button"
                                     className="table-action-btn edit-btn"
@@ -484,7 +502,16 @@ function RoleSection({ roleName, roleLabel, assignee, isOfficer, canEdit, onAssi
                                 >
                                     <UserCog size={18} />
                                 </button>
-                            ) : (
+                            ) : canManageThisLeadershipRole ? (
+                                <button
+                                    type="button"
+                                    className="table-action-btn edit-btn"
+                                    onClick={() => onLeadershipManage(assignee)}
+                                    title="Hand over role"
+                                >
+                                    <UserCog size={18} />
+                                </button>
+                            ) : canEdit ? (
                                 <button
                                     type="button"
                                     className="table-action-btn edit-btn"
@@ -493,7 +520,7 @@ function RoleSection({ roleName, roleLabel, assignee, isOfficer, canEdit, onAssi
                                 >
                                     <Pencil />
                                 </button>
-                            ))}
+                            ) : null}
                         </div>
                     </div>
                 ) : (
@@ -501,7 +528,18 @@ function RoleSection({ roleName, roleLabel, assignee, isOfficer, canEdit, onAssi
                         <p className="administration-empty-text">
                             {isOfficer ? 'No officer assigned' : 'No one assigned'}
                         </p>
-                        {canEdit && (
+                        {isOfficer ? (
+                            canBootstrapOfficer ? (
+                                <button
+                                    type="button"
+                                    className="empty-state-btn"
+                                    onClick={() => (isOfficer ? onAddOfficer() : onAssign(roleName))}
+                                >
+                                    <UserPlus size={18} />
+                                    {isOfficer ? 'Add Officer' : 'Assign member'}
+                                </button>
+                            ) : null
+                        ) : canEdit ? (
                             <button
                                 type="button"
                                 className="empty-state-btn"
@@ -510,7 +548,7 @@ function RoleSection({ roleName, roleLabel, assignee, isOfficer, canEdit, onAssi
                                 <UserPlus size={18} />
                                 {isOfficer ? 'Add Officer' : 'Assign member'}
                             </button>
-                        )}
+                        ) : null}
                     </div>
                 )}
             </div>
@@ -521,6 +559,8 @@ function RoleSection({ roleName, roleLabel, assignee, isOfficer, canEdit, onAssi
 function AdministrationPage() {
     const { user } = useAuth();
     const canEdit = !!(user?.isDeveloper || user?.isOfficer);
+    const canBootstrapOfficer = !!user?.isAdmin;
+    const canManageLeadership = !!user?.isAdmin;
 
     const [adminTeam, setAdminTeam] = useState<AdminTeamData | null>(null);
     const [members, setMembers] = useState<MemberOption[]>([]);
@@ -538,6 +578,8 @@ function AdministrationPage() {
     const [allSubteamsForModal, setAllSubteamsForModal] = useState<TeamSubteamOption[]>([]);
     const [showOfficerHandoverModal, setShowOfficerHandoverModal] = useState(false);
     const [officerHandoverAssignee, setOfficerHandoverAssignee] = useState<TeamMemberAssignment | null>(null);
+    const [showLeadershipHandoverModal, setShowLeadershipHandoverModal] = useState(false);
+    const [leadershipHandoverAssignee, setLeadershipHandoverAssignee] = useState<TeamMemberAssignment | null>(null);
 
     const fetchAdminTeam = async (): Promise<void> => {
         try {
@@ -653,6 +695,11 @@ function AdministrationPage() {
         setShowOfficerHandoverModal(true);
     };
 
+    const handleLeadershipManage = (assignee: TeamMemberAssignment): void => {
+        setLeadershipHandoverAssignee(assignee);
+        setShowLeadershipHandoverModal(true);
+    };
+
     const handleOfficerRetire = async (data: OfficerRetirePayload): Promise<void> => {
         if (!officerHandoverAssignee) return;
         await teamMembersAPI.updateStatus(officerHandoverAssignee.id, {
@@ -690,6 +737,28 @@ function AdministrationPage() {
         await fetchAdminTeam();
         setShowOfficerHandoverModal(false);
         setOfficerHandoverAssignee(null);
+    };
+
+    const handleLeadershipHandover = async (handoverData: LeadershipHandoverSubmitPayload): Promise<void> => {
+        if (!leadershipHandoverAssignee) return;
+
+        await administrationAPI.handoverLeadership({
+            currentAssignmentId: leadershipHandoverAssignee.id,
+            targetMemberId: handoverData.memberId,
+            targetAssignmentId: handoverData.targetAssignmentId ?? null,
+            changeReason: handoverData.changeReason || null,
+            notes: handoverData.notes || null,
+            outgoingDisposition: handoverData.outgoingDisposition,
+            outgoingChangeType: handoverData.outgoingChangeType,
+            outgoingTransferTeamId: handoverData.outgoingDisposition === 'transfer' ? handoverData.outgoingTransferTeamId ?? null : null,
+            outgoingTransferRoleId: handoverData.outgoingDisposition === 'transfer' ? handoverData.outgoingTransferRoleId ?? null : null,
+            outgoingChangeReason: handoverData.outgoingChangeReason || null,
+            outgoingNotes: handoverData.outgoingNotes || null,
+        });
+
+        await fetchAdminTeam();
+        setShowLeadershipHandoverModal(false);
+        setLeadershipHandoverAssignee(null);
     };
 
     const handleEditMember = (assignee: TeamMemberAssignment): void => {
@@ -755,6 +824,8 @@ function AdministrationPage() {
                             assignee={getAssigneeByRole(roleName)}
                             isOfficer={roleName === 'Officer'}
                             canEdit={canEdit}
+                            canBootstrapOfficer={canBootstrapOfficer}
+                            canManageLeadership={canManageLeadership}
                             onAssign={(name) => {
                                 const role = (adminTeam.roles || []).find((adminTeamRole) => adminTeamRole.roleName === name);
                                 if (role) setAssignModalRole({ roleName: name, role });
@@ -766,6 +837,7 @@ function AdministrationPage() {
                             }}
                             onEdit={handleEditMember}
                             onOfficerManage={handleOfficerManage}
+                            onLeadershipManage={handleLeadershipManage}
                             onRemove={handleRemove}
                             formatDate={formatDate}
                         />
@@ -779,7 +851,7 @@ function AdministrationPage() {
                         <Shield className="empty-state-icon" size={48} />
                         <h4 className="empty-state-title">Administration roles</h4>
                         <p className="empty-state-text">
-                            Assign members from any team to Officer, President, or Vice President using the Assign button in each section above.
+                            Assign members from any team to Officer, President, or Vice President using the Assign button in each section above. Use handover for current President or Vice President roles.
                         </p>
                     </div>
                 </div>
@@ -800,6 +872,17 @@ function AdministrationPage() {
                 currentOfficerAssignee={officerHandoverAssignee}
                 onRetire={handleOfficerRetire}
                 onHandover={handleOfficerHandover}
+            />
+
+            <LeadershipHandoverModal
+                isOpen={showLeadershipHandoverModal}
+                onClose={() => {
+                    setShowLeadershipHandoverModal(false);
+                    setLeadershipHandoverAssignee(null);
+                }}
+                currentLeadershipAssignee={leadershipHandoverAssignee}
+                roleLabel={leadershipHandoverAssignee?.role?.roleName || 'Leadership'}
+                onSubmit={handleLeadershipHandover}
             />
 
             <AssignAdministrationModal

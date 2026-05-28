@@ -542,6 +542,16 @@ export const administrationAPI: ApiNamespace = {
         });
         return handleResponse(response);
     },
+
+    // Hand over a leadership role to an existing member
+    handoverLeadership: async (data) => {
+        const response = await apiFetch(`${API_BASE_URL}/administration/leadership-handover`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+        return handleResponse(response);
+    },
 };
 
 // ============================================
