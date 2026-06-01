@@ -192,6 +192,19 @@ describe('projects routes integration', () => {
         expect(prismaMocks.projectCreate).not.toHaveBeenCalled()
     })
 
+    it('rejects developer backdoor project creation without a member id', async () => {
+        const response = await request(buildRouteApp(projectsRouter, {
+            memberId: 0,
+            isDeveloper: true,
+        }))
+            .post('/')
+            .send({ title: 'Developer Draft', projectTypeId: 2 })
+
+        expect(response.status).toBe(400)
+        expect(response.body.error).toBe('memberId required')
+        expect(prismaMocks.projectCreate).not.toHaveBeenCalled()
+    })
+
     it('creates a project and logs activity for privileged users', async () => {
         prismaMocks.projectCreate.mockResolvedValueOnce({
             id: 31,

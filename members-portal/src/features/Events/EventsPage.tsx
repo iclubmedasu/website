@@ -33,14 +33,33 @@ export default function EventsPage() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showFiltersModal, setShowFiltersModal] = useState(false);
 
-    const canCreateEvent = !!(user?.isDeveloper || user?.isOfficer || user?.isAdmin || user?.isLeadership);
+    // ── Permission helpers ──
+    // Privileged roles: developer, officer, admin, leadership
+    const eventPermissions = useMemo(() => {
+        const isPrivileged = !!(user?.isDeveloper || user?.isAdmin || user?.isOfficer || user?.isLeadership);
+        const isElevatedWorkItemRole = isPrivileged || !!user?.isSpecial;
+
+        return {
+            isPrivileged,
+            isElevatedWorkItemRole,
+            // Only privileged roles with a real member identity can create/edit/manage events
+            canCreateEvent: isPrivileged && !!user?.id,
+            canEditEvent: (event: any) => isPrivileged && !!event?.isActive && !event?.isFinalized && event?.status !== 'CANCELLED',
+            // canManageEvent: finalize, archive, hold, abort, publish, reactivate (NOT blocked by finalized)
+            canManageEvent: () => isPrivileged,
+            // Upload follows backend visibility scope: if an event is visible to the user, upload is allowed.
+            canUploadToEvent: () => !!user?.id,
+        };
+    }, [user?.id, user?.isAdmin, user?.isDeveloper, user?.isLeadership, user?.isOfficer, user?.isSpecial]);
+
+    const canCreateEvent = eventPermissions.canCreateEvent;
 
     const filters = useMemo(() => ({
         status: status || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
-        scope: canCreateEvent ? 'all' as const : 'published' as const,
-    }), [canCreateEvent, dateFrom, dateTo, status]);
+        scope: eventPermissions.canManageEvent() ? 'all' as const : 'published' as const,
+    }), [dateFrom, dateTo, eventPermissions, status]);
 
     const loadEvents = useCallback(async () => {
         setLoading(true);
@@ -68,6 +87,12 @@ export default function EventsPage() {
     }, [events, searchQuery]);
 
     const hasActiveFilters = status !== '' || dateFrom !== '' || dateTo !== '';
+    const statusClassName: Record<string, string> = {
+        DRAFT: 'event-status-badge event-status-badge--draft',
+        PUBLISHED: 'event-status-badge event-status-badge--published',
+        COMPLETED: 'event-status-badge event-status-badge--completed',
+        CANCELLED: 'event-status-badge event-status-badge--cancelled',
+    };
 
     const handleOpenFilters = () => {
         setShowFiltersModal(true);
@@ -150,7 +175,6 @@ export default function EventsPage() {
                     {filteredEvents.map((event) => {
                         const registrationCount = event._count?.registrations ?? event.registrationCount ?? 0;
                         const capacity = event.capacity ?? null;
-                        const statusColor = statusPalette[event.status] ?? '#475569';
 
                         return (
                             <Link
@@ -160,10 +184,16 @@ export default function EventsPage() {
                             >
                                 <div className="event-card-collapsed-content">
                                     <div>
-                                        <span className="event-status-badge" style={{ background: `${statusColor}18`, color: statusColor }}>
+                                        <span className={statusClassName[event.status] ?? 'event-status-badge'}>
                                             {event.status.replaceAll('_', ' ')}
                                         </span>
                                         <h2 className="event-card-title">{event.title}</h2>
+                                        {event.createdBy?.fullName ? (
+                                            <div className="event-meta-row event-meta-row--compact">
+                                                <Users size={14} />
+                                                <span>Created by {event.createdBy.fullName}</span>
+                                            </div>
+                                        ) : null}
                                         <p className="event-card-description">
                                             {event.description || 'No description yet'}
                                         </p>
@@ -181,7 +211,7 @@ export default function EventsPage() {
                                 </div>
 
                                 <div className="event-card-bottom-bar">
-                                    <div className="event-meta-row" style={{ marginTop: 0 }}>
+                                    <div className="event-meta-row event-meta-row--compact">
                                         <Users size={14} />
                                         <span>
                                             {registrationCount} registered
@@ -189,9 +219,9 @@ export default function EventsPage() {
                                         </span>
                                     </div>
                                     {capacity != null ? (
-                                        <strong style={{ color: '#0f172a' }}>{Math.max(capacity - registrationCount, 0)} left</strong>
+                                        <strong className="event-card-availability">{Math.max(capacity - registrationCount, 0)} left</strong>
                                     ) : (
-                                        <strong style={{ color: '#0f172a' }}>Unlimited</strong>
+                                        <strong className="event-card-availability">Unlimited</strong>
                                     )}
                                 </div>
                             </Link>
@@ -235,10 +265,3 @@ export default function EventsPage() {
         </main>
     );
 }
-
-const statusPalette: Record<string, string> = {
-    DRAFT: '#64748b',
-    PUBLISHED: '#0f766e',
-    COMPLETED: '#2563eb',
-    CANCELLED: '#b91c1c',
-};

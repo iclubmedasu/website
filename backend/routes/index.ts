@@ -55,7 +55,7 @@ router.use("/alumni", authenticateToken, alumniRoutes);
 router.use("/administration", authenticateToken, administrationRoutes);
 router.use("/projects", authenticateToken, projectsRoutes);
 router.use("/tasks", authenticateToken, tasksRoutes);
-router.use("/events", eventsRoutes);
+router.use("/events", authenticateToken, eventsRoutes);
 router.use("/phases", authenticateToken, phasesRoutes);
 router.use("/schedule-slots", authenticateToken, scheduleSlotsRoutes);
 router.use("/project-files", authenticateToken, projectFilesRoutes);

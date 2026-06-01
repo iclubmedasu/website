@@ -132,7 +132,6 @@ export default function CreateEventModal({ onClose, onCreated }: CreateEventModa
                     <div className="modal-header-content">
                         <div>
                             <h2 className="modal-title">Create Event</h2>
-                            <p className="modal-subtitle">Draft a new club event, link it to a project, and open registration later.</p>
                         </div>
                     </div>
                     <button className="modal-close-btn" type="button" onClick={handleClose} aria-label="Close">

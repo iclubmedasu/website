@@ -185,6 +185,26 @@
     font-family: var(--font-heading);
 }
 
+.event-status-badge--draft {
+    background: rgba(100, 116, 139, 0.18);
+    color: #64748b;
+}
+
+.event-status-badge--published {
+    background: rgba(15, 118, 110, 0.18);
+    color: #0f766e;
+}
+
+.event-status-badge--completed {
+    background: rgba(37, 99, 235, 0.18);
+    color: #2563eb;
+}
+
+.event-status-badge--cancelled {
+    background: rgba(185, 28, 28, 0.18);
+    color: #b91c1c;
+}
+
 .event-meta-row {
     display: flex;
     align-items: center;
@@ -192,6 +212,14 @@
     color: var(--gray-600);
     margin-top: 0.3rem;
     font-family: var(--font-body);
+}
+
+.event-meta-row--compact {
+    margin-top: 0;
+}
+
+.event-card-availability {
+    color: var(--gray-900);
 }
 
 .event-add-card {

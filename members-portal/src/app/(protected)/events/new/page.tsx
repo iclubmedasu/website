@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import EventCreatePage from '@/features/Events/EventCreatePage';
+import AdminProtectedRoute from '@/components/AdminProtectedRoute';
+import CreateEventModal from '@/features/Events/modals/CreateEventModal';
 
 export const metadata: Metadata = {
     title: 'Create Event | iClub Members Portal',
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function NewEventPage() {
-    return <EventCreatePage />;
+    return (
+        <AdminProtectedRoute>
+            <CreateEventModal />
+        </AdminProtectedRoute>
+    );
 }

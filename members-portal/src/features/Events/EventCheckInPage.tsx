@@ -48,58 +48,136 @@ export default function EventCheckInPage({ eventId, tiers }: EventCheckInPagePro
     };
 
     return (
-        <main style={{ padding: '1.5rem', maxWidth: '960px', margin: '0 auto' }}>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <main className="event-checkin-page">
+            <div className="event-checkin-tabs">
                 {(['scan', 'manual', 'walkin'] as const).map((item) => (
-                    <button key={item} type="button" onClick={() => setMode(item)} style={{ ...pillStyle, ...(mode === item ? activePillStyle : {}) }}>
+                    <button key={item} type="button" onClick={() => setMode(item)} className={mode === item ? 'pill pill-active' : 'pill'}>
                         {item === 'scan' ? 'Scan mode' : item === 'manual' ? 'Manual mode' : 'Walk-in mode'}
                     </button>
                 ))}
             </div>
 
             {mode === 'scan' && (
-                <section style={cardStyle}>
+                <section className="card">
                     <h2>Scan mode</h2>
-                    <div style={scanBoxStyle}>Camera scanner placeholder for QR-based check-in.</div>
-                    <p style={hintStyle}>This view is ready for a camera scanner library. The same check-in endpoint already accepts confirmation codes.</p>
+                    <div className="scan-box">Camera scanner placeholder for QR-based check-in.</div>
+                    <p className="hint">This view is ready for a camera scanner library. The same check-in endpoint already accepts confirmation codes.</p>
                 </section>
             )}
 
             {mode === 'manual' && (
-                <section style={cardStyle}>
+                <section className="card">
                     <h2>Manual mode</h2>
-                    <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="6-character confirmation code" style={inputStyle} />
-                    <button type="button" onClick={() => void handleManualCheckIn()} style={buttonStyle}>Check in attendee</button>
+                    <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="6-character confirmation code" className="input" />
+                    <button type="button" onClick={() => void handleManualCheckIn()} className="button">Check in attendee</button>
                 </section>
             )}
 
             {mode === 'walkin' && (
-                <section style={cardStyle}>
+                <section className="card">
                     <h2>Walk-in mode</h2>
-                    <div style={gridStyle}>
-                        <input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Full name" style={inputStyle} />
-                        <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" style={inputStyle} />
-                        <input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} placeholder="Phone" style={inputStyle} />
-                        <select value={tierId} onChange={(event) => setTierId(event.target.value)} style={inputStyle}>
+                    <div className="grid">
+                        <input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Full name" className="input" />
+                        <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" className="input" />
+                        <input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} placeholder="Phone" className="input" />
+                        <select value={tierId} onChange={(event) => setTierId(event.target.value)} className="input" aria-label="Tier">
                             <option value="">No tier</option>
                             {tiers.map((tier) => <option key={tier.id} value={tier.id}>{tier.name}</option>)}
                         </select>
                     </div>
-                    <button type="button" onClick={() => void handleWalkIn()} style={buttonStyle}>Save walk-in</button>
+                    <button type="button" onClick={() => void handleWalkIn()} className="button">Save walk-in</button>
                 </section>
             )}
 
-            {status ? <div style={statusStyle}>{status}</div> : null}
+            {status ? <div className="status">{status}</div> : null}
+
+            <style jsx>{`
+                .event-checkin-page {
+                    padding: 1.5rem;
+                    max-width: 960px;
+                    margin: 0 auto;
+                }
+
+                .event-checkin-tabs {
+                    display: flex;
+                    gap: 0.5rem;
+                    margin-bottom: 1rem;
+                    flex-wrap: wrap;
+                }
+
+                .pill {
+                    min-height: 44px;
+                    border-radius: 999px;
+                    border: 1px solid rgba(15, 23, 42, 0.12);
+                    background: #fff;
+                    padding: 0 1rem;
+                    font-weight: 700;
+                }
+
+                .pill-active {
+                    background: #111827;
+                    color: #fff;
+                }
+
+                .card {
+                    display: grid;
+                    gap: 1rem;
+                    border-radius: 1rem;
+                    background: #fff;
+                    border: 1px solid rgba(15, 23, 42, 0.08);
+                    padding: 1rem;
+                }
+
+                .scan-box {
+                    min-height: 200px;
+                    border-radius: 1rem;
+                    border: 1px dashed rgba(15, 23, 42, 0.18);
+                    display: grid;
+                    place-items: center;
+                    background: #f8fafc;
+                    color: #64748b;
+                    text-align: center;
+                }
+
+                .hint {
+                    margin: 0;
+                    color: #64748b;
+                }
+
+                .input {
+                    min-height: 46px;
+                    border-radius: 0.85rem;
+                    border: 1px solid rgba(15, 23, 42, 0.14);
+                    background: #fff;
+                    padding: 0 0.9rem;
+                    color: #0f172a;
+                }
+
+                .grid {
+                    display: grid;
+                    gap: 0.75rem;
+                    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                }
+
+                .button {
+                    min-height: 46px;
+                    border-radius: 999px;
+                    border: none;
+                    background: #111827;
+                    color: #fff;
+                    padding: 0 1rem;
+                    font-weight: 700;
+                }
+
+                .status {
+                    margin-top: 1rem;
+                    border-radius: 1rem;
+                    background: #ecfeff;
+                    color: #155e75;
+                    padding: 1rem;
+                    border: 1px solid #a5f3fc;
+                }
+            `}</style>
         </main>
     );
 }
-
-const pillStyle: React.CSSProperties = { minHeight: '44px', borderRadius: '999px', border: '1px solid rgba(15, 23, 42, 0.12)', background: '#fff', padding: '0 1rem', fontWeight: 700 };
-const activePillStyle: React.CSSProperties = { background: '#111827', color: '#fff' };
-const cardStyle: React.CSSProperties = { display: 'grid', gap: '1rem', borderRadius: '1rem', background: '#fff', border: '1px solid rgba(15, 23, 42, 0.08)', padding: '1rem' };
-const scanBoxStyle: React.CSSProperties = { minHeight: '200px', borderRadius: '1rem', border: '1px dashed rgba(15, 23, 42, 0.18)', display: 'grid', placeItems: 'center', background: '#f8fafc', color: '#64748b', textAlign: 'center' };
-const hintStyle: React.CSSProperties = { margin: 0, color: '#64748b' };
-const inputStyle: React.CSSProperties = { minHeight: '46px', borderRadius: '0.85rem', border: '1px solid rgba(15, 23, 42, 0.14)', background: '#fff', padding: '0 0.9rem', color: '#0f172a' };
-const gridStyle: React.CSSProperties = { display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' };
-const buttonStyle: React.CSSProperties = { minHeight: '46px', borderRadius: '999px', border: 'none', background: '#111827', color: '#fff', padding: '0 1rem', fontWeight: 700 };
-const statusStyle: React.CSSProperties = { marginTop: '1rem', borderRadius: '1rem', background: '#ecfeff', color: '#155e75', padding: '1rem', border: '1px solid #a5f3fc' };

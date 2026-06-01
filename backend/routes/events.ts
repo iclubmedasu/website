@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import express, { Request, Response } from 'express';
 import { prisma } from '../db';
+import { authenticateToken } from '../middleware/auth';
 import { generateUniqueConfirmationCode } from '../services/eventCode';
 
 const router = express.Router();
@@ -170,7 +171,7 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) {
             return res.status(403).json({ error: 'Event management access required' });
@@ -216,7 +217,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) {
             return res.status(403).json({ error: 'Event management access required' });
@@ -264,7 +265,7 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) {
             return res.status(403).json({ error: 'Event management access required' });
@@ -297,7 +298,7 @@ router.patch('/:id/status', async (req, res) => {
     }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) {
             return res.status(403).json({ error: 'Event management access required' });
@@ -350,7 +351,7 @@ router.get('/:id/tiers', async (req, res) => {
     }
 });
 
-router.post('/:id/tiers', async (req, res) => {
+router.post('/:id/tiers', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
 
@@ -386,7 +387,7 @@ router.post('/:id/tiers', async (req, res) => {
     }
 });
 
-router.put('/:id/tiers/:tierId', async (req, res) => {
+router.put('/:id/tiers/:tierId', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
 
@@ -421,7 +422,7 @@ router.put('/:id/tiers/:tierId', async (req, res) => {
     }
 });
 
-router.delete('/:id/tiers/:tierId', async (req, res) => {
+router.delete('/:id/tiers/:tierId', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
 
@@ -466,7 +467,7 @@ router.get('/:id/custom-fields', async (req, res) => {
     }
 });
 
-router.post('/:id/custom-fields', async (req, res) => {
+router.post('/:id/custom-fields', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
 
@@ -501,7 +502,7 @@ router.post('/:id/custom-fields', async (req, res) => {
     }
 });
 
-router.put('/:id/custom-fields/:fieldId', async (req, res) => {
+router.put('/:id/custom-fields/:fieldId', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
 
@@ -531,7 +532,7 @@ router.put('/:id/custom-fields/:fieldId', async (req, res) => {
     }
 });
 
-router.patch('/:id/custom-fields/reorder', async (req, res) => {
+router.patch('/:id/custom-fields/reorder', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
 
@@ -563,7 +564,7 @@ router.patch('/:id/custom-fields/reorder', async (req, res) => {
     }
 });
 
-router.delete('/:id/custom-fields/:fieldId', async (req, res) => {
+router.delete('/:id/custom-fields/:fieldId', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
 
@@ -587,7 +588,7 @@ router.delete('/:id/custom-fields/:fieldId', async (req, res) => {
 // ============================================
 // Registrations
 // ============================================
-router.get('/:id/registrations', async (req, res) => {
+router.get('/:id/registrations', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
 
@@ -624,7 +625,7 @@ router.get('/:id/registrations', async (req, res) => {
     }
 });
 
-router.get('/:id/registrations/:registrationId', async (req, res) => {
+router.get('/:id/registrations/:registrationId', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
 
@@ -716,7 +717,7 @@ router.post('/:id/registrations', async (req, res) => {
     }
 });
 
-router.post('/:id/registrations/walk-in', async (req, res) => {
+router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
 
@@ -756,7 +757,7 @@ router.post('/:id/registrations/walk-in', async (req, res) => {
     }
 });
 
-router.patch('/:id/registrations/:registrationId/check-in', async (req, res) => {
+router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
 
@@ -786,7 +787,7 @@ router.patch('/:id/registrations/:registrationId/check-in', async (req, res) => 
     }
 });
 
-router.patch('/:id/registrations/:registrationId', async (req, res) => {
+router.patch('/:id/registrations/:registrationId', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
 
@@ -816,7 +817,7 @@ router.patch('/:id/registrations/:registrationId', async (req, res) => {
     }
 });
 
-router.delete('/:id/registrations/:registrationId', async (req, res) => {
+router.delete('/:id/registrations/:registrationId', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
 
@@ -842,7 +843,7 @@ router.delete('/:id/registrations/:registrationId', async (req, res) => {
 // ============================================
 // Statistics
 // ============================================
-router.get('/:id/statistics', async (req, res) => {
+router.get('/:id/statistics', authenticateToken, async (req, res) => {
     try {
         if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
 

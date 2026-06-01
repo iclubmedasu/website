@@ -901,8 +901,8 @@ export default function ProjectsPage() {
     // Privileged roles: developer, officer, admin, leadership
     const isPrivileged = user?.isDeveloper || user?.isAdmin || user?.isOfficer || user?.isLeadership;
     const isElevatedWorkItemRole = isPrivileged || user?.isSpecial;
-    // Only privileged roles can create/edit/manage projects
-    const canCreateProject = isPrivileged;
+    // Only privileged roles with a real member identity can create/edit/manage projects
+    const canCreateProject = isPrivileged && !!user?.id;
 
     const canEditProject = (project: any) => isPrivileged && !!project?.isActive && !project?.isFinalized && project?.status !== 'CANCELLED';
 
