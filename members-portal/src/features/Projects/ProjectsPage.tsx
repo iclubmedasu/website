@@ -15,11 +15,13 @@ import {
     Archive,
     PlayCircle,
     History,
+    Search,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { projectsAPI, tasksAPI, teamsAPI, membersAPI, phasesAPI, projectTypesAPI, projectFilesAPI, getProfilePhotoUrl } from '../../services/api';
 import FileUploadZone from '../../components/FileUpload/FileUploadZone';
 import Dropdown from '../../components/dropdown/dropdown';
+import { buildSearchText, matchesSearchQuery } from '../../utils/search';
 import './ProjectsPage.css';
 import {
     fmtDate,
@@ -715,6 +717,7 @@ export default function ProjectsPage() {
     const [filterTeam, setFilterTeam] = useState('');
     const [filterCategory, setFilterCategory] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Pagination
     const PROJECTS_PER_PAGE = 10;
@@ -793,14 +796,21 @@ export default function ProjectsPage() {
     useEffect(() => { loadProjects(); }, [loadProjects]);
 
     // Reset to page 1 when filters change
-    useEffect(() => { setCurrentPage(1); }, [filterTeam, filterCategory, filterPriority]);
+    useEffect(() => { setCurrentPage(1); }, [filterTeam, filterCategory, filterPriority, searchQuery]);
+
+    const filteredProjects = useMemo(() => {
+        return projects.filter((project) => matchesSearchQuery(
+            buildSearchText(project.title, project.description, project.status, project.priority, project.projectType?.name, project.projectType?.category),
+            searchQuery,
+        ));
+    }, [projects, searchQuery]);
 
     // Pagination derived values
-    const totalPages = Math.max(1, Math.ceil(projects.length / PROJECTS_PER_PAGE));
+    const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PROJECTS_PER_PAGE));
     const paginatedProjects = useMemo(() => {
         const start = (currentPage - 1) * PROJECTS_PER_PAGE;
-        return projects.slice(start, start + PROJECTS_PER_PAGE);
-    }, [projects, currentPage]);
+        return filteredProjects.slice(start, start + PROJECTS_PER_PAGE);
+    }, [filteredProjects, currentPage]);
 
     // ── Handle card expansion ──
     const handleToggleExpand = async (project: any) => {
@@ -948,16 +958,32 @@ export default function ProjectsPage() {
             </div>
             <hr className="title-divider" />
 
+            <div className="page-search-row">
+                <div className="page-search-field page-search-field--full">
+                    <Search className="page-search-icon" size={16} />
+                    <input
+                        type="search"
+                        className="page-search-input"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search projects"
+                        aria-label="Search projects"
+                    />
+                </div>
+            </div>
+
             {/* ─── Content ─── */}
             {loading ? (
                 <div className="projects-loading">Loading projects…</div>
             ) : error ? (
                 <div className="projects-error">{error}</div>
-            ) : projects.length === 0 ? (
+            ) : filteredProjects.length === 0 ? (
                 <div className="empty-state">
                     <CheckSquare className="empty-state-icon" />
-                    <h4 className="empty-state-title">No projects yet</h4>
-                    <p className="empty-state-text">Create your first project to get started.</p>
+                    <h4 className="empty-state-title">{searchQuery ? 'No projects found' : 'No projects yet'}</h4>
+                    <p className="empty-state-text">
+                        {searchQuery ? 'Try a different search.' : 'Create your first project to get started.'}
+                    </p>
                     <button className="empty-state-btn" onClick={() => setShowCreateModal(true)}>
                         <Plus />
                         New Project

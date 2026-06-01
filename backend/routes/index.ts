@@ -12,6 +12,7 @@ import alumniRoutes from "./alumni";
 import administrationRoutes from "./administration";
 import projectsRoutes from "./projects";
 import tasksRoutes from "./tasks";
+import eventsRoutes from "./events";
 import phasesRoutes from "./phases";
 import scheduleSlotsRoutes from "./scheduleSlots";
 import projectFilesRoutes from "./projectFiles";
@@ -54,6 +55,7 @@ router.use("/alumni", authenticateToken, alumniRoutes);
 router.use("/administration", authenticateToken, administrationRoutes);
 router.use("/projects", authenticateToken, projectsRoutes);
 router.use("/tasks", authenticateToken, tasksRoutes);
+router.use("/events", eventsRoutes);
 router.use("/phases", authenticateToken, phasesRoutes);
 router.use("/schedule-slots", authenticateToken, scheduleSlotsRoutes);
 router.use("/project-files", authenticateToken, projectFilesRoutes);
@@ -75,6 +77,7 @@ router.get("/", (_req: Request, res: Response) => {
             administration: "/api/administration",
             projects: "/api/projects",
             tasks: "/api/tasks",
+            events: "/api/events",
             phases: "/api/phases",
             scheduleSlots: "/api/schedule-slots",
             projectFiles: "/api/project-files",

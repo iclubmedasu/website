@@ -1,13 +1,14 @@
 ﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Eye, Pencil, Users, UserPlus } from 'lucide-react';
+import { Eye, Pencil, Search, Users, UserPlus } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { teamMembersAPI, membersAPI, teamsAPI, teamRolesAPI, teamSubteamsAPI, getProfilePhotoUrl } from '../../../services/api';
 import ViewMemberModal from '../Teams/modals/ViewMemberModal';
 import EditMembersModal from '../Teams/modals/EditMembersModal';
 import AssignToTeamModal from './modals/AssignToTeamModal';
 import Dropdown from '../../../components/dropdown/dropdown';
+import { buildSearchText, matchesSearchQuery } from '../../../utils/search';
 import '../../Projects/ProjectsPage.css';
 import type { Id } from '../../../types/backend-contracts';
 
@@ -140,6 +141,7 @@ function MembersPage() {
     // Filters
     const [filterTeamId, setFilterTeamId] = useState('');
     const [filterStatus, setFilterStatus] = useState(''); // '' = all, 'active' | 'inactive' | 'unassigned'
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Pagination
     const ROWS_PER_PAGE = 20;
@@ -263,15 +265,22 @@ function MembersPage() {
         }));
     }, [assignments]);
 
+    const filteredRows = useMemo(() => {
+        return rows.filter((row) => matchesSearchQuery(
+            buildSearchText(row.name, row.email, row.role, row.teamName, row.subteamName, row.status),
+            searchQuery,
+        ));
+    }, [rows, searchQuery]);
+
     // Reset to page 1 when filters change
-    useEffect(() => { setCurrentPage(1); }, [filterTeamId, filterStatus]);
+    useEffect(() => { setCurrentPage(1); }, [filterTeamId, filterStatus, searchQuery]);
 
     // Pagination derived values
-    const totalPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
+    const totalPages = Math.max(1, Math.ceil(filteredRows.length / ROWS_PER_PAGE));
     const paginatedRows = useMemo(() => {
         const start = (currentPage - 1) * ROWS_PER_PAGE;
-        return rows.slice(start, start + ROWS_PER_PAGE);
-    }, [rows, currentPage]);
+        return filteredRows.slice(start, start + ROWS_PER_PAGE);
+    }, [filteredRows, currentPage]);
 
     const handleViewMember = (row: MemberRow) => {
         setViewingMemberId(row.memberId);
@@ -394,6 +403,20 @@ function MembersPage() {
             {/* Divider (same as Teams page) */}
             <hr className="title-divider" />
 
+            <div className="page-search-row">
+                <div className="page-search-field page-search-field--full">
+                    <Search className="page-search-icon" size={16} />
+                    <input
+                        type="search"
+                        className="page-search-input"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search members"
+                        aria-label="Search members"
+                    />
+                </div>
+            </div>
+
             {error && <div className="error-message">{error}</div>}
             {loading && <div className="loading-message">Loading members...</div>}
 
@@ -402,16 +425,22 @@ function MembersPage() {
                 <div className="card-header card-header-with-action">
                     <div className="card-header-left">
                         <h3 className="card-title">Members</h3>
-                        <p className="card-subtitle">{rows.length} total</p>
+                        <p className="card-subtitle">{filteredRows.length} total</p>
                     </div>
                 </div>
                 <div className="card-body">
-                    {!loading && rows.length === 0 ? (
+                    {!loading && filteredRows.length === 0 ? (
                         <div className="empty-state">
                             <Users className="empty-state-icon" />
                             <h4 className="empty-state-title">No members found</h4>
                             <p className="empty-state-text">
-                                {filterStatus === 'unassigned' ? 'No unassigned members.' : filterTeamId || filterStatus ? 'Try changing the filters above.' : 'No club members yet.'}
+                                {searchQuery
+                                    ? 'No members match your search.'
+                                    : filterStatus === 'unassigned'
+                                        ? 'No unassigned members.'
+                                        : filterTeamId || filterStatus
+                                            ? 'Try changing the filters above.'
+                                            : 'No club members yet.'}
                             </p>
                         </div>
                     ) : (

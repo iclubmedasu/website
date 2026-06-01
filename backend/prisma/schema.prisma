@@ -42,6 +42,8 @@ model Member {
   createdScheduleSlots ProjectScheduleSlot[]   @relation("ProjectScheduleSlotCreatedBy")
   uploadedFiles       ProjectFile[]           // Files uploaded by this member
   createdFolders      ProjectFolder[]         // Folders created by this member
+  createdEvents       Event[]                 @relation("EventCreatedBy")
+  eventRegistrations  EventRegistration[]
   notificationEventsAuthored NotificationEvent[] @relation("NotificationEventActor")
   notifications      Notification[]
 }
@@ -302,6 +304,7 @@ model Project {
   scheduleSlots   ProjectScheduleSlot[] // People/time allocations for this project
   folders         ProjectFolder[]  // Folder containers for attached files
   files           ProjectFile[]    // Files attached to this project
+  events          Event[]          // Events linked to this project
   projectType     ProjectType      @relation(fields: [projectTypeId], references: [id], onDelete: Restrict)
   
   @@index([createdByMemberId])
@@ -311,6 +314,112 @@ model Project {
   @@index([projectTypeId])
   @@index([isFinalized])
   @@index([isArchived])
+}
+
+// ============================================
+// EVENTS - Club events and registrations
+// ============================================
+model Event {
+  id                  Int       @id @default(autoincrement())
+  projectId           Int?
+  createdByMemberId   Int
+  title               String
+  description         String?
+  venue               String?
+  eventDate           DateTime
+  registrationDeadline DateTime?
+  capacity            Int?
+  allowWalkIns        Boolean   @default(false)
+  isCertifiable       Boolean   @default(false)
+  status              String    @default("DRAFT") // DRAFT, PUBLISHED, COMPLETED, CANCELLED
+  isActive            Boolean   @default(true)
+  deletedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Relations
+  project             Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdBy           Member              @relation("EventCreatedBy", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  tiers               EventTier[]
+  customFields        EventCustomField[]
+  registrations       EventRegistration[]
+
+  @@index([projectId])
+  @@index([createdByMemberId])
+  @@index([status])
+  @@index([eventDate])
+  @@index([registrationDeadline])
+  @@index([isActive])
+}
+
+model EventTier {
+  id              Int       @id @default(autoincrement())
+  eventId         Int
+  name            String
+  description     String?
+  maxCapacity     Int?
+  price           Decimal?  @db.Decimal(10, 2)
+  order           Int       @default(0)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  event           Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registrations   EventRegistration[]
+
+  @@unique([eventId, name])
+  @@index([eventId])
+  @@index([eventId, order])
+}
+
+model EventCustomField {
+  id              Int       @id @default(autoincrement())
+  eventId         Int
+  label           String
+  type            String
+  options         Json?
+  required        Boolean   @default(false)
+  order           Int       @default(0)
+  isLocked        Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  event           Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([eventId, order])
+}
+
+model EventRegistration {
+  id                 Int       @id @default(autoincrement())
+  eventId            Int
+  tierId             Int?
+  memberId           Int?
+  fullName           String
+  email              String
+  phoneNumber        String?
+  confirmationCode   String    @unique
+  source             String    @default("PORTAL") // PORTAL, PUBLIC, IMPORT, WALK_IN
+  status             String    @default("REGISTERED") // REGISTERED, CHECKED_IN, CANCELLED
+  isWalkIn           Boolean   @default(false)
+  checkedInAt        DateTime?
+  cancelledAt        DateTime?
+  notes              String?
+  customFieldValues  Json?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  event              Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tier               EventTier? @relation(fields: [tierId], references: [id], onDelete: SetNull)
+  member             Member?    @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  @@index([eventId])
+  @@index([tierId])
+  @@index([memberId])
+  @@index([confirmationCode])
+  @@index([status])
+  @@index([isWalkIn])
 }
 
 // ============================================

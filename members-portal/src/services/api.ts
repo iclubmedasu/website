@@ -3,10 +3,22 @@ import type {
     AddTaskTagPayload,
     ApiErrorResponse,
     CreatePhasePayload,
+    CreateEventCustomFieldPayload,
+    CreateEventPayload,
+    CreateEventRegistrationPayload,
+    CreateEventTierPayload,
     CreateProjectPayload,
     CreateScheduleSlotPayload,
     CreateTaskPayload,
     Id,
+    EventCustomFieldRef,
+    EventDetail,
+    EventQueryParams,
+    EventRegistrationQueryParams,
+    EventRegistrationRef,
+    EventStatistics,
+    EventSummary,
+    EventTierRef,
     NotificationMarkAllReadResponse,
     NotificationMarkReadResponse,
     NotificationsListResponse,
@@ -32,9 +44,14 @@ import type {
     TaskStatus,
     TaskSummary,
     UpdatePhasePayload,
+    UpdateEventCustomFieldPayload,
+    UpdateEventPayload,
+    UpdateEventRegistrationPayload,
+    UpdateEventTierPayload,
     UpdateProjectPayload,
     UpdateScheduleSlotPayload,
     UpdateTaskPayload,
+    ReorderEventCustomFieldsPayload,
 } from "../types/backend-contracts";
 
 function isLoopbackHost(hostname: string): boolean {
@@ -1425,5 +1442,240 @@ export const projectFilesAPI = {
             headers: getAuthHeaders(),
         });
         return handleResponse<ProjectFileRef>(response);
+    },
+};
+
+// ============================================
+// EVENTS API
+// ============================================
+
+export const eventsAPI = {
+    getAll: async (filters: EventQueryParams = {}): Promise<EventSummary[]> => {
+        const params = new URLSearchParams();
+        if (filters.status) params.append('status', filters.status);
+        if (filters.projectId) params.append('projectId', String(filters.projectId));
+        if (filters.dateFrom) params.append('dateFrom', String(filters.dateFrom));
+        if (filters.dateTo) params.append('dateTo', String(filters.dateTo));
+        if (filters.scope) params.append('scope', filters.scope);
+
+        const response = await apiFetch(`${API_BASE_URL}/events${params.toString() ? `?${params.toString()}` : ''}`, {
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventSummary[]>(response);
+    },
+
+    getById: async (id: Id | string): Promise<EventDetail> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${id}`, {
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventDetail>(response);
+    },
+
+    create: async (data: CreateEventPayload): Promise<EventDetail> => {
+        const response = await apiFetch(`${API_BASE_URL}/events`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        return handleResponse<EventDetail>(response);
+    },
+
+    update: async (id: Id | string, data: UpdateEventPayload): Promise<EventDetail> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${id}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        return handleResponse<EventDetail>(response);
+    },
+
+    updateStatus: async (id: Id | string, status: EventQueryParams['status'] | 'DRAFT' | 'PUBLISHED' | 'COMPLETED' | 'CANCELLED'): Promise<EventDetail> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${id}/status`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ status }),
+        });
+
+        return handleResponse<EventDetail>(response);
+    },
+
+    remove: async (id: Id | string): Promise<EventDetail> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventDetail>(response);
+    },
+
+    getTiers: async (eventId: Id | string): Promise<EventTierRef[]> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/tiers`, {
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventTierRef[]>(response);
+    },
+
+    createTier: async (eventId: Id | string, data: CreateEventTierPayload): Promise<EventTierRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/tiers`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        return handleResponse<EventTierRef>(response);
+    },
+
+    updateTier: async (eventId: Id | string, tierId: Id | string, data: UpdateEventTierPayload): Promise<EventTierRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/tiers/${tierId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        return handleResponse<EventTierRef>(response);
+    },
+
+    removeTier: async (eventId: Id | string, tierId: Id | string): Promise<void> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/tiers/${tierId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+
+        if (!response.ok) {
+            await handleResponse(response);
+        }
+    },
+
+    getCustomFields: async (eventId: Id | string): Promise<EventCustomFieldRef[]> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/custom-fields`, {
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventCustomFieldRef[]>(response);
+    },
+
+    createCustomField: async (eventId: Id | string, data: CreateEventCustomFieldPayload): Promise<EventCustomFieldRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/custom-fields`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        return handleResponse<EventCustomFieldRef>(response);
+    },
+
+    updateCustomField: async (eventId: Id | string, fieldId: Id | string, data: UpdateEventCustomFieldPayload): Promise<EventCustomFieldRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/custom-fields/${fieldId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        return handleResponse<EventCustomFieldRef>(response);
+    },
+
+    reorderCustomFields: async (eventId: Id | string, data: ReorderEventCustomFieldsPayload): Promise<EventCustomFieldRef[]> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/custom-fields/reorder`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        return handleResponse<EventCustomFieldRef[]>(response);
+    },
+
+    removeCustomField: async (eventId: Id | string, fieldId: Id | string): Promise<void> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/custom-fields/${fieldId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+
+        if (!response.ok) {
+            await handleResponse(response);
+        }
+    },
+
+    getRegistrations: async (eventId: Id | string, filters: EventRegistrationQueryParams = {}): Promise<EventRegistrationRef[]> => {
+        const params = new URLSearchParams();
+        if (filters.tierId) params.append('tierId', String(filters.tierId));
+        if (filters.checkInStatus) params.append('checkInStatus', filters.checkInStatus);
+        if (filters.walkIn !== undefined) params.append('walkIn', String(filters.walkIn));
+
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations${params.toString() ? `?${params.toString()}` : ''}`, {
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventRegistrationRef[]>(response);
+    },
+
+    getRegistration: async (eventId: Id | string, registrationId: Id | string): Promise<EventRegistrationRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${registrationId}`, {
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventRegistrationRef>(response);
+    },
+
+    createRegistration: async (eventId: Id | string, data: CreateEventRegistrationPayload): Promise<EventRegistrationRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        return handleResponse<EventRegistrationRef>(response);
+    },
+
+    createWalkInRegistration: async (eventId: Id | string, data: CreateEventRegistrationPayload): Promise<EventRegistrationRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/walk-in`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        return handleResponse<EventRegistrationRef>(response);
+    },
+
+    checkInRegistration: async (eventId: Id | string, registrationId: Id | string, confirmationCode?: string): Promise<EventRegistrationRef> => {
+        const safeRegistrationId = String(registrationId || 'code');
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${safeRegistrationId}/check-in`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ confirmationCode }),
+        });
+
+        return handleResponse<EventRegistrationRef>(response);
+    },
+
+    updateRegistration: async (eventId: Id | string, registrationId: Id | string, data: UpdateEventRegistrationPayload): Promise<EventRegistrationRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${registrationId}`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        return handleResponse<EventRegistrationRef>(response);
+    },
+
+    cancelRegistration: async (eventId: Id | string, registrationId: Id | string): Promise<EventRegistrationRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${registrationId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventRegistrationRef>(response);
+    },
+
+    getStatistics: async (eventId: Id | string): Promise<EventStatistics> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/statistics`, {
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventStatistics>(response);
     },
 };

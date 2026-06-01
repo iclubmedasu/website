@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { X, Calendar, Briefcase, MapPin, MessageCircle } from 'lucide-react';
 import { roleHistoryAPI, membersAPI, getProfilePhotoUrl } from '../../../../services/api';
+import { normalizePhoneDisplay } from '../../../../utils/countryCodes';
 import type { Id } from '../../../../types/backend-contracts';
 
 interface MemberDetails {
@@ -164,8 +165,8 @@ const ViewMemberModal = ({ isOpen, onClose, memberId }: ViewMemberModalProps) =>
                                 <div className="member-info-details">
                                     <h3 className="member-name">{member.fullName}</h3>
                                     <p className="member-email">{member.email || 'N/A'}</p>
-                                    <p className="member-phone">{member.phoneNumber || 'N/A'}</p>
-                                    {member.phoneNumber2 && <p className="member-phone">{member.phoneNumber2}</p>}
+                                    <p className="member-phone">{normalizePhoneDisplay(member.phoneNumber) || 'N/A'}</p>
+                                    {member.phoneNumber2 && <p className="member-phone">{normalizePhoneDisplay(member.phoneNumber2)}</p>}
                                     <p className="member-student-id">ID: {member.studentId ?? 'N/A'}</p>
                                     <p className="member-join-date">
                                         Joined: {formatDate(member.joinDate)}

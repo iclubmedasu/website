@@ -10,11 +10,13 @@ import {
     Archive,
     History,
     PlayCircle,
+    Search,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { projectsAPI, teamsAPI, membersAPI, projectTypesAPI, projectFilesAPI } from '../../services/api';
 import FileUploadZone from '../../components/FileUpload/FileUploadZone';
 import Dropdown from '../../components/dropdown/dropdown';
+import { buildSearchText, matchesSearchQuery } from '../../utils/search';
 import './ProjectsPage.css';
 import {
     fmtDate,
@@ -334,6 +336,7 @@ export default function PastProjectsPage() {
     const [filterTeam, setFilterTeam] = useState('');
     const [filterCategory, setFilterCategory] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Pagination
     const PROJECTS_PER_PAGE = 10;
@@ -401,13 +404,20 @@ export default function PastProjectsPage() {
     }, [expandedProjectId, loadProjects]);
 
     useEffect(() => { loadProjects(); }, [loadProjects]);
-    useEffect(() => { setCurrentPage(1); }, [filterTeam, filterCategory, filterPriority]);
+    useEffect(() => { setCurrentPage(1); }, [filterTeam, filterCategory, filterPriority, searchQuery]);
 
-    const totalPages = Math.max(1, Math.ceil(projects.length / PROJECTS_PER_PAGE));
+    const filteredProjects = useMemo(() => {
+        return projects.filter((project) => matchesSearchQuery(
+            buildSearchText(project.title, project.description, project.status, project.priority, project.projectType?.name, project.projectType?.category),
+            searchQuery,
+        ));
+    }, [projects, searchQuery]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PROJECTS_PER_PAGE));
     const paginatedProjects = useMemo(() => {
         const start = (currentPage - 1) * PROJECTS_PER_PAGE;
-        return projects.slice(start, start + PROJECTS_PER_PAGE);
-    }, [projects, currentPage]);
+        return filteredProjects.slice(start, start + PROJECTS_PER_PAGE);
+    }, [filteredProjects, currentPage]);
 
     const handleToggleExpand = async (project: any) => {
         if (!project || !project.id) {
@@ -469,16 +479,32 @@ export default function PastProjectsPage() {
             </div>
             <hr className="title-divider" />
 
+            <div className="page-search-row">
+                <div className="page-search-field page-search-field--full">
+                    <Search className="page-search-icon" size={16} />
+                    <input
+                        type="search"
+                        className="page-search-input"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search archived projects"
+                        aria-label="Search archived projects"
+                    />
+                </div>
+            </div>
+
             {/* Content */}
             {loading ? (
                 <div className="projects-loading">Loading past projects…</div>
             ) : error ? (
                 <div className="projects-error">{error}</div>
-            ) : projects.length === 0 ? (
+            ) : filteredProjects.length === 0 ? (
                 <div className="empty-state">
                     <Archive className="empty-state-icon" />
-                    <h4 className="empty-state-title">No archived projects</h4>
-                    <p className="empty-state-text">Projects that have been archived will appear here.</p>
+                    <h4 className="empty-state-title">{searchQuery ? 'No archived projects found' : 'No archived projects'}</h4>
+                    <p className="empty-state-text">
+                        {searchQuery ? 'Try a different search.' : 'Projects that have been archived will appear here.'}
+                    </p>
                 </div>
             ) : (
                 <>

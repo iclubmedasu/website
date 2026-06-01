@@ -11,6 +11,7 @@ import type { NotificationRealtimeMessage } from '@/types/backend-contracts'
 import {
     Users,
     FolderKanban,
+    Calendar,
     UserCircle,
     Bell,
     HelpCircle,
@@ -45,6 +46,11 @@ const NAV_ITEMS = [
             { label: 'Active Projects', href: '/projects', icon: FolderKanban },
             { label: 'Past Projects', href: '/past-projects', icon: Archive }
         ]
+    },
+    {
+        label: 'Events',
+        href: '/events',
+        icon: Calendar,
     },
     {
         label: 'Help & Support',

@@ -1,7 +1,7 @@
 ﻿'use client';
 
-import { useState, useEffect } from 'react';
-import { Eye, Pencil, PlayCircle, PauseCircle, Plus, Users } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Eye, Pencil, PlayCircle, PauseCircle, Plus, Search, Users } from 'lucide-react';
 import Dropdown from '../../../components/dropdown/dropdown';
 import AddTeamModal from './modals/AddTeamModal';
 import EditTeamModal from './modals/EditTeamModal';
@@ -21,6 +21,8 @@ import ViewMemberModal from './modals/ViewMemberModal';
 import { useAuth } from '../../../context/AuthContext';
 import { teamsAPI, teamRolesAPI, teamSubteamsAPI, teamMembersAPI, getProfilePhotoUrl } from '../../../services/api';
 import type { Id } from '../../../types/backend-contracts';
+import { buildSearchText, matchesSearchQuery } from '../../../utils/search';
+import '../../Projects/ProjectsPage.css';
 
 interface TeamItem {
     id: Id;
@@ -182,6 +184,8 @@ interface SpecialMembersCardProps {
     onEditMember: (member: TeamMemberView) => void;
     onAddMember: () => void;
     canManageMembers?: boolean;
+    emptyTitle?: string;
+    emptyText?: string;
 }
 
 interface MembersTableProps {
@@ -190,6 +194,8 @@ interface MembersTableProps {
     onEditMember: (member: TeamMemberView) => void;
     onAddMember: () => void;
     canManageMembers?: boolean;
+    emptyTitle?: string;
+    emptyText?: string;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -487,7 +493,7 @@ const SubteamsDropdown = ({ subteams, onAddSubteam, onEditSubteam, onDeactivateS
     );
 };
 
-const SpecialMembersCard = ({ title, members, onViewMember, onEditMember, onAddMember, canManageMembers = true }: SpecialMembersCardProps) => {
+const SpecialMembersCard = ({ title, members, onViewMember, onEditMember, onAddMember, canManageMembers = true, emptyTitle = 'No members yet', emptyText = 'Add members to this group to get started' }: SpecialMembersCardProps) => {
     return (
         <div className="card special-members-card">
             <div className="card-header card-header-with-action">
@@ -508,10 +514,8 @@ const SpecialMembersCard = ({ title, members, onViewMember, onEditMember, onAddM
                 {members.length === 0 ? (
                     <div className="empty-state">
                         <Users className="empty-state-icon" />
-                        <h4 className="empty-state-title">No members yet</h4>
-                        <p className="empty-state-text">
-                            Add members to this group to get started
-                        </p>
+                        <h4 className="empty-state-title">{emptyTitle}</h4>
+                        <p className="empty-state-text">{emptyText}</p>
                         {canManageMembers && (
                             <button className="empty-state-btn" onClick={onAddMember}>
                                 <Plus />
@@ -564,7 +568,7 @@ const SpecialMembersCard = ({ title, members, onViewMember, onEditMember, onAddM
     );
 };
 
-const MembersTable = ({ members, onViewMember, onEditMember, onAddMember, canManageMembers = true }: MembersTableProps) => {
+const MembersTable = ({ members, onViewMember, onEditMember, onAddMember, canManageMembers = true, emptyTitle = 'No team members yet', emptyText = 'Start building your team by adding members' }: MembersTableProps) => {
     return (
         <div className="card members-table-card">
             <div className="card-header card-header-with-action">
@@ -586,10 +590,8 @@ const MembersTable = ({ members, onViewMember, onEditMember, onAddMember, canMan
                 {members.length === 0 ? (
                     <div className="empty-state">
                         <Users className="empty-state-icon" />
-                        <h4 className="empty-state-title">No team members yet</h4>
-                        <p className="empty-state-text">
-                            Start building your team by adding members
-                        </p>
+                        <h4 className="empty-state-title">{emptyTitle}</h4>
+                        <p className="empty-state-text">{emptyText}</p>
                         {canManageMembers && (
                             <button className="empty-state-btn" onClick={onAddMember}>
                                 <Plus />
@@ -714,13 +716,38 @@ function TeamsPage() {
     const [viewingMemberId, setViewingMemberId] = useState<Id | null>(null);
     const [editingMember, setEditingMember] = useState<TeamMemberView | null>(null);
     const [editingMemberAssignment, setEditingMemberAssignment] = useState<TeamAssignmentState | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const [leadershipMembers, setLeadershipMembers] = useState<TeamMemberView[]>([]);
     const [specialMembers, setSpecialMembers] = useState<TeamMemberView[]>([]);
     const [regularMembers, setRegularMembers] = useState<TeamMemberView[]>([]);
 
+    const filteredLeadershipMembers = useMemo(() => leadershipMembers.filter((member) => matchesSearchQuery(
+        buildSearchText(member.name, member.email, member.role, member.subteamName, member.status),
+        searchQuery,
+    )), [leadershipMembers, searchQuery]);
+    const filteredSpecialMembers = useMemo(() => specialMembers.filter((member) => matchesSearchQuery(
+        buildSearchText(member.name, member.email, member.role, member.subteamName, member.status),
+        searchQuery,
+    )), [specialMembers, searchQuery]);
+    const filteredRegularMembers = useMemo(() => regularMembers.filter((member) => matchesSearchQuery(
+        buildSearchText(member.name, member.email, member.role, member.subteamName, member.status),
+        searchQuery,
+    )), [regularMembers, searchQuery]);
+
     const fetchTeams = async (): Promise<void> => {
         setLoading(true);
+        <div className="page-search-field">
+            <Search className="page-search-icon" size={16} />
+            <input
+                type="search"
+                className="page-search-input"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search team members"
+                aria-label="Search team members"
+            />
+        </div>
         setError(null);
         try {
             const data = await teamsAPI.getAll();
@@ -1156,30 +1183,50 @@ function TeamsPage() {
 
             <hr className="title-divider" />
 
+            <div className="page-search-row">
+                <div className="page-search-field page-search-field--full">
+                    <Search className="page-search-icon" size={16} />
+                    <input
+                        type="search"
+                        className="page-search-input"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search team members"
+                        aria-label="Search team members"
+                    />
+                </div>
+            </div>
+
             <SpecialMembersCard
                 title="Leadership"
-                members={leadershipMembers}
+                members={filteredLeadershipMembers}
                 onViewMember={handleViewMember}
                 onEditMember={handleEditMember}
                 onAddMember={handleAddLeadership}
                 canManageMembers={canManageMembersInSelectedTeam}
+                emptyTitle={searchQuery ? 'No matches found' : 'No members yet'}
+                emptyText={searchQuery ? 'Try a different search.' : 'Add members to this group to get started'}
             />
 
             <SpecialMembersCard
                 title="Special Roles"
-                members={specialMembers}
+                members={filteredSpecialMembers}
                 onViewMember={handleViewMember}
                 onEditMember={handleEditMember}
                 onAddMember={handleAddSpecialRole}
                 canManageMembers={canManageMembersInSelectedTeam}
+                emptyTitle={searchQuery ? 'No matches found' : 'No members yet'}
+                emptyText={searchQuery ? 'Try a different search.' : 'Add members to this group to get started'}
             />
 
             <MembersTable
-                members={regularMembers}
+                members={filteredRegularMembers}
                 onViewMember={handleViewMember}
                 onEditMember={handleEditMember}
                 onAddMember={handleAddTeamMember}
                 canManageMembers={canManageMembersInSelectedTeam}
+                emptyTitle={searchQuery ? 'No matches found' : 'No team members yet'}
+                emptyText={searchQuery ? 'Try a different search.' : 'Start building your team by adding members'}
             />
 
             <AddTeamModal

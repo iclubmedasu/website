@@ -25,6 +25,7 @@ import {
 import { membersAPI, authAPI, roleHistoryAPI, getProfilePhotoUrl, notificationsAPI } from '@/services/api';
 import { PhoneInput } from '@/components/PhoneInput/PhoneInput';
 import UploadPhotoModal from '@/components/UploadPhotoModal/UploadPhotoModal';
+import { normalizePhoneDisplay } from '@/utils/countryCodes';
 import '@/components/modal/modal.css';
 import type { Id, NotificationItem } from '@/types/backend-contracts';
 
@@ -443,12 +444,12 @@ function UserPage() {
                                         )}
                                         <div className="user-profile-data-item">
                                             <span className="user-profile-data-label">Phone</span>
-                                            <span className="user-profile-data-value">{user.phoneNumber || '—'}</span>
+                                            <span className="user-profile-data-value">{normalizePhoneDisplay(user.phoneNumber) || '—'}</span>
                                         </div>
                                         {user.phoneNumber2 && (
                                             <div className="user-profile-data-item">
                                                 <span className="user-profile-data-label">Phone 2</span>
-                                                <span className="user-profile-data-value">{user.phoneNumber2}</span>
+                                                <span className="user-profile-data-value">{normalizePhoneDisplay(user.phoneNumber2)}</span>
                                             </div>
                                         )}
                                         <div className="user-profile-data-item">
@@ -897,7 +898,7 @@ function UserPage() {
                                             <Phone size={16} className="user-signin-method-icon" />
                                             <div className="user-signin-method-info">
                                                 <span className="user-signin-method-label">Phone 2</span>
-                                                <span className="user-signin-method-value">{user.phoneNumber2}</span>
+                                                <span className="user-signin-method-value">{normalizePhoneDisplay(user.phoneNumber2)}</span>
                                             </div>
                                             <span className="user-signin-method-badge">Active</span>
                                         </div>

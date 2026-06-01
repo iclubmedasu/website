@@ -1,11 +1,12 @@
 ﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Eye, Users } from 'lucide-react';
+import { Eye, Search, Users } from 'lucide-react';
 import { alumniAPI, teamsAPI, getProfilePhotoUrl } from '../../../services/api';
 import ViewMemberModal from '../Teams/modals/ViewMemberModal';
 import Dropdown from '../../../components/dropdown/dropdown';
 import type { Id } from '../../../types/backend-contracts';
+import { buildSearchText, matchesSearchQuery } from '../../../utils/search';
 import '../../Projects/ProjectsPage.css';
 
 type PageToken = number | '...';
@@ -76,6 +77,7 @@ function AlumniPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [filterTeamId, setFilterTeamId] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
     const [showViewModal, setShowViewModal] = useState(false);
     const [viewingMemberId, setViewingMemberId] = useState<Id | null>(null);
 
@@ -128,17 +130,24 @@ function AlumniPage() {
         }));
     }, [alumniList]);
 
+    const filteredRows = useMemo(() => {
+        return rows.filter((row) => matchesSearchQuery(
+            buildSearchText(row.name, row.email, row.teamName, row.role, row.subteamName, row.leaveType),
+            searchQuery,
+        ));
+    }, [rows, searchQuery]);
+
     // Reset to page 1 when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [filterTeamId]);
+    }, [filterTeamId, searchQuery]);
 
     // Pagination derived values
-    const totalPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
+    const totalPages = Math.max(1, Math.ceil(filteredRows.length / ROWS_PER_PAGE));
     const paginatedRows = useMemo<AlumniRow[]>(() => {
         const start = (currentPage - 1) * ROWS_PER_PAGE;
-        return rows.slice(start, start + ROWS_PER_PAGE);
-    }, [rows, currentPage]);
+        return filteredRows.slice(start, start + ROWS_PER_PAGE);
+    }, [filteredRows, currentPage]);
 
     const formatDate = (d: string | null | undefined): string => {
         if (!d || Number.isNaN(new Date(d).getTime())) return '—';
@@ -161,6 +170,20 @@ function AlumniPage() {
 
             <hr className="title-divider" />
 
+            <div className="page-search-row">
+                <div className="page-search-field page-search-field--full">
+                    <Search className="page-search-icon" size={16} />
+                    <input
+                        type="search"
+                        className="page-search-input"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search alumni"
+                        aria-label="Search alumni"
+                    />
+                </div>
+            </div>
+
             {error && <div className="error-message">{error}</div>}
             {loading && <div className="loading-message">Loading alumni...</div>}
 
@@ -168,16 +191,20 @@ function AlumniPage() {
                 <div className="card-header card-header-with-action">
                     <div className="card-header-left">
                         <h3 className="card-title">Former members</h3>
-                        <p className="card-subtitle">{rows.length} alumni</p>
+                        <p className="card-subtitle">{filteredRows.length} alumni</p>
                     </div>
                 </div>
                 <div className="card-body">
-                    {!loading && rows.length === 0 ? (
+                    {!loading && filteredRows.length === 0 ? (
                         <div className="empty-state">
                             <Users className="empty-state-icon" />
                             <h4 className="empty-state-title">No alumni found</h4>
                             <p className="empty-state-text">
-                                {filterTeamId ? 'No one has left this team yet.' : 'No one has left the club yet.'}
+                                {searchQuery
+                                    ? 'No alumni match your search.'
+                                    : filterTeamId
+                                        ? 'No one has left this team yet.'
+                                        : 'No one has left the club yet.'}
                             </p>
                         </div>
                     ) : (

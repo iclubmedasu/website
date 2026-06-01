@@ -111,3 +111,26 @@ export function formatPhoneValue(
     const code = (countryCode || '+20').replace(/\D/g, '');
     return code ? `+${code}${digits}` : digits;
 }
+
+export function normalizePhoneDisplay(value: string | null | undefined): string {
+    const trimmed = value?.trim();
+    if (!trimmed) return '';
+
+    if (!/^[+\d]+$/.test(trimmed)) {
+        return trimmed;
+    }
+
+    for (let chunkLength = 8; chunkLength <= Math.min(15, Math.floor(trimmed.length / 2)); chunkLength += 1) {
+        if (trimmed.length % chunkLength !== 0) continue;
+
+        const chunk = trimmed.slice(0, chunkLength);
+        const repetitions = trimmed.length / chunkLength;
+
+        if (repetitions < 2) continue;
+        if (chunk.repeat(repetitions) === trimmed) {
+            return chunk;
+        }
+    }
+
+    return trimmed;
+}
