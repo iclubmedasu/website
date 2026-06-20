@@ -281,6 +281,43 @@
 }
 
 /* ============================================
+   TOGGLES
+   ============================================ */
+
+.toggle-field {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
+    background: var(--gray-50);
+}
+
+.toggle-field input {
+    margin-top: 0.2rem;
+    flex-shrink: 0;
+}
+
+.toggle-field span {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.toggle-field strong {
+    font-family: var(--font-heading);
+    color: var(--gray-900);
+    font-size: 0.95rem;
+}
+
+.toggle-field small {
+    font-family: var(--font-body);
+    color: var(--gray-500);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+/* ============================================
    MODAL FOOTER
    ============================================ */
 
@@ -448,6 +485,26 @@
 .warning-text strong {
     color: var(--error-text);
     font-weight: 600;
+}
+
+.danger-info-box {
+    padding: 1.25rem;
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+    border-radius: var(--radius-md);
+    margin-bottom: 1.5rem;
+}
+
+.danger-highlight {
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--error-text);
+    padding: 0.75rem;
+    background: white;
+    border-radius: var(--radius-sm);
+    margin: 0.75rem 0;
+    text-align: center;
 }
 
 /* ============================================
@@ -2175,6 +2232,10 @@
 
     .duration-text {
         word-break: break-word;
+    }
+
+    .toggle-field {
+        padding: 0.875rem;
     }
 }
 

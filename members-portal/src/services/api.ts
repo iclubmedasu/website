@@ -1457,6 +1457,7 @@ export const eventsAPI = {
         if (filters.dateFrom) params.append('dateFrom', String(filters.dateFrom));
         if (filters.dateTo) params.append('dateTo', String(filters.dateTo));
         if (filters.scope) params.append('scope', filters.scope);
+        if (filters.archived) params.append('archived', 'true');
 
         const response = await apiFetch(`${API_BASE_URL}/events${params.toString() ? `?${params.toString()}` : ''}`, {
             headers: getAuthHeaders(),
@@ -1498,6 +1499,51 @@ export const eventsAPI = {
             method: 'PATCH',
             headers: getAuthHeaders(),
             body: JSON.stringify({ status }),
+        });
+
+        return handleResponse<EventDetail>(response);
+    },
+
+    deactivate: async (id: Id | string): Promise<EventDetail> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${id}/deactivate`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventDetail>(response);
+    },
+
+    reactivate: async (id: Id | string): Promise<EventDetail> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${id}/reactivate`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventDetail>(response);
+    },
+
+    abort: async (id: Id | string): Promise<EventDetail> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${id}/abort`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventDetail>(response);
+    },
+
+    finalize: async (id: Id | string): Promise<EventDetail> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${id}/finalize`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventDetail>(response);
+    },
+
+    archive: async (id: Id | string): Promise<EventDetail> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${id}/archive`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
         });
 
         return handleResponse<EventDetail>(response);

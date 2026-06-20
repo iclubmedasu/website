@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import type { EventQueryParams, ProjectStatus, TeamRef } from '@/types/backend-contracts';
+import type { ProjectStatus, TeamRef } from '@/types/backend-contracts';
 
 const WORK_STATUSES: ProjectStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD', 'CANCELLED'];
 
@@ -25,43 +25,45 @@ const PRIORITY_LABELS: Record<(typeof PRIORITIES)[number], string> = {
     URGENT: 'Urgent',
 };
 
-export interface EventFiltersState {
-    status: EventQueryParams['status'] | '';
-    dateFrom: string;
-    dateTo: string;
+export interface ProjectFiltersState {
     filterTeam: string;
     filterCategory: string;
     filterPriority: string;
+    filterStatus: string;
+    dateFrom: string;
+    dateTo: string;
 }
 
-interface EventFiltersModalProps {
-    status: EventQueryParams['status'] | '';
-    dateFrom: string;
-    dateTo: string;
+interface ProjectFiltersModalProps {
     filterTeam: string;
     filterCategory: string;
     filterPriority: string;
+    filterStatus: string;
+    dateFrom: string;
+    dateTo: string;
     allTeams: TeamRef[];
     allCategories: string[];
+    dateRangeLabel?: string;
     onClose: () => void;
-    onApply: (filters: EventFiltersState) => void;
+    onApply: (filters: ProjectFiltersState) => void;
     onClear: () => void;
 }
 
-export default function EventFiltersModal({
-    status,
-    dateFrom,
-    dateTo,
+export default function ProjectFiltersModal({
     filterTeam,
     filterCategory,
     filterPriority,
+    filterStatus,
+    dateFrom,
+    dateTo,
     allTeams,
     allCategories,
+    dateRangeLabel = 'Due date range',
     onClose,
     onApply,
     onClear,
-}: EventFiltersModalProps) {
-    const [draftStatus, setDraftStatus] = useState<EventQueryParams['status'] | ''>(status);
+}: ProjectFiltersModalProps) {
+    const [draftStatus, setDraftStatus] = useState(filterStatus);
     const [draftDateFrom, setDraftDateFrom] = useState(dateFrom);
     const [draftDateTo, setDraftDateTo] = useState(dateTo);
     const [draftTeam, setDraftTeam] = useState(filterTeam);
@@ -71,11 +73,11 @@ export default function EventFiltersModal({
     return (
         <>
             <div className="modal-backdrop" onClick={onClose} />
-            <div className="modal-container events-filters-modal" role="dialog" aria-modal="true" aria-labelledby="event-filters-title">
+            <div className="modal-container events-filters-modal" role="dialog" aria-modal="true" aria-labelledby="project-filters-title">
                 <div className="modal-header">
                     <div>
-                        <h2 className="modal-title" id="event-filters-title">Advanced Filters</h2>
-                        <p className="modal-subtitle">Narrow the list by status, team, category, priority, and event date.</p>
+                        <h2 className="modal-title" id="project-filters-title">Advanced Filters</h2>
+                        <p className="modal-subtitle">Narrow the list by status, team, category, priority, and date.</p>
                     </div>
                     <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close filters">
                         <X />
@@ -86,12 +88,12 @@ export default function EventFiltersModal({
                     <div className="form-section">
                         <h3 className="form-section-title">Status</h3>
                         <div className="form-group">
-                            <label className="form-label" htmlFor="event-filter-status">Work status</label>
+                            <label className="form-label" htmlFor="project-filter-status">Work status</label>
                             <select
-                                id="event-filter-status"
+                                id="project-filter-status"
                                 className="form-input"
                                 value={draftStatus}
-                                onChange={(event) => setDraftStatus(event.target.value as EventQueryParams['status'] | '')}
+                                onChange={(event) => setDraftStatus(event.target.value)}
                             >
                                 <option value="">All statuses</option>
                                 {WORK_STATUSES.map((value) => (
@@ -104,9 +106,9 @@ export default function EventFiltersModal({
                     <div className="form-section">
                         <h3 className="form-section-title">Team</h3>
                         <div className="form-group">
-                            <label className="form-label" htmlFor="event-filter-team">Assigned team</label>
+                            <label className="form-label" htmlFor="project-filter-team">Assigned team</label>
                             <select
-                                id="event-filter-team"
+                                id="project-filter-team"
                                 className="form-input"
                                 value={draftTeam}
                                 onChange={(event) => setDraftTeam(event.target.value)}
@@ -122,9 +124,9 @@ export default function EventFiltersModal({
                     <div className="form-section">
                         <h3 className="form-section-title">Category</h3>
                         <div className="form-group">
-                            <label className="form-label" htmlFor="event-filter-category">Event category</label>
+                            <label className="form-label" htmlFor="project-filter-category">Project category</label>
                             <select
-                                id="event-filter-category"
+                                id="project-filter-category"
                                 className="form-input"
                                 value={draftCategory}
                                 onChange={(event) => setDraftCategory(event.target.value)}
@@ -140,9 +142,9 @@ export default function EventFiltersModal({
                     <div className="form-section">
                         <h3 className="form-section-title">Priority</h3>
                         <div className="form-group">
-                            <label className="form-label" htmlFor="event-filter-priority">Priority</label>
+                            <label className="form-label" htmlFor="project-filter-priority">Priority</label>
                             <select
-                                id="event-filter-priority"
+                                id="project-filter-priority"
                                 className="form-input"
                                 value={draftPriority}
                                 onChange={(event) => setDraftPriority(event.target.value)}
@@ -159,9 +161,9 @@ export default function EventFiltersModal({
                         <h3 className="form-section-title">Date range</h3>
                         <div className="form-row">
                             <div className="form-group">
-                                <label className="form-label" htmlFor="event-filter-date-from">From</label>
+                                <label className="form-label" htmlFor="project-filter-date-from">From</label>
                                 <input
-                                    id="event-filter-date-from"
+                                    id="project-filter-date-from"
                                     type="date"
                                     className="form-input"
                                     value={draftDateFrom}
@@ -169,9 +171,9 @@ export default function EventFiltersModal({
                                 />
                             </div>
                             <div className="form-group">
-                                <label className="form-label" htmlFor="event-filter-date-to">To</label>
+                                <label className="form-label" htmlFor="project-filter-date-to">To</label>
                                 <input
-                                    id="event-filter-date-to"
+                                    id="project-filter-date-to"
                                     type="date"
                                     className="form-input"
                                     value={draftDateTo}
@@ -179,6 +181,7 @@ export default function EventFiltersModal({
                                 />
                             </div>
                         </div>
+                        <p className="form-hint-text">{dateRangeLabel}</p>
                     </div>
                 </div>
 
@@ -205,12 +208,12 @@ export default function EventFiltersModal({
                         type="button"
                         className="btn btn-primary"
                         onClick={() => onApply({
-                            status: draftStatus,
-                            dateFrom: draftDateFrom,
-                            dateTo: draftDateTo,
                             filterTeam: draftTeam,
                             filterCategory: draftCategory,
                             filterPriority: draftPriority,
+                            filterStatus: draftStatus,
+                            dateFrom: draftDateFrom,
+                            dateTo: draftDateTo,
                         })}
                     >
                         Apply Filters

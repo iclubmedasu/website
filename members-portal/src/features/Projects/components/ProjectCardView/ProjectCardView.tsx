@@ -63,6 +63,7 @@ interface ProjectDetailsSectionProps {
     detail: ProjectCardViewModel;
     over: boolean;
     detailExtra?: React.ReactNode;
+    dateFields?: Array<{ label: string; value: React.ReactNode; overdue?: boolean }>;
 }
 
 interface ProjectTeamsSectionProps {
@@ -86,6 +87,7 @@ interface ProjectCardViewProps {
     expandedMeta?: React.ReactNode;
     expandedActions?: React.ReactNode;
     detailExtra?: React.ReactNode;
+    detailDateFields?: Array<{ label: string; value: React.ReactNode; overdue?: boolean }>;
     teamEmptyMessage?: string;
     formatAssignedTeamSuffix?: (team: ProjectTeamView) => React.ReactNode;
     teamExtra?: React.ReactNode;
@@ -183,7 +185,7 @@ export function getArchiveOutcomeBadge(project: ProjectCardViewModel | null | un
     return null;
 }
 
-function ProjectDetailsSection({ detail, over, detailExtra }: ProjectDetailsSectionProps) {
+function ProjectDetailsSection({ detail, over, detailExtra, dateFields }: ProjectDetailsSectionProps) {
     return (
         <div className="exp-card-section">
             <div className="exp-card-section-header">Details</div>
@@ -221,20 +223,18 @@ function ProjectDetailsSection({ detail, over, detailExtra }: ProjectDetailsSect
                 </div>
             </div>
             <div className="exp-dates-row">
-                <div className="exp-date-item">
-                    <span className="exp-date-label">Created</span>
-                    <span className="exp-date-value">{fmtDate(detail.createdAt) || '—'}</span>
-                </div>
-                <div className="exp-date-item">
-                    <span className="exp-date-label">Start</span>
-                    <span className="exp-date-value">{fmtDate(detail.startDate) || '—'}</span>
-                </div>
-                <div className="exp-date-item">
-                    <span className="exp-date-label">Due</span>
-                    <span className={`exp-date-value${over ? ' overdue' : ''}`}>
-                        {fmtDate(detail.dueDate) || '—'}
-                    </span>
-                </div>
+                {(dateFields ?? [
+                    { label: 'Created', value: fmtDate(detail.createdAt) || '—' },
+                    { label: 'Start', value: fmtDate(detail.startDate) || '—' },
+                    { label: 'Due', value: fmtDate(detail.dueDate) || '—', overdue: over },
+                ]).map((field) => (
+                    <div key={field.label} className="exp-date-item">
+                        <span className="exp-date-label">{field.label}</span>
+                        <span className={`exp-date-value${field.overdue ? ' overdue' : ''}`}>
+                            {field.value}
+                        </span>
+                    </div>
+                ))}
                 {detailExtra}
             </div>
         </div>
@@ -287,6 +287,7 @@ export function ProjectCardView({
     expandedMeta,
     expandedActions,
     detailExtra,
+    detailDateFields,
     teamEmptyMessage,
     formatAssignedTeamSuffix,
     teamExtra,
@@ -380,7 +381,12 @@ export function ProjectCardView({
                         </div>
 
                         <div className="exp-card-columns">
-                            <ProjectDetailsSection detail={currentDetail} over={over} detailExtra={detailExtra} />
+                            <ProjectDetailsSection
+                                detail={currentDetail}
+                                over={over}
+                                detailExtra={detailExtra}
+                                dateFields={detailDateFields}
+                            />
                             <ProjectTeamsSection
                                 detail={currentDetail}
                                 ownerTeam={ownerTeam}

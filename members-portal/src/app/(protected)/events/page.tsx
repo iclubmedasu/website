@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import EventsPage from '@/features/Events/EventsPage';
 
 export const metadata: Metadata = {
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function EventsRoute() {
-    return <EventsPage />;
+    return (
+        <Suspense fallback={<main className="events-page"><div className="empty-message">Loading events…</div></main>}>
+            <EventsPage />
+        </Suspense>
+    );
 }

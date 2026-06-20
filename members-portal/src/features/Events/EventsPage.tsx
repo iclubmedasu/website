@@ -1,65 +1,115 @@
 'use client';
 
-import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Calendar, CirclePlus, Filter, MapPin, Search, Users } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Calendar, Plus, Filter, Search } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { eventsAPI } from '@/services/api';
+import { eventsAPI, projectTypesAPI, teamsAPI } from '@/services/api';
 import CreateEventModal from './modals/CreateEventModal';
 import EventFiltersModal from './modals/EventFiltersModal';
-import type { EventQueryParams, EventSummary } from '@/types/backend-contracts';
+import EventCard from './components/EventCard/EventCard';
+import HoldEventModal from './modals/HoldEventModal';
+import AbortEventModal from './modals/AbortEventModal';
+import FinalizeEventModal from './modals/FinalizeEventModal';
+import ArchiveEventModal from './modals/ArchiveEventModal';
+import ReactivateEventModal from './modals/ReactivateEventModal';
+import EventActivityModal from './modals/EventActivityModal';
+import { parseEventTab, type EventTabKey } from './components/eventUtils';
+import type { EventDetail, EventQueryParams, EventSummary, Id, TeamRef } from '@/types/backend-contracts';
 import './EventsPage.css';
+import '../../features/Projects/ProjectsPage.css';
 
-function formatDate(value?: string | null) {
-    if (!value) return 'TBD';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return 'TBD';
-    return date.toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-    });
+const EVENTS_PER_PAGE = 10;
+
+function getPageNumbers(current: number, total: number): Array<number | '...'> {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages: Array<number | '...'> = [];
+    pages.push(1);
+    if (current > 3) pages.push('...');
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (current < total - 2) pages.push('...');
+    pages.push(total);
+    return pages;
 }
 
 export default function EventsPage() {
     const { user } = useAuth();
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const pendingExpandRef = useRef<{ eventId: string; tab: EventTabKey | null } | null>(null);
+    const deepLinkHandledRef = useRef(false);
+
     const [events, setEvents] = useState<EventSummary[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [status, setStatus] = useState<EventQueryParams['status'] | ''>('');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
+    const [filterTeam, setFilterTeam] = useState('');
+    const [filterCategory, setFilterCategory] = useState('');
+    const [filterPriority, setFilterPriority] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showFiltersModal, setShowFiltersModal] = useState(false);
+    const [editingEvent, setEditingEvent] = useState<EventDetail | null>(null);
+    const [holdingEvent, setHoldingEvent] = useState<EventSummary | EventDetail | null>(null);
+    const [finalizingEvent, setFinalizingEvent] = useState<EventSummary | EventDetail | null>(null);
+    const [archivingEvent, setArchivingEvent] = useState<EventSummary | EventDetail | null>(null);
+    const [reactivatingEvent, setReactivatingEvent] = useState<EventSummary | EventDetail | null>(null);
+    const [abortingEvent, setAbortingEvent] = useState<EventSummary | EventDetail | null>(null);
+    const [activityEvent, setActivityEvent] = useState<EventSummary | EventDetail | null>(null);
 
-    // ── Permission helpers ──
-    // Privileged roles: developer, officer, admin, leadership
+    const [expandedEventId, setExpandedEventId] = useState<Id | null>(null);
+    const [expandedEventDetail, setExpandedEventDetail] = useState<EventDetail | null>(null);
+    const [detailLoading, setDetailLoading] = useState(false);
+    const [initialTab, setInitialTab] = useState<EventTabKey | null>(null);
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const [allTeams, setAllTeams] = useState<TeamRef[]>([]);
+    const [allCategories, setAllCategories] = useState<string[]>([]);
+
+    useEffect(() => {
+        Promise.all([
+            teamsAPI.getAll(undefined, 'all').catch(() => [] as TeamRef[]),
+            projectTypesAPI.getAll().catch(() => []),
+        ]).then(([teams, types]) => {
+            setAllTeams(Array.isArray(teams) ? teams : []);
+            const categories = [...new Set(
+                (Array.isArray(types) ? types : [])
+                    .map((typeItem) => typeItem.category)
+                    .filter((category): category is string => typeof category === 'string' && category.length > 0),
+            )];
+            setAllCategories(categories);
+        });
+    }, []);
+
     const eventPermissions = useMemo(() => {
         const isPrivileged = !!(user?.isDeveloper || user?.isAdmin || user?.isOfficer || user?.isLeadership);
-        const isElevatedWorkItemRole = isPrivileged || !!user?.isSpecial;
 
         return {
             isPrivileged,
-            isElevatedWorkItemRole,
-            // Only privileged roles with a real member identity can create/edit/manage events
             canCreateEvent: isPrivileged && !!user?.id,
-            canEditEvent: (event: any) => isPrivileged && !!event?.isActive && !event?.isFinalized && event?.status !== 'CANCELLED',
-            // canManageEvent: finalize, archive, hold, abort, publish, reactivate (NOT blocked by finalized)
+            canEditEvent: (event: EventSummary | EventDetail) => (
+                isPrivileged
+                && !!event?.isActive
+                && !event?.isFinalized
+                && !event?.isArchived
+                && event?.status !== 'CANCELLED'
+            ),
             canManageEvent: () => isPrivileged,
-            // Upload follows backend visibility scope: if an event is visible to the user, upload is allowed.
             canUploadToEvent: () => !!user?.id,
         };
-    }, [user?.id, user?.isAdmin, user?.isDeveloper, user?.isLeadership, user?.isOfficer, user?.isSpecial]);
+    }, [user?.id, user?.isAdmin, user?.isDeveloper, user?.isLeadership, user?.isOfficer]);
 
     const canCreateEvent = eventPermissions.canCreateEvent;
 
     const filters = useMemo(() => ({
-        status: status || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
         scope: eventPermissions.canManageEvent() ? 'all' as const : 'published' as const,
-    }), [dateFrom, dateTo, eventPermissions, status]);
+    }), [dateFrom, dateTo, eventPermissions]);
 
     const loadEvents = useCallback(async () => {
         setLoading(true);
@@ -78,21 +128,140 @@ export default function EventsPage() {
         void loadEvents();
     }, [loadEvents]);
 
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, status, dateFrom, dateTo, filterTeam, filterCategory, filterPriority]);
+
     const filteredEvents = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
         return events.filter((event) => {
+            if (status && event.status !== status) return false;
+            if (filterTeam && !event.eventTeams?.some((entry) => String(entry.teamId) === filterTeam)) return false;
+            if (filterCategory && event.projectType?.category !== filterCategory) return false;
+            if (filterPriority && event.priority !== filterPriority) return false;
             if (!query) return true;
             return [event.title, event.venue, event.description].some((value) => String(value || '').toLowerCase().includes(query));
         });
-    }, [events, searchQuery]);
+    }, [events, searchQuery, status, filterTeam, filterCategory, filterPriority]);
 
-    const hasActiveFilters = status !== '' || dateFrom !== '' || dateTo !== '';
-    const statusClassName: Record<string, string> = {
-        DRAFT: 'event-status-badge event-status-badge--draft',
-        PUBLISHED: 'event-status-badge event-status-badge--published',
-        COMPLETED: 'event-status-badge event-status-badge--completed',
-        CANCELLED: 'event-status-badge event-status-badge--cancelled',
-    };
+    const totalPages = Math.max(1, Math.ceil(filteredEvents.length / EVENTS_PER_PAGE));
+    const paginatedEvents = useMemo(() => {
+        const start = (currentPage - 1) * EVENTS_PER_PAGE;
+        return filteredEvents.slice(start, start + EVENTS_PER_PAGE);
+    }, [filteredEvents, currentPage]);
+
+    const handleToggleExpand = useCallback(async (event: EventSummary | EventDetail | null, tabOverride?: EventTabKey | null) => {
+        if (!event) {
+            setExpandedEventId(null);
+            setExpandedEventDetail(null);
+            setInitialTab(null);
+            return;
+        }
+
+        if (expandedEventId === event.id) {
+            setExpandedEventId(null);
+            setExpandedEventDetail(null);
+            setInitialTab(null);
+            return;
+        }
+
+        if (tabOverride) setInitialTab(tabOverride);
+
+        setExpandedEventId(event.id);
+        setDetailLoading(true);
+        try {
+            const detail = await eventsAPI.getById(event.id);
+            setExpandedEventDetail(detail);
+        } catch {
+            setExpandedEventDetail(null);
+        } finally {
+            setDetailLoading(false);
+        }
+    }, [expandedEventId]);
+
+    const handleRefreshDetail = useCallback(async () => {
+        if (!expandedEventId) return;
+        try {
+            const detail = await eventsAPI.getById(expandedEventId);
+            setExpandedEventDetail(detail);
+            void loadEvents();
+        } catch {
+            /* swallow */
+        }
+    }, [expandedEventId, loadEvents]);
+
+    const handleLifecycleRefresh = useCallback(() => {
+        void loadEvents();
+        if (expandedEventId) {
+            void eventsAPI.getById(expandedEventId).then(setExpandedEventDetail).catch(() => {});
+        }
+    }, [expandedEventId, loadEvents]);
+
+    const expandEventById = useCallback(async (eventId: string, tab: EventTabKey | null) => {
+        const index = filteredEvents.findIndex((item) => String(item.id) === String(eventId));
+        if (index >= 0) {
+            setCurrentPage(Math.floor(index / EVENTS_PER_PAGE) + 1);
+            await handleToggleExpand(filteredEvents[index], tab);
+            return;
+        }
+
+        const summary = events.find((item) => String(item.id) === String(eventId));
+        if (summary) {
+            await handleToggleExpand(summary, tab);
+            return;
+        }
+
+        setDetailLoading(true);
+        try {
+            const detail = await eventsAPI.getById(eventId);
+            if (tab) setInitialTab(tab);
+            setExpandedEventId(detail.id);
+            setExpandedEventDetail(detail);
+        } catch {
+            setExpandedEventId(null);
+            setExpandedEventDetail(null);
+        } finally {
+            setDetailLoading(false);
+        }
+    }, [events, filteredEvents, handleToggleExpand]);
+
+    useEffect(() => {
+        const eventId = searchParams.get('event');
+        const tab = parseEventTab(searchParams.get('tab'));
+        const create = searchParams.get('create');
+
+        if (create === '1' || create === 'true') {
+            setShowCreateModal(true);
+        }
+
+        if (eventId) {
+            pendingExpandRef.current = { eventId, tab };
+            deepLinkHandledRef.current = false;
+        }
+
+        if (eventId || create) {
+            router.replace('/events', { scroll: false });
+        }
+    }, [searchParams, router]);
+
+    useEffect(() => {
+        if (loading || deepLinkHandledRef.current || !pendingExpandRef.current) return;
+
+        const { eventId, tab } = pendingExpandRef.current;
+        pendingExpandRef.current = null;
+        deepLinkHandledRef.current = true;
+        void expandEventById(eventId, tab);
+    }, [loading, events, expandEventById]);
+
+    const handleEventCreated = useCallback(async (saved: EventDetail) => {
+        setShowCreateModal(false);
+        await loadEvents();
+        setCurrentPage(1);
+        await handleToggleExpand(saved, 'statistics');
+    }, [loadEvents, handleToggleExpand]);
+
+    const hasActiveFilters = status !== '' || dateFrom !== '' || dateTo !== ''
+        || filterTeam !== '' || filterCategory !== '' || filterPriority !== '';
 
     const handleOpenFilters = () => {
         setShowFiltersModal(true);
@@ -102,10 +271,16 @@ export default function EventsPage() {
         status: EventQueryParams['status'] | '';
         dateFrom: string;
         dateTo: string;
+        filterTeam: string;
+        filterCategory: string;
+        filterPriority: string;
     }) => {
         setStatus(nextFilters.status);
         setDateFrom(nextFilters.dateFrom);
         setDateTo(nextFilters.dateTo);
+        setFilterTeam(nextFilters.filterTeam);
+        setFilterCategory(nextFilters.filterCategory);
+        setFilterPriority(nextFilters.filterPriority);
         setShowFiltersModal(false);
     };
 
@@ -113,7 +288,23 @@ export default function EventsPage() {
         setStatus('');
         setDateFrom('');
         setDateTo('');
+        setFilterTeam('');
+        setFilterCategory('');
+        setFilterPriority('');
     };
+
+    const expandedEventSummary = useMemo((): EventSummary | null => {
+        if (!expandedEventId) return null;
+        const inPage = paginatedEvents.find((item) => item.id === expandedEventId);
+        if (inPage) return inPage;
+        const inList = events.find((item) => item.id === expandedEventId);
+        if (inList) return inList;
+        if (expandedEventDetail) return expandedEventDetail as EventSummary;
+        return null;
+    }, [expandedEventId, paginatedEvents, events, expandedEventDetail]);
+
+    const showOrphanExpandedCard = expandedEventSummary
+        && !paginatedEvents.some((item) => item.id === expandedEventId);
 
     return (
         <main className="events-page">
@@ -125,12 +316,12 @@ export default function EventsPage() {
 
             <hr className="title-divider" />
 
-            <div className="page-search-row events-search-row">
-                <div className="events-search-field page-search-field page-search-field--full">
-                    <Search className="events-search-icon" size={16} />
+            <div className="page-search-row">
+                <div className="page-search-field page-search-field--full">
+                    <Search className="page-search-icon" size={16} />
                     <input
                         type="search"
-                        className="events-search-input page-search-input"
+                        className="page-search-input"
                         value={searchQuery}
                         onChange={(event) => setSearchQuery(event.target.value)}
                         placeholder="Search events"
@@ -138,22 +329,20 @@ export default function EventsPage() {
                     />
                     <button
                         type="button"
-                        className={`events-search-filter-btn${hasActiveFilters ? ' events-search-filter-btn--active' : ''}`}
+                        className={`page-search-filter-btn${hasActiveFilters ? ' page-search-filter-btn--active' : ''}`}
                         onClick={handleOpenFilters}
                         aria-label="Open advanced filters"
                     >
                         <Filter size={16} />
-                        <span className="events-search-filter-label">Advanced Filters</span>
+                        <span className="page-search-filter-label">Advanced Filters</span>
                     </button>
                 </div>
             </div>
 
-            {error ? (
-                <div className="events-error">{error}</div>
-            ) : null}
-
             {loading ? (
                 <div className="empty-message">Loading events…</div>
+            ) : error ? (
+                <div className="projects-error">{error}</div>
             ) : filteredEvents.length === 0 ? (
                 <div className="empty-state">
                     <Calendar className="empty-state-icon" />
@@ -165,88 +354,124 @@ export default function EventsPage() {
                     </p>
                     {canCreateEvent ? (
                         <button className="empty-state-btn" onClick={() => setShowCreateModal(true)}>
-                            <CirclePlus />
+                            <Plus />
                             New Event
                         </button>
                     ) : null}
                 </div>
             ) : (
-                <div className="events-grid">
-                    {filteredEvents.map((event) => {
-                        const registrationCount = event._count?.registrations ?? event.registrationCount ?? 0;
-                        const capacity = event.capacity ?? null;
-
-                        return (
-                            <Link
+                <>
+                    <div className="projects-grid">
+                        {paginatedEvents.map((event) => (
+                            <EventCard
                                 key={event.id}
-                                href={`/events/${event.id}`}
-                                className="event-card"
+                                event={event}
+                                expanded={expandedEventId === event.id}
+                                fullDetail={expandedEventId === event.id ? expandedEventDetail : null}
+                                detailLoading={expandedEventId === event.id && detailLoading}
+                                initialTab={expandedEventId === event.id ? initialTab : null}
+                                canEdit={eventPermissions.canEditEvent(event)}
+                                canManage={eventPermissions.canManageEvent()}
+                                onToggle={handleToggleExpand}
+                                onEdit={(target) => setEditingEvent(target as EventDetail)}
+                                onDeactivate={setHoldingEvent}
+                                onFinalize={setFinalizingEvent}
+                                onArchive={setArchivingEvent}
+                                onReactivate={setReactivatingEvent}
+                                onAbort={setAbortingEvent}
+                                onViewActivity={setActivityEvent}
+                                onReloadDetail={() => void handleRefreshDetail()}
+                            />
+                        ))}
+                        {canCreateEvent && currentPage === 1 ? (
+                            <div
+                                className="project-add-card"
+                                onClick={() => setShowCreateModal(true)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(event) => event.key === 'Enter' && setShowCreateModal(true)}
                             >
-                                <div className="event-card-collapsed-content">
-                                    <div>
-                                        <span className={statusClassName[event.status] ?? 'event-status-badge'}>
-                                            {event.status.replaceAll('_', ' ')}
-                                        </span>
-                                        <h2 className="event-card-title">{event.title}</h2>
-                                        {event.createdBy?.fullName ? (
-                                            <div className="event-meta-row event-meta-row--compact">
-                                                <Users size={14} />
-                                                <span>Created by {event.createdBy.fullName}</span>
-                                            </div>
-                                        ) : null}
-                                        <p className="event-card-description">
-                                            {event.description || 'No description yet'}
-                                        </p>
-                                        <div className="event-meta-row">
-                                            <Calendar size={14} />
-                                            <span>{formatDate(event.eventDate)}</span>
-                                        </div>
-                                        {event.venue ? (
-                                            <div className="event-meta-row">
-                                                <MapPin size={14} />
-                                                <span>{event.venue}</span>
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                </div>
-
-                                <div className="event-card-bottom-bar">
-                                    <div className="event-meta-row event-meta-row--compact">
-                                        <Users size={14} />
-                                        <span>
-                                            {registrationCount} registered
-                                            {capacity != null ? ` / ${capacity}` : ''}
-                                        </span>
-                                    </div>
-                                    {capacity != null ? (
-                                        <strong className="event-card-availability">{Math.max(capacity - registrationCount, 0)} left</strong>
+                                <Plus className="project-add-card-icon" />
+                                <span className="project-add-card-text">New Event</span>
+                            </div>
+                        ) : null}
+                    </div>
+                    {totalPages > 1 && (
+                        <div className="pagination-controls">
+                            <button
+                                className="pagination-btn"
+                                disabled={currentPage <= 1}
+                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                type="button"
+                            >
+                                Previous
+                            </button>
+                            <div className="pagination-pages">
+                                {getPageNumbers(currentPage, totalPages).map((p, i) =>
+                                    p === '...' ? (
+                                        <span key={`ellipsis-${i}`} className="pagination-ellipsis">…</span>
                                     ) : (
-                                        <strong className="event-card-availability">Unlimited</strong>
-                                    )}
-                                </div>
-                            </Link>
-                        );
-                    })}
-                    {canCreateEvent ? (
-                        <div
-                            className="event-add-card"
-                            onClick={() => setShowCreateModal(true)}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(event) => event.key === 'Enter' && setShowCreateModal(true)}
-                        >
-                            <CirclePlus className="event-add-card-icon" />
-                            <span className="event-add-card-text">New Event</span>
+                                        <button
+                                            key={p}
+                                            type="button"
+                                            className={`pagination-page-btn${p === currentPage ? ' pagination-page-btn--active' : ''}`}
+                                            onClick={() => setCurrentPage(p)}
+                                        >
+                                            {p}
+                                        </button>
+                                    ),
+                                )}
+                            </div>
+                            <button
+                                className="pagination-btn"
+                                disabled={currentPage >= totalPages}
+                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                type="button"
+                            >
+                                Next
+                            </button>
                         </div>
-                    ) : null}
+                    )}
+                </>
+            )}
+
+            {expandedEventId && detailLoading && !expandedEventDetail && (
+                <div className="project-detail-loading-indicator">
+                    Loading details…
                 </div>
             )}
+
+            {showOrphanExpandedCard && expandedEventSummary ? (
+                <EventCard
+                    event={expandedEventSummary}
+                    expanded
+                    fullDetail={expandedEventDetail}
+                    detailLoading={detailLoading}
+                    initialTab={initialTab}
+                    canEdit={eventPermissions.canEditEvent(expandedEventSummary)}
+                    canManage={eventPermissions.canManageEvent()}
+                    onToggle={handleToggleExpand}
+                    onEdit={(target) => setEditingEvent(target as EventDetail)}
+                    onDeactivate={setHoldingEvent}
+                    onFinalize={setFinalizingEvent}
+                    onArchive={setArchivingEvent}
+                    onReactivate={setReactivatingEvent}
+                    onAbort={setAbortingEvent}
+                    onViewActivity={setActivityEvent}
+                    onReloadDetail={() => void handleRefreshDetail()}
+                />
+            ) : null}
 
             {showFiltersModal ? (
                 <EventFiltersModal
                     status={status}
                     dateFrom={dateFrom}
                     dateTo={dateTo}
+                    filterTeam={filterTeam}
+                    filterCategory={filterCategory}
+                    filterPriority={filterPriority}
+                    allTeams={allTeams}
+                    allCategories={allCategories}
                     onClose={() => setShowFiltersModal(false)}
                     onApply={handleApplyFilters}
                     onClear={handleResetFilters}
@@ -255,11 +480,93 @@ export default function EventsPage() {
 
             {showCreateModal && (
                 <CreateEventModal
+                    allTeams={allTeams}
+                    userTeamIds={user?.teamIds ?? []}
                     onClose={() => setShowCreateModal(false)}
-                    onCreated={() => {
-                        setShowCreateModal(false);
-                        void loadEvents();
+                    onCreated={handleEventCreated}
+                />
+            )}
+
+            {editingEvent && (
+                <CreateEventModal
+                    mode="edit"
+                    initial={editingEvent}
+                    allTeams={allTeams}
+                    userTeamIds={user?.teamIds ?? []}
+                    onClose={() => setEditingEvent(null)}
+                    onSaved={(saved) => {
+                        setEditingEvent(null);
+                        void handleLifecycleRefresh();
+                        if (expandedEventId === saved.id) {
+                            setExpandedEventDetail(saved);
+                        }
                     }}
+                />
+            )}
+
+            {holdingEvent && (
+                <HoldEventModal
+                    event={holdingEvent}
+                    onClose={() => setHoldingEvent(null)}
+                    onHeld={() => {
+                        setHoldingEvent(null);
+                        handleLifecycleRefresh();
+                    }}
+                />
+            )}
+
+            {finalizingEvent && (
+                <FinalizeEventModal
+                    event={finalizingEvent}
+                    onClose={() => setFinalizingEvent(null)}
+                    onFinalized={() => {
+                        setFinalizingEvent(null);
+                        handleLifecycleRefresh();
+                    }}
+                />
+            )}
+
+            {archivingEvent && (
+                <ArchiveEventModal
+                    event={archivingEvent}
+                    onClose={() => setArchivingEvent(null)}
+                    onArchived={() => {
+                        setArchivingEvent(null);
+                        if (expandedEventId === archivingEvent.id) {
+                            setExpandedEventId(null);
+                            setExpandedEventDetail(null);
+                        }
+                        handleLifecycleRefresh();
+                    }}
+                />
+            )}
+
+            {reactivatingEvent && (
+                <ReactivateEventModal
+                    event={reactivatingEvent}
+                    onClose={() => setReactivatingEvent(null)}
+                    onReactivated={() => {
+                        setReactivatingEvent(null);
+                        handleLifecycleRefresh();
+                    }}
+                />
+            )}
+
+            {abortingEvent && (
+                <AbortEventModal
+                    event={abortingEvent}
+                    onClose={() => setAbortingEvent(null)}
+                    onAborted={() => {
+                        setAbortingEvent(null);
+                        handleLifecycleRefresh();
+                    }}
+                />
+            )}
+
+            {activityEvent && (
+                <EventActivityModal
+                    event={activityEvent}
+                    onClose={() => setActivityEvent(null)}
                 />
             )}
         </main>

@@ -9,63 +9,6 @@
 /* Filter dropdowns are handled by the manage-* classes imported from TeamsPage.css */
 
 /* ============================================
-   SEARCH FIELD
-   ============================================ */
-.page-search-field {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 260px;
-    max-width: 360px;
-    width: 100%;
-    padding: 0.55rem 0.8rem;
-    border: 1px solid var(--gray-200);
-    border-radius: 999px;
-    background: var(--bg-card);
-    box-shadow: var(--shadow-sm);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.page-search-row {
-    margin: 0.85rem 0 1.1rem;
-}
-
-.page-search-field--full {
-    min-width: 0;
-    max-width: none;
-}
-
-.page-search-field:focus-within {
-    border-color: var(--purple-400);
-    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12), var(--shadow-sm);
-}
-
-.page-search-icon {
-    flex-shrink: 0;
-    color: var(--gray-400);
-}
-
-.page-search-input {
-    width: 100%;
-    border: 0;
-    outline: none;
-    background: transparent;
-    font: inherit;
-    color: var(--gray-900);
-}
-
-.page-search-input::placeholder {
-    color: var(--gray-400);
-}
-
-@media (max-width: 900px) {
-    .page-search-field {
-        min-width: 0;
-        max-width: none;
-    }
-}
-
-/* ============================================
    PROJECT CARDS GRID
    ============================================ */
 .projects-grid {

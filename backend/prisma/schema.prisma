@@ -66,6 +66,7 @@ model Team {
   roleHistory      MemberRoleHistory[]
   alumni           Alumni[]
   projectTeams     ProjectTeam[]           // Projects assigned to this team
+  eventTeams       EventTeam[]             // Events assigned to this team
   taskTeams        TaskTeam[]              // Tasks assigned to this team
 }
 
@@ -322,6 +323,7 @@ model Project {
 model Event {
   id                  Int       @id @default(autoincrement())
   projectId           Int?
+  projectTypeId       Int?
   createdByMemberId   Int
   title               String
   description         String?
@@ -332,24 +334,35 @@ model Event {
   allowWalkIns        Boolean   @default(false)
   isCertifiable       Boolean   @default(false)
   status              String    @default("DRAFT") // DRAFT, PUBLISHED, COMPLETED, CANCELLED
+  priority            String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  progressStatus      String    @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED, ON_HOLD, CANCELLED
   isActive            Boolean   @default(true)
+  isFinalized         Boolean   @default(false)
+  isArchived          Boolean   @default(false)
   deletedAt           DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
   // Relations
   project             Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  projectType         ProjectType?        @relation(fields: [projectTypeId], references: [id], onDelete: SetNull)
   createdBy           Member              @relation("EventCreatedBy", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  eventTeams          EventTeam[]
   tiers               EventTier[]
   customFields        EventCustomField[]
   registrations       EventRegistration[]
 
   @@index([projectId])
+  @@index([projectTypeId])
   @@index([createdByMemberId])
   @@index([status])
+  @@index([priority])
+  @@index([progressStatus])
   @@index([eventDate])
   @@index([registrationDeadline])
   @@index([isActive])
+  @@index([isFinalized])
+  @@index([isArchived])
 }
 
 model EventTier {
@@ -423,6 +436,28 @@ model EventRegistration {
 }
 
 // ============================================
+// EVENT TEAMS - Which teams can access/edit an event
+// ============================================
+model EventTeam {
+  id              Int       @id @default(autoincrement())
+  eventId         Int
+  teamId          Int
+  canEdit         Boolean   @default(true)
+  isOwner         Boolean   @default(false)
+  assignedDate    DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  event           Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  team            Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, teamId])
+  @@index([eventId])
+  @@index([teamId])
+  @@index([eventId, canEdit])
+}
+
+// ============================================
 // PROJECT TEAMS - Which teams can access/edit a project
 // ============================================
 model ProjectTeam {
@@ -478,7 +513,8 @@ model ProjectType {
   
   // Relations
   projects    Project[]
-  
+  events      Event[]
+
   @@index([category])
   @@index([isActive])
 }

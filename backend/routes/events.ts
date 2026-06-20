@@ -9,6 +9,39 @@ const router = express.Router();
 const MANAGER_ROLES = ['isDeveloper', 'isOfficer', 'isAdmin', 'isLeadership'];
 const PUBLIC_VISIBLE_STATUSES = ['PUBLISHED', 'COMPLETED'];
 const VALID_EVENT_STATUSES = new Set(['DRAFT', 'PUBLISHED', 'COMPLETED', 'CANCELLED']);
+const VALID_PROGRESS_STATUSES = new Set(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD', 'CANCELLED']);
+const VALID_PRIORITIES = new Set(['LOW', 'MEDIUM', 'HIGH', 'URGENT', 'CRITICAL']);
+
+function parseTeamIds(teamIds: unknown): Array<{ teamId: number; canEdit: boolean; isOwner: boolean }> {
+    if (!Array.isArray(teamIds)) return [];
+    return teamIds
+        .map((entry) => {
+            const teamId = parseId((entry as { teamId?: unknown })?.teamId);
+            if (!teamId) return null;
+            return {
+                teamId,
+                canEdit: (entry as { canEdit?: boolean }).canEdit !== false,
+                isOwner: (entry as { isOwner?: boolean }).isOwner === true,
+            };
+        })
+        .filter((entry): entry is { teamId: number; canEdit: boolean; isOwner: boolean } => entry !== null);
+}
+
+function normalizePriority(value: unknown): string {
+    const priority = String(value || 'MEDIUM').trim().toUpperCase();
+    return VALID_PRIORITIES.has(priority) ? priority : 'MEDIUM';
+}
+
+function normalizeProgressStatus(value: unknown): string {
+    const progressStatus = String(value || 'NOT_STARTED').trim().toUpperCase();
+    return VALID_PROGRESS_STATUSES.has(progressStatus) ? progressStatus : 'NOT_STARTED';
+}
+
+function normalizeDescription(value: unknown): string | null {
+    const text = String(value ?? '').trim();
+    if (!text || text.toLowerCase() === 'null') return null;
+    return text;
+}
 
 function parseId(value: unknown): number | null {
     const parsed = Number.parseInt(String(value), 10);
@@ -20,9 +53,14 @@ function hasManagerAccess(req: Request): boolean {
 }
 
 async function buildEventWhere(req: Request) {
-    const where: Record<string, unknown> = {
-        isActive: true,
-    };
+    const where: Record<string, unknown> = {};
+    const isArchivedQuery = String(req.query.archived || '').trim().toLowerCase() === 'true';
+
+    if (isArchivedQuery) {
+        where.isArchived = true;
+    } else {
+        where.isArchived = false;
+    }
 
     const status = String(req.query.status || '').trim().toUpperCase();
     const projectId = parseId(req.query.projectId);
@@ -56,7 +94,13 @@ async function buildEventWhere(req: Request) {
 function eventInclude() {
     return {
         project: { select: { id: true, title: true, status: true } },
+        projectType: { select: { id: true, name: true, category: true, description: true, icon: true } },
         createdBy: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+        eventTeams: {
+            include: {
+                team: { select: { id: true, name: true } },
+            },
+        },
         tiers: {
             orderBy: [{ order: 'asc' as const }, { createdAt: 'asc' as const }],
             include: {
@@ -183,6 +227,11 @@ router.post('/', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'title and valid eventDate are required' });
         }
 
+        const projectTypeId = parseId(req.body?.projectTypeId);
+        if (!projectTypeId) {
+            return res.status(400).json({ error: 'projectTypeId is required' });
+        }
+
         const projectId = parseId(req.body?.projectId);
         const registrationDeadline = req.body?.registrationDeadline ? new Date(String(req.body.registrationDeadline)) : null;
         const parsedCapacity = req.body?.capacity === '' || req.body?.capacity == null ? undefined : Number.parseInt(String(req.body.capacity), 10);
@@ -192,10 +241,14 @@ router.post('/', authenticateToken, async (req, res) => {
             return res.status(403).json({ error: 'Event management access required' });
         }
 
+        const status = normalizeProgressStatus(req.body?.status ?? req.body?.progressStatus);
+        const priority = normalizePriority(req.body?.priority);
+        const teamIds = parseTeamIds(req.body?.teamIds);
+
         const created = await prisma.event.create({
             data: {
                 title,
-                description: String(req.body?.description || '').trim() || null,
+                description: normalizeDescription(req.body?.description),
                 venue: String(req.body?.venue || '').trim() || null,
                 eventDate,
                 registrationDeadline: registrationDeadline && !Number.isNaN(registrationDeadline.getTime()) ? registrationDeadline : null,
@@ -203,9 +256,19 @@ router.post('/', authenticateToken, async (req, res) => {
                 allowWalkIns: Boolean(req.body?.allowWalkIns),
                 isCertifiable: Boolean(req.body?.isCertifiable),
                 projectId,
+                projectTypeId,
+                priority,
+                progressStatus: status,
                 createdByMemberId: memberId,
-                status: 'DRAFT',
+                status,
                 isActive: true,
+                eventTeams: teamIds.length > 0 ? {
+                    create: teamIds.map((team) => ({
+                        teamId: team.teamId,
+                        canEdit: team.canEdit,
+                        isOwner: team.isOwner,
+                    })),
+                } : undefined,
             },
             include: eventInclude(),
         });
@@ -238,30 +301,266 @@ router.put('/:id', authenticateToken, async (req, res) => {
         const parsedCapacity = req.body?.capacity === '' || req.body?.capacity == null ? undefined : Number.parseInt(String(req.body.capacity), 10);
         const capacity = typeof parsedCapacity === 'number' && Number.isInteger(parsedCapacity) && parsedCapacity >= 0 ? parsedCapacity : null;
         const projectId = req.body?.projectId === null ? null : parseId(req.body?.projectId);
+        const projectTypeId = req.body?.projectTypeId !== undefined ? parseId(req.body?.projectTypeId) : undefined;
+
+        const data: Record<string, unknown> = {
+            title: req.body?.title !== undefined ? String(req.body.title).trim() : existing.title,
+            description: req.body?.description !== undefined ? normalizeDescription(req.body.description) : existing.description,
+            venue: req.body?.venue !== undefined ? String(req.body.venue).trim() || null : existing.venue,
+            eventDate: eventDateValue && !Number.isNaN(eventDateValue.getTime()) ? eventDateValue : existing.eventDate,
+            registrationDeadline:
+                req.body?.registrationDeadline !== undefined
+                    ? (registrationDeadlineValue && !Number.isNaN(registrationDeadlineValue.getTime()) ? registrationDeadlineValue : null)
+                    : existing.registrationDeadline,
+            capacity: req.body?.capacity !== undefined ? capacity : existing.capacity,
+            allowWalkIns: req.body?.allowWalkIns !== undefined ? Boolean(req.body.allowWalkIns) : existing.allowWalkIns,
+            isCertifiable: req.body?.isCertifiable !== undefined ? Boolean(req.body.isCertifiable) : existing.isCertifiable,
+            projectId: req.body?.projectId !== undefined ? projectId : existing.projectId,
+        };
+
+        if (projectTypeId !== undefined) {
+            if (!projectTypeId) {
+                return res.status(400).json({ error: 'Invalid projectTypeId' });
+            }
+            data.projectTypeId = projectTypeId;
+        }
+
+        if (req.body?.priority !== undefined) {
+            data.priority = normalizePriority(req.body.priority);
+        }
+
+        if (req.body?.status !== undefined || req.body?.progressStatus !== undefined) {
+            const nextStatus = normalizeProgressStatus(req.body?.status ?? req.body?.progressStatus);
+            data.status = nextStatus;
+            data.progressStatus = nextStatus;
+        }
+
+        const updated = await prisma.event.update({
+            where: { id: eventId },
+            data,
+            include: eventInclude(),
+        });
+
+        if (Array.isArray(req.body?.teamIds)) {
+            const incomingTeamIds = parseTeamIds(req.body.teamIds);
+
+            await prisma.eventTeam.deleteMany({
+                where: { eventId, teamId: { notIn: incomingTeamIds.map((team) => team.teamId) } },
+            });
+
+            for (const team of incomingTeamIds) {
+                await prisma.eventTeam.upsert({
+                    where: { eventId_teamId: { eventId, teamId: team.teamId } },
+                    create: {
+                        eventId,
+                        teamId: team.teamId,
+                        canEdit: team.canEdit,
+                        isOwner: team.isOwner,
+                    },
+                    update: {
+                        canEdit: team.canEdit,
+                        isOwner: team.isOwner,
+                    },
+                });
+            }
+
+            const refreshed = await prisma.event.findUnique({
+                where: { id: eventId },
+                include: eventInclude(),
+            });
+
+            return res.json(refreshed);
+        }
+
+        return res.json(updated);
+    } catch (error) {
+        console.error(`PUT /events/${req.params.id} error:`, error);
+        return res.status(500).json({ error: 'Failed to update event' });
+    }
+});
+
+router.patch('/:id/deactivate', authenticateToken, async (req, res) => {
+    try {
+        if (!hasManagerAccess(req)) {
+            return res.status(403).json({ error: 'Event management access required' });
+        }
+
+        const eventId = parseId(req.params.id);
+        if (!eventId) {
+            return res.status(400).json({ error: 'Invalid event ID' });
+        }
+
+        const current = await prisma.event.findUnique({ where: { id: eventId } });
+        if (!current) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+        if (current.isArchived || current.isFinalized || current.status === 'CANCELLED' || !current.isActive) {
+            return res.status(400).json({ error: 'Only active events can be held' });
+        }
+
+        const updated = await prisma.event.update({
+            where: { id: eventId },
+            data: { isActive: false },
+            include: eventInclude(),
+        });
+
+        return res.json(updated);
+    } catch (error) {
+        console.error(`PATCH /events/${req.params.id}/deactivate error:`, error);
+        return res.status(500).json({ error: 'Failed to hold event' });
+    }
+});
+
+router.patch('/:id/reactivate', authenticateToken, async (req, res) => {
+    try {
+        if (!hasManagerAccess(req)) {
+            return res.status(403).json({ error: 'Event management access required' });
+        }
+
+        const eventId = parseId(req.params.id);
+        if (!eventId) {
+            return res.status(400).json({ error: 'Invalid event ID' });
+        }
+
+        const current = await prisma.event.findUnique({ where: { id: eventId } });
+        if (!current) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+        if (current.isArchived) {
+            return res.status(400).json({ error: 'Archived events cannot be reactivated' });
+        }
+        if (current.isFinalized) {
+            return res.status(400).json({ error: 'Finalized events cannot be reactivated' });
+        }
 
         const updated = await prisma.event.update({
             where: { id: eventId },
             data: {
-                title: req.body?.title !== undefined ? String(req.body.title).trim() : existing.title,
-                description: req.body?.description !== undefined ? String(req.body.description).trim() || null : existing.description,
-                venue: req.body?.venue !== undefined ? String(req.body.venue).trim() || null : existing.venue,
-                eventDate: eventDateValue && !Number.isNaN(eventDateValue.getTime()) ? eventDateValue : existing.eventDate,
-                registrationDeadline:
-                    req.body?.registrationDeadline !== undefined
-                        ? (registrationDeadlineValue && !Number.isNaN(registrationDeadlineValue.getTime()) ? registrationDeadlineValue : null)
-                        : existing.registrationDeadline,
-                capacity: req.body?.capacity !== undefined ? capacity : existing.capacity,
-                allowWalkIns: req.body?.allowWalkIns !== undefined ? Boolean(req.body.allowWalkIns) : existing.allowWalkIns,
-                isCertifiable: req.body?.isCertifiable !== undefined ? Boolean(req.body.isCertifiable) : existing.isCertifiable,
-                projectId: req.body?.projectId !== undefined ? projectId : existing.projectId,
+                isActive: true,
+                progressStatus: current.status === 'CANCELLED' ? 'NOT_STARTED' : current.status,
+                status: current.status === 'CANCELLED' ? 'NOT_STARTED' : current.status,
             },
             include: eventInclude(),
         });
 
         return res.json(updated);
     } catch (error) {
-        console.error(`PUT /events/${req.params.id} error:`, error);
-        return res.status(500).json({ error: 'Failed to update event' });
+        console.error(`PATCH /events/${req.params.id}/reactivate error:`, error);
+        return res.status(500).json({ error: 'Failed to reactivate event' });
+    }
+});
+
+router.patch('/:id/abort', authenticateToken, async (req, res) => {
+    try {
+        if (!hasManagerAccess(req)) {
+            return res.status(403).json({ error: 'Event management access required' });
+        }
+
+        const eventId = parseId(req.params.id);
+        if (!eventId) {
+            return res.status(400).json({ error: 'Invalid event ID' });
+        }
+
+        const current = await prisma.event.findUnique({ where: { id: eventId } });
+        if (!current) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+        if (current.isArchived || current.isFinalized) {
+            return res.status(400).json({ error: 'Only active or held events can be aborted' });
+        }
+
+        const updated = await prisma.event.update({
+            where: { id: eventId },
+            data: {
+                isActive: false,
+                isFinalized: false,
+                isArchived: false,
+                progressStatus: 'CANCELLED',
+                status: 'CANCELLED',
+            },
+            include: eventInclude(),
+        });
+
+        return res.json(updated);
+    } catch (error) {
+        console.error(`PATCH /events/${req.params.id}/abort error:`, error);
+        return res.status(500).json({ error: 'Failed to abort event' });
+    }
+});
+
+router.patch('/:id/finalize', authenticateToken, async (req, res) => {
+    try {
+        if (!hasManagerAccess(req)) {
+            return res.status(403).json({ error: 'Event management access required' });
+        }
+
+        const eventId = parseId(req.params.id);
+        if (!eventId) {
+            return res.status(400).json({ error: 'Invalid event ID' });
+        }
+
+        const current = await prisma.event.findUnique({ where: { id: eventId } });
+        if (!current) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+        if (current.isArchived) {
+            return res.status(400).json({ error: 'Archived events cannot be finalized' });
+        }
+
+        const updated = await prisma.event.update({
+            where: { id: eventId },
+            data: {
+                isFinalized: true,
+                isActive: true,
+                isArchived: false,
+                progressStatus: 'COMPLETED',
+                status: 'COMPLETED',
+            },
+            include: eventInclude(),
+        });
+
+        return res.json(updated);
+    } catch (error) {
+        console.error(`PATCH /events/${req.params.id}/finalize error:`, error);
+        return res.status(500).json({ error: 'Failed to finalize event' });
+    }
+});
+
+router.patch('/:id/archive', authenticateToken, async (req, res) => {
+    try {
+        if (!hasManagerAccess(req)) {
+            return res.status(403).json({ error: 'Event management access required' });
+        }
+
+        const eventId = parseId(req.params.id);
+        if (!eventId) {
+            return res.status(400).json({ error: 'Invalid event ID' });
+        }
+
+        const current = await prisma.event.findUnique({ where: { id: eventId } });
+        if (!current) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+        if (!current.isFinalized && current.status !== 'CANCELLED') {
+            return res.status(400).json({ error: 'Only finalized or aborted events can be archived' });
+        }
+
+        const updated = await prisma.event.update({
+            where: { id: eventId },
+            data: {
+                isArchived: true,
+                isActive: false,
+                isFinalized: current.isFinalized,
+                progressStatus: current.status,
+                status: current.status,
+            },
+            include: eventInclude(),
+        });
+
+        return res.json(updated);
+    } catch (error) {
+        console.error(`PATCH /events/${req.params.id}/archive error:`, error);
+        return res.status(500).json({ error: 'Failed to archive event' });
     }
 });
 

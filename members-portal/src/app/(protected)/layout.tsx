@@ -49,8 +49,11 @@ const NAV_ITEMS = [
     },
     {
         label: 'Events',
-        href: '/events',
         icon: Calendar,
+        items: [
+            { label: 'Events', href: '/events', icon: Calendar },
+            { label: 'Past Events', href: '/past-events', icon: Archive },
+        ],
     },
     {
         label: 'Help & Support',

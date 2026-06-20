@@ -1,13 +1,14 @@
 ﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Eye, Pencil, Search, Users, UserPlus } from 'lucide-react';
+import { Eye, Pencil, Search, Users, UserPlus, Filter } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { teamMembersAPI, membersAPI, teamsAPI, teamRolesAPI, teamSubteamsAPI, getProfilePhotoUrl } from '../../../services/api';
 import ViewMemberModal from '../Teams/modals/ViewMemberModal';
 import EditMembersModal from '../Teams/modals/EditMembersModal';
 import AssignToTeamModal from './modals/AssignToTeamModal';
-import Dropdown from '../../../components/dropdown/dropdown';
+import MembersFiltersModal, { type MembersFiltersState } from './modals/MembersFiltersModal';
+import { isDateWithinRange } from '../../../utils/filterDateRange';
 import { buildSearchText, matchesSearchQuery } from '../../../utils/search';
 import '../../Projects/ProjectsPage.css';
 import type { Id } from '../../../types/backend-contracts';
@@ -141,7 +142,10 @@ function MembersPage() {
     // Filters
     const [filterTeamId, setFilterTeamId] = useState('');
     const [filterStatus, setFilterStatus] = useState(''); // '' = all, 'active' | 'inactive' | 'unassigned'
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [showFiltersModal, setShowFiltersModal] = useState(false);
 
     // Pagination
     const ROWS_PER_PAGE = 20;
@@ -266,14 +270,34 @@ function MembersPage() {
     }, [assignments]);
 
     const filteredRows = useMemo(() => {
-        return rows.filter((row) => matchesSearchQuery(
-            buildSearchText(row.name, row.email, row.role, row.teamName, row.subteamName, row.status),
-            searchQuery,
-        ));
-    }, [rows, searchQuery]);
+        return rows.filter((row) => {
+            if (!isDateWithinRange(row.joinedDate, dateFrom, dateTo)) return false;
+            return matchesSearchQuery(
+                buildSearchText(row.name, row.email, row.role, row.teamName, row.subteamName, row.status),
+                searchQuery,
+            );
+        });
+    }, [rows, searchQuery, dateFrom, dateTo]);
+
+    const hasActiveFilters = filterTeamId !== '' || filterStatus !== '' || dateFrom !== '' || dateTo !== '';
+
+    const handleApplyFilters = (filters: MembersFiltersState) => {
+        setFilterTeamId(filters.filterTeamId);
+        setFilterStatus(filters.filterStatus);
+        setDateFrom(filters.dateFrom);
+        setDateTo(filters.dateTo);
+        setShowFiltersModal(false);
+    };
+
+    const handleResetFilters = () => {
+        setFilterTeamId('');
+        setFilterStatus('');
+        setDateFrom('');
+        setDateTo('');
+    };
 
     // Reset to page 1 when filters change
-    useEffect(() => { setCurrentPage(1); }, [filterTeamId, filterStatus, searchQuery]);
+    useEffect(() => { setCurrentPage(1); }, [filterTeamId, filterStatus, dateFrom, dateTo, searchQuery]);
 
     // Pagination derived values
     const totalPages = Math.max(1, Math.ceil(filteredRows.length / ROWS_PER_PAGE));
@@ -373,31 +397,9 @@ function MembersPage() {
 
     return (
         <div className="members-page">
-            {/* Page Header: title on left, filter squircle s on right (same layout as Teams) */}
+            {/* Page Header */}
             <div className="page-header">
                 <h1 className="members-page-title members-page-title-inline">Club Members</h1>
-                <div className="page-header-actions">
-                    <Dropdown
-                        triggerLabel="Team"
-                        options={[
-                            { value: '', label: 'All teams' },
-                            ...teams.map((t) => ({ value: String(t.id), label: t.name })),
-                        ]}
-                        value={filterTeamId}
-                        onChange={(v) => setFilterTeamId(String(v ?? ''))}
-                    />
-                    <Dropdown
-                        triggerLabel="Status"
-                        options={[
-                            { value: '', label: 'All statuses' },
-                            { value: 'active', label: 'Active' },
-                            { value: 'inactive', label: 'Inactive' },
-                            { value: 'unassigned', label: 'Unassigned' },
-                        ]}
-                        value={filterStatus}
-                        onChange={(v) => setFilterStatus(String(v ?? ''))}
-                    />
-                </div>
             </div>
 
             {/* Divider (same as Teams page) */}
@@ -414,6 +416,15 @@ function MembersPage() {
                         placeholder="Search members"
                         aria-label="Search members"
                     />
+                    <button
+                        type="button"
+                        className={`page-search-filter-btn${hasActiveFilters ? ' page-search-filter-btn--active' : ''}`}
+                        onClick={() => setShowFiltersModal(true)}
+                        aria-label="Open advanced filters"
+                    >
+                        <Filter size={16} />
+                        <span className="page-search-filter-label">Advanced Filters</span>
+                    </button>
                 </div>
             </div>
 
@@ -434,13 +445,9 @@ function MembersPage() {
                             <Users className="empty-state-icon" />
                             <h4 className="empty-state-title">No members found</h4>
                             <p className="empty-state-text">
-                                {searchQuery
-                                    ? 'No members match your search.'
-                                    : filterStatus === 'unassigned'
-                                        ? 'No unassigned members.'
-                                        : filterTeamId || filterStatus
-                                            ? 'Try changing the filters above.'
-                                            : 'No club members yet.'}
+                                {searchQuery || hasActiveFilters
+                                    ? 'Try a different search or adjust the filters.'
+                                    : 'No club members yet.'}
                             </p>
                         </div>
                     ) : (
@@ -580,6 +587,19 @@ function MembersPage() {
                 roles={allRoles}
                 subteams={allSubteams}
             />
+
+            {showFiltersModal && (
+                <MembersFiltersModal
+                    filterTeamId={filterTeamId}
+                    filterStatus={filterStatus}
+                    dateFrom={dateFrom}
+                    dateTo={dateTo}
+                    allTeams={teams}
+                    onClose={() => setShowFiltersModal(false)}
+                    onApply={handleApplyFilters}
+                    onClear={handleResetFilters}
+                />
+            )}
         </div>
     );
 }

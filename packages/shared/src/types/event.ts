@@ -1,6 +1,9 @@
 import type { Id, ISODateTime, MemberSummary } from "./member";
+import type { ProjectStatus, ProjectTypeRef } from "./project";
+import type { Priority } from "./task";
+import type { TeamRef } from "./team";
 
-export type EventStatus = "DRAFT" | "PUBLISHED" | "COMPLETED" | "CANCELLED";
+export type EventStatus = ProjectStatus | "DRAFT" | "PUBLISHED" | "COMPLETED" | "CANCELLED";
 
 export type EventRegistrationStatus = "REGISTERED" | "CHECKED_IN" | "CANCELLED";
 
@@ -12,6 +15,14 @@ export interface EventProjectRef {
     id: Id;
     title: string;
     status?: string | null;
+}
+
+export interface EventTeamRef {
+    eventId?: Id;
+    teamId: Id;
+    canEdit?: boolean;
+    isOwner?: boolean;
+    team?: TeamRef;
 }
 
 export interface EventTierRef {
@@ -74,10 +85,19 @@ export interface EventSummary {
     allowWalkIns?: boolean;
     isCertifiable?: boolean;
     status: EventStatus;
+    priority?: Priority | string;
+    progressStatus?: ProjectStatus | string;
+    projectTypeId?: Id | null;
+    projectType?: ProjectTypeRef | null;
     isActive?: boolean;
+    isFinalized?: boolean;
+    isArchived?: boolean;
     deletedAt?: ISODateTime | null;
+    createdAt?: ISODateTime;
+    updatedAt?: ISODateTime;
     projectId?: Id | null;
     project?: EventProjectRef | null;
+    eventTeams?: EventTeamRef[];
     createdByMemberId?: Id;
     createdBy?: MemberSummary;
     tiers?: EventTierRef[];
@@ -98,6 +118,7 @@ export interface EventQueryParams {
     dateFrom?: ISODateTime | string;
     dateTo?: ISODateTime | string;
     scope?: "all" | "mine" | "published";
+    archived?: boolean;
 }
 
 export interface EventStatistics {
@@ -126,8 +147,13 @@ export interface CreateEventPayload {
     registrationDeadline?: ISODateTime | string | null;
     capacity?: number | null;
     projectId?: Id | string | null;
+    projectTypeId?: Id | string;
+    priority?: Priority | string;
+    progressStatus?: ProjectStatus | string;
+    teamIds?: Array<{ teamId: Id | string; canEdit?: boolean; isOwner?: boolean }>;
     allowWalkIns?: boolean;
     isCertifiable?: boolean;
+    status?: EventStatus;
 }
 
 export interface UpdateEventPayload extends Partial<CreateEventPayload> {

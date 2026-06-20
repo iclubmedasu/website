@@ -16,11 +16,11 @@ import {
     PlayCircle,
     History,
     Search,
+    Filter,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { projectsAPI, tasksAPI, teamsAPI, membersAPI, phasesAPI, projectTypesAPI, projectFilesAPI, getProfilePhotoUrl } from '../../services/api';
 import FileUploadZone from '../../components/FileUpload/FileUploadZone';
-import Dropdown from '../../components/dropdown/dropdown';
 import { buildSearchText, matchesSearchQuery } from '../../utils/search';
 import './ProjectsPage.css';
 import {
@@ -48,6 +48,8 @@ import TaskActivityModal from './modals/TaskActivityModal';
 import EditPhaseModal from './modals/EditPhaseModal';
 import DeletePhaseTaskModal from './modals/DeletePhaseTaskModal';
 import ProjectActivityModal from './modals/ProjectActivityModal';
+import ProjectFiltersModal, { type ProjectFiltersState } from './modals/ProjectFiltersModal';
+import { isDateWithinRange } from '../../utils/filterDateRange';
 import GanttChart from './components/GanttChart/GanttChart';
 import type { Id, ProjectFileRef, ProjectFolderRef } from '../../types/backend-contracts';
 
@@ -66,15 +68,7 @@ const STATUS_LABELS: Record<string, string> = {
     BLOCKED: 'Blocked',
 };
 
-const PRIORITY_LABELS: Record<string, string> = {
-    LOW: 'Low',
-    MEDIUM: 'Medium',
-    HIGH: 'High',
-    URGENT: 'Urgent',
-};
-
 const TASK_STATUSES = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'DELAYED', 'BLOCKED'];
-const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 function isOverdue(dueDate: any, status: any) {
     if (!dueDate || status === 'COMPLETED' || status === 'CANCELLED') return false;
@@ -507,7 +501,7 @@ function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, o
                                 onClick={(e) => { e.stopPropagation(); onEdit(detail); }}
                             >
                                 <Pencil size={13} />
-                                <span className="expanded-action-label">Edit Project</span>
+                                <span className="expanded-action-label">Edit</span>
                             </button>
                             <button
                                 className="icon-btn hold-btn icon-btn--text"
@@ -717,7 +711,11 @@ export default function ProjectsPage() {
     const [filterTeam, setFilterTeam] = useState('');
     const [filterCategory, setFilterCategory] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [showFiltersModal, setShowFiltersModal] = useState(false);
 
     // Pagination
     const PROJECTS_PER_PAGE = 10;
@@ -761,11 +759,13 @@ export default function ProjectsPage() {
                 projectsAPI.getAll({
                     teamId: filterTeam ? Number(filterTeam) : undefined,
                     priority: (filterPriority || undefined) as any,
+                    status: (filterStatus || undefined) as any,
                 }),
                 projectsAPI.getAll({
                     isActive: false,
                     teamId: filterTeam ? Number(filterTeam) : undefined,
                     priority: (filterPriority || undefined) as any,
+                    status: (filterStatus || undefined) as any,
                 }),
             ]);
 
@@ -791,19 +791,22 @@ export default function ProjectsPage() {
         } finally {
             setLoading(false);
         }
-    }, [filterTeam, filterCategory, filterPriority]);
+    }, [filterTeam, filterCategory, filterPriority, filterStatus]);
 
     useEffect(() => { loadProjects(); }, [loadProjects]);
 
     // Reset to page 1 when filters change
-    useEffect(() => { setCurrentPage(1); }, [filterTeam, filterCategory, filterPriority, searchQuery]);
+    useEffect(() => { setCurrentPage(1); }, [filterTeam, filterCategory, filterPriority, filterStatus, dateFrom, dateTo, searchQuery]);
 
     const filteredProjects = useMemo(() => {
-        return projects.filter((project) => matchesSearchQuery(
-            buildSearchText(project.title, project.description, project.status, project.priority, project.projectType?.name, project.projectType?.category),
-            searchQuery,
-        ));
-    }, [projects, searchQuery]);
+        return projects.filter((project) => {
+            if (!isDateWithinRange(project.dueDate, dateFrom, dateTo)) return false;
+            return matchesSearchQuery(
+                buildSearchText(project.title, project.description, project.status, project.priority, project.projectType?.name, project.projectType?.category),
+                searchQuery,
+            );
+        });
+    }, [projects, searchQuery, dateFrom, dateTo]);
 
     // Pagination derived values
     const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PROJECTS_PER_PAGE));
@@ -912,6 +915,28 @@ export default function ProjectsPage() {
     // Upload follows backend visibility scope: if a project is visible to the user, upload is allowed.
     const canUploadToProject = () => !!user?.id;
 
+    const hasActiveFilters = filterTeam !== '' || filterCategory !== '' || filterPriority !== ''
+        || filterStatus !== '' || dateFrom !== '' || dateTo !== '';
+
+    const handleApplyFilters = (filters: ProjectFiltersState) => {
+        setFilterTeam(filters.filterTeam);
+        setFilterCategory(filters.filterCategory);
+        setFilterPriority(filters.filterPriority);
+        setFilterStatus(filters.filterStatus);
+        setDateFrom(filters.dateFrom);
+        setDateTo(filters.dateTo);
+        setShowFiltersModal(false);
+    };
+
+    const handleResetFilters = () => {
+        setFilterTeam('');
+        setFilterCategory('');
+        setFilterPriority('');
+        setFilterStatus('');
+        setDateFrom('');
+        setDateTo('');
+    };
+
     // Filter allMembers to only those in the project's teams
     const getProjectMembers = (project: any) => {
         if (!project?.projectTeams?.length) return allMembers;
@@ -926,35 +951,6 @@ export default function ProjectsPage() {
             {/* ─── Header ─── */}
             <div className="page-header">
                 <h1 className="projects-title">Projects</h1>
-                <div className="page-header-actions">
-                    <Dropdown
-                        triggerLabel="Team"
-                        options={[
-                            { value: '', label: 'All Teams' },
-                            ...allTeams.map((t) => ({ value: String(t.id), label: t.name })),
-                        ]}
-                        value={filterTeam}
-                        onChange={(value) => setFilterTeam(value == null ? '' : String(value))}
-                    />
-                    <Dropdown
-                        triggerLabel="Category"
-                        options={[
-                            { value: '', label: 'All Categories' },
-                            ...allCategories.map((c) => ({ value: c, label: c })),
-                        ]}
-                        value={filterCategory}
-                        onChange={(value) => setFilterCategory(value == null ? '' : String(value))}
-                    />
-                    <Dropdown
-                        triggerLabel="Priority"
-                        options={[
-                            { value: '', label: 'All Priorities' },
-                            ...PRIORITIES.map((p) => ({ value: p, label: PRIORITY_LABELS[p] })),
-                        ]}
-                        value={filterPriority}
-                        onChange={(value) => setFilterPriority(value == null ? '' : String(value))}
-                    />
-                </div>
             </div>
             <hr className="title-divider" />
 
@@ -969,6 +965,15 @@ export default function ProjectsPage() {
                         placeholder="Search projects"
                         aria-label="Search projects"
                     />
+                    <button
+                        type="button"
+                        className={`page-search-filter-btn${hasActiveFilters ? ' page-search-filter-btn--active' : ''}`}
+                        onClick={() => setShowFiltersModal(true)}
+                        aria-label="Open advanced filters"
+                    >
+                        <Filter size={16} />
+                        <span className="page-search-filter-label">Advanced Filters</span>
+                    </button>
                 </div>
             </div>
 
@@ -980,9 +985,11 @@ export default function ProjectsPage() {
             ) : filteredProjects.length === 0 ? (
                 <div className="empty-state">
                     <CheckSquare className="empty-state-icon" />
-                    <h4 className="empty-state-title">{searchQuery ? 'No projects found' : 'No projects yet'}</h4>
+                    <h4 className="empty-state-title">{searchQuery || hasActiveFilters ? 'No projects found' : 'No projects yet'}</h4>
                     <p className="empty-state-text">
-                        {searchQuery ? 'Try a different search.' : 'Create your first project to get started.'}
+                        {searchQuery || hasActiveFilters
+                            ? 'Try a different search or adjust the filters.'
+                            : 'Create your first project to get started.'}
                     </p>
                     <button className="empty-state-btn" onClick={() => setShowCreateModal(true)}>
                         <Plus />
@@ -1152,6 +1159,22 @@ export default function ProjectsPage() {
                 <ProjectActivityModal
                     project={activityProject}
                     onClose={() => setActivityProject(null)}
+                />
+            )}
+
+            {showFiltersModal && (
+                <ProjectFiltersModal
+                    filterTeam={filterTeam}
+                    filterCategory={filterCategory}
+                    filterPriority={filterPriority}
+                    filterStatus={filterStatus}
+                    dateFrom={dateFrom}
+                    dateTo={dateTo}
+                    allTeams={allTeams}
+                    allCategories={allCategories}
+                    onClose={() => setShowFiltersModal(false)}
+                    onApply={handleApplyFilters}
+                    onClear={handleResetFilters}
                 />
             )}
 

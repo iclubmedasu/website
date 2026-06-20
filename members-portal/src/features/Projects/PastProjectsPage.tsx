@@ -11,11 +11,11 @@ import {
     History,
     PlayCircle,
     Search,
+    Filter,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { projectsAPI, teamsAPI, membersAPI, projectTypesAPI, projectFilesAPI } from '../../services/api';
 import FileUploadZone from '../../components/FileUpload/FileUploadZone';
-import Dropdown from '../../components/dropdown/dropdown';
 import { buildSearchText, matchesSearchQuery } from '../../utils/search';
 import './ProjectsPage.css';
 import {
@@ -32,6 +32,8 @@ import FinalizeProjectModal from './modals/FinalizeProjectModal';
 import ArchiveProjectModal from './modals/ArchiveProjectModal';
 import AbortProjectModal from './modals/AbortProjectModal';
 import ProjectActivityModal from './modals/ProjectActivityModal';
+import ProjectFiltersModal, { type ProjectFiltersState } from './modals/ProjectFiltersModal';
+import { isDateWithinRange } from '../../utils/filterDateRange';
 import type {
     Id,
     MemberSummary,
@@ -66,15 +68,6 @@ type ProjectActionPayload = (PastProjectSummary | ProjectDetail | ProjectActionT
 type ProjectActionType = 'reactivate' | 'abort' | 'finalize' | 'publish' | 'archive' | 'activity';
 
 const PRIORITY_ORDER: Record<PriorityKey, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-
-const PRIORITY_LABELS: Record<PriorityKey, string> = {
-    LOW: 'Low',
-    MEDIUM: 'Medium',
-    HIGH: 'High',
-    URGENT: 'Urgent',
-};
-
-const PRIORITIES: PriorityKey[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 // ─────────────────────────────────────────────────────────
 //  Past-Project Card (read-only)
@@ -336,7 +329,11 @@ export default function PastProjectsPage() {
     const [filterTeam, setFilterTeam] = useState('');
     const [filterCategory, setFilterCategory] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [showFiltersModal, setShowFiltersModal] = useState(false);
 
     // Pagination
     const PROJECTS_PER_PAGE = 10;
@@ -348,6 +345,27 @@ export default function PastProjectsPage() {
     const [detailLoading, setDetailLoading] = useState(false);
     const [actionProject, setActionProject] = useState<{ type: ProjectActionType; project: ProjectActionPayload } | null>(null);
     const canManageProjectLifecycle = !!(user?.isDeveloper || user?.isOfficer || user?.isAdmin || user?.isLeadership);
+    const hasActiveFilters = filterTeam !== '' || filterCategory !== '' || filterPriority !== ''
+        || filterStatus !== '' || dateFrom !== '' || dateTo !== '';
+
+    const handleApplyFilters = (filters: ProjectFiltersState) => {
+        setFilterTeam(filters.filterTeam);
+        setFilterCategory(filters.filterCategory);
+        setFilterPriority(filters.filterPriority);
+        setFilterStatus(filters.filterStatus);
+        setDateFrom(filters.dateFrom);
+        setDateTo(filters.dateTo);
+        setShowFiltersModal(false);
+    };
+
+    const handleResetFilters = () => {
+        setFilterTeam('');
+        setFilterCategory('');
+        setFilterPriority('');
+        setFilterStatus('');
+        setDateFrom('');
+        setDateTo('');
+    };
 
     // Load supporting data
     useEffect(() => {
@@ -374,6 +392,7 @@ export default function PastProjectsPage() {
                 archived: true,
                 teamId: filterTeam ? Number(filterTeam) : undefined,
                 priority: (filterPriority || undefined) as any,
+                status: (filterStatus || undefined) as any,
             }) as PastProjectSummary[];
 
             let filtered = data;
@@ -394,7 +413,7 @@ export default function PastProjectsPage() {
         } finally {
             setLoading(false);
         }
-    }, [filterTeam, filterCategory, filterPriority]);
+    }, [filterTeam, filterCategory, filterPriority, filterStatus]);
 
     const handleLifecycleRefresh = useCallback(() => {
         loadProjects();
@@ -404,14 +423,17 @@ export default function PastProjectsPage() {
     }, [expandedProjectId, loadProjects]);
 
     useEffect(() => { loadProjects(); }, [loadProjects]);
-    useEffect(() => { setCurrentPage(1); }, [filterTeam, filterCategory, filterPriority, searchQuery]);
+    useEffect(() => { setCurrentPage(1); }, [filterTeam, filterCategory, filterPriority, filterStatus, dateFrom, dateTo, searchQuery]);
 
     const filteredProjects = useMemo(() => {
-        return projects.filter((project) => matchesSearchQuery(
-            buildSearchText(project.title, project.description, project.status, project.priority, project.projectType?.name, project.projectType?.category),
-            searchQuery,
-        ));
-    }, [projects, searchQuery]);
+        return projects.filter((project) => {
+            if (!isDateWithinRange(project.dueDate, dateFrom, dateTo)) return false;
+            return matchesSearchQuery(
+                buildSearchText(project.title, project.description, project.status, project.priority, project.projectType?.name, project.projectType?.category),
+                searchQuery,
+            );
+        });
+    }, [projects, searchQuery, dateFrom, dateTo]);
 
     const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PROJECTS_PER_PAGE));
     const paginatedProjects = useMemo(() => {
@@ -447,35 +469,6 @@ export default function PastProjectsPage() {
             {/* Header */}
             <div className="page-header">
                 <h1 className="projects-title">Past Projects</h1>
-                <div className="page-header-actions">
-                    <Dropdown
-                        triggerLabel="Team"
-                        options={[
-                            { value: '', label: 'All Teams' },
-                            ...allTeams.map((t: TeamRef) => ({ value: String(t.id), label: t.name })),
-                        ]}
-                        value={filterTeam}
-                        onChange={(value) => setFilterTeam(value == null ? '' : String(value))}
-                    />
-                    <Dropdown
-                        triggerLabel="Category"
-                        options={[
-                            { value: '', label: 'All Categories' },
-                            ...allCategories.map((c: string) => ({ value: c, label: c })),
-                        ]}
-                        value={filterCategory}
-                        onChange={(value) => setFilterCategory(value == null ? '' : String(value))}
-                    />
-                    <Dropdown
-                        triggerLabel="Priority"
-                        options={[
-                            { value: '', label: 'All Priorities' },
-                            ...PRIORITIES.map((p: PriorityKey) => ({ value: p, label: PRIORITY_LABELS[p] })),
-                        ]}
-                        value={filterPriority}
-                        onChange={(value) => setFilterPriority(value == null ? '' : String(value))}
-                    />
-                </div>
             </div>
             <hr className="title-divider" />
 
@@ -490,6 +483,15 @@ export default function PastProjectsPage() {
                         placeholder="Search archived projects"
                         aria-label="Search archived projects"
                     />
+                    <button
+                        type="button"
+                        className={`page-search-filter-btn${hasActiveFilters ? ' page-search-filter-btn--active' : ''}`}
+                        onClick={() => setShowFiltersModal(true)}
+                        aria-label="Open advanced filters"
+                    >
+                        <Filter size={16} />
+                        <span className="page-search-filter-label">Advanced Filters</span>
+                    </button>
                 </div>
             </div>
 
@@ -501,9 +503,9 @@ export default function PastProjectsPage() {
             ) : filteredProjects.length === 0 ? (
                 <div className="empty-state">
                     <Archive className="empty-state-icon" />
-                    <h4 className="empty-state-title">{searchQuery ? 'No archived projects found' : 'No archived projects'}</h4>
+                    <h4 className="empty-state-title">{searchQuery || hasActiveFilters ? 'No archived projects found' : 'No archived projects'}</h4>
                     <p className="empty-state-text">
-                        {searchQuery ? 'Try a different search.' : 'Projects that have been archived will appear here.'}
+                        {searchQuery || hasActiveFilters ? 'Try a different search or adjust the filters.' : 'Projects that have been archived will appear here.'}
                     </p>
                 </div>
             ) : (
@@ -617,6 +619,23 @@ export default function PastProjectsPage() {
                         setActionProject(null);
                         handleLifecycleRefresh();
                     }}
+                />
+            )}
+
+            {showFiltersModal && (
+                <ProjectFiltersModal
+                    filterTeam={filterTeam}
+                    filterCategory={filterCategory}
+                    filterPriority={filterPriority}
+                    filterStatus={filterStatus}
+                    dateFrom={dateFrom}
+                    dateTo={dateTo}
+                    allTeams={allTeams}
+                    allCategories={allCategories}
+                    dateRangeLabel="Filters by due date."
+                    onClose={() => setShowFiltersModal(false)}
+                    onApply={handleApplyFilters}
+                    onClear={handleResetFilters}
                 />
             )}
         </div>

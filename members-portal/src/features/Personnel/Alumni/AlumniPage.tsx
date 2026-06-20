@@ -1,10 +1,11 @@
 ﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Eye, Search, Users } from 'lucide-react';
+import { Eye, Search, Users, Filter } from 'lucide-react';
 import { alumniAPI, teamsAPI, getProfilePhotoUrl } from '../../../services/api';
 import ViewMemberModal from '../Teams/modals/ViewMemberModal';
-import Dropdown from '../../../components/dropdown/dropdown';
+import AlumniFiltersModal, { type AlumniFiltersState } from './modals/AlumniFiltersModal';
+import { isDateWithinRange } from '../../../utils/filterDateRange';
 import type { Id } from '../../../types/backend-contracts';
 import { buildSearchText, matchesSearchQuery } from '../../../utils/search';
 import '../../Projects/ProjectsPage.css';
@@ -77,7 +78,10 @@ function AlumniPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [filterTeamId, setFilterTeamId] = useState('');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [showFiltersModal, setShowFiltersModal] = useState(false);
     const [showViewModal, setShowViewModal] = useState(false);
     const [viewingMemberId, setViewingMemberId] = useState<Id | null>(null);
 
@@ -131,16 +135,34 @@ function AlumniPage() {
     }, [alumniList]);
 
     const filteredRows = useMemo(() => {
-        return rows.filter((row) => matchesSearchQuery(
-            buildSearchText(row.name, row.email, row.teamName, row.role, row.subteamName, row.leaveType),
-            searchQuery,
-        ));
-    }, [rows, searchQuery]);
+        return rows.filter((row) => {
+            if (!isDateWithinRange(row.leftDate, dateFrom, dateTo)) return false;
+            return matchesSearchQuery(
+                buildSearchText(row.name, row.email, row.teamName, row.role, row.subteamName, row.leaveType),
+                searchQuery,
+            );
+        });
+    }, [rows, searchQuery, dateFrom, dateTo]);
+
+    const hasActiveFilters = filterTeamId !== '' || dateFrom !== '' || dateTo !== '';
+
+    const handleApplyFilters = (filters: AlumniFiltersState) => {
+        setFilterTeamId(filters.filterTeamId);
+        setDateFrom(filters.dateFrom);
+        setDateTo(filters.dateTo);
+        setShowFiltersModal(false);
+    };
+
+    const handleResetFilters = () => {
+        setFilterTeamId('');
+        setDateFrom('');
+        setDateTo('');
+    };
 
     // Reset to page 1 when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [filterTeamId, searchQuery]);
+    }, [filterTeamId, dateFrom, dateTo, searchQuery]);
 
     // Pagination derived values
     const totalPages = Math.max(1, Math.ceil(filteredRows.length / ROWS_PER_PAGE));
@@ -158,14 +180,6 @@ function AlumniPage() {
         <div className="alumni-page members-page">
             <div className="page-header">
                 <h1 className="members-page-title members-page-title-inline">Alumni</h1>
-                <div className="page-header-actions">
-                    <Dropdown
-                        triggerLabel="Left from team"
-                        options={[{ value: '', label: 'All teams' }, ...teams.map((team) => ({ value: String(team.id), label: team.name }))]}
-                        value={filterTeamId}
-                        onChange={(value) => setFilterTeamId(value != null ? String(value) : '')}
-                    />
-                </div>
             </div>
 
             <hr className="title-divider" />
@@ -181,6 +195,15 @@ function AlumniPage() {
                         placeholder="Search alumni"
                         aria-label="Search alumni"
                     />
+                    <button
+                        type="button"
+                        className={`page-search-filter-btn${hasActiveFilters ? ' page-search-filter-btn--active' : ''}`}
+                        onClick={() => setShowFiltersModal(true)}
+                        aria-label="Open advanced filters"
+                    >
+                        <Filter size={16} />
+                        <span className="page-search-filter-label">Advanced Filters</span>
+                    </button>
                 </div>
             </div>
 
@@ -200,11 +223,9 @@ function AlumniPage() {
                             <Users className="empty-state-icon" />
                             <h4 className="empty-state-title">No alumni found</h4>
                             <p className="empty-state-text">
-                                {searchQuery
-                                    ? 'No alumni match your search.'
-                                    : filterTeamId
-                                        ? 'No one has left this team yet.'
-                                        : 'No one has left the club yet.'}
+                                {searchQuery || hasActiveFilters
+                                    ? 'Try a different search or adjust the filters.'
+                                    : 'No one has left the club yet.'}
                             </p>
                         </div>
                     ) : (
@@ -310,6 +331,18 @@ function AlumniPage() {
                 }}
                 memberId={viewingMemberId}
             />
+
+            {showFiltersModal && (
+                <AlumniFiltersModal
+                    filterTeamId={filterTeamId}
+                    dateFrom={dateFrom}
+                    dateTo={dateTo}
+                    allTeams={teams}
+                    onClose={() => setShowFiltersModal(false)}
+                    onApply={handleApplyFilters}
+                    onClear={handleResetFilters}
+                />
+            )}
         </div>
     );
 }
