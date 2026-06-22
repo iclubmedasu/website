@@ -1,0 +1,8 @@
+.quarter-hour-time-input {
+    min-width: 0;
+    flex: 1 1 7rem;
+}
+
+.form-slot-row .quarter-hour-time-input {
+    flex: 1 1 7rem;
+}

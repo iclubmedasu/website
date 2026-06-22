@@ -7,6 +7,11 @@ import {
     summarizeChanges,
 } from '../services/activityLogService';
 import { emitNotificationEvent } from '../services/notificationService';
+import {
+    buildScheduleSlotActivityValue,
+    enrichScheduleSlotChangePayload,
+    getTaskMemberName,
+} from '../services/taskActivityHelpers';
 
 const router: any = express.Router();
 
@@ -171,14 +176,8 @@ router.post('/', async (req, res) => {
             memberId: req.user.memberId,
             actionType: 'CREATED',
             entityType: 'SCHEDULE_SLOT',
-            newValue: {
-                memberId: slot.memberId,
-                taskId: slot.taskId,
-                title: slot.title,
-                startDateTime: slot.startDateTime,
-                endDateTime: slot.endDateTime,
-            },
-            description: `Schedule slot created for ${slot.member.fullName}`,
+            newValue: buildScheduleSlotActivityValue(slot),
+            description: `Schedule slot created for ${getTaskMemberName(slot.memberId, slot.member)}`,
         });
 
         await emitNotificationEvent({
@@ -231,6 +230,8 @@ router.patch('/:id', async (req, res) => {
                 startDateTime: true,
                 endDateTime: true,
                 isActive: true,
+                member: { select: { id: true, fullName: true } },
+                task: { select: { id: true, title: true } },
             },
         });
         if (!before) return res.status(404).json({ error: 'Schedule slot not found' });
@@ -332,8 +333,8 @@ router.patch('/:id', async (req, res) => {
                 memberId: req.user.memberId,
                 actionType: 'UPDATED',
                 entityType: 'SCHEDULE_SLOT',
-                oldValue,
-                newValue,
+                oldValue: enrichScheduleSlotChangePayload(oldValue, before.memberId, before.member, before.task?.title),
+                newValue: enrichScheduleSlotChangePayload(newValue, slot.memberId, slot.member, slot.task?.title),
                 description: summarizeChanges(changes) || 'Schedule slot updated',
             });
 
@@ -381,14 +382,9 @@ router.delete('/:id', async (req, res) => {
 
         const existing = await prisma.projectScheduleSlot.findUnique({
             where: { id },
-            select: {
-                projectId: true,
-                taskId: true,
-                memberId: true,
-                title: true,
-                notes: true,
-                startDateTime: true,
-                endDateTime: true,
+            include: {
+                member: { select: { id: true, fullName: true } },
+                task: { select: { id: true, title: true } },
             },
         });
         if (!existing) return res.status(404).json({ error: 'Schedule slot not found' });
@@ -408,8 +404,8 @@ router.delete('/:id', async (req, res) => {
             memberId: req.user.memberId,
             actionType: 'DELETED',
             entityType: 'SCHEDULE_SLOT',
-            oldValue: existing,
-            description: `Schedule slot deleted for member #${existing.memberId}`,
+            oldValue: buildScheduleSlotActivityValue(existing),
+            description: `Schedule slot deleted for ${getTaskMemberName(existing.memberId, existing.member)}`,
         });
 
         await prisma.projectScheduleSlot.delete({ where: { id } });

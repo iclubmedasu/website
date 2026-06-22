@@ -1,86 +1,33 @@
 'use client';
-import {
-    AlertCircle,
-    Archive,
-    Calendar,
-    CheckCircle,
-    CheckSquare,
-    PauseCircle,
-    SquareCheckBig,
-    X,
-} from 'lucide-react';
-import type {
-    Difficulty,
-    Id,
-    MemberSummary,
-    Priority,
-    ProjectStatus,
-    ProjectTypeRef,
-    TaskStatus,
-} from '../../../../types/backend-contracts';
 
-type StatusValue = ProjectStatus | TaskStatus | string;
-type PriorityValue = Priority | 'URGENT' | string;
+import { useEffect } from 'react';
+import { AlertCircle, X } from 'lucide-react';
+import { fmtDate, getCategoryClass, PriorityBadge, StatusBadge } from './badges';
+import type { CardTeamView, CardViewModel } from './types';
+import './LifecycleCardView.css';
 
-interface ProjectTeamView {
-    id?: Id;
-    teamId?: Id;
-    canEdit?: boolean;
-    isOwner?: boolean;
-    team?: {
-        name?: string | null;
-    };
-}
-
-interface ProjectCardViewModel {
-    id?: Id;
-    title: string;
-    name?: string | null;
-    description?: string | null;
-    status: StatusValue;
-    priority?: PriorityValue | null;
-    dueDate?: string | null;
-    createdAt?: string | null;
-    startDate?: string | null;
-    isActive?: boolean;
-    isFinalized?: boolean;
-    isArchived?: boolean;
-    projectType?: ProjectTypeRef | null;
-    projectTeams?: ProjectTeamView[];
-    createdBy?: MemberSummary | null;
-    difficulty?: Difficulty;
-}
-
-interface StatusBadgeProps {
-    status: StatusValue | null | undefined;
-}
-
-interface PriorityBadgeProps {
-    priority: PriorityValue | null | undefined;
-}
-
-interface ProjectDetailsSectionProps {
-    detail: ProjectCardViewModel;
+interface CardDetailsSectionProps {
+    detail: CardViewModel;
     over: boolean;
     detailExtra?: React.ReactNode;
     dateFields?: Array<{ label: string; value: React.ReactNode; overdue?: boolean }>;
 }
 
-interface ProjectTeamsSectionProps {
-    detail: ProjectCardViewModel;
-    ownerTeam: ProjectTeamView | null;
+interface CardTeamsSectionProps {
+    detail: CardViewModel;
+    ownerTeam: CardTeamView | null;
     teamEmptyMessage?: string;
-    formatAssignedTeamSuffix?: (team: ProjectTeamView) => React.ReactNode;
+    formatAssignedTeamSuffix?: (team: CardTeamView) => React.ReactNode;
     teamExtra?: React.ReactNode;
 }
 
-interface ProjectCardViewProps {
-    project: ProjectCardViewModel;
+export interface LifecycleCardViewProps {
+    item: CardViewModel;
     expanded: boolean;
-    detail?: ProjectCardViewModel | null;
-    fullDetail?: ProjectCardViewModel | null;
+    detail?: CardViewModel | null;
+    fullDetail?: CardViewModel | null;
     detailLoading?: boolean;
-    onToggle: (project: ProjectCardViewModel | null) => void;
+    onToggle: (item: CardViewModel | null) => void;
     collapsedMeta?: React.ReactNode;
     collapsedActions?: React.ReactNode;
     collapsedFooterTrailing?: React.ReactNode;
@@ -89,103 +36,16 @@ interface ProjectCardViewProps {
     detailExtra?: React.ReactNode;
     detailDateFields?: Array<{ label: string; value: React.ReactNode; overdue?: boolean }>;
     teamEmptyMessage?: string;
-    formatAssignedTeamSuffix?: (team: ProjectTeamView) => React.ReactNode;
+    formatAssignedTeamSuffix?: (team: CardTeamView) => React.ReactNode;
     teamExtra?: React.ReactNode;
     afterSections?: React.ReactNode;
+    loadingTitle?: string;
+    loadingText?: string;
+    accessDeniedTitle?: string;
+    accessDeniedText?: string;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-    NOT_STARTED: 'Not Started',
-    IN_PROGRESS: 'In Progress',
-    COMPLETED: 'Completed',
-    ON_HOLD: 'On Hold',
-    CANCELLED: 'Cancelled',
-    DELAYED: 'Delayed',
-    BLOCKED: 'Blocked',
-};
-
-const PRIORITY_LABELS: Record<string, string> = {
-    LOW: 'Low',
-    MEDIUM: 'Medium',
-    HIGH: 'High',
-    URGENT: 'Urgent',
-    CRITICAL: 'Critical',
-};
-
-export function fmtDate(d: string | Date | null | undefined): string {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-export function getCategoryClass(category: string | null | undefined): string {
-    return 'badge-category-' + (category ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-}
-
-export function StatusBadge({ status }: StatusBadgeProps) {
-    const normalizedStatus = status ?? 'UNKNOWN';
-    return (
-        <span className={`badge badge-status-${normalizedStatus}`}>
-            <span className={`status-dot status-dot-${normalizedStatus}`} />
-            {STATUS_LABELS[String(normalizedStatus)] ?? String(normalizedStatus)}
-        </span>
-    );
-}
-
-export function PriorityBadge({ priority }: PriorityBadgeProps) {
-    const normalizedPriority = priority ?? 'UNKNOWN';
-    return (
-        <span className={`badge badge-priority-${normalizedPriority}`}>
-            {PRIORITY_LABELS[String(normalizedPriority)] ?? String(normalizedPriority)}
-        </span>
-    );
-}
-
-export function isProjectAborted(project: ProjectCardViewModel | null | undefined): boolean {
-    return project?.status === 'CANCELLED' && !project?.isArchived;
-}
-
-export function isProjectInactive(project: ProjectCardViewModel | null | undefined): boolean {
-    return !!project && !project.isActive && !project.isFinalized && !project.isArchived && project.status !== 'CANCELLED';
-}
-
-export function getLifecycleBadge(project: ProjectCardViewModel | null | undefined): {
-    className: string;
-    label: string;
-    icon: typeof Archive;
-    title: string;
-} {
-    if (project?.isArchived) {
-        return { className: 'badge-lifecycle-archived', label: 'Archived', icon: Archive, title: 'Archived' };
-    }
-    if (project?.isFinalized) {
-        return { className: 'badge-lifecycle-finalized', label: 'Finalized', icon: CheckCircle, title: 'Finalized' };
-    }
-    if (project?.status === 'CANCELLED') {
-        return { className: 'badge-lifecycle-aborted', label: 'Aborted', icon: AlertCircle, title: 'Aborted' };
-    }
-    if (project && !project.isActive) {
-        return { className: 'badge-lifecycle-hold', label: 'On Hold', icon: PauseCircle, title: 'On Hold' };
-    }
-    return { className: 'badge-lifecycle-active', label: 'Active', icon: CheckSquare, title: 'Active' };
-}
-
-export function getArchiveOutcomeBadge(project: ProjectCardViewModel | null | undefined): {
-    className: string;
-    label: string;
-    icon: typeof Archive;
-    title: string;
-} | null {
-    if (!project?.isArchived) return null;
-    if (project.isFinalized) {
-        return { className: 'badge-lifecycle-finalized', label: 'Finalized', icon: CheckCircle, title: 'Archived after finalizing' };
-    }
-    if (project.status === 'CANCELLED') {
-        return { className: 'badge-lifecycle-aborted', label: 'Aborted', icon: AlertCircle, title: 'Archived after being aborted' };
-    }
-    return null;
-}
-
-function ProjectDetailsSection({ detail, over, detailExtra, dateFields }: ProjectDetailsSectionProps) {
+function CardDetailsSection({ detail, over, detailExtra, dateFields }: CardDetailsSectionProps) {
     return (
         <div className="exp-card-section">
             <div className="exp-card-section-header">Details</div>
@@ -241,7 +101,7 @@ function ProjectDetailsSection({ detail, over, detailExtra, dateFields }: Projec
     );
 }
 
-function ProjectTeamsSection({ detail, ownerTeam, teamEmptyMessage, formatAssignedTeamSuffix, teamExtra }: ProjectTeamsSectionProps) {
+function CardTeamsSection({ detail, ownerTeam, teamEmptyMessage, formatAssignedTeamSuffix, teamExtra }: CardTeamsSectionProps) {
     return (
         <div className="exp-card-section">
             <div className="exp-card-section-header">Teams</div>
@@ -274,8 +134,8 @@ function ProjectTeamsSection({ detail, ownerTeam, teamEmptyMessage, formatAssign
     );
 }
 
-export function ProjectCardView({
-    project,
+export function LifecycleCardView({
+    item,
     expanded,
     detail,
     fullDetail,
@@ -292,25 +152,51 @@ export function ProjectCardView({
     formatAssignedTeamSuffix,
     teamExtra,
     afterSections,
-}: ProjectCardViewProps) {
+    loadingTitle = 'Loading details…',
+    loadingText = 'Fetching content and activity history.',
+    accessDeniedTitle = 'You do not have access to this item',
+    accessDeniedText = 'This item can’t be opened with your current permissions.',
+}: LifecycleCardViewProps) {
     const currentDetail = detail || fullDetail;
     const over = currentDetail
         ? Boolean(currentDetail.dueDate && currentDetail.status !== 'COMPLETED' && currentDetail.status !== 'CANCELLED' && new Date(currentDetail.dueDate) < new Date())
-        : Boolean(project?.dueDate && project?.status !== 'COMPLETED' && project?.status !== 'CANCELLED' && new Date(project.dueDate) < new Date());
+        : Boolean(item?.dueDate && item?.status !== 'COMPLETED' && item?.status !== 'CANCELLED' && new Date(item.dueDate) < new Date());
     const ownerTeam = currentDetail?.projectTeams?.find((pt) => pt.isOwner) ?? null;
     const accessDenied = expanded && !detailLoading && !currentDetail;
     const loadingDetail = expanded && detailLoading && !currentDetail;
 
+    useEffect(() => {
+        if (!expanded) return;
+
+        const mainContent = document.querySelector('.main-content') as HTMLElement | null;
+        const prevOverflow = mainContent?.style.overflow ?? '';
+
+        if (mainContent) {
+            mainContent.style.overflow = 'hidden';
+        }
+
+        return () => {
+            if (mainContent) {
+                mainContent.style.overflow = prevOverflow;
+            }
+        };
+    }, [expanded]);
+
     return (
-        <div
+        <>
+            {expanded && (
+                <div className="project-card-expanded-backdrop" aria-hidden="true" />
+            )}
+            <div
             className={`project-card${expanded ? ' project-card--expanded' : ''}`}
-            onClick={() => !expanded && onToggle(project)}
+            onClick={() => !expanded && onToggle(item)}
         >
             {expanded && (
                 <button
                     className="expanded-close-btn"
                     onClick={(e) => { e.stopPropagation(); onToggle(null); }}
                     title="Close"
+                    type="button"
                 >
                     <X size={16} />
                 </button>
@@ -318,7 +204,7 @@ export function ProjectCardView({
 
             <div className="project-card-collapsed-content">
                 <div className="project-card-header">
-                    <span className="project-card-title">{project.title}</span>
+                    <span className="project-card-title">{item.title}</span>
                     <div className="project-card-meta">
                         {collapsedMeta && (
                             <div className="project-card-meta-badges">
@@ -333,22 +219,22 @@ export function ProjectCardView({
                     </div>
                 </div>
 
-                {project.description && (
-                    <div className="project-card-description">{project.description}</div>
+                {item.description && (
+                    <div className="project-card-description">{item.description}</div>
                 )}
 
                 <div className="project-card-badges">
-                    <StatusBadge status={project.status} />
-                    <PriorityBadge priority={project.priority} />
+                    <StatusBadge status={item.status} />
+                    <PriorityBadge priority={item.priority} />
                 </div>
 
                 <div className="project-card-footer">
                     <div className="project-card-teams">
-                        {project.projectTeams?.slice(0, 3).map((pt, index) => (
+                        {item.projectTeams?.slice(0, 3).map((pt, index) => (
                             <span key={pt.id ?? `${pt.teamId}-${index}`} className="badge-team">{pt.team?.name}</span>
                         ))}
-                        {(project.projectTeams?.length ?? 0) > 3 && (
-                            <span className="badge-team">+{(project.projectTeams?.length ?? 0) - 3}</span>
+                        {(item.projectTeams?.length ?? 0) > 3 && (
+                            <span className="badge-team">+{(item.projectTeams?.length ?? 0) - 3}</span>
                         )}
                     </div>
                 </div>
@@ -381,13 +267,13 @@ export function ProjectCardView({
                         </div>
 
                         <div className="exp-card-columns">
-                            <ProjectDetailsSection
+                            <CardDetailsSection
                                 detail={currentDetail}
                                 over={over}
                                 detailExtra={detailExtra}
                                 dateFields={detailDateFields}
                             />
-                            <ProjectTeamsSection
+                            <CardTeamsSection
                                 detail={currentDetail}
                                 ownerTeam={ownerTeam}
                                 teamEmptyMessage={teamEmptyMessage}
@@ -405,10 +291,8 @@ export function ProjectCardView({
                 <div className="project-card-expanded-content">
                     <div className="expanded-content-wrapper">
                         <div className="project-card-loading-state">
-                            <div className="project-card-loading-title">Loading project details…</div>
-                            <div className="project-card-loading-text">
-                                Fetching phases, tasks, and activity history.
-                            </div>
+                            <div className="project-card-loading-title">{loadingTitle}</div>
+                            <div className="project-card-loading-text">{loadingText}</div>
                         </div>
                     </div>
                 </div>
@@ -419,20 +303,25 @@ export function ProjectCardView({
                     <div className="expanded-content-wrapper">
                         <div className="project-card-access-denied">
                             <AlertCircle size={18} className="project-card-access-denied-icon" />
-                            <div className="project-card-access-denied-title">
-                                You do not have access to this project
-                            </div>
-                            <div className="project-card-access-denied-text">
-                                This project can’t be opened with your current permissions.
-                            </div>
+                            <div className="project-card-access-denied-title">{accessDeniedTitle}</div>
+                            <div className="project-card-access-denied-text">{accessDeniedText}</div>
                         </div>
                     </div>
                 </div>
             )}
         </div>
+        </>
     );
 }
 
-export { Calendar, SquareCheckBig };
+export { Calendar, SquareCheckBig } from 'lucide-react';
+export { fmtDate, getCategoryClass, StatusBadge, PriorityBadge } from './badges';
+export {
+    getArchiveOutcomeBadge,
+    getLifecycleBadge,
+    isProjectAborted,
+    isProjectInactive,
+} from './lifecycleBadges';
+export type { CardViewModel, CardTeamView } from './types';
 
-export default ProjectCardView;
+export default LifecycleCardView;

@@ -36,14 +36,21 @@ model Member {
   taskAssignments     TaskAssignment[]        // Tasks assigned to this member
   taskComments        TaskComment[]           // Comments on tasks
   projectFileComments ProjectFileComment[]    // Comments on project files
+  eventFileComments   EventFileComment[]      // Comments on event files
   taskActivityLog     TaskActivityLog[]       // Activity log entries
   projectActivityLog  ProjectActivityLog[]     // Project-level activity log entries
+  eventActivityLog    EventActivityLog[]       // Event-level activity log entries
   scheduleSlots       ProjectScheduleSlot[]    // Time slots assigned to this member
   createdScheduleSlots ProjectScheduleSlot[]   @relation("ProjectScheduleSlotCreatedBy")
   uploadedFiles       ProjectFile[]           // Files uploaded by this member
   createdFolders      ProjectFolder[]         // Folders created by this member
+  uploadedEventFiles  EventFile[]             // Event files uploaded by this member
+  createdEventFolders EventFolder[]           // Event folders created by this member
   createdEvents       Event[]                 @relation("EventCreatedBy")
   eventRegistrations  EventRegistration[]
+  eventTaskAssignments EventTaskAssignment[]   // Event task time slots assigned to this member
+  eventTasksLed       EventTask[]             @relation("EventTaskLeader")
+  eventTasksCreated   EventTask[]             @relation("EventTaskCreatedBy")
   notificationEventsAuthored NotificationEvent[] @relation("NotificationEventActor")
   notifications      Notification[]
 }
@@ -329,6 +336,7 @@ model Event {
   description         String?
   venue               String?
   eventDate           DateTime
+  eventEndDate        DateTime
   registrationDeadline DateTime?
   capacity            Int?
   allowWalkIns        Boolean   @default(false)
@@ -351,6 +359,10 @@ model Event {
   tiers               EventTier[]
   customFields        EventCustomField[]
   registrations       EventRegistration[]
+  tasks               EventTask[]
+  files               EventFile[]
+  folders             EventFolder[]
+  activityLog         EventActivityLog[]
 
   @@index([projectId])
   @@index([projectTypeId])
@@ -359,6 +371,7 @@ model Event {
   @@index([priority])
   @@index([progressStatus])
   @@index([eventDate])
+  @@index([eventEndDate])
   @@index([registrationDeadline])
   @@index([isActive])
   @@index([isFinalized])
@@ -372,6 +385,7 @@ model EventTier {
   description     String?
   maxCapacity     Int?
   price           Decimal?  @db.Decimal(10, 2)
+  currency        String    @default("EGP")
   order           Int       @default(0)
   isActive        Boolean   @default(true)
   createdAt       DateTime  @default(now())
@@ -392,6 +406,7 @@ model EventCustomField {
   type            String
   options         Json?
   required        Boolean   @default(false)
+  showOnPublic    Boolean   @default(false)
   order           Int       @default(0)
   isLocked        Boolean   @default(false)
   isActive        Boolean   @default(true)
@@ -455,6 +470,83 @@ model EventTeam {
   @@index([eventId])
   @@index([teamId])
   @@index([eventId, canEdit])
+}
+
+// ============================================
+// EVENT TASKS - Roles/duties assigned to team members for an event
+// ============================================
+model EventTask {
+  id                Int       @id @default(autoincrement())
+  eventId           Int
+  leaderId          Int?
+  createdByMemberId Int?
+  title             String
+  description       String?
+  location          String
+  taskDate          DateTime  // The day this task belongs to
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  event       Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  leader      Member?               @relation("EventTaskLeader", fields: [leaderId], references: [id], onDelete: SetNull)
+  createdBy   Member?               @relation("EventTaskCreatedBy", fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  assignments EventTaskAssignment[]
+  activityLog EventActivityLog[]
+
+  @@index([eventId])
+  @@index([leaderId])
+  @@index([eventId, taskDate])
+}
+
+// ============================================
+// EVENT ACTIVITY LOG - Event, task, tier, registration, and file history
+// ============================================
+model EventActivityLog {
+  id          Int       @id @default(autoincrement())
+  eventId     Int
+  eventTaskId Int?
+  memberId    Int?
+  entityType  String    @default("EVENT") // EVENT, TIER, CUSTOM_FIELD, REGISTRATION, TASK, ASSIGNMENT, FILE, etc.
+  actionType  String    // CREATED, UPDATED, DEACTIVATED, REACTIVATED, FINALIZED, ARCHIVED, COMMENTED, etc.
+  oldValue    String?
+  newValue    String?
+  description String?
+  createdAt   DateTime  @default(now())
+
+  event     Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventTask EventTask? @relation(fields: [eventTaskId], references: [id], onDelete: SetNull)
+  member    Member?    @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  @@index([eventId])
+  @@index([eventTaskId])
+  @@index([memberId])
+  @@index([eventId, createdAt])
+  @@index([actionType])
+  @@index([entityType])
+}
+
+// ============================================
+// EVENT TASK ASSIGNMENTS - Per-member time slots for an event task
+// ============================================
+model EventTaskAssignment {
+  id            Int       @id @default(autoincrement())
+  eventTaskId   Int
+  memberId      Int
+  startDateTime DateTime
+  endDateTime   DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  eventTask EventTask @relation(fields: [eventTaskId], references: [id], onDelete: Cascade)
+  member    Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([eventTaskId])
+  @@index([memberId])
+  @@index([startDateTime])
+  @@index([endDateTime])
 }
 
 // ============================================
@@ -858,5 +950,76 @@ model ProjectFolder {
 
   @@index([projectId])
   @@index([projectId, isActive])
+  @@index([createdByMemberId])
+}
+
+// ============================================
+// EVENT FILES - Files attached to events
+// ============================================
+model EventFile {
+  id                  Int       @id @default(autoincrement())
+  eventId             Int
+  folderId            Int?
+  uploadedByMemberId  Int
+  fileName            String
+  githubPath          String
+  githubSha           String
+  fileSize            Int
+  mimeType            String
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  event       Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  folder      EventFolder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  uploadedBy  Member         @relation(fields: [uploadedByMemberId], references: [id])
+  comments    EventFileComment[]
+
+  @@index([eventId])
+  @@index([folderId])
+  @@index([uploadedByMemberId])
+}
+
+// ============================================
+// EVENT FILE COMMENTS - Discussion/notes on event files
+// ============================================
+model EventFileComment {
+  id          Int       @id @default(autoincrement())
+  fileId      Int
+  memberId    Int
+  comment     String
+  isEdited    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  file        EventFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  member      Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([fileId])
+  @@index([memberId])
+  @@index([fileId, createdAt])
+}
+
+// ============================================
+// EVENT FOLDERS - Folder containers for event files
+// ============================================
+model EventFolder {
+  id                  Int       @id @default(autoincrement())
+  eventId             Int
+  createdByMemberId   Int
+  folderName          String
+  githubPath          String
+  githubSha           String
+  isActive            Boolean   @default(true)
+  deletedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  event       Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy   Member      @relation(fields: [createdByMemberId], references: [id])
+  files       EventFile[]
+
+  @@index([eventId])
+  @@index([eventId, isActive])
   @@index([createdByMemberId])
 }

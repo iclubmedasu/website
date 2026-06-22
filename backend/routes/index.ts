@@ -16,6 +16,7 @@ import eventsRoutes from "./events";
 import phasesRoutes from "./phases";
 import scheduleSlotsRoutes from "./scheduleSlots";
 import projectFilesRoutes from "./projectFiles";
+import eventFilesRoutes from "./eventFiles";
 import notificationsRoutes from "./notifications";
 
 import { downloadProfilePhoto } from "../services/githubStorage";
@@ -59,6 +60,7 @@ router.use("/events", authenticateToken, eventsRoutes);
 router.use("/phases", authenticateToken, phasesRoutes);
 router.use("/schedule-slots", authenticateToken, scheduleSlotsRoutes);
 router.use("/project-files", authenticateToken, projectFilesRoutes);
+router.use("/event-files", authenticateToken, eventFilesRoutes);
 router.use("/notifications", authenticateToken, notificationsRoutes);
 
 router.get("/", (_req: Request, res: Response) => {
@@ -81,6 +83,7 @@ router.get("/", (_req: Request, res: Response) => {
             phases: "/api/phases",
             scheduleSlots: "/api/schedule-slots",
             projectFiles: "/api/project-files",
+            eventFiles: "/api/event-files",
             notifications: "/api/notifications",
         },
     });

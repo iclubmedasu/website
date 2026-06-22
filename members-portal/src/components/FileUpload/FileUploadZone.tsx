@@ -1,20 +1,21 @@
 'use client';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { FileText, Image, File, Folder, FolderOpen, Upload, Check, X, RotateCcw, Trash2, Loader, Download, AlertTriangle, History, ArchiveRestore, Pencil, ChevronDown, ChevronRight, Plus, MessageCircle } from 'lucide-react';
-import { projectFilesAPI } from '@/services/api';
-import FileCommentsModal from '../../features/Projects/modals/FileCommentsModal';
+import FileCommentsModal from './FileCommentsModal';
 import '@/components/modal/modal.css';
 import './FileUploadZone.css';
-import type { Id, ProjectFileRef, ProjectFolderRef } from '../../types/backend-contracts';
+import type { Id } from '../../types/backend-contracts';
+import type { EntityFileRef, EntityFolderRef, EntityFilesAPI } from './types';
 
 export interface FileUploadZoneProps {
-    projectId: Id | string;
+    entityId: Id | string;
+    filesAPI: EntityFilesAPI;
     memberId?: Id | string | null;
-    onFileUploaded?: (file: ProjectFileRef, replaced: boolean) => void;
+    onFileUploaded?: (file: EntityFileRef, replaced: boolean) => void;
     onFileRemoved?: (fileId: Id | string) => void;
-    onFileRenamed?: (file: ProjectFileRef) => void;
-    existingFiles?: ProjectFileRef[];
-    existingFolders?: ProjectFolderRef[];
+    onFileRenamed?: (file: EntityFileRef) => void;
+    existingFiles?: EntityFileRef[];
+    existingFolders?: EntityFolderRef[];
     disabled?: boolean;
 }
 
@@ -34,7 +35,7 @@ type UploadFileEntry = {
 
 type FolderActionState = {
     type: 'delete' | 'restore' | 'history';
-    folder: ProjectFolderRef;
+    folder: EntityFolderRef;
 };
 
 type RenameTarget = {
@@ -69,7 +70,7 @@ function FileIcon({ mimeType }: { mimeType?: string | null }) {
 let _uid = 0;
 function uid() { return `upload_${Date.now()}_${++_uid}`; }
 
-export default function FileUploadZone({ projectId, memberId, onFileUploaded, onFileRemoved, onFileRenamed, existingFiles = [], existingFolders = [], disabled }: FileUploadZoneProps) {
+export default function FileUploadZone({ entityId, filesAPI, memberId, onFileUploaded, onFileRemoved, onFileRenamed, existingFiles = [], existingFolders = [], disabled }: FileUploadZoneProps) {
     const [uploadingFiles, setUploadingFiles] = useState<UploadFileEntry[]>([]);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [targetFolderId, setTargetFolderId] = useState('');
@@ -77,7 +78,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
     const [confirmDelete, setConfirmDelete] = useState<UploadFileEntry | null>(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
     const [deleteError, setDeleteError] = useState('');
-    const [folders, setFolders] = useState<ProjectFolderRef[]>([]);
+    const [folders, setFolders] = useState<EntityFolderRef[]>([]);
     const [expandedFolders, setExpandedFolders] = useState<Set<Id | string>>(() => new Set());
     const [showDeletedFolders, setShowDeletedFolders] = useState(false);
     const [folderCreateOpen, setFolderCreateOpen] = useState(false);
@@ -94,7 +95,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
     const [historyLoading, setHistoryLoading] = useState(false);
     const [commentTarget, setCommentTarget] = useState<UploadFileEntry | null>(null);
     const [showDeleted, setShowDeleted] = useState(false);
-    const [deletedFiles, setDeletedFiles] = useState<ProjectFileRef[]>([]);
+    const [deletedFiles, setDeletedFiles] = useState<EntityFileRef[]>([]);
     const [deletedLoading, setDeletedLoading] = useState(false);
     const [restoringId, setRestoringId] = useState<Id | string | null>(null);
     // Rename state
@@ -113,7 +114,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         const existing = existingFiles.map((f) => ({
             id: f.id,
             name: f.fileName,
-            size: f.fileSize,
+            size: f.fileSize ?? 0,
             mimeType: f.mimeType,
             folderId: f.folderId ?? null,
             progress: 100,
@@ -175,7 +176,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         }
 
         try {
-            const moved = await projectFilesAPI.move(fileEntry.id, folderId) as any;
+            const moved = await filesAPI.move(fileEntry.id, folderId) as any;
             setUploadingFiles((prev) => prev.map((f) => (f.id === moved.id ? { ...f, ...moved, folderId: moved.folderId ?? null } : f)));
         } catch (err: unknown) {
             console.error('Move failed:', err);
@@ -204,8 +205,8 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
     const doUpload = useCallback(async (entry: UploadFileEntry) => {
         if (!entry.fileObj) return;
         try {
-            const result = await projectFilesAPI.upload(
-                projectId,
+            const result = await filesAPI.upload(
+                entityId,
                 memberId as any,
                 entry.fileObj,
                 (progress) => {
@@ -249,7 +250,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
             console.error('Upload failed:', err);
             updateFile(entry.id, { failed: true, processing: false });
         }
-    }, [projectId, memberId, onFileUploaded, updateFile]);
+    }, [entityId, memberId, onFileUploaded, updateFile]);
 
     const processFiles = useCallback((fileList: FileList | File[], folderIdOverride: Id | null = null) => {
         if (disabled) return;
@@ -328,7 +329,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         setDeleteLoading(true);
         setDeleteError('');
         try {
-            await projectFilesAPI.remove(confirmDelete.id);
+            await filesAPI.remove(confirmDelete.id);
             if (onFileRemoved) onFileRemoved(confirmDelete.id);
             setUploadingFiles((prev) => prev.filter((f) => f.id !== confirmDelete.id));
             closeDeleteModal();
@@ -350,7 +351,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         setHistoryLoading(true);
         setHistoryData([]);
         try {
-            const data = await projectFilesAPI.getHistory(fileEntry.id);
+            const data = await filesAPI.getHistory(fileEntry.id);
             setHistoryData(data);
         } catch (err) {
             console.error('History fetch failed:', err);
@@ -379,16 +380,16 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
             + ' ' + d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
     };
 
-    const refreshFoldersAfterAction = useCallback((updatedFolder: ProjectFolderRef) => {
+    const refreshFoldersAfterAction = useCallback((updatedFolder: EntityFolderRef) => {
         setFolders((prev) => prev.map((folder) => (folder.id === updatedFolder.id ? updatedFolder : folder)));
     }, []);
 
-    const openFolderHistory = async (folder: ProjectFolderRef) => {
+    const openFolderHistory = async (folder: EntityFolderRef) => {
         setFolderAction({ type: 'history', folder });
         setFolderHistoryLoading(true);
         setFolderHistoryData([]);
         try {
-            const data = await projectFilesAPI.getFolderHistory(folder.id);
+            const data = await filesAPI.getFolderHistory(folder.id);
             setFolderHistoryData(data);
         } catch (err) {
             console.error('Folder history fetch failed:', err);
@@ -397,7 +398,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         }
     };
 
-    const openFolderAction = (type: 'delete' | 'restore' | 'history', folder: ProjectFolderRef) => {
+    const openFolderAction = (type: 'delete' | 'restore' | 'history', folder: EntityFolderRef) => {
         setFolderAction({ type, folder });
         setFolderActionError('');
     };
@@ -417,11 +418,11 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         setFolderActionError('');
         try {
             if (type === 'delete') {
-                const result = await projectFilesAPI.removeFolder(folder.id) as any;
-                refreshFoldersAfterAction((result?.folder || folder) as ProjectFolderRef);
+                const result = await filesAPI.removeFolder(folder.id) as any;
+                refreshFoldersAfterAction((result?.folder || folder) as EntityFolderRef);
             } else if (type === 'restore') {
-                const result = await projectFilesAPI.restoreFolder(folder.id) as any;
-                refreshFoldersAfterAction((result?.folder || result || folder) as ProjectFolderRef);
+                const result = await filesAPI.restoreFolder(folder.id) as any;
+                refreshFoldersAfterAction((result?.folder || result || folder) as EntityFolderRef);
             }
             closeFolderAction();
         } catch (err: unknown) {
@@ -453,7 +454,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         setFolderCreateLoading(true);
         setFolderCreateError('');
         try {
-            const created = await projectFilesAPI.createFolder(projectId, trimmed, memberId as any);
+            const created = await filesAPI.createFolder(entityId, trimmed, memberId as any);
             setFolders((prev) => [...prev, created]);
             setFolderCreateOpen(false);
             setFolderName('');
@@ -482,7 +483,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         setShowDeleted(true);
         setDeletedLoading(true);
         try {
-            const files = await projectFilesAPI.getDeleted(projectId);
+            const files = await filesAPI.getDeleted(entityId);
             setDeletedFiles(files);
         } catch (err) {
             console.error('Fetch deleted files failed:', err);
@@ -499,7 +500,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         setRenameError('');
     };
 
-    const openFolderRename = (folder: ProjectFolderRef) => {
+    const openFolderRename = (folder: EntityFolderRef) => {
         setRenameTarget({ kind: 'folder', item: folder });
         setRenameValue(folder.folderName);
         setRenameError('');
@@ -523,10 +524,10 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         setRenameError('');
         try {
             if (isFolder) {
-                const updated = await projectFilesAPI.renameFolder(renameTarget.item.id, trimmed);
+                const updated = await filesAPI.renameFolder(renameTarget.item.id, trimmed);
                 refreshFoldersAfterAction(updated);
             } else {
-                const updated = await projectFilesAPI.rename(renameTarget.item.id, trimmed);
+                const updated = await filesAPI.rename(renameTarget.item.id, trimmed);
                 // Update local list
                 setUploadingFiles((prev) =>
                     prev.map((f) => (f.id === renameTarget.item.id ? { ...f, name: updated.fileName } : f))
@@ -569,10 +570,10 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         setDuplicateConfirm(null);
     };
 
-    const handleRestore = async (file: ProjectFileRef) => {
+    const handleRestore = async (file: EntityFileRef) => {
         setRestoringId(file.id);
         try {
-            const restored = await projectFilesAPI.restore(file.id);
+            const restored = await filesAPI.restore(file.id);
             // Remove from deleted list
             setDeletedFiles((prev) => prev.filter((f) => f.id !== file.id));
             // Add to active files
@@ -587,7 +588,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
 
     const handleDownloadFile = useCallback(async (file: UploadFileEntry) => {
         try {
-            await projectFilesAPI.download(file.id, file.name);
+            await filesAPI.download(file.id, file.name);
         } catch (err) {
             console.error('Download failed:', err);
             alert(getErrorMessage(err, 'Failed to download file'));
@@ -596,7 +597,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
 
     const handleDownloadVersion = useCallback(async (fileId: Id | string, fileName: string, commitSha: string) => {
         try {
-            await projectFilesAPI.downloadVersion(fileId, commitSha, fileName);
+            await filesAPI.downloadVersion(fileId, commitSha, fileName);
         } catch (err) {
             console.error('Version download failed:', err);
             alert(getErrorMessage(err, 'Failed to download file version'));
@@ -683,7 +684,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
         );
     };
 
-    const renderFolderCard = (folder: ProjectFolderRef) => {
+    const renderFolderCard = (folder: EntityFolderRef) => {
         const isExpanded = expandedFolders.has(folder.id);
         const folderFiles = (filesByFolder.get(folder.id) || []) as UploadFileEntry[];
         return (
@@ -702,7 +703,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                     e.preventDefault();
                     e.stopPropagation();
                     const dragged = uploadingFiles.find((f) => f.id === draggingFileId);
-                    if (dragged) moveFileToFolder(dragged, folder.id);
+                    if (dragged) moveFileToFolder(dragged, folder.id as Id);
                 }}
             >
                 <div
@@ -884,7 +885,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
                                                     <div className="file-info">
                                                         <div className="file-name-row">
                                                             <span className="file-name file-name--deleted">{f.fileName}</span>
-                                                            <span className="file-size">{formatSize(f.fileSize)}</span>
+                                                            <span className="file-size">{formatSize(f.fileSize ?? 0)}</span>
                                                         </div>
                                                         <span className="deleted-file-date">Deleted {formatHistoryDate(f.updatedAt || new Date().toISOString())}</span>
                                                     </div>
@@ -979,6 +980,7 @@ export default function FileUploadZone({ projectId, memberId, onFileUploaded, on
             {commentTarget && (
                 <FileCommentsModal
                     file={commentTarget as any}
+                    filesAPI={filesAPI}
                     onClose={closeComments}
                 />
             )}

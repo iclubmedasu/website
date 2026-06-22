@@ -7,18 +7,28 @@ import type {
     CreateEventPayload,
     CreateEventRegistrationPayload,
     CreateEventTierPayload,
+    CreateEventTaskPayload,
+    CheckInRegistrationPayload,
     CreateProjectPayload,
     CreateScheduleSlotPayload,
     CreateTaskPayload,
     Id,
     EventCustomFieldRef,
     EventDetail,
+    EventFileCommentRef,
+    EventFileHistoryEntry,
+    EventFileRef,
+    EventFolderRef,
     EventQueryParams,
     EventRegistrationQueryParams,
+    EventRegistrationLookupResult,
     EventRegistrationRef,
     EventStatistics,
     EventSummary,
+    EventActivityEntry,
     EventTierRef,
+    EventTaskRef,
+    MemberSummary,
     NotificationMarkAllReadResponse,
     NotificationMarkReadResponse,
     NotificationsListResponse,
@@ -48,6 +58,7 @@ import type {
     UpdateEventPayload,
     UpdateEventRegistrationPayload,
     UpdateEventTierPayload,
+    UpdateEventTaskPayload,
     UpdateProjectPayload,
     UpdateScheduleSlotPayload,
     UpdateTaskPayload,
@@ -1446,6 +1457,210 @@ export const projectFilesAPI = {
 };
 
 // ============================================
+// EVENT FILES API
+// ============================================
+
+export const eventFilesAPI = {
+    getAll: async (eventId: Id | string): Promise<EventFileRef[]> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files?eventId=${eventId}`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<EventFileRef[]>(response);
+    },
+
+    getFolders: async (eventId: Id | string, includeDeleted = false): Promise<EventFolderRef[]> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/folders?eventId=${eventId}&includeDeleted=${includeDeleted}`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<EventFolderRef[]>(response);
+    },
+
+    createFolder: async (eventId: Id | string, folderName: string, createdByMemberId: Id | string): Promise<EventFolderRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/folders`, {
+            method: 'POST',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eventId, folderName, createdByMemberId }),
+        });
+        return handleResponse<EventFolderRef>(response);
+    },
+
+    removeFolder: async (folderId: Id | string): Promise<{ success?: boolean; message?: string }> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/folders/${folderId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<{ success?: boolean; message?: string }>(response);
+    },
+
+    restoreFolder: async (folderId: Id | string): Promise<{ success?: boolean; message?: string }> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/folders/${folderId}/restore`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<{ success?: boolean; message?: string }>(response);
+    },
+
+    getFolderHistory: async (folderId: Id | string): Promise<EventFileHistoryEntry[]> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/folders/${folderId}/history`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<EventFileHistoryEntry[]>(response);
+    },
+
+    renameFolder: async (folderId: Id | string, folderName: string): Promise<EventFolderRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/folders/${folderId}/rename`, {
+            method: 'PATCH',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folderName }),
+        });
+        return handleResponse<EventFolderRef>(response);
+    },
+
+    getDownloadUrl: (fileId: Id | string): string => {
+        return `${API_BASE_URL}/event-files/${fileId}/download`;
+    },
+
+    download: async (fileId: Id | string, fileName: string): Promise<void> => {
+        await downloadProtectedFile(`${API_BASE_URL}/event-files/${fileId}/download`, fileName);
+    },
+
+    upload: (
+        eventId: Id | string,
+        uploadedByMemberId: Id | string,
+        file: File,
+        onProgress?: (progress: number) => void,
+        folderId: Id | string | null = null,
+    ): Promise<EventFileRef> => {
+        return new Promise<EventFileRef>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('eventId', String(eventId));
+            formData.append('uploadedByMemberId', String(uploadedByMemberId));
+            if (folderId != null) formData.append('folderId', String(folderId));
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable && onProgress) {
+                    onProgress(Math.round((e.loaded / e.total) * 100));
+                }
+            };
+
+            xhr.onload = () => {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve(data as EventFileRef);
+                    } else {
+                        reject(new Error(data.error || `Upload failed (${xhr.status})`));
+                    }
+                } catch {
+                    reject(new Error('Failed to parse upload response'));
+                }
+            };
+
+            xhr.onerror = () => reject(new Error('Network error during upload'));
+
+            xhr.open('POST', `${API_BASE_URL}/event-files/upload`);
+            const token = getAuthToken();
+            if (token) {
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            }
+            xhr.withCredentials = true;
+            xhr.send(formData);
+        });
+    },
+
+    remove: async (fileId: Id | string): Promise<{ success?: boolean; message?: string }> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/${fileId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<{ success?: boolean; message?: string }>(response);
+    },
+
+    getHistory: async (fileId: Id | string): Promise<EventFileHistoryEntry[]> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/${fileId}/history`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<EventFileHistoryEntry[]>(response);
+    },
+
+    getComments: async (fileId: Id | string): Promise<EventFileCommentRef[]> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/${fileId}/comments`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<EventFileCommentRef[]>(response);
+    },
+
+    addComment: async (fileId: Id | string, comment: string): Promise<EventFileCommentRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/${fileId}/comments`, {
+            method: 'POST',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ comment }),
+        });
+        return handleResponse<EventFileCommentRef>(response);
+    },
+
+    editComment: async (fileId: Id | string, commentId: Id | string, comment: string): Promise<EventFileCommentRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/${fileId}/comments/${commentId}`, {
+            method: 'PUT',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ comment }),
+        });
+        return handleResponse<EventFileCommentRef>(response);
+    },
+
+    deleteComment: async (fileId: Id | string, commentId: Id | string): Promise<{ success?: boolean; message?: string }> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/${fileId}/comments/${commentId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<{ success?: boolean; message?: string }>(response);
+    },
+
+    getVersionDownloadUrl: (fileId: Id | string, commitSha: string): string => {
+        return `${API_BASE_URL}/event-files/${fileId}/version/${commitSha}`;
+    },
+
+    downloadVersion: async (fileId: Id | string, commitSha: string, fileName: string): Promise<void> => {
+        await downloadProtectedFile(`${API_BASE_URL}/event-files/${fileId}/version/${commitSha}`, fileName);
+    },
+
+    rename: async (fileId: Id | string, fileName: string): Promise<EventFileRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/${fileId}/rename`, {
+            method: 'PATCH',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileName }),
+        });
+        return handleResponse<EventFileRef>(response);
+    },
+
+    move: async (fileId: Id | string, folderId: Id | string | null = null): Promise<EventFileRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/${fileId}/move`, {
+            method: 'PATCH',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folderId }),
+        });
+        return handleResponse<EventFileRef>(response);
+    },
+
+    getDeleted: async (eventId: Id | string): Promise<EventFileRef[]> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/deleted?eventId=${eventId}`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<EventFileRef[]>(response);
+    },
+
+    restore: async (fileId: Id | string): Promise<EventFileRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-files/${fileId}/restore`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<EventFileRef>(response);
+    },
+};
+
+// ============================================
 // EVENTS API
 // ============================================
 
@@ -1472,6 +1687,14 @@ export const eventsAPI = {
         });
 
         return handleResponse<EventDetail>(response);
+    },
+
+    getActivity: async (id: Id | string): Promise<EventActivityEntry[]> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${id}/activity`, {
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventActivityEntry[]>(response);
     },
 
     create: async (data: CreateEventPayload): Promise<EventDetail> => {
@@ -1667,6 +1890,15 @@ export const eventsAPI = {
         return handleResponse<EventRegistrationRef>(response);
     },
 
+    lookupRegistrationByCode: async (eventId: Id | string, confirmationCode: string): Promise<EventRegistrationLookupResult> => {
+        const params = new URLSearchParams({ confirmationCode: confirmationCode.trim().toUpperCase() });
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/lookup?${params.toString()}`, {
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventRegistrationLookupResult>(response);
+    },
+
     createRegistration: async (eventId: Id | string, data: CreateEventRegistrationPayload): Promise<EventRegistrationRef> => {
         const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations`, {
             method: 'POST',
@@ -1687,12 +1919,16 @@ export const eventsAPI = {
         return handleResponse<EventRegistrationRef>(response);
     },
 
-    checkInRegistration: async (eventId: Id | string, registrationId: Id | string, confirmationCode?: string): Promise<EventRegistrationRef> => {
+    checkInRegistration: async (
+        eventId: Id | string,
+        registrationId: Id | string,
+        payload: CheckInRegistrationPayload = {},
+    ): Promise<EventRegistrationRef> => {
         const safeRegistrationId = String(registrationId || 'code');
         const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${safeRegistrationId}/check-in`, {
             method: 'PATCH',
             headers: getAuthHeaders(),
-            body: JSON.stringify({ confirmationCode }),
+            body: JSON.stringify(payload),
         });
 
         return handleResponse<EventRegistrationRef>(response);
@@ -1723,5 +1959,70 @@ export const eventsAPI = {
         });
 
         return handleResponse<EventStatistics>(response);
+    },
+
+    getAssignableMembers: async (eventId: Id | string): Promise<MemberSummary[]> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/assignable-members`, {
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<MemberSummary[]>(response);
+    },
+
+    getTasks: async (eventId: Id | string): Promise<EventTaskRef[]> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/tasks`, {
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventTaskRef[]>(response);
+    },
+
+    createTask: async (eventId: Id | string, data: CreateEventTaskPayload): Promise<EventTaskRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/tasks`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        return handleResponse<EventTaskRef>(response);
+    },
+
+    updateTask: async (eventId: Id | string, taskId: Id | string, data: UpdateEventTaskPayload): Promise<EventTaskRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/tasks/${taskId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        return handleResponse<EventTaskRef>(response);
+    },
+
+    removeTask: async (eventId: Id | string, taskId: Id | string): Promise<void> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/tasks/${taskId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+
+        if (!response.ok) {
+            await handleResponse(response);
+        }
+    },
+
+    removeTaskAssignment: async (
+        eventId: Id | string,
+        taskId: Id | string,
+        assignmentId: Id | string,
+    ): Promise<void> => {
+        const response = await apiFetch(
+            `${API_BASE_URL}/events/${eventId}/tasks/${taskId}/assignments/${assignmentId}`,
+            {
+                method: 'DELETE',
+                headers: getAuthHeaders(),
+            },
+        );
+
+        if (!response.ok) {
+            await handleResponse(response);
+        }
     },
 };

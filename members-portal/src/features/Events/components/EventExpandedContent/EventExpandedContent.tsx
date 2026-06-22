@@ -2,7 +2,7 @@
 
 import type { ComponentType } from 'react';
 import { useEffect, useState } from 'react';
-import { CheckCircle2, ClipboardList, Layers3, RefreshCw, Users } from 'lucide-react';
+import { Layers3, ListChecks, RefreshCw, Users } from 'lucide-react';
 import type {
     EventCustomFieldRef,
     EventStatistics,
@@ -10,28 +10,37 @@ import type {
     Id,
 } from '@/types/backend-contracts';
 import { eventsAPI } from '@/services/api';
-import EventCheckInSection from './sections/EventCheckInSection';
-import EventFormBuilderSection from './sections/EventFormBuilderSection';
 import EventRegistrationsSection from './sections/EventRegistrationsSection';
 import EventStatisticsSection from './sections/EventStatisticsSection';
+import EventTasksSection from './sections/EventTasksSection';
 import EventTiersSection from './sections/EventTiersSection';
-import type { EventTabKey } from './eventUtils';
+import type { EventTabKey } from '../eventUtils';
+import './EventExpandedContent.css';
 
 const TABS: Array<{ key: EventTabKey; label: string; icon: ComponentType<{ size?: number }> }> = [
     { key: 'statistics', label: 'Statistics', icon: RefreshCw },
     { key: 'tiers', label: 'Tiers', icon: Layers3 },
-    { key: 'builder', label: 'Form Builder', icon: ClipboardList },
     { key: 'registrations', label: 'Registrations', icon: Users },
-    { key: 'checkin', label: 'Check-in', icon: CheckCircle2 },
+    { key: 'tasks', label: 'Tasks', icon: ListChecks },
 ];
 
 interface EventExpandedContentProps {
     eventId: Id | string;
     initialTab?: EventTabKey | null;
+    allowWalkIns?: boolean;
+    eventDate?: string | null;
+    eventEndDate?: string | null;
     onReload: () => void;
 }
 
-export default function EventExpandedContent({ eventId, initialTab, onReload }: EventExpandedContentProps) {
+export default function EventExpandedContent({
+    eventId,
+    initialTab,
+    allowWalkIns = false,
+    eventDate,
+    eventEndDate,
+    onReload,
+}: EventExpandedContentProps) {
     const [stats, setStats] = useState<EventStatistics | null>(null);
     const [tiers, setTiers] = useState<EventTierRef[]>([]);
     const [fields, setFields] = useState<EventCustomFieldRef[]>([]);
@@ -102,14 +111,26 @@ export default function EventExpandedContent({ eventId, initialTab, onReload }: 
             {activeTab === 'tiers' && (
                 <EventTiersSection eventId={eventId} tiers={tiers} onTiersChange={setTiers} />
             )}
-            {activeTab === 'builder' && (
-                <EventFormBuilderSection eventId={eventId} fields={fields} onFieldsChange={setFields} />
-            )}
             {activeTab === 'registrations' && (
-                <EventRegistrationsSection eventId={eventId} tiers={tiers} />
+                <EventRegistrationsSection
+                    eventId={eventId}
+                    tiers={tiers}
+                    fields={fields}
+                    onFieldsChange={setFields}
+                    totalRegistered={(stats?.totalRegistered ?? 0) + (stats?.walkInCount ?? 0)}
+                    allowWalkIns={allowWalkIns}
+                    eventDate={eventDate}
+                    eventEndDate={eventEndDate}
+                    onRegistrationAdded={() => void reloadAll()}
+                    onCheckIn={() => void reloadAll()}
+                />
             )}
-            {activeTab === 'checkin' && (
-                <EventCheckInSection eventId={eventId} tiers={tiers} onCheckIn={() => void reloadAll()} />
+            {activeTab === 'tasks' && (
+                <EventTasksSection
+                    eventId={eventId}
+                    eventDate={eventDate}
+                    eventEndDate={eventEndDate}
+                />
             )}
         </div>
     );

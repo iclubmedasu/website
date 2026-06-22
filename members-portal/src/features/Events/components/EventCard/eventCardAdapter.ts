@@ -1,26 +1,5 @@
 import type { EventDetail, EventSummary } from '@/types/backend-contracts';
-
-export interface EventCardViewModel {
-    id?: EventSummary['id'];
-    title: string;
-    description?: string | null;
-    status: string;
-    priority?: string | null;
-    dueDate?: string | null;
-    createdAt?: string | null;
-    isActive?: boolean;
-    isFinalized?: boolean;
-    isArchived?: boolean;
-    projectType?: EventSummary['projectType'];
-    projectTeams?: Array<{
-        id?: number;
-        teamId?: EventSummary['id'];
-        canEdit?: boolean;
-        isOwner?: boolean;
-        team?: { name?: string | null };
-    }>;
-    createdBy?: EventSummary['createdBy'];
-}
+import type { CardViewModel } from '@/components/cards/LifecycleCardView/types';
 
 export function normalizeEventDescription(description?: string | null): string | null {
     if (description == null) return null;
@@ -29,14 +8,14 @@ export function normalizeEventDescription(description?: string | null): string |
     return text;
 }
 
-export function eventToCardViewModel(event: EventSummary | EventDetail): EventCardViewModel {
+export function eventToCardViewModel(event: EventSummary | EventDetail): CardViewModel {
     return {
         id: event.id,
         title: event.title,
         description: normalizeEventDescription(event.description),
         status: event.status ?? 'NOT_STARTED',
         priority: event.priority,
-        dueDate: event.eventDate,
+        dueDate: event.eventEndDate ?? event.eventDate,
         createdAt: (event as EventDetail & { createdAt?: string }).createdAt ?? null,
         isActive: event.isActive,
         isFinalized: event.isFinalized,

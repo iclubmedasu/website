@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import './EventFiltersModal.css';
 import type { EventQueryParams, ProjectStatus, TeamRef } from '@/types/backend-contracts';
 
 const WORK_STATUSES: ProjectStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD', 'CANCELLED'];

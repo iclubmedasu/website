@@ -1,11 +1,10 @@
-export type EventTabKey = 'tiers' | 'builder' | 'registrations' | 'checkin' | 'statistics';
+export type EventTabKey = 'tiers' | 'registrations' | 'statistics' | 'tasks';
 
 export const EVENT_TABS = [
     { key: 'statistics' as const, label: 'Statistics' },
     { key: 'tiers' as const, label: 'Tiers' },
-    { key: 'builder' as const, label: 'Form Builder' },
     { key: 'registrations' as const, label: 'Registrations' },
-    { key: 'checkin' as const, label: 'Check-in' },
+    { key: 'tasks' as const, label: 'Tasks' },
 ];
 
 export const EVENT_STATUS_CLASS: Record<string, string> = {
@@ -18,6 +17,8 @@ export const EVENT_STATUS_CLASS: Record<string, string> = {
 export function parseEventTab(value: string | null): EventTabKey | null {
     if (!value) return null;
     if (value === 'overview') return 'statistics';
-    const valid: EventTabKey[] = ['tiers', 'builder', 'registrations', 'checkin', 'statistics'];
+    if (value === 'builder') return 'registrations';
+    if (value === 'checkin') return 'registrations';
+    const valid: EventTabKey[] = ['tiers', 'registrations', 'statistics', 'tasks'];
     return valid.includes(value as EventTabKey) ? (value as EventTabKey) : null;
 }

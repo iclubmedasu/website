@@ -8,30 +8,15 @@ import {
     Calendar,
     CheckSquare,
     AlertCircle,
-    Pencil,
-    PauseCircle,
-    SquareCheckBig,
-    Paperclip,
-    Archive,
-    PlayCircle,
-    History,
     Search,
     Filter,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { projectsAPI, tasksAPI, teamsAPI, membersAPI, phasesAPI, projectTypesAPI, projectFilesAPI, getProfilePhotoUrl } from '../../services/api';
-import FileUploadZone from '../../components/FileUpload/FileUploadZone';
+import { projectsAPI, tasksAPI, teamsAPI, membersAPI, projectTypesAPI, getProfilePhotoUrl } from '../../services/api';
 import { buildSearchText, matchesSearchQuery } from '../../utils/search';
 import './ProjectsPage.css';
-import {
-    fmtDate,
-    PriorityBadge,
-    ProjectCardView,
-    StatusBadge,
-    getLifecycleBadge,
-    isProjectAborted,
-    isProjectInactive,
-} from './components/ProjectCardView/ProjectCardView';
+import { PriorityBadge, fmtDate, StatusBadge } from '@/components/cards/LifecycleCardView/LifecycleCardView';
+import ProjectCard from './components/ProjectCard/ProjectCard';
 
 import CreateProjectModal from './modals/CreateProjectModal';
 import HoldProjectModal from './modals/HoldProjectModal';
@@ -39,19 +24,10 @@ import AbortProjectModal from './modals/AbortProjectModal';
 import FinalizeProjectModal from './modals/FinalizeProjectModal';
 import ArchiveProjectModal from './modals/ArchiveProjectModal';
 import ReactivateProjectModal from './modals/ReactivateProjectModal';
-import AddPhaseModal from './modals/AddPhaseModal';
-import AddTaskModal from './modals/AddTaskModal';
-import EditTaskModal from './modals/EditTaskModal';
-import TaskCommentsModal from './modals/TaskCommentsModal';
-import TaskScheduleSlotsModal from './modals/TaskScheduleSlotsModal';
-import TaskActivityModal from './modals/TaskActivityModal';
-import EditPhaseModal from './modals/EditPhaseModal';
-import DeletePhaseTaskModal from './modals/DeletePhaseTaskModal';
 import ProjectActivityModal from './modals/ProjectActivityModal';
 import ProjectFiltersModal, { type ProjectFiltersState } from './modals/ProjectFiltersModal';
 import { isDateWithinRange } from '../../utils/filterDateRange';
-import GanttChart from './components/GanttChart/GanttChart';
-import type { Id, ProjectFileRef, ProjectFolderRef } from '../../types/backend-contracts';
+import type { Id } from '../../types/backend-contracts';
 
 // ─────────────────────────────────────────────────────────
 //  Small helpers
@@ -242,444 +218,7 @@ void TaskItem;
 
 
 // ─────────────────────────────────────────────────────────
-//  Project Card with Expandable Detail
-// ─────────────────────────────────────────────────────────
-function ProjectCard({ project, expanded, fullDetail, detailLoading, onToggle, onEdit, onDeactivate, onFinalize, onArchive, onReactivate, onAbort, onRefreshDetail, onViewActivity, allMembers, canEdit, canManage, canUpload, canEditStructure, canEditStatus }: any) {
-    const { user } = useAuth();
-
-    // Local copy of detail for optimistic inline updates (avoids full refresh & scroll reset)
-    const [localDetail, setLocalDetail] = useState(fullDetail);
-    useEffect(() => { setLocalDetail(fullDetail); }, [fullDetail]);
-
-    // Optimistic in-place update for inline field changes (status/priority/difficulty)
-    const handleTaskFieldUpdate = useCallback((phaseId: any, taskId: any, field: any, value: any) => {
-        if (field === '__delete') {
-            // Structural change — need real refresh
-            onRefreshDetail(localDetail?.id);
-            return;
-        }
-        setLocalDetail((prev: any) => {
-            if (!prev?.phases) return prev;
-            return {
-                ...prev,
-                phases: prev.phases.map((phase: any) => {
-                    if (phase.id !== phaseId) return phase;
-                    return {
-                        ...phase,
-                        tasks: (phase.tasks || []).map((task: any) => {
-                            if (task.id === taskId) return { ...task, [field]: value };
-                            // Check subtasks
-                            if (task.subtasks?.length) {
-                                return {
-                                    ...task,
-                                    subtasks: task.subtasks.map((s: any) =>
-                                        s.id === taskId ? { ...s, [field]: value } : s
-                                    ),
-                                };
-                            }
-                            return task;
-                        }),
-                    };
-                }),
-            };
-        });
-    }, [localDetail?.id, onRefreshDetail]);
-    void handleTaskFieldUpdate;
-
-    // Project files state
-    const [projectFiles, setProjectFiles] = useState<ProjectFileRef[]>([]);
-    const [projectFolders, setProjectFolders] = useState<ProjectFolderRef[]>([]);
-    useEffect(() => {
-        if (expanded && localDetail?.id) {
-            projectFilesAPI.getAll(localDetail.id).then(setProjectFiles).catch(() => setProjectFiles([]));
-            projectFilesAPI.getFolders(localDetail.id, true).then(setProjectFolders).catch(() => setProjectFolders([]));
-        }
-    }, [expanded, localDetail?.id]);
-
-    // Phase/task management state (inline in card)
-    const [showAddPhase, setShowAddPhase] = useState(false);
-    const [addTaskTarget, setAddTaskTarget] = useState<{ phaseId: Id; parentTask?: any } | null>(null); // { phaseId, parentTask? }
-    const [editTaskTarget, setEditTaskTarget] = useState<any>(null); // task object to edit
-    const [taskCommentsTarget, setTaskCommentsTarget] = useState<any>(null);
-    const [taskScheduleTarget, setTaskScheduleTarget] = useState<any>(null);
-    const [taskActivityTarget, setTaskActivityTarget] = useState<any>(null);
-    const [editPhaseTarget, setEditPhaseTarget] = useState<any>(null); // phase object to edit
-    const [confirmDeletePhase, setConfirmDeletePhase] = useState<any>(null); // phase object to delete
-
-    // Use localDetail for rendering instead of fullDetail
-    const detail = localDetail;
-    const aborted = isProjectAborted(project);
-    const inactive = isProjectInactive(project);
-    const lifecycleBadge = getLifecycleBadge(project);
-    const LifecycleIcon = lifecycleBadge.icon;
-
-    return (
-        <ProjectCardView
-            project={project}
-            expanded={expanded}
-            detail={detail}
-            detailLoading={detailLoading}
-            onToggle={onToggle}
-            collapsedMeta={(
-                <>
-                    <span className={`badge ${lifecycleBadge.className}`} title={lifecycleBadge.title}>
-                        <LifecycleIcon size={12} />
-                        {lifecycleBadge.label}
-                    </span>
-                </>
-            )}
-            collapsedActions={(
-                <>
-                    {project.isFinalized && canManage && (
-                        <button
-                            className="icon-btn archive-btn"
-                            title="Archive project"
-                            onClick={(e) => { e.stopPropagation(); onArchive(project); }}
-                        >
-                            <Archive size={14} />
-                        </button>
-                    )}
-                    {canEdit && !project.isFinalized && project.isActive && project.status !== 'CANCELLED' && (
-                        <>
-                            <button
-                                className="icon-btn edit-btn"
-                                title="Edit project"
-                                onClick={(e) => { e.stopPropagation(); onEdit(project); }}
-                            >
-                                <Pencil size={14} />
-                            </button>
-                            <button
-                                className="icon-btn hold-btn"
-                                title="Hold project"
-                                onClick={(e) => { e.stopPropagation(); onDeactivate(project); }}
-                            >
-                                <PauseCircle size={14} />
-                            </button>
-                            <button
-                                className="icon-btn deactivate-btn"
-                                title="Abort project"
-                                onClick={(e) => { e.stopPropagation(); onAbort(project); }}
-                            >
-                                <AlertCircle size={14} />
-                            </button>
-                            <button
-                                className="icon-btn finalize-btn"
-                                title="Finalize project"
-                                onClick={(e) => { e.stopPropagation(); onFinalize(project); }}
-                            >
-                                <CheckSquare size={14} />
-                            </button>
-                        </>
-                    )}
-                    {canManage && inactive && (
-                        <>
-                            <button
-                                className="icon-btn reactivate-btn"
-                                title="Reactivate project"
-                                onClick={(e) => { e.stopPropagation(); onReactivate(project); }}
-                            >
-                                <PlayCircle size={14} />
-                            </button>
-                            <button
-                                className="icon-btn deactivate-btn"
-                                title="Abort project"
-                                onClick={(e) => { e.stopPropagation(); onAbort(project); }}
-                            >
-                                <AlertCircle size={14} />
-                            </button>
-                            <button
-                                className="icon-btn finalize-btn"
-                                title="Finalize project"
-                                onClick={(e) => { e.stopPropagation(); onFinalize(project); }}
-                            >
-                                <CheckSquare size={14} />
-                            </button>
-                        </>
-                    )}
-                    {canManage && aborted && !project.isArchived && (
-                        <button
-                            className="icon-btn archive-btn"
-                            title="Archive project"
-                            onClick={(e) => { e.stopPropagation(); onArchive(project); }}
-                        >
-                            <Archive size={14} />
-                        </button>
-                    )}
-                    <button
-                        className="icon-btn activity-btn"
-                        title="View activity"
-                        onClick={(e) => { e.stopPropagation(); onViewActivity(project); }}
-                    >
-                        <History size={14} />
-                    </button>
-                </>
-            )}
-            collapsedFooterTrailing={(
-                <div className="project-card-footer-trailing">
-                    <div className="project-card-due project-card-date-range">
-                        <Calendar size={11} />
-                        {fmtDate(project.startDate)} → {fmtDate(project.dueDate)}
-                    </div>
-                    <div className="project-card-task-count">
-                        <SquareCheckBig size={11} />
-                        {project._count?.tasks ?? 0} task{project._count?.tasks !== 1 ? 's' : ''}
-                        {' · '}
-                        {project._count?.phases ?? 0} phase{project._count?.phases !== 1 ? 's' : ''}
-                    </div>
-                </div>
-            )}
-            expandedMeta={(
-                <span className={`badge badge--compact ${lifecycleBadge.className}`}>
-                    <LifecycleIcon size={14} />
-                    {lifecycleBadge.label}
-                </span>
-            )}
-            expandedActions={detail ? (
-                <div className="expanded-title-actions">
-                    {detail.isFinalized ? (
-                        canManage && (
-                            <button
-                                className="icon-btn archive-btn icon-btn--text"
-                                title="Archive"
-                                aria-label="Archive"
-                                onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
-                            >
-                                <Archive size={13} />
-                                <span className="expanded-action-label">Archive</span>
-                            </button>
-                        )
-                    ) : detail.status === 'CANCELLED' ? (
-                        canManage && !detail.isArchived && (
-                            <button
-                                className="icon-btn archive-btn icon-btn--text"
-                                title="Archive"
-                                aria-label="Archive"
-                                onClick={(e) => { e.stopPropagation(); onArchive(detail); }}
-                            >
-                                <Archive size={13} />
-                                <span className="expanded-action-label">Archive</span>
-                            </button>
-                        )
-                    ) : detail.isActive === false ? (
-                        canManage && !detail.isArchived && (
-                            <>
-                                <button
-                                    className="icon-btn reactivate-btn icon-btn--text"
-                                    title="Reactivate"
-                                    aria-label="Reactivate"
-                                    onClick={(e) => { e.stopPropagation(); onReactivate(detail); }}
-                                >
-                                    <PlayCircle size={13} />
-                                    <span className="expanded-action-label">Reactivate</span>
-                                </button>
-                                <button
-                                    className="icon-btn deactivate-btn icon-btn--text"
-                                    title="Abort"
-                                    aria-label="Abort"
-                                    onClick={(e) => { e.stopPropagation(); onAbort(detail); }}
-                                >
-                                    <AlertCircle size={13} />
-                                    <span className="expanded-action-label">Abort</span>
-                                </button>
-                                <button
-                                    className="icon-btn finalize-btn icon-btn--text"
-                                    title="Finalize"
-                                    aria-label="Finalize"
-                                    onClick={(e) => { e.stopPropagation(); onFinalize(detail); }}
-                                >
-                                    <CheckSquare size={13} />
-                                    <span className="expanded-action-label">Finalize</span>
-                                </button>
-                            </>
-                        )
-                    ) : canEdit ? (
-                        <>
-                            <button
-                                className="icon-btn edit-btn icon-btn--text"
-                                title="Edit project"
-                                aria-label="Edit project"
-                                onClick={(e) => { e.stopPropagation(); onEdit(detail); }}
-                            >
-                                <Pencil size={13} />
-                                <span className="expanded-action-label">Edit</span>
-                            </button>
-                            <button
-                                className="icon-btn hold-btn icon-btn--text"
-                                title="Hold"
-                                aria-label="Hold"
-                                onClick={(e) => { e.stopPropagation(); onDeactivate(detail); }}
-                            >
-                                <PauseCircle size={13} />
-                                <span className="expanded-action-label">Hold</span>
-                            </button>
-                            <button
-                                className="icon-btn deactivate-btn icon-btn--text"
-                                title="Abort"
-                                aria-label="Abort"
-                                onClick={(e) => { e.stopPropagation(); onAbort(detail); }}
-                            >
-                                <AlertCircle size={13} />
-                                <span className="expanded-action-label">Abort</span>
-                            </button>
-                            <button
-                                className="icon-btn finalize-btn icon-btn--text"
-                                title="Finalize"
-                                aria-label="Finalize"
-                                onClick={(e) => { e.stopPropagation(); onFinalize(detail); }}
-                            >
-                                <CheckSquare size={13} />
-                                <span className="expanded-action-label">Finalize</span>
-                            </button>
-                        </>
-                    ) : null}
-                    {onViewActivity && (
-                        <button
-                            className="icon-btn activity-btn icon-btn--text"
-                            title="View activity"
-                            aria-label="View activity"
-                            onClick={(e) => { e.stopPropagation(); onViewActivity(detail); }}
-                        >
-                            <History size={13} />
-                            <span className="expanded-action-label">View activity</span>
-                        </button>
-                    )}
-                </div>
-            ) : null}
-            teamEmptyMessage="No teams assigned"
-            formatAssignedTeamSuffix={(pt) => `${pt.isOwner ? ' ★' : ''}${!pt.canEdit ? ' (view)' : ''}`}
-            afterSections={detail ? (
-                <>
-                    <div className="exp-card-section exp-card-section--flush">
-                        <GanttChart
-                            phases={detail.phases || []}
-                            projectId={detail.id}
-                            projectTitle={detail.title}
-                            projectDetail={detail}
-                            projectStartDate={detail.startDate}
-                            projectDueDate={detail.dueDate}
-                            currentMemberId={user?.id}
-                            canEdit={canEditStructure}
-                            canEditStatus={canEditStatus}
-                            onAddPhase={() => setShowAddPhase(true)}
-                            onAddTask={(phase: any) => setAddTaskTarget({ phaseId: phase.id })}
-                            onAddSubtask={(phase: any, parentTask: any) => setAddTaskTarget({ phaseId: phase.id, parentTask })}
-                            onEditPhase={(phase: any) => setEditPhaseTarget(phase)}
-                            onEditTask={(task: any) => setEditTaskTarget(task)}
-                            onOpenTaskComments={(task: any) => setTaskCommentsTarget(task)}
-                            onOpenTaskScheduleSlots={(task: any) => setTaskScheduleTarget(task)}
-                            onOpenTaskActivity={(task: any) => setTaskActivityTarget(task)}
-                            onDeletePhase={(phase: any) => setConfirmDeletePhase(phase)}
-                            onRefresh={() => onRefreshDetail(detail.id)}
-                        />
-                    </div>
-
-                    <div className="exp-card-section">
-                        <div className="exp-card-section-header">
-                            <Paperclip size={14} className="exp-card-section-icon" />
-                            Project Files
-                        </div>
-                        <FileUploadZone
-                            projectId={detail.id}
-                            memberId={user?.id}
-                            existingFiles={projectFiles}
-                            existingFolders={projectFolders}
-                            onFileUploaded={(newFile, replaced) => setProjectFiles((prev) =>
-                                replaced
-                                    ? prev.map((f) => f.id === newFile.id ? newFile : f)
-                                    : [newFile, ...prev]
-                            )}
-                            onFileRemoved={(fileId) => setProjectFiles((prev) => prev.filter((f) => f.id !== fileId))}
-                            onFileRenamed={(updated) => setProjectFiles((prev) =>
-                                prev.map((f) => f.id === updated.id ? { ...f, fileName: updated.fileName } : f)
-                            )}
-                            disabled={!canUpload}
-                        />
-                    </div>
-
-                    {editPhaseTarget && (
-                        <EditPhaseModal
-                            phase={editPhaseTarget}
-                            onClose={() => setEditPhaseTarget(null)}
-                            onPhaseUpdated={() => { setEditPhaseTarget(null); onRefreshDetail(detail.id); }}
-                        />
-                    )}
-
-                    {confirmDeletePhase && (
-                        <DeletePhaseTaskModal
-                            title="Delete Phase"
-                            itemName={confirmDeletePhase.title}
-                            message="All tasks, subtasks, and assignees in this phase will be permanently removed. This action cannot be undone."
-                            confirmLabel="Delete Phase"
-                            onConfirm={async () => {
-                                await phasesAPI.remove(confirmDeletePhase.id);
-                                onRefreshDetail(detail.id);
-                            }}
-                            onClose={() => setConfirmDeletePhase(null)}
-                        />
-                    )}
-
-                    {showAddPhase && (
-                        <AddPhaseModal
-                            projectId={detail.id}
-                            existingPhasesCount={detail.phases?.length ?? 0}
-                            onClose={() => setShowAddPhase(false)}
-                            onPhaseCreated={() => { setShowAddPhase(false); onRefreshDetail(detail.id); }}
-                        />
-                    )}
-
-                    {addTaskTarget && (
-                        <AddTaskModal
-                            projectId={detail.id}
-                            phaseId={addTaskTarget.phaseId}
-                            parentTask={addTaskTarget.parentTask || null}
-                            allMembers={allMembers}
-                            onClose={() => setAddTaskTarget(null)}
-                            onTaskCreated={() => { setAddTaskTarget(null); onRefreshDetail(detail.id); }}
-                        />
-                    )}
-
-                    {editTaskTarget && (
-                        <EditTaskModal
-                            task={editTaskTarget}
-                            projectDetail={detail}
-                            allMembers={allMembers}
-                            onClose={() => setEditTaskTarget(null)}
-                            onTaskUpdated={() => { setEditTaskTarget(null); onRefreshDetail(detail.id); }}
-                            onDependenciesChanged={() => onRefreshDetail(detail.id)}
-                        />
-                    )}
-
-                    {taskCommentsTarget && (
-                        <TaskCommentsModal
-                            task={taskCommentsTarget}
-                            onClose={() => setTaskCommentsTarget(null)}
-                        />
-                    )}
-
-                    {taskScheduleTarget && (
-                        <TaskScheduleSlotsModal
-                            task={taskScheduleTarget}
-                            allMembers={allMembers}
-                            currentMemberId={user?.id}
-                            onClose={() => setTaskScheduleTarget(null)}
-                        />
-                    )}
-
-                    {taskActivityTarget && (
-                        <TaskActivityModal
-                            task={taskActivityTarget}
-                            onClose={() => setTaskActivityTarget(null)}
-                        />
-                    )}
-                </>
-            ) : null}
-        />
-    );
-}
-
-// ─────────────────────────────────────────────────────────
 //  Pagination helper – produces [1, 2, '...', 5, 6, 7, '...', 10] style array
-// ─────────────────────────────────────────────────────────
 function getPageNumbers(current: number, total: number): Array<number | '...'> {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
     const pages: Array<number | '...'> = [];
@@ -734,7 +273,6 @@ export default function ProjectsPage() {
     const [archivingProject, setArchivingProject] = useState<any>(null);
     const [reactivatingProject, setReactivatingProject] = useState<any>(null);
     const [abortingProject, setAbortingProject] = useState<any>(null);
-    const [, setPublishingProject] = useState<any>(null);
     const [activityProject, setActivityProject] = useState<any>(null);
 
     // ── Load all supporting data ──
@@ -1013,14 +551,13 @@ export default function ProjectsPage() {
                                 onArchive={(proj: any) => setArchivingProject(proj)}
                                 onRefreshDetail={handleRefreshDetail}
                                 allMembers={getProjectMembers(p)}
-                                canEdit={canEditProject(p)}
-                                canManage={canManageProject()}
+                                canEdit={!!canEditProject(p)}
+                                canManage={!!canManageProject()}
                                 canUpload={canUploadToProject()}
                                 canEditStructure={isElevatedWorkItemRole && p.isActive && !p.isFinalized && p.status !== 'CANCELLED'}
                                 canEditStatus={p.isActive && !p.isFinalized && p.status !== 'CANCELLED'}
                                 onReactivate={(proj: any) => setReactivatingProject(proj)}
                                 onAbort={(proj: any) => setAbortingProject(proj)}
-                                onPublish={(proj: any) => setPublishingProject(proj)}
                                 onViewActivity={(proj: any) => setActivityProject(proj)}
                             />
                         ))}

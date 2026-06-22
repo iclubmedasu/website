@@ -42,6 +42,17 @@ interface TaskAndProjectActivityInput {
     phaseId?: number | null;
 }
 
+interface EventActivityInput {
+    eventId: number;
+    memberId?: number | null;
+    eventTaskId?: number | null;
+    actionType: string;
+    oldValue?: unknown;
+    newValue?: unknown;
+    description?: string | null;
+    entityType?: string;
+}
+
 function serializeActivityValue(value: unknown): string | null {
     if (value === undefined || value === null) return null;
     if (value instanceof Date) return value.toISOString();
@@ -188,6 +199,30 @@ async function logTaskAndProjectActivity({
     await Promise.all(writes);
 }
 
+async function logEventActivity({
+    eventId,
+    memberId = null,
+    eventTaskId = null,
+    actionType,
+    oldValue = null,
+    newValue = null,
+    description = null,
+    entityType = "EVENT",
+}: EventActivityInput): Promise<void> {
+    await prisma.eventActivityLog.create({
+        data: {
+            eventId,
+            eventTaskId,
+            memberId,
+            entityType,
+            actionType,
+            oldValue: serializeActivityValue(oldValue),
+            newValue: serializeActivityValue(newValue),
+            description,
+        },
+    });
+}
+
 export {
     serializeActivityValue,
     collectChangedFields,
@@ -196,4 +231,5 @@ export {
     logTaskActivity,
     logProjectActivity,
     logTaskAndProjectActivity,
+    logEventActivity,
 };

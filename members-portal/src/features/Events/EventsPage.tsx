@@ -372,6 +372,7 @@ export default function EventsPage() {
                                 initialTab={expandedEventId === event.id ? initialTab : null}
                                 canEdit={eventPermissions.canEditEvent(event)}
                                 canManage={eventPermissions.canManageEvent()}
+                                canUpload={eventPermissions.canUploadToEvent()}
                                 onToggle={handleToggleExpand}
                                 onEdit={(target) => setEditingEvent(target as EventDetail)}
                                 onDeactivate={setHoldingEvent}
@@ -450,6 +451,7 @@ export default function EventsPage() {
                     initialTab={initialTab}
                     canEdit={eventPermissions.canEditEvent(expandedEventSummary)}
                     canManage={eventPermissions.canManageEvent()}
+                    canUpload={eventPermissions.canUploadToEvent()}
                     onToggle={handleToggleExpand}
                     onEdit={(target) => setEditingEvent(target as EventDetail)}
                     onDeactivate={setHoldingEvent}

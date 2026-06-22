@@ -13,6 +13,20 @@ import {
     resolveTaskAssigneeMemberIds,
     resolveTaskCommenterMemberIds,
 } from '../services/notificationService';
+import {
+    buildAssignmentStatusChangedDescription,
+    buildAssignmentStatusChangedValue,
+    buildCommentedDescription,
+    buildDependencyAddedDescription,
+    buildDependencyAddedValue,
+    buildDependencyRemovedDescription,
+    buildDependencyRemovedValue,
+    buildTaskAssignedActivityValue,
+    buildTaskAssignedDescription,
+    buildTaskSelfAssignedDescription,
+    buildTaskUnassignedActivityValue,
+    buildTaskUnassignedDescription,
+} from '../services/taskActivityHelpers';
 
 const router: any = express.Router();
 
@@ -1234,8 +1248,12 @@ router.post('/:id/assign', async (req, res) => {
         });
 
         await logActivity(taskId, req.user.memberId, 'ASSIGNED', {
-            newValue: memberIdInt,
-            description: `Member ${memberIdInt} assigned to task`,
+            newValue: buildTaskAssignedActivityValue({
+                memberId: memberIdInt,
+                member: assignment.member,
+                taskTitle: task.title,
+            }),
+            description: buildTaskAssignedDescription(task.title, memberIdInt, assignment.member),
         });
 
         try {
@@ -1309,7 +1327,12 @@ router.post('/:id/self-assign', async (req, res) => {
         });
 
         await logActivity(taskId, req.user.memberId, 'SELF_ASSIGNED', {
-            description: `Member ${req.user.memberId} self-assigned to task`,
+            newValue: buildTaskAssignedActivityValue({
+                memberId: req.user.memberId,
+                member: assignment.member,
+                taskTitle: task.title,
+            }),
+            description: buildTaskSelfAssignedDescription(task.title, req.user.memberId, assignment.member),
         });
 
         const [projectTeamMemberIds, assigneeIds] = await Promise.all([
@@ -1369,6 +1392,11 @@ router.patch('/:id/assign/:memberId', async (req, res) => {
         if (status === 'ACCEPTED') data.acceptedDate = new Date();
         if (status === 'COMPLETED') data.completedDate = new Date();
 
+        const existingAssignment = await prisma.taskAssignment.findUnique({
+            where: { taskId_memberId: { taskId, memberId } },
+            select: { status: true },
+        });
+
         const assignment = await prisma.taskAssignment.update({
             where: { taskId_memberId: { taskId, memberId } },
             data,
@@ -1377,10 +1405,11 @@ router.patch('/:id/assign/:memberId', async (req, res) => {
             },
         });
 
+        const previousStatus = existingAssignment?.status || 'ASSIGNED';
         await logActivity(taskId, req.user.memberId, 'ASSIGNMENT_STATUS_CHANGED', {
-            oldValue: null,
-            newValue: status,
-            description: `Assignment for member ${memberId} changed to ${status}`,
+            oldValue: { status: previousStatus },
+            newValue: buildAssignmentStatusChangedValue(memberId, assignment.member, previousStatus, status),
+            description: buildAssignmentStatusChangedDescription(memberId, assignment.member, previousStatus, status),
         });
 
         res.json(assignment);
@@ -1401,12 +1430,25 @@ router.delete('/:id/assign/:memberId', async (req, res) => {
             return res.status(403).json({ error: 'Edit access denied' });
         }
 
+        const [taskMeta, assignmentMeta] = await Promise.all([
+            prisma.task.findUnique({
+                where: { id: taskId },
+                select: { title: true },
+            }),
+            prisma.taskAssignment.findUnique({
+                where: { taskId_memberId: { taskId, memberId } },
+                include: { member: { select: { id: true, fullName: true } } },
+            }),
+        ]);
+
         await prisma.taskAssignment.delete({
             where: { taskId_memberId: { taskId, memberId } },
         });
 
+        const taskTitle = taskMeta?.title || `Task #${taskId}`;
         await logActivity(taskId, req.user.memberId, 'UNASSIGNED', {
-            description: `Member ${memberId} unassigned from task`,
+            oldValue: buildTaskUnassignedActivityValue(memberId, assignmentMeta?.member, taskTitle),
+            description: buildTaskUnassignedDescription(taskTitle, memberId, assignmentMeta?.member),
         });
 
         res.json({ message: 'Member unassigned' });
@@ -1469,7 +1511,8 @@ router.post('/:id/comments', async (req, res) => {
         });
 
         await logActivity(taskId, req.user.memberId, 'COMMENTED', {
-            description: `Comment added by member ${req.user.memberId}`,
+            newValue: newComment.comment,
+            description: buildCommentedDescription(req.user.memberId, newComment.member),
         });
 
         const taskMeta = await prisma.task.findUnique({
@@ -1675,8 +1718,12 @@ router.post('/:id/dependencies', async (req, res) => {
         });
 
         await logActivity(taskId, req.user.memberId, 'DEPENDENCY_ADDED', {
-            newValue: { dependsOnTaskId: parseInt(dependsOnTaskId), dependencyType },
-            description: `Dependency added on task #${dependsOnTaskId}`,
+            newValue: buildDependencyAddedValue(
+                parseInt(dependsOnTaskId),
+                dep.dependsOnTask.title,
+                dependencyType,
+            ),
+            description: buildDependencyAddedDescription(dep.dependsOnTask.title),
         });
 
         res.status(201).json(dep);
@@ -1697,9 +1744,15 @@ router.delete('/:id/dependencies/:dependsOnTaskId', async (req, res) => {
             return res.status(403).json({ error: 'Edit access denied' });
         }
 
+        const dependsOnTask = await prisma.task.findUnique({
+            where: { id: dependsOnTaskId },
+            select: { title: true },
+        });
+        const dependsOnTaskTitle = dependsOnTask?.title || `Task #${dependsOnTaskId}`;
+
         await logActivity(taskId, req.user.memberId, 'DEPENDENCY_REMOVED', {
-            oldValue: { dependsOnTaskId },
-            description: `Dependency removed from task #${dependsOnTaskId}`,
+            oldValue: buildDependencyRemovedValue(dependsOnTaskId, dependsOnTaskTitle),
+            description: buildDependencyRemovedDescription(dependsOnTaskTitle),
         });
 
         await prisma.taskDependency.delete({

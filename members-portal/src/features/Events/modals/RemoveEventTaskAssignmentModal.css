@@ -1,0 +1,14 @@
+.event-task-remove-modal-backdrop {
+    z-index: 1300;
+}
+
+.event-task-remove-modal {
+    z-index: 1301;
+}
+
+.event-task-remove-modal-message {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--gray-700);
+}

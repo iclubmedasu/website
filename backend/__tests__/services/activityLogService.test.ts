@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 const prismaMocks = vi.hoisted(() => ({
     taskActivityCreate: vi.fn(),
     projectActivityCreate: vi.fn(),
+    eventActivityCreate: vi.fn(),
     taskFindUnique: vi.fn()
 }))
 
@@ -14,6 +15,9 @@ vi.mock('../../db', () => ({
         projectActivityLog: {
             create: prismaMocks.projectActivityCreate
         },
+        eventActivityLog: {
+            create: prismaMocks.eventActivityCreate
+        },
         task: {
             findUnique: prismaMocks.taskFindUnique
         }
@@ -23,6 +27,7 @@ vi.mock('../../db', () => ({
 import {
     changesToPayload,
     collectChangedFields,
+    logEventActivity,
     logTaskAndProjectActivity,
     serializeActivityValue,
     summarizeChanges
@@ -135,5 +140,32 @@ describe('activityLogService', () => {
 
         expect(prismaMocks.taskActivityCreate).toHaveBeenCalledTimes(1)
         expect(prismaMocks.projectActivityCreate).not.toHaveBeenCalled()
+    })
+
+    it('logs event activity with optional member and task context', async () => {
+        prismaMocks.eventActivityCreate.mockResolvedValueOnce({})
+
+        await logEventActivity({
+            eventId: 42,
+            memberId: 5,
+            eventTaskId: 8,
+            actionType: 'CREATED',
+            entityType: 'TASK',
+            newValue: { title: 'Setup booth' },
+            description: 'Task "Setup booth" created',
+        })
+
+        expect(prismaMocks.eventActivityCreate).toHaveBeenCalledTimes(1)
+        expect(prismaMocks.eventActivityCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                eventId: 42,
+                memberId: 5,
+                eventTaskId: 8,
+                entityType: 'TASK',
+                actionType: 'CREATED',
+                newValue: '{"title":"Setup booth"}',
+                description: 'Task "Setup booth" created',
+            }),
+        })
     })
 })

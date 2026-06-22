@@ -6,5 +6,5 @@ type EventCheckInPageProps = {
 
 export default async function EventCheckInRoute({ params }: EventCheckInPageProps) {
     const { id } = await params;
-    redirect(`/events?event=${id}&tab=checkin`);
+    redirect(`/events?event=${id}&tab=registrations`);
 }

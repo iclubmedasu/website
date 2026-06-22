@@ -6,6 +6,8 @@ export type NotificationEventType =
     | "TASK_LEADER_ASSIGNED"
     | "TASK_STATUS_CHANGED"
     | "TASK_COMMENTED"
+    | "EVENT_TASK_ASSIGNED"
+    | "EVENT_TASK_LEADER_ASSIGNED"
     | "PROJECT_CREATED"
     | "PROJECT_STATUS_CHANGED"
     | "SCHEDULE_SLOT_ASSIGNED"
@@ -17,6 +19,7 @@ export type NotificationAudienceType =
     | "TEAM"
     | "PROJECT"
     | "TASK"
+    | "EVENT"
     | "SYSTEM";
 
 export interface NotificationEvent {

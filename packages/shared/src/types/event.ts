@@ -25,6 +25,8 @@ export interface EventTeamRef {
     team?: TeamRef;
 }
 
+export type EventTierCurrency = 'USD' | 'EUR' | 'EGP';
+
 export interface EventTierRef {
     id: Id;
     eventId: Id;
@@ -32,6 +34,7 @@ export interface EventTierRef {
     description?: string | null;
     maxCapacity?: number | null;
     price?: number | null;
+    currency?: EventTierCurrency | string;
     order?: number;
     isActive?: boolean;
     registrationCount?: number;
@@ -47,6 +50,7 @@ export interface EventCustomFieldRef {
     type: EventCustomFieldType | string;
     options?: unknown;
     required?: boolean;
+    showOnPublic?: boolean;
     order?: number;
     isLocked?: boolean;
     isActive?: boolean;
@@ -80,6 +84,7 @@ export interface EventSummary {
     description?: string | null;
     venue?: string | null;
     eventDate: ISODateTime;
+    eventEndDate: ISODateTime;
     registrationDeadline?: ISODateTime | null;
     capacity?: number | null;
     allowWalkIns?: boolean;
@@ -112,6 +117,21 @@ export interface EventDetail extends EventSummary {
     registrations?: EventRegistrationRef[];
 }
 
+export interface EventActivityEntry {
+    id: Id;
+    eventId: Id;
+    eventTaskId?: Id | null;
+    memberId?: Id | null;
+    entityType?: string;
+    actionType?: string;
+    oldValue?: string | null;
+    newValue?: string | null;
+    description?: string | null;
+    createdAt?: ISODateTime;
+    member?: MemberSummary | null;
+    eventTask?: { id: Id; title: string } | null;
+}
+
 export interface EventQueryParams {
     status?: EventStatus;
     projectId?: Id | string;
@@ -137,6 +157,10 @@ export interface EventStatistics {
         date: string;
         count: number;
     }>;
+    attendanceOverTime: Array<{
+        date: string;
+        count: number;
+    }>;
 }
 
 export interface CreateEventPayload {
@@ -144,6 +168,7 @@ export interface CreateEventPayload {
     description?: string | null;
     venue?: string | null;
     eventDate: ISODateTime | string;
+    eventEndDate?: ISODateTime | string;
     registrationDeadline?: ISODateTime | string | null;
     capacity?: number | null;
     projectId?: Id | string | null;
@@ -165,6 +190,7 @@ export interface CreateEventTierPayload {
     description?: string | null;
     maxCapacity?: number | null;
     price?: number | null;
+    currency?: EventTierCurrency | string;
     order?: number;
 }
 
@@ -177,6 +203,7 @@ export interface CreateEventCustomFieldPayload {
     type: EventCustomFieldType | string;
     options?: unknown;
     required?: boolean;
+    showOnPublic?: boolean;
     order?: number;
     isLocked?: boolean;
 }
@@ -213,4 +240,119 @@ export interface EventRegistrationQueryParams {
     tierId?: Id | string;
     checkInStatus?: "CHECKED_IN" | "NOT_CHECKED_IN";
     walkIn?: boolean;
+}
+
+export interface CheckInRegistrationPayload {
+    confirmationCode?: string;
+    customFieldValues?: Record<string, unknown> | unknown;
+}
+
+export interface EventRegistrationLookupResult {
+    registration: EventRegistrationRef;
+    missingRequiredFields: EventCustomFieldRef[];
+}
+
+export interface EventTaskAssignmentRef {
+    id: Id;
+    eventTaskId: Id;
+    memberId: Id;
+    startDateTime: ISODateTime;
+    endDateTime: ISODateTime;
+    createdAt?: ISODateTime;
+    updatedAt?: ISODateTime;
+    member?: MemberSummary | null;
+}
+
+export interface EventTaskRef {
+    id: Id;
+    eventId: Id;
+    leaderId?: Id | null;
+    createdByMemberId?: Id | null;
+    title: string;
+    description?: string | null;
+    location: string;
+    taskDate: ISODateTime;
+    isActive?: boolean;
+    createdAt?: ISODateTime;
+    updatedAt?: ISODateTime;
+    leader?: MemberSummary | null;
+    createdBy?: MemberSummary | null;
+    assignments?: EventTaskAssignmentRef[];
+}
+
+export interface EventTaskAssignmentInput {
+    memberId: Id | string;
+    startDateTime: ISODateTime | string;
+    endDateTime: ISODateTime | string;
+}
+
+export interface CreateEventTaskPayload {
+    title: string;
+    description?: string | null;
+    location: string;
+    taskDate: ISODateTime | string;
+    leaderId?: Id | string | null;
+    assignments?: EventTaskAssignmentInput[];
+}
+
+export interface UpdateEventTaskPayload extends Partial<CreateEventTaskPayload> {}
+
+export interface EventFolderRef {
+    id: Id;
+    folderName: string;
+    githubPath: string;
+    isActive?: boolean;
+}
+
+export interface EventFileRef {
+    id: Id;
+    eventId: Id;
+    folderId?: Id | null;
+    uploadedByMemberId: Id;
+    fileName: string;
+    githubPath: string;
+    githubSha: string;
+    fileSize: number;
+    mimeType: string;
+    isActive?: boolean;
+    createdAt?: ISODateTime;
+    updatedAt?: ISODateTime;
+    uploadedBy?: MemberSummary;
+    folder?: EventFolderRef;
+}
+
+export interface EventFileCommentRef {
+    id: Id;
+    fileId: Id;
+    memberId: Id;
+    comment: string;
+    isEdited?: boolean;
+    createdAt?: ISODateTime;
+    updatedAt?: ISODateTime;
+    member?: MemberSummary;
+}
+
+export interface EventFileHistoryEntry {
+    sha: string;
+    message: string;
+    date: ISODateTime;
+    author: string;
+}
+
+export interface CreateEventFolderPayload {
+    eventId: Id;
+    folderName: string;
+    createdByMemberId?: Id;
+}
+
+export interface RenameEventFolderPayload {
+    folderName: string;
+}
+
+export interface MoveEventFilePayload {
+    folderId?: Id | null;
+}
+
+export interface RenameEventFilePayload {
+    fileName: string;
 }

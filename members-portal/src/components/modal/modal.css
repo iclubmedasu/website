@@ -317,6 +317,55 @@
     line-height: 1.4;
 }
 
+.custom-field-options-list {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.custom-field-option-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.custom-field-option-row .form-input {
+    flex: 1;
+}
+
+.custom-field-option-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    color: var(--gray-600);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.custom-field-option-remove:hover {
+    background: var(--gray-50);
+    color: var(--error-text);
+}
+
+.custom-field-option-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+}
+
+.form-slot-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 7rem 7rem auto;
+    gap: 0.5rem;
+    align-items: center;
+}
+
 /* ============================================
    MODAL FOOTER
    ============================================ */
@@ -779,6 +828,15 @@
 @media (max-width: 768px) {
     .form-row {
         grid-template-columns: 1fr;
+    }
+
+    .form-slot-row {
+        grid-template-columns: minmax(0, 1fr) 1fr;
+        grid-auto-rows: auto;
+    }
+
+    .form-slot-row .custom-field-option-remove {
+        width: 100%;
     }
 
     .modal-header {
@@ -1765,10 +1823,9 @@
 }
 
 .activity-change-label {
-    font-size: 0.688rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
     color: var(--gray-500);
 }
 

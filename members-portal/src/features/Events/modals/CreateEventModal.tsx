@@ -3,6 +3,7 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
+import { Checkbox } from '@/components/checkbox';
 import { eventsAPI, projectsAPI, projectTypesAPI } from '@/services/api';
 import { toTitleCase } from '@/utils/titleCase';
 import type {
@@ -105,6 +106,9 @@ export default function CreateEventModal({
         status: (initial?.status as ProjectStatus | undefined) ?? 'NOT_STARTED',
         venue: initial?.venue ?? '',
         eventDate: initial?.eventDate ? toDateInput(initial.eventDate) : '',
+        eventEndDate: initial?.eventEndDate
+            ? toDateInput(initial.eventEndDate)
+            : (initial?.eventDate ? toDateInput(initial.eventDate) : ''),
         registrationDeadline: initial?.registrationDeadline ? toDateInput(initial.registrationDeadline) : '',
         capacity: initial?.capacity != null ? String(initial.capacity) : '',
         projectId: initial?.projectId != null ? String(initial.projectId) : '',
@@ -207,7 +211,13 @@ export default function CreateEventModal({
         }
 
         if (!form.eventDate) {
-            setError('Event date is required');
+            setError('Duration start date is required');
+            return;
+        }
+
+        const endDateValue = form.eventEndDate || form.eventDate;
+        if (new Date(endDateValue).getTime() < new Date(form.eventDate).getTime()) {
+            setError('Duration end must be on or after the start date');
             return;
         }
 
@@ -220,6 +230,7 @@ export default function CreateEventModal({
                 description: form.description.trim() || null,
                 venue: form.venue.trim() || null,
                 eventDate: form.eventDate,
+                eventEndDate: endDateValue,
                 registrationDeadline: form.registrationDeadline || null,
                 capacity: form.capacity ? Number.parseInt(form.capacity, 10) : null,
                 projectId: form.projectId ? Number.parseInt(form.projectId, 10) : null,
@@ -359,6 +370,30 @@ export default function CreateEventModal({
 
                             <div className="form-row">
                                 <div className="form-group">
+                                    <label className="form-label" htmlFor="event-start-date">Duration start *</label>
+                                    <input
+                                        id="event-start-date"
+                                        type="datetime-local"
+                                        className="form-input"
+                                        value={toDateInput(form.eventDate)}
+                                        onChange={handleChange('eventDate')}
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label" htmlFor="event-end-date">Duration end *</label>
+                                    <input
+                                        id="event-end-date"
+                                        type="datetime-local"
+                                        className="form-input"
+                                        value={toDateInput(form.eventEndDate || form.eventDate)}
+                                        onChange={handleChange('eventEndDate')}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-row">
+                                <div className="form-group">
                                     <label className="form-label" htmlFor="event-venue">Venue</label>
                                     <input
                                         id="event-venue"
@@ -370,20 +405,7 @@ export default function CreateEventModal({
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label" htmlFor="event-date">Event Date *</label>
-                                    <input
-                                        id="event-date"
-                                        type="datetime-local"
-                                        className="form-input"
-                                        value={toDateInput(form.eventDate)}
-                                        onChange={handleChange('eventDate')}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label" htmlFor="event-deadline">Registration Deadline</label>
+                                    <label className="form-label" htmlFor="event-deadline">Registration deadline</label>
                                     <input
                                         id="event-deadline"
                                         type="datetime-local"
@@ -392,7 +414,9 @@ export default function CreateEventModal({
                                         onChange={handleChange('registrationDeadline')}
                                     />
                                 </div>
+                            </div>
 
+                            <div className="form-row">
                                 <div className="form-group">
                                     <label className="form-label" htmlFor="event-capacity">Capacity</label>
                                     <input
@@ -429,15 +453,15 @@ export default function CreateEventModal({
 
                             <div className="form-row">
                                 <label className="toggle-field">
-                                    <input type="checkbox" checked={form.allowWalkIns} onChange={handleChange('allowWalkIns')} />
+                                    <Checkbox checked={form.allowWalkIns} onChange={handleChange('allowWalkIns')} />
                                     <span>
                                         <strong>Allow walk-ins</strong>
-                                        <small>Organizers can add attendees at the door.</small>
+                                        <small>Organizers can add attendees at the door on event days only.</small>
                                     </span>
                                 </label>
 
                                 <label className="toggle-field">
-                                    <input type="checkbox" checked={form.isCertifiable} onChange={handleChange('isCertifiable')} />
+                                    <Checkbox checked={form.isCertifiable} onChange={handleChange('isCertifiable')} />
                                     <span>
                                         <strong>Certifiable event</strong>
                                         <small>Mark attendance for certificate or recognition tracking.</small>

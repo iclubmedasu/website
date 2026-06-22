@@ -1,31 +1,23 @@
 'use client';
 
-import {
-    AlertCircle,
-    Archive,
-    Calendar,
-    CheckSquare,
-    History,
-    PauseCircle,
-    Pencil,
-    PlayCircle,
-    Users,
-} from 'lucide-react';
-import {
-    ProjectCardView,
-    fmtDate,
+import { useEffect, useState } from 'react';
+import { Archive, Calendar, Paperclip, Users } from 'lucide-react';
+import LifecycleCardView, {
     getArchiveOutcomeBadge,
     getLifecycleBadge,
-    isProjectAborted,
-    isProjectInactive,
-} from '@/features/Projects/components/ProjectCardView/ProjectCardView';
-import type { EventDetail, EventSummary } from '@/types/backend-contracts';
-import { eventToCardViewModel } from '../eventCardAdapter';
-import EventExpandedContent from '../EventExpandedContent';
+} from '@/components/cards/LifecycleCardView/LifecycleCardView';
+import LifecycleCardActions from '@/components/cards/LifecycleCardView/LifecycleCardActions';
+import FileUploadZone from '@/components/FileUpload/FileUploadZone';
+import type { EntityFilesAPI } from '@/components/FileUpload/types';
+import { useAuth } from '@/context/AuthContext';
+import { eventFilesAPI } from '@/services/api';
+import type { EventDetail, EventFileRef, EventFolderRef, EventSummary, Id } from '@/types/backend-contracts';
+import { eventToCardViewModel } from './eventCardAdapter';
+import EventExpandedContent from '../EventExpandedContent/EventExpandedContent';
+import { formatEventDuration } from '../eventDateUtils';
 import type { EventTabKey } from '../eventUtils';
-import '../../EventCardExpanded.css';
 
-interface EventCardProps {
+export interface EventCardProps {
     event: EventSummary;
     expanded: boolean;
     fullDetail: EventDetail | null;
@@ -43,6 +35,7 @@ interface EventCardProps {
     onViewActivity: (event: EventSummary | EventDetail) => void;
     onReloadDetail?: () => void;
     archivedView?: boolean;
+    canUpload?: boolean;
 }
 
 export default function EventCard({
@@ -63,99 +56,64 @@ export default function EventCard({
     onViewActivity,
     onReloadDetail,
     archivedView = false,
+    canUpload = false,
 }: EventCardProps) {
-    const cardProject = eventToCardViewModel(event);
-    const detail = fullDetail ? eventToCardViewModel(fullDetail) : null;
+    const { user } = useAuth();
+    const [eventFiles, setEventFiles] = useState<EventFileRef[]>([]);
+    const [eventFolders, setEventFolders] = useState<EventFolderRef[]>([]);
+    const detailId = fullDetail?.id as Id | undefined;
+
+    useEffect(() => {
+        if (expanded && detailId) {
+            eventFilesAPI.getAll(detailId).then(setEventFiles).catch(() => setEventFiles([]));
+            eventFilesAPI.getFolders(detailId, true).then(setEventFolders).catch(() => setEventFolders([]));
+        }
+    }, [expanded, detailId]);
+
+    const cardItem = eventToCardViewModel(event);
+    const detailCard = fullDetail ? eventToCardViewModel(fullDetail) : null;
     const registrationCount = event._count?.registrations ?? event.registrationCount ?? 0;
     const capacity = event.capacity ?? null;
 
-    const aborted = isProjectAborted(cardProject);
-    const inactive = isProjectInactive(cardProject);
-    const lifecycleBadge = getLifecycleBadge(cardProject);
+    const lifecycleBadge = getLifecycleBadge(cardItem);
     const LifecycleIcon = lifecycleBadge.icon;
-    const archiveOutcomeBadge = archivedView ? getArchiveOutcomeBadge(cardProject) : null;
+    const archiveOutcomeBadge = archivedView ? getArchiveOutcomeBadge(cardItem) : null;
     const ArchiveOutcomeIcon = archiveOutcomeBadge?.icon ?? Archive;
 
-    const collapsedActions = archivedView ? (
-        <>
-            {canManage && inactive && (
-                <>
-                    <button className="icon-btn reactivate-btn" title="Reactivate event" type="button" onClick={(e) => { e.stopPropagation(); onReactivate(event); }}>
-                        <PlayCircle size={14} />
-                    </button>
-                    <button className="icon-btn finalize-btn" title="Finalize event" type="button" onClick={(e) => { e.stopPropagation(); onFinalize(event); }}>
-                        <CheckSquare size={14} />
-                    </button>
-                    <button className="icon-btn deactivate-btn" title="Abort event" type="button" onClick={(e) => { e.stopPropagation(); onAbort(event); }}>
-                        <AlertCircle size={14} />
-                    </button>
-                </>
-            )}
-            {canManage && aborted && !event.isArchived && (
-                <button className="icon-btn archive-btn" title="Archive event" type="button" onClick={(e) => { e.stopPropagation(); onArchive(event); }}>
-                    <Archive size={14} />
-                </button>
-            )}
-            <button className="icon-btn activity-btn" title="View activity" type="button" onClick={(e) => { e.stopPropagation(); onViewActivity(event); }}>
-                <History size={14} />
-            </button>
-        </>
-    ) : (
-        <>
-            {event.isFinalized && canManage && (
-                <button className="icon-btn archive-btn" title="Archive event" type="button" onClick={(e) => { e.stopPropagation(); onArchive(event); }}>
-                    <Archive size={14} />
-                </button>
-            )}
-            {canEdit && !event.isFinalized && event.isActive && cardProject.status !== 'CANCELLED' && (
-                <>
-                    <button className="icon-btn edit-btn" title="Edit event" type="button" onClick={(e) => { e.stopPropagation(); onEdit(event); }}>
-                        <Pencil size={14} />
-                    </button>
-                    <button className="icon-btn hold-btn" title="Hold event" type="button" onClick={(e) => { e.stopPropagation(); onDeactivate(event); }}>
-                        <PauseCircle size={14} />
-                    </button>
-                    <button className="icon-btn deactivate-btn" title="Abort event" type="button" onClick={(e) => { e.stopPropagation(); onAbort(event); }}>
-                        <AlertCircle size={14} />
-                    </button>
-                    <button className="icon-btn finalize-btn" title="Finalize event" type="button" onClick={(e) => { e.stopPropagation(); onFinalize(event); }}>
-                        <CheckSquare size={14} />
-                    </button>
-                </>
-            )}
-            {canManage && inactive && (
-                <>
-                    <button className="icon-btn reactivate-btn" title="Reactivate event" type="button" onClick={(e) => { e.stopPropagation(); onReactivate(event); }}>
-                        <PlayCircle size={14} />
-                    </button>
-                    <button className="icon-btn deactivate-btn" title="Abort event" type="button" onClick={(e) => { e.stopPropagation(); onAbort(event); }}>
-                        <AlertCircle size={14} />
-                    </button>
-                    <button className="icon-btn finalize-btn" title="Finalize event" type="button" onClick={(e) => { e.stopPropagation(); onFinalize(event); }}>
-                        <CheckSquare size={14} />
-                    </button>
-                </>
-            )}
-            {canManage && aborted && !event.isArchived && (
-                <button className="icon-btn archive-btn" title="Archive event" type="button" onClick={(e) => { e.stopPropagation(); onArchive(event); }}>
-                    <Archive size={14} />
-                </button>
-            )}
-            <button className="icon-btn activity-btn" title="View activity" type="button" onClick={(e) => { e.stopPropagation(); onViewActivity(event); }}>
-                <History size={14} />
-            </button>
-        </>
-    );
-
     const detailTarget = fullDetail ?? event;
+    const lifecycleMode = archivedView ? 'archived' as const : 'active' as const;
+
+    const collapsedHandlers = {
+        onEdit: () => onEdit(event),
+        onDeactivate: () => onDeactivate(event),
+        onFinalize: () => onFinalize(event),
+        onArchive: () => onArchive(event),
+        onReactivate: () => onReactivate(event),
+        onAbort: () => onAbort(event),
+        onViewActivity: () => onViewActivity(event),
+    };
+
+    const expandedHandlers = {
+        onEdit: () => onEdit(detailTarget),
+        onDeactivate: () => onDeactivate(detailTarget),
+        onFinalize: () => onFinalize(detailTarget),
+        onArchive: () => onArchive(detailTarget),
+        onReactivate: () => onReactivate(detailTarget),
+        onAbort: () => onAbort(detailTarget),
+        onViewActivity: () => onViewActivity(detailTarget),
+    };
 
     return (
-        <ProjectCardView
-            project={cardProject}
+        <LifecycleCardView
+            item={cardItem}
             expanded={expanded}
-            detail={detail}
+            detail={detailCard}
             detailLoading={detailLoading}
             onToggle={(card) => onToggle(card != null ? event : null)}
+            loadingTitle="Loading event details…"
+            loadingText="Fetching tiers, registrations, and statistics."
+            accessDeniedTitle="You do not have access to this event"
+            accessDeniedText="This event can't be opened with your current permissions."
             collapsedMeta={(
                 <>
                     {archiveOutcomeBadge && (
@@ -170,12 +128,22 @@ export default function EventCard({
                     </span>
                 </>
             )}
-            collapsedActions={collapsedActions}
+            collapsedActions={(
+                <LifecycleCardActions
+                    item={cardItem}
+                    mode={lifecycleMode}
+                    variant="collapsed"
+                    canEdit={canEdit}
+                    canManage={canManage}
+                    entityLabel="event"
+                    {...collapsedHandlers}
+                />
+            )}
             collapsedFooterTrailing={(
                 <div className="project-card-footer-trailing">
                     <div className="project-card-due project-card-date-range">
                         <Calendar size={11} />
-                        {fmtDate(event.eventDate)}
+                        {formatEventDuration(event.eventDate, event.eventEndDate ?? event.eventDate)}
                     </div>
                     <div className="project-card-task-count">
                         <Users size={11} />
@@ -199,78 +167,72 @@ export default function EventCard({
             )}
             expandedActions={fullDetail ? (
                 <div className="expanded-title-actions">
-                    {fullDetail.isFinalized ? (
-                        canManage && (
-                            <button className="icon-btn archive-btn icon-btn--text" title="Archive" type="button" onClick={(e) => { e.stopPropagation(); onArchive(detailTarget); }}>
-                                <Archive size={13} />
-                                <span className="expanded-action-label">Archive</span>
-                            </button>
-                        )
-                    ) : cardProject.status === 'CANCELLED' ? (
-                        canManage && !event.isArchived && (
-                            <button className="icon-btn archive-btn icon-btn--text" title="Archive" type="button" onClick={(e) => { e.stopPropagation(); onArchive(detailTarget); }}>
-                                <Archive size={13} />
-                                <span className="expanded-action-label">Archive</span>
-                            </button>
-                        )
-                    ) : fullDetail.isActive === false ? (
-                        canManage && !event.isArchived && (
-                            <>
-                                <button className="icon-btn reactivate-btn icon-btn--text" title="Reactivate" type="button" onClick={(e) => { e.stopPropagation(); onReactivate(detailTarget); }}>
-                                    <PlayCircle size={13} />
-                                    <span className="expanded-action-label">Reactivate</span>
-                                </button>
-                                <button className="icon-btn deactivate-btn icon-btn--text" title="Abort" type="button" onClick={(e) => { e.stopPropagation(); onAbort(detailTarget); }}>
-                                    <AlertCircle size={13} />
-                                    <span className="expanded-action-label">Abort</span>
-                                </button>
-                                <button className="icon-btn finalize-btn icon-btn--text" title="Finalize" type="button" onClick={(e) => { e.stopPropagation(); onFinalize(detailTarget); }}>
-                                    <CheckSquare size={13} />
-                                    <span className="expanded-action-label">Finalize</span>
-                                </button>
-                            </>
-                        )
-                    ) : canEdit ? (
-                        <>
-                            <button className="icon-btn edit-btn icon-btn--text" title="Edit event" type="button" onClick={(e) => { e.stopPropagation(); onEdit(detailTarget); }}>
-                                <Pencil size={13} />
-                                <span className="expanded-action-label">Edit</span>
-                            </button>
-                            <button className="icon-btn hold-btn icon-btn--text" title="Hold event" type="button" onClick={(e) => { e.stopPropagation(); onDeactivate(detailTarget); }}>
-                                <PauseCircle size={13} />
-                                <span className="expanded-action-label">Hold</span>
-                            </button>
-                            <button className="icon-btn deactivate-btn icon-btn--text" title="Abort event" type="button" onClick={(e) => { e.stopPropagation(); onAbort(detailTarget); }}>
-                                <AlertCircle size={13} />
-                                <span className="expanded-action-label">Abort</span>
-                            </button>
-                            <button className="icon-btn finalize-btn icon-btn--text" title="Finalize event" type="button" onClick={(e) => { e.stopPropagation(); onFinalize(detailTarget); }}>
-                                <CheckSquare size={13} />
-                                <span className="expanded-action-label">Finalize</span>
-                            </button>
-                        </>
-                    ) : null}
-                    <button className="icon-btn activity-btn icon-btn--text" title="View activity" type="button" onClick={(e) => { e.stopPropagation(); onViewActivity(detailTarget); }}>
-                        <History size={13} />
-                        <span className="expanded-action-label">View activity</span>
-                    </button>
+                    <LifecycleCardActions
+                        item={cardItem}
+                        detail={eventToCardViewModel(detailTarget as EventDetail)}
+                        mode={lifecycleMode}
+                        variant="expanded"
+                        canEdit={canEdit}
+                        canManage={canManage}
+                        entityLabel="event"
+                        {...expandedHandlers}
+                    />
                 </div>
             ) : null}
             formatAssignedTeamSuffix={(team) => `${team.isOwner ? ' ★' : ''}`}
-            detailDateFields={fullDetail ? [
-                { label: 'Created', value: fmtDate(fullDetail.createdAt) || '—' },
-                { label: 'Venue', value: fullDetail.venue || '—' },
-                { label: 'Capacity', value: fullDetail.capacity != null ? String(fullDetail.capacity) : 'Unlimited' },
-                { label: 'Event date', value: fmtDate(fullDetail.eventDate) || '—' },
-            ] : undefined}
+            detailDateFields={fullDetail ? (() => {
+                const venue = fullDetail.venue?.trim() || '—';
+                const duration = formatEventDuration(fullDetail.eventDate, fullDetail.eventEndDate ?? fullDetail.eventDate);
+                return [
+                    // { label: 'Created', value: fmtDate(fullDetail.createdAt) || '—' },
+                    {
+                        label: 'Venue',
+                        value: venue !== '—' ? (
+                            <span className="exp-date-value event-venue-truncate" title={venue}>
+                                {venue}
+                            </span>
+                        ) : '—',
+                    },
+                    { label: 'Capacity', value: fullDetail.capacity != null ? String(fullDetail.capacity) : 'Unlimited' },
+                    { label: 'Duration', value: duration },
+                ];
+            })() : undefined}
             afterSections={fullDetail ? (
-                <div className="exp-card-section exp-card-section--flush">
-                    <EventExpandedContent
-                        eventId={fullDetail.id}
-                        initialTab={initialTab}
-                        onReload={() => onReloadDetail?.()}
-                    />
-                </div>
+                <>
+                    <div className="exp-card-section exp-card-section--flush">
+                        <EventExpandedContent
+                            eventId={fullDetail.id}
+                            initialTab={initialTab}
+                            allowWalkIns={fullDetail.allowWalkIns ?? false}
+                            eventDate={fullDetail.eventDate}
+                            eventEndDate={fullDetail.eventEndDate}
+                            onReload={() => onReloadDetail?.()}
+                        />
+                    </div>
+                    <div className="exp-card-section">
+                        <div className="exp-card-section-header">
+                            <Paperclip size={14} className="exp-card-section-icon" />
+                            Event Files
+                        </div>
+                        <FileUploadZone
+                            entityId={fullDetail.id}
+                            filesAPI={eventFilesAPI as EntityFilesAPI}
+                            memberId={user?.id}
+                            existingFiles={eventFiles}
+                            existingFolders={eventFolders}
+                            onFileUploaded={archivedView ? () => { } : (newFile, replaced) => setEventFiles((prev) =>
+                                replaced
+                                    ? prev.map((f) => f.id === newFile.id ? newFile as EventFileRef : f)
+                                    : [newFile as EventFileRef, ...prev]
+                            )}
+                            onFileRemoved={archivedView ? () => { } : (fileId) => setEventFiles((prev) => prev.filter((f) => f.id !== fileId))}
+                            onFileRenamed={archivedView ? () => { } : (updated) => setEventFiles((prev) =>
+                                prev.map((f) => f.id === updated.id ? { ...f, fileName: updated.fileName } : f)
+                            )}
+                            disabled={archivedView || !canUpload}
+                        />
+                    </div>
+                </>
             ) : null}
         />
     );

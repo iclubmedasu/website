@@ -8,11 +8,19 @@ const prismaMocks = vi.hoisted(() => ({
     eventFindUnique: vi.fn(),
     eventUpdate: vi.fn(),
     eventRegistrationFindFirst: vi.fn(),
-    eventCreate: vi.fn()
+    eventCreate: vi.fn(),
+    eventActivityFindMany: vi.fn()
 }))
 
 const eventCodeMocks = vi.hoisted(() => ({
     generateUniqueConfirmationCode: vi.fn()
+}))
+
+const activityMocks = vi.hoisted(() => ({
+    collectChangedFields: vi.fn(),
+    changesToPayload: vi.fn(),
+    summarizeChanges: vi.fn(),
+    logEventActivity: vi.fn()
 }))
 
 vi.mock('../../db', () => ({
@@ -25,11 +33,15 @@ vi.mock('../../db', () => ({
         },
         eventRegistration: {
             findFirst: prismaMocks.eventRegistrationFindFirst
+        },
+        eventActivityLog: {
+            findMany: prismaMocks.eventActivityFindMany
         }
     }
 }))
 
 vi.mock('../../services/eventCode', () => eventCodeMocks)
+vi.mock('../../services/activityLogService', () => activityMocks)
 
 import { JWT_SECRET, authenticateToken } from '../../middleware/auth'
 import eventsRouter from '../../routes/events'
@@ -55,9 +67,18 @@ function createToken(payload: Record<string, unknown>) {
 describe('events routes auth wiring', () => {
     beforeEach(() => {
         prismaMocks.eventRegistrationFindFirst.mockResolvedValue(null)
+        prismaMocks.eventActivityFindMany.mockResolvedValue([])
+        activityMocks.collectChangedFields.mockReturnValue([])
+        activityMocks.changesToPayload.mockReturnValue({ oldValue: {}, newValue: {} })
+        activityMocks.summarizeChanges.mockReturnValue(null)
+        activityMocks.logEventActivity.mockResolvedValue(undefined)
         prismaMocks.eventCreate.mockResolvedValue({
             id: 101,
-            title: 'Launch Night'
+            title: 'Launch Night',
+            projectTypeId: 3,
+            priority: 'HIGH',
+            status: 'NOT_STARTED',
+            eventDate: new Date('2026-06-10T10:00:00.000Z')
         })
         eventCodeMocks.generateUniqueConfirmationCode.mockResolvedValue('CONFIRM-12345')
     })
@@ -366,6 +387,97 @@ describe('events routes auth wiring', () => {
         expect(prismaMocks.eventUpdate).toHaveBeenCalledWith(expect.objectContaining({
             where: { id: 58 },
             data: expect.objectContaining({ isArchived: true, isActive: false })
+        }))
+        expect(activityMocks.logEventActivity).toHaveBeenCalledTimes(1)
+    })
+
+    it('logs activity when creating an event', async () => {
+        const token = createToken({
+            memberId: 14,
+            isOfficer: true,
+            isAdmin: false,
+            isLeadership: false
+        })
+
+        prismaMocks.eventCreate.mockResolvedValueOnce({
+            id: 102,
+            title: 'Officer Event',
+            projectTypeId: 2,
+            priority: 'MEDIUM',
+            status: 'NOT_STARTED',
+            eventDate: new Date('2026-06-10T10:00:00.000Z')
+        })
+
+        const response = await request(createApp())
+            .post('/events')
+            .set('Authorization', `Bearer ${token}`)
+            .send({
+                title: 'Officer Event',
+                eventDate: '2026-06-10T10:00:00.000Z',
+                projectTypeId: 2
+            })
+
+        expect(response.status).toBe(201)
+        expect(activityMocks.logEventActivity).toHaveBeenCalledWith(expect.objectContaining({
+            eventId: 102,
+            memberId: 14,
+            actionType: 'CREATED',
+            entityType: 'EVENT'
+        }))
+    })
+
+    it('returns empty activity for an existing event', async () => {
+        prismaMocks.eventFindUnique.mockResolvedValueOnce({
+            id: 77,
+            title: 'Summit',
+            status: 'PUBLISHED',
+            isActive: true
+        })
+        prismaMocks.eventActivityFindMany.mockResolvedValueOnce([])
+
+        const token = createToken({ memberId: 12, isDeveloper: true })
+
+        const response = await request(createAuthedApp())
+            .get('/events/77/activity')
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(response.status).toBe(200)
+        expect(response.body).toEqual([])
+        expect(prismaMocks.eventActivityFindMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: { eventId: 77 },
+            orderBy: { createdAt: 'desc' }
+        }))
+    })
+
+    it('returns event activity entries for managers', async () => {
+        prismaMocks.eventFindUnique.mockResolvedValueOnce({
+            id: 77,
+            title: 'Summit',
+            status: 'PUBLISHED',
+            isActive: true
+        })
+        prismaMocks.eventActivityFindMany.mockResolvedValueOnce([
+            {
+                id: 1,
+                eventId: 77,
+                actionType: 'CREATED',
+                entityType: 'EVENT',
+                description: 'Event "Summit" created',
+                member: { id: 12, fullName: 'Dev User', profilePhotoUrl: null }
+            }
+        ])
+
+        const token = createToken({ memberId: 12, isDeveloper: true })
+
+        const response = await request(createAuthedApp())
+            .get('/events/77/activity')
+            .set('Authorization', `Bearer ${token}`)
+
+        expect(response.status).toBe(200)
+        expect(response.body).toHaveLength(1)
+        expect(response.body[0]).toEqual(expect.objectContaining({
+            actionType: 'CREATED',
+            entityType: 'EVENT'
         }))
     })
 })
