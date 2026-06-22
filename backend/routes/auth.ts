@@ -897,7 +897,8 @@ router.post('/login', async (req, res) => {
                         isLeadership: false,
                         isSpecial: false,
                         teamIds: []
-                    }
+                    },
+                    token
                 });
             } else {
                 return res.status(401).json({ error: 'Invalid credentials' });

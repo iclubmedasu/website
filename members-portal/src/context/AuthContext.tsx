@@ -99,6 +99,9 @@ const API_URL = resolveApiUrl();
 const NO_SETUP: CheckStudentIdResponse = { canSetup: false };
 
 function toErrorMessage(error: unknown, fallback: string): string {
+    if (error instanceof TypeError && /fetch|network|load failed/i.test(error.message)) {
+        return "Could not reach the API. If this is your first request after idle time, wait a moment and try again.";
+    }
     if (error instanceof Error && error.message) {
         return error.message;
     }
