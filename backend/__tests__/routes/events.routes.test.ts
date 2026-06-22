@@ -135,6 +135,7 @@ describe('events routes auth wiring', () => {
                 status: 'NOT_STARTED',
                 projectTypeId: 3,
                 priority: 'HIGH',
+                status: 'NOT_STARTED',
                 progressStatus: 'NOT_STARTED',
                 eventTeams: {
                     create: [{ teamId: 1, canEdit: true, isOwner: true }]

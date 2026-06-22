@@ -19,7 +19,6 @@ console.log(
 );
 
 const app = express();
-app.set("trust proxy", 1);
 
 const frontendOrigins = [
     "http://localhost:5173",
@@ -53,14 +52,6 @@ function isPrivateNetworkOrigin(origin: string): boolean {
     }
 }
 
-function isNetlifyOrigin(origin: string): boolean {
-    try {
-        return new URL(origin).hostname.endsWith(".netlify.app");
-    } catch {
-        return false;
-    }
-}
-
 app.use(
     cors({
         origin: (origin, callback) => {
@@ -70,11 +61,6 @@ app.use(
             }
 
             if (frontendOriginSet.has(origin)) {
-                callback(null, true);
-                return;
-            }
-
-            if (!isDevelopment && isNetlifyOrigin(origin)) {
                 callback(null, true);
                 return;
             }
@@ -92,18 +78,6 @@ app.use(
 
 app.use(express.json());
 app.use(cookieParser());
-
-app.get("/", (_req: Request, res: Response) => {
-    res.json({
-        service: "iClub Members Portal API",
-        status: "ok",
-        message: "This Hugging Face Space hosts the backend API only. Open the members portal to sign in.",
-        membersPortal: process.env.FRONTEND_URL ?? "https://iclubmedasu-members-portal.netlify.app",
-        health: "/health",
-        api: "/api",
-    });
-});
-
 app.use("/api", routes);
 
 app.get("/health", (_req: Request, res: Response) => {

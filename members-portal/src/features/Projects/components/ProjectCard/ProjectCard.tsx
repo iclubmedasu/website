@@ -156,11 +156,11 @@ export default function ProjectCard({
         : { id: project.id, title: project.title };
 
     const collapsedLifecycleHandlers = archivedView ? {
-        onReactivate: () => onReactivate?.({ id: project.id, title: project.title }),
-        onAbort: () => onAbort?.({ id: project.id, title: project.title }),
-        onFinalize: () => onFinalize?.({ id: project.id, title: project.title }),
-        onArchive: () => onArchive?.({ id: project.id, title: project.title }),
-        onViewActivity: () => onViewActivity(project),
+        onReactivate: (_item: unknown) => onReactivate?.({ id: project.id, title: project.title }),
+        onAbort: (_item: unknown) => onAbort?.({ id: project.id, title: project.title }),
+        onFinalize: (_item: unknown) => onFinalize?.({ id: project.id, title: project.title }),
+        onArchive: (_item: unknown) => onArchive?.({ id: project.id, title: project.title }),
+        onViewActivity: (_item: unknown) => onViewActivity(project),
     } : {
         onEdit,
         onDeactivate,
@@ -172,11 +172,11 @@ export default function ProjectCard({
     };
 
     const expandedLifecycleHandlers = archivedView ? {
-        onReactivate: () => onReactivate?.(detailTarget),
-        onAbort: () => onAbort?.(detailTarget),
-        onFinalize: () => onFinalize?.(detailTarget),
-        onArchive: () => onArchive?.(detailTarget),
-        onViewActivity: () => onViewActivity(detail || project),
+        onReactivate: (_item: unknown) => onReactivate?.(detailTarget),
+        onAbort: (_item: unknown) => onAbort?.(detailTarget),
+        onFinalize: (_item: unknown) => onFinalize?.(detailTarget),
+        onArchive: (_item: unknown) => onArchive?.(detailTarget),
+        onViewActivity: (_item: unknown) => onViewActivity(detail || project),
     } : collapsedLifecycleHandlers;
 
     const effectiveCanEdit = archivedView ? false : canEdit;
