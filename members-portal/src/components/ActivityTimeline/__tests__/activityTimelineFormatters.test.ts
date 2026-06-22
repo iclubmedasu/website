@@ -3,7 +3,7 @@ import {
     collectReadableChanges,
     getBadgeLabel,
     getEntityDetails,
-} from '../../../members-portal/src/components/ActivityTimeline/activityTimelineFormatters';
+} from '../activityTimelineFormatters';
 
 describe('activityTimelineFormatters', () => {
     it('formats numeric assignment logs with member name from description', () => {
