@@ -97,6 +97,18 @@ function resolveApiBaseUrl(): string {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+export function shouldSendCredentials(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+        const api = new URL(API_BASE_URL, window.location.origin);
+        const page = new URL(window.location.href);
+        if (api.origin === page.origin) return true;
+        return isLoopbackHost(api.hostname) && isLoopbackHost(page.hostname);
+    } catch {
+        return false;
+    }
+}
+
 export function getNotificationsWebSocketUrl(): string {
     if (typeof window === 'undefined') {
         return '';
@@ -155,7 +167,7 @@ export const apiFetch = (input: RequestInfo | URL, init: RequestInit = {}): Prom
     }
     return globalThis.fetch(input, {
         ...init,
-        credentials: 'include', // keep for desktop browsers
+        credentials: shouldSendCredentials() ? 'include' : 'omit',
         headers,
     });
 };

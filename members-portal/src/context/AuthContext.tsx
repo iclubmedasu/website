@@ -1,6 +1,6 @@
 'use client'
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { setToken, clearToken as clearTokenUtil, initToken } from '../services/api';
+import { setToken, clearToken as clearTokenUtil, initToken, shouldSendCredentials } from '../services/api';
 import { apiFetch } from '../services/api';
 import type {
     ApiErrorResponse,
@@ -194,7 +194,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         try {
             const response = await fetch(`${API_URL}/auth/check-email`, {
                 method: "POST",
-                credentials: "include",
+                credentials: shouldSendCredentials() ? "include" : "omit",
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -216,7 +216,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         try {
             const response = await fetch(`${API_URL}/auth/check-student-id`, {
                 method: "POST",
-                credentials: "include",
+                credentials: shouldSendCredentials() ? "include" : "omit",
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -254,7 +254,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         try {
             const response = await fetch(`${API_URL}/auth/complete-profile`, {
                 method: "POST",
-                credentials: "include",
+                credentials: shouldSendCredentials() ? "include" : "omit",
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -299,7 +299,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         try {
             const response = await fetch(`${API_URL}/auth/complete-officer-profile`, {
                 method: "POST",
-                credentials: "include",
+                credentials: shouldSendCredentials() ? "include" : "omit",
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -343,7 +343,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         try {
             const response = await fetch(`${API_URL}/auth/update-invited-profile`, {
                 method: "POST",
-                credentials: "include",
+                credentials: shouldSendCredentials() ? "include" : "omit",
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -375,7 +375,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         try {
             const response = await fetch(`${API_URL}/auth/setup-password`, {
                 method: "POST",
-                credentials: "include",
+                credentials: shouldSendCredentials() ? "include" : "omit",
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -402,7 +402,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         try {
             const response = await fetch(`${API_URL}/auth/login`, {
                 method: "POST",
-                credentials: "include",
+                credentials: shouldSendCredentials() ? "include" : "omit",
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -438,7 +438,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const logout = (): void => {
         void fetch(`${API_URL}/auth/logout`, {
             method: "POST",
-            credentials: "include",
+            credentials: shouldSendCredentials() ? "include" : "omit",
         }).catch((error) => {
             console.error("Logout request failed:", error);
         });
