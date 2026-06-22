@@ -64,6 +64,9 @@ jobs:
           # NOTE: packages/shared is kept — Dockerfile depends on it
           rm -rf members-portal public-website
 
+          # Backend tests are not needed in the HF Docker image
+          rm -rf backend/__tests__
+
           # Remove all node_modules and cache folders
           find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name ".cache" -exec rm -rf {} + 2>/dev/null || true
@@ -124,6 +127,11 @@ jobs:
                   ".env.*",
                   "*.log",
                   "*.tsbuildinfo",
+              ],
+              delete_patterns=[
+                  "backend/__tests__/**",
+                  "members-portal/**",
+                  "public-website/**",
               ],
               commit_message="Deploy from GitHub Actions",
           )
