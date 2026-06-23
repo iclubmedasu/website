@@ -15,9 +15,12 @@ interface EventCheckInPanelProps {
     suspended?: boolean;
 }
 
-export default function EventCheckInPanel({ eventId, onCheckIn, suspended = false }: EventCheckInPanelProps) {
+export default function EventCheckInPanel({
+    eventId,
+    onCheckIn,
+    suspended = false,
+}: EventCheckInPanelProps) {
     const manualInputRef = useRef<HTMLInputElement>(null);
-    const panelRef = useRef<HTMLDivElement>(null);
 
     const {
         manualCode,
@@ -118,7 +121,6 @@ export default function EventCheckInPanel({ eventId, onCheckIn, suspended = fals
         <>
             <input ref={captureInputRef} {...captureInputProps} />
             <div
-                ref={panelRef}
                 className="event-registrations-checkin-panel"
                 onClick={panelClickHandler}
             >
@@ -128,10 +130,11 @@ export default function EventCheckInPanel({ eventId, onCheckIn, suspended = fals
                         paused={loading || requiredFieldsModalOpen || suspended}
                         onCode={handleCameraCode}
                     />
-                    <p className="event-checkin-scan-status">
+                    {/* <p className="event-checkin-scan-status">
                         Use camera, USB scanner, or enter a code below.
-                    </p>
+                    </p> */}
                 </div>
+                <hr className="event-checkin-divider" />
                 <div className="event-registrations-checkin-manual">
                     <h3 className="expanded-section-title expanded-section-title--sm">Manual entry</h3>
                     <input

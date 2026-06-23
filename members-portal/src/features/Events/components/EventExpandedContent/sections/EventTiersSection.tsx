@@ -106,7 +106,7 @@ export default function EventTiersSection({ eventId, tiers, onTiersChange }: Eve
                 />
                 <button type="button" onClick={() => void handleCreateTier()} className="btn btn-primary" disabled={isEditing}>Add tier</button>
             </div>
-            <div className="event-expanded-stack event-expanded-stack--spaced">
+            <div className="event-expanded-tiers-list">
                 {tiers.map((tier) => {
                     const tierIsEditing = editingTierId === Number(tier.id);
                     const actionsDisabled = isEditing && !tierIsEditing;

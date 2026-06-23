@@ -1,0 +1,32 @@
+.event-tasks-export-bar {
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(86, 23, 137, 0.08);
+}
+
+.event-tasks-export-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    width: 100%;
+    padding: 0.65rem 1rem;
+    border: none;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--purple-700);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.event-tasks-export-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--purple-700) 0%, #8b5cf6 100%);
+    color: white;
+}
+
+.event-tasks-export-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

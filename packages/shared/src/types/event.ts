@@ -56,6 +56,11 @@ export interface EventCustomFieldRef {
     isActive?: boolean;
 }
 
+export interface EventAttendanceDayRef {
+    eventDay: string;
+    checkedInAt: ISODateTime;
+}
+
 export interface EventRegistrationRef {
     id: Id;
     eventId: Id;
@@ -72,10 +77,13 @@ export interface EventRegistrationRef {
     cancelledAt?: ISODateTime | null;
     notes?: string | null;
     customFieldValues?: Record<string, unknown> | null;
+    ticketEmailSentAt?: ISODateTime | null;
+    reminderEmailSentAt?: ISODateTime | null;
     createdAt?: ISODateTime;
     updatedAt?: ISODateTime;
     tier?: EventTierRef | null;
     member?: MemberSummary | null;
+    attendanceDays?: EventAttendanceDayRef[];
 }
 
 export interface EventSummary {
@@ -236,20 +244,95 @@ export interface UpdateEventRegistrationPayload {
     customFieldValues?: Record<string, unknown> | unknown;
 }
 
+export interface WalkInRegistrationResult extends EventRegistrationRef {
+    action?: 'created' | 'checked_in_existing';
+}
+
+export type RegistrationImportStandardField =
+    | 'fullName'
+    | 'email'
+    | 'phoneNumber'
+    | 'tier'
+    | 'notes';
+
+export interface RegistrationImportNewFieldSpec {
+    excelColumn: string;
+    label: string;
+    type: EventCustomFieldType;
+    options?: string[];
+    required?: boolean;
+}
+
+export interface RegistrationImportColumnMapping {
+    fullName: string | null;
+    email: string | null;
+    phoneNumber: string | null;
+    tier: string | null;
+    notes: string | null;
+    customFields: Record<string, string | null>;
+}
+
+export interface RegistrationImportRow {
+    fullName: string;
+    email?: string;
+    phoneNumber?: string | null;
+    tierName?: string | null;
+    notes?: string | null;
+    customFieldValues?: Record<string, unknown>;
+}
+
+export interface ImportRegistrationsPayload {
+    newCustomFields?: RegistrationImportNewFieldSpec[];
+    rows: RegistrationImportRow[];
+}
+
+export interface ImportRegistrationsResult {
+    created: number;
+    updated: number;
+    skipped: number;
+    errors: Array<{ row: number; email?: string; message: string }>;
+    createdRegistrationIds: number[];
+}
+
+export interface SendRegistrationTicketsPayload {
+    registrationIds: number[];
+}
+
+export interface SendRegistrationRemindersPayload {
+    registrationIds: number[];
+}
+
+export interface SendRegistrationTicketsResult {
+    sent: number;
+    skipped: number;
+    failed: number;
+    errors: Array<{ registrationId: number; message: string }>;
+}
+
+export type EventRegistrationSourceGroup = "PRE_REGISTERED" | "WALK_IN" | "IMPORT";
+
 export interface EventRegistrationQueryParams {
     tierId?: Id | string;
-    checkInStatus?: "CHECKED_IN" | "NOT_CHECKED_IN";
+    checkInStatus?: "CHECKED_IN" | "NOT_CHECKED_IN" | "CHECKED_IN_TODAY";
     walkIn?: boolean;
+    source?: EventRegistrationSource;
+    sourceGroup?: EventRegistrationSourceGroup;
+    ticketStatus?: "SENT" | "NOT_SENT";
+    reminderStatus?: "SENT" | "NOT_SENT";
+    eventDay?: string;
 }
 
 export interface CheckInRegistrationPayload {
     confirmationCode?: string;
+    eventDay?: string;
     customFieldValues?: Record<string, unknown> | unknown;
 }
 
 export interface EventRegistrationLookupResult {
     registration: EventRegistrationRef;
     missingRequiredFields: EventCustomFieldRef[];
+    eventDay: string;
+    checkedInToday: boolean;
 }
 
 export interface EventTaskAssignmentRef {

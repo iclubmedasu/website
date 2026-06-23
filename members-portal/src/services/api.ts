@@ -13,6 +13,11 @@ import type {
     CreateScheduleSlotPayload,
     CreateTaskPayload,
     Id,
+    ImportRegistrationsPayload,
+    ImportRegistrationsResult,
+    SendRegistrationRemindersPayload,
+    SendRegistrationTicketsPayload,
+    SendRegistrationTicketsResult,
     EventCustomFieldRef,
     EventDetail,
     EventFileCommentRef,
@@ -23,6 +28,7 @@ import type {
     EventRegistrationQueryParams,
     EventRegistrationLookupResult,
     EventRegistrationRef,
+    WalkInRegistrationResult,
     EventStatistics,
     EventSummary,
     EventActivityEntry,
@@ -1886,6 +1892,11 @@ export const eventsAPI = {
         if (filters.tierId) params.append('tierId', String(filters.tierId));
         if (filters.checkInStatus) params.append('checkInStatus', filters.checkInStatus);
         if (filters.walkIn !== undefined) params.append('walkIn', String(filters.walkIn));
+        if (filters.source) params.append('source', filters.source);
+        if (filters.sourceGroup) params.append('sourceGroup', filters.sourceGroup);
+        if (filters.ticketStatus) params.append('ticketStatus', filters.ticketStatus);
+        if (filters.reminderStatus) params.append('reminderStatus', filters.reminderStatus);
+        if (filters.eventDay) params.append('eventDay', filters.eventDay);
 
         const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations${params.toString() ? `?${params.toString()}` : ''}`, {
             headers: getAuthHeaders(),
@@ -1921,14 +1932,50 @@ export const eventsAPI = {
         return handleResponse<EventRegistrationRef>(response);
     },
 
-    createWalkInRegistration: async (eventId: Id | string, data: CreateEventRegistrationPayload): Promise<EventRegistrationRef> => {
+    createWalkInRegistration: async (eventId: Id | string, data: CreateEventRegistrationPayload): Promise<WalkInRegistrationResult> => {
         const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/walk-in`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify(data),
         });
 
-        return handleResponse<EventRegistrationRef>(response);
+        return handleResponse<WalkInRegistrationResult>(response);
+    },
+
+    importRegistrations: async (eventId: Id | string, payload: ImportRegistrationsPayload): Promise<ImportRegistrationsResult> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/import`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+
+        return handleResponse<ImportRegistrationsResult>(response);
+    },
+
+    sendRegistrationTickets: async (
+        eventId: Id | string,
+        payload: SendRegistrationTicketsPayload,
+    ): Promise<SendRegistrationTicketsResult> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/send-tickets`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+
+        return handleResponse<SendRegistrationTicketsResult>(response);
+    },
+
+    sendRegistrationReminders: async (
+        eventId: Id | string,
+        payload: SendRegistrationRemindersPayload,
+    ): Promise<SendRegistrationTicketsResult> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/send-reminders`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+
+        return handleResponse<SendRegistrationTicketsResult>(response);
     },
 
     checkInRegistration: async (
@@ -1963,6 +2010,24 @@ export const eventsAPI = {
         });
 
         return handleResponse<EventRegistrationRef>(response);
+    },
+
+    resendRegistrationTicket: async (eventId: Id | string, registrationId: Id | string): Promise<{ ok: boolean; message: string }> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${registrationId}/resend-ticket`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<{ ok: boolean; message: string }>(response);
+    },
+
+    resendRegistrationReminder: async (eventId: Id | string, registrationId: Id | string): Promise<{ ok: boolean; message: string }> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${registrationId}/resend-reminder`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<{ ok: boolean; message: string }>(response);
     },
 
     getStatistics: async (eventId: Id | string): Promise<EventStatistics> => {

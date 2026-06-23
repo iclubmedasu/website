@@ -44,3 +44,15 @@ export function isWithinEventDays(
     const today = toLocalDayString(referenceDate);
     return today >= range.startDay && today <= range.endDay;
 }
+
+export function isMultiDayEvent(start?: string | null, end?: string | null): boolean {
+    const range = getEventDayRange(start, end);
+    if (!range) return false;
+    return range.startDay !== range.endDay;
+}
+
+export function formatAttendanceDayLabel(eventDay: string): string {
+    const parsed = new Date(`${eventDay}T12:00:00`);
+    if (Number.isNaN(parsed.getTime())) return eventDay;
+    return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}

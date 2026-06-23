@@ -38,6 +38,7 @@ RUN pnpm install --frozen-lockfile --filter backend... --prod
 
 COPY --from=build /app/backend/dist /app/backend/dist
 COPY --from=build /app/backend/prisma /app/backend/prisma
+COPY --from=build /app/backend/assets /app/backend/assets
 COPY --from=build /app/packages/shared /app/packages/shared
 
 WORKDIR /app/backend

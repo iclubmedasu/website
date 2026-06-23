@@ -1,10 +1,11 @@
 import { Prisma } from '@prisma/client';
 import express, { Request, Response } from 'express';
 import { prisma } from '../db';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, optionalAuthenticateToken } from '../middleware/auth';
 import { generateUniqueConfirmationCode } from '../services/eventCode';
-import { isWithinEventDays } from '../services/eventDates';
+import { formatEventDay, isWithinEventDays, parseEventDayString, resolveCheckInEventDay, eventDayStringToDate, shouldSendWalkInTicket } from '../services/eventDates';
 import { emitNotificationEvent } from '../services/notificationService';
+import { sendEventReminderEmail, sendEventTicketEmail } from '../services/eventTicketEmailService';
 import {
     collectChangedFields,
     changesToPayload,
@@ -25,6 +26,12 @@ const VALID_EVENT_STATUSES = new Set(['DRAFT', 'PUBLISHED', 'COMPLETED', 'CANCEL
 const VALID_PROGRESS_STATUSES = new Set(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD', 'CANCELLED']);
 const VALID_PRIORITIES = new Set(['LOW', 'MEDIUM', 'HIGH', 'URGENT', 'CRITICAL']);
 const VALID_TIER_CURRENCIES = new Set(['USD', 'EUR', 'EGP']);
+
+function queueTicketEmail(registrationId: number, context: string): void {
+    void sendEventTicketEmail(registrationId).catch((error) => {
+        console.error(`Failed to send ticket email (${context}) for registration ${registrationId}:`, error);
+    });
+}
 
 function normalizeTierCurrency(value: unknown): string {
     const currency = String(value || 'EGP').trim().toUpperCase();
@@ -65,6 +72,107 @@ function normalizeDescription(value: unknown): string | null {
 function parseId(value: unknown): number | null {
     const parsed = Number.parseInt(String(value), 10);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+const registrationInclude = {
+    tier: { select: { id: true, name: true } },
+    member: { select: { id: true, fullName: true, email: true } },
+    attendanceDays: { orderBy: { eventDay: 'asc' as const } },
+} satisfies Prisma.EventRegistrationInclude;
+
+type RegistrationWithDays = Prisma.EventRegistrationGetPayload<{ include: typeof registrationInclude }>;
+
+function serializeAttendanceDays(
+    days: Array<{ eventDay: Date; checkedInAt: Date }>,
+): Array<{ eventDay: string; checkedInAt: string }> {
+    return days.map((day) => ({
+        eventDay: formatEventDay(day.eventDay),
+        checkedInAt: day.checkedInAt.toISOString(),
+    }));
+}
+
+function serializeRegistration(registration: RegistrationWithDays) {
+    const { attendanceDays, ...rest } = registration;
+    return {
+        ...rest,
+        attendanceDays: serializeAttendanceDays(attendanceDays ?? []),
+    };
+}
+
+function hasAttendanceOnDay(attendanceDays: Array<{ eventDay: Date }>, eventDay: string): boolean {
+    return attendanceDays.some((day) => formatEventDay(day.eventDay) === eventDay);
+}
+
+async function findActiveEventRegistration(
+    eventId: number,
+    { email, memberId }: { email: string; memberId?: number | null },
+): Promise<RegistrationWithDays | null> {
+    const or: Prisma.EventRegistrationWhereInput[] = [
+        { eventId, email, status: { not: 'CANCELLED' } },
+    ];
+    if (memberId) {
+        or.push({ eventId, memberId, status: { not: 'CANCELLED' } });
+    }
+    return prisma.eventRegistration.findFirst({
+        where: { OR: or },
+        include: registrationInclude,
+    });
+}
+
+async function resolveMemberIdByEmail(email: string): Promise<number | null> {
+    const normalized = email.trim().toLowerCase();
+    const member = await prisma.member.findFirst({
+        where: {
+            OR: [
+                { email: normalized },
+                { email2: normalized },
+                { email3: normalized },
+            ],
+        },
+        select: { id: true },
+    });
+    return member?.id ?? null;
+}
+
+function slugImportFullName(fullName: string): string {
+    const slug = fullName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return slug || 'attendee';
+}
+
+function buildImportPlaceholderEmail(eventId: number, fullName: string): string {
+    return `import.${eventId}.${slugImportFullName(fullName)}@event-import.local`;
+}
+
+function isImportPlaceholderEmail(email: string): boolean {
+    return email.trim().toLowerCase().endsWith('@event-import.local');
+}
+
+async function findActiveEventRegistrationForImport(
+    eventId: number,
+    { fullName, email }: { fullName: string; email?: string | null },
+): Promise<RegistrationWithDays | null> {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (normalizedEmail) {
+        const memberId = await resolveMemberIdByEmail(normalizedEmail);
+        return findActiveEventRegistration(eventId, { email: normalizedEmail, memberId });
+    }
+
+    const placeholderEmail = buildImportPlaceholderEmail(eventId, fullName);
+    const byPlaceholder = await prisma.eventRegistration.findFirst({
+        where: { eventId, email: placeholderEmail, status: { not: 'CANCELLED' } },
+        include: registrationInclude,
+    });
+    if (byPlaceholder) return byPlaceholder;
+
+    return prisma.eventRegistration.findFirst({
+        where: {
+            eventId,
+            status: { not: 'CANCELLED' },
+            fullName: { equals: fullName.trim(), mode: 'insensitive' },
+            email: { endsWith: '@event-import.local' },
+        },
+        include: registrationInclude,
+    });
 }
 
 function hasManagerAccess(req: Request): boolean {
@@ -389,6 +497,73 @@ function validateRequiredCustomFieldValues(
         errors[String(field.id)] = `${field.label} is required.`;
     }
     return errors;
+}
+
+function getDropdownOptions(options: unknown): string[] {
+    if (!Array.isArray(options)) return [];
+    return options.map((option) => String(option));
+}
+
+function coerceImportCustomFieldValue(type: string, value: unknown, options?: unknown): unknown {
+    if (value === null || value === undefined || value === '') return null;
+
+    if (type === 'checkbox') {
+        if (typeof value === 'boolean') return value;
+        const normalized = String(value).trim().toLowerCase();
+        if (['true', 'yes', 'y', '1', 'x', 'checked'].includes(normalized)) return true;
+        if (['false', 'no', 'n', '0'].includes(normalized)) return false;
+        return null;
+    }
+
+    if (type === 'number') {
+        const parsed = typeof value === 'number' ? value : Number(String(value).trim());
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    if (type === 'dropdown') {
+        const raw = String(value).trim();
+        if (!raw) return null;
+        const allowed = getDropdownOptions(options);
+        const match = allowed.find((option) => option.toLowerCase() === raw.toLowerCase());
+        return match ?? null;
+    }
+
+    return String(value).trim();
+}
+
+function validateImportCustomFieldValues(
+    fields: CustomFieldRow[],
+    customFieldValues: Record<string, unknown>,
+): string | null {
+    for (const field of fields) {
+        const value = customFieldValues[String(field.id)];
+        if (value === null || value === undefined || value === '') {
+            if (field.required) return `${field.label} is required.`;
+            continue;
+        }
+        if (field.type === 'dropdown') {
+            const allowed = getDropdownOptions(field.options);
+            const raw = String(value).trim();
+            const match = allowed.find((option) => option.toLowerCase() === raw.toLowerCase());
+            if (!match) return `Invalid value "${raw}" for ${field.label}.`;
+        }
+    }
+    return null;
+}
+
+function remapImportedCustomFieldValues(
+    rawValues: Record<string, unknown> | undefined,
+    newFieldIdByExcelColumn: Map<string, number>,
+): Record<string, unknown> {
+    if (!rawValues) return {};
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(rawValues)) {
+        const mappedId = newFieldIdByExcelColumn.get(key) ?? parseId(key);
+        if (mappedId) {
+            result[String(mappedId)] = value;
+        }
+    }
+    return result;
 }
 
 // ============================================
@@ -1371,27 +1546,58 @@ router.get('/:id/registrations', authenticateToken, async (req, res) => {
         const tierId = parseId(req.query.tierId);
         const checkInStatus = String(req.query.checkInStatus || '').trim().toUpperCase();
         const walkIn = String(req.query.walkIn || '').trim().toLowerCase();
+        const source = String(req.query.source || '').trim().toUpperCase();
+        const sourceGroup = String(req.query.sourceGroup || '').trim().toUpperCase();
+        const ticketStatus = String(req.query.ticketStatus || '').trim().toUpperCase();
+        const reminderStatus = String(req.query.reminderStatus || '').trim().toUpperCase();
+        const eventDayFilter = parseEventDayString(req.query.eventDay);
 
-        const where: Record<string, unknown> = { eventId };
+        const VALID_REGISTRATION_SOURCES = new Set(['PORTAL', 'PUBLIC', 'IMPORT', 'WALK_IN']);
+
+        const where: Prisma.EventRegistrationWhereInput = { eventId };
         if (tierId) where.tierId = tierId;
         if (checkInStatus === 'CHECKED_IN') {
             where.status = 'CHECKED_IN';
         } else if (checkInStatus === 'NOT_CHECKED_IN') {
             where.status = 'REGISTERED';
+        } else if (checkInStatus === 'CHECKED_IN_TODAY') {
+            const event = await prisma.event.findUnique({
+                where: { id: eventId },
+                select: { eventDate: true, eventEndDate: true },
+            });
+            if (!event) return res.status(404).json({ error: 'Event not found' });
+            const resolved = resolveCheckInEventDay(event.eventDate, event.eventEndDate);
+            if (!resolved) {
+                where.id = -1;
+            } else {
+                where.attendanceDays = { some: { eventDay: resolved.eventDayDate } };
+            }
+        }
+        if (eventDayFilter) {
+            where.attendanceDays = { some: { eventDay: eventDayStringToDate(eventDayFilter) } };
         }
         if (walkIn === 'true') where.isWalkIn = true;
         if (walkIn === 'false') where.isWalkIn = false;
+        if (VALID_REGISTRATION_SOURCES.has(source)) where.source = source;
+        if (sourceGroup === 'PRE_REGISTERED') {
+            where.source = { in: ['PORTAL', 'PUBLIC'] };
+        } else if (sourceGroup === 'WALK_IN') {
+            where.OR = [{ source: 'WALK_IN' }, { isWalkIn: true }];
+        } else if (sourceGroup === 'IMPORT') {
+            where.source = 'IMPORT';
+        }
+        if (ticketStatus === 'SENT') where.ticketEmailSentAt = { not: null };
+        if (ticketStatus === 'NOT_SENT') where.ticketEmailSentAt = null;
+        if (reminderStatus === 'SENT') where.reminderEmailSentAt = { not: null };
+        if (reminderStatus === 'NOT_SENT') where.reminderEmailSentAt = null;
 
         const registrations = await prisma.eventRegistration.findMany({
             where,
             orderBy: [{ createdAt: 'asc' }],
-            include: {
-                tier: { select: { id: true, name: true } },
-                member: { select: { id: true, fullName: true, email: true } },
-            },
+            include: registrationInclude,
         });
 
-        return res.json(registrations);
+        return res.json(registrations.map(serializeRegistration));
     } catch (error) {
         console.error(`GET /events/${req.params.id}/registrations error:`, error);
         return res.status(500).json({ error: 'Failed to fetch registrations' });
@@ -1409,18 +1615,31 @@ router.get('/:id/registrations/lookup', authenticateToken, async (req, res) => {
 
         const registration = await prisma.eventRegistration.findFirst({
             where: { eventId, confirmationCode },
-            include: {
-                tier: { select: { id: true, name: true } },
-                member: { select: { id: true, fullName: true, email: true } },
-            },
+            include: registrationInclude,
         });
 
         if (!registration) return res.status(404).json({ error: 'Registration not found' });
 
+        const event = await prisma.event.findUnique({
+            where: { id: eventId },
+            select: { eventDate: true, eventEndDate: true },
+        });
+        if (!event) return res.status(404).json({ error: 'Event not found' });
+
         const fields = await getActiveCustomFields(eventId);
         const missingRequiredFields = getMissingRequiredCustomFieldsFromValues(fields, registration.customFieldValues);
+        const resolved = resolveCheckInEventDay(event.eventDate, event.eventEndDate);
+        const eventDay = resolved?.eventDay ?? '';
+        const checkedInToday = resolved
+            ? hasAttendanceOnDay(registration.attendanceDays ?? [], resolved.eventDay)
+            : false;
 
-        return res.json({ registration, missingRequiredFields });
+        return res.json({
+            registration: serializeRegistration(registration),
+            missingRequiredFields,
+            eventDay,
+            checkedInToday,
+        });
     } catch (error) {
         console.error(`GET /events/${req.params.id}/registrations/lookup error:`, error);
         return res.status(500).json({ error: 'Failed to lookup registration' });
@@ -1437,21 +1656,18 @@ router.get('/:id/registrations/:registrationId', authenticateToken, async (req, 
 
         const registration = await prisma.eventRegistration.findFirst({
             where: { id: registrationId, eventId },
-            include: {
-                tier: { select: { id: true, name: true } },
-                member: { select: { id: true, fullName: true, email: true } },
-            },
+            include: registrationInclude,
         });
 
         if (!registration) return res.status(404).json({ error: 'Registration not found' });
-        return res.json(registration);
+        return res.json(serializeRegistration(registration));
     } catch (error) {
         console.error(`GET /events/${req.params.id}/registrations/${req.params.registrationId} error:`, error);
         return res.status(500).json({ error: 'Failed to fetch registration' });
     }
 });
 
-router.post('/:id/registrations', async (req, res) => {
+router.post('/:id/registrations', optionalAuthenticateToken, async (req, res) => {
     try {
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
@@ -1489,6 +1705,15 @@ router.post('/:id/registrations', async (req, res) => {
         const email = String(req.body?.email || '').trim().toLowerCase();
         if (!fullName || !email) return res.status(400).json({ error: 'fullName and email are required' });
 
+        const registrationMemberId = req.user?.memberId ?? await resolveMemberIdByEmail(email);
+        const existingRegistration = await findActiveEventRegistration(eventId, {
+            email,
+            memberId: registrationMemberId,
+        });
+        if (existingRegistration) {
+            return res.status(409).json({ error: 'Already registered for this event' });
+        }
+
         const customFieldValuesInput = req.body?.customFieldValues;
         if (!isManager) {
             const publicFields = await getActiveCustomFields(eventId, { publicOnly: true });
@@ -1504,7 +1729,7 @@ router.post('/:id/registrations', async (req, res) => {
             data: {
                 eventId,
                 tierId,
-                memberId: req.user?.memberId ?? null,
+                memberId: registrationMemberId,
                 fullName,
                 email,
                 phoneNumber: String(req.body?.phoneNumber || '').trim() || null,
@@ -1537,6 +1762,10 @@ router.post('/:id/registrations', async (req, res) => {
                 : `Public registration: ${registration.fullName} (${registration.email})`,
         });
 
+        if (!isManager) {
+            queueTicketEmail(registration.id, 'public-registration');
+        }
+
         return res.status(201).json(registration);
     } catch (error) {
         console.error(`POST /events/${req.params.id}/registrations error:`, error);
@@ -1568,12 +1797,81 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
             return res.status(400).json({ error: 'Required custom fields are missing', fieldErrors: walkInFieldErrors });
         }
 
+        const bodyMemberId = req.body?.memberId ? parseId(req.body.memberId) : null;
+        const resolvedMemberId = bodyMemberId ?? await resolveMemberIdByEmail(email);
+        const walkInCheckedInAt = new Date();
+        const resolvedDay = resolveCheckInEventDay(event.eventDate, event.eventEndDate, { referenceDate: walkInCheckedInAt });
+        if (!resolvedDay) {
+            return res.status(409).json({ error: 'Walk-ins are only available on event days' });
+        }
+
+        const existingRegistration = await findActiveEventRegistration(eventId, {
+            email,
+            memberId: resolvedMemberId,
+        });
+
+        if (existingRegistration) {
+            if (hasAttendanceOnDay(existingRegistration.attendanceDays ?? [], resolvedDay.eventDay)) {
+                return res.status(409).json({ error: 'This person is already checked in today' });
+            }
+
+            const mergedCustomFieldValues = mergeCustomFieldValues(
+                existingRegistration.customFieldValues,
+                req.body?.customFieldValues ?? {},
+            );
+            const mergedFieldErrors = validateRequiredCustomFieldValues(walkInFields, mergedCustomFieldValues);
+            if (Object.keys(mergedFieldErrors).length > 0) {
+                return res.status(400).json({ error: 'Required custom fields are missing', fieldErrors: mergedFieldErrors });
+            }
+
+            const updated = await prisma.$transaction(async (tx) => {
+                await tx.eventRegistrationDay.create({
+                    data: {
+                        registrationId: existingRegistration.id,
+                        eventDay: resolvedDay.eventDayDate,
+                        checkedInAt: walkInCheckedInAt,
+                    },
+                });
+
+                return tx.eventRegistration.update({
+                    where: { id: existingRegistration.id },
+                    data: {
+                        status: 'CHECKED_IN',
+                        ...(existingRegistration.status !== 'CHECKED_IN' ? { checkedInAt: walkInCheckedInAt } : {}),
+                        ...(resolvedMemberId && !existingRegistration.memberId ? { memberId: resolvedMemberId } : {}),
+                        customFieldValues: toJsonInput(mergedCustomFieldValues),
+                    },
+                    include: registrationInclude,
+                });
+            });
+
+            await logEventActivity({
+                eventId,
+                memberId: req.user!.memberId!,
+                actionType: 'CHECKED_IN',
+                entityType: 'REGISTRATION',
+                oldValue: { status: existingRegistration.status },
+                newValue: {
+                    status: 'CHECKED_IN',
+                    fullName: updated.fullName,
+                    eventDay: resolvedDay.eventDay,
+                    source: 'WALK_IN',
+                },
+                description: `${updated.fullName} checked in for ${resolvedDay.eventDay} via walk-in`,
+            });
+
+            return res.status(200).json({
+                ...serializeRegistration(updated),
+                action: 'checked_in_existing',
+            });
+        }
+
         const confirmationCode = await createRegistrationCodeWithRetry();
         const registration = await prisma.eventRegistration.create({
             data: {
                 eventId,
                 tierId: parseId(req.body?.tierId),
-                memberId: req.body?.memberId ? parseId(req.body.memberId) : null,
+                memberId: resolvedMemberId,
                 fullName,
                 email,
                 phoneNumber: String(req.body?.phoneNumber || '').trim() || null,
@@ -1581,13 +1879,17 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
                 source: 'WALK_IN',
                 status: 'CHECKED_IN',
                 isWalkIn: true,
-                checkedInAt: new Date(),
+                checkedInAt: walkInCheckedInAt,
                 notes: String(req.body?.notes || '').trim() || null,
                 customFieldValues: toJsonInput(req.body?.customFieldValues),
+                attendanceDays: {
+                    create: {
+                        eventDay: resolvedDay.eventDayDate,
+                        checkedInAt: walkInCheckedInAt,
+                    },
+                },
             },
-            include: {
-                tier: { select: { id: true, name: true } },
-            },
+            include: registrationInclude,
         });
 
         await logEventActivity({
@@ -1605,10 +1907,251 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
             description: `Walk-in registration for ${registration.fullName} (${registration.email})`,
         });
 
-        return res.status(201).json(registration);
+        if (shouldSendWalkInTicket(event.eventDate, event.eventEndDate, walkInCheckedInAt)) {
+            queueTicketEmail(registration.id, 'walk-in');
+        }
+
+        return res.status(201).json({
+            ...serializeRegistration(registration),
+            action: 'created',
+        });
     } catch (error) {
         console.error(`POST /events/${req.params.id}/registrations/walk-in error:`, error);
         return res.status(500).json({ error: 'Failed to create walk-in registration' });
+    }
+});
+
+router.post('/:id/registrations/import', authenticateToken, async (req, res) => {
+    try {
+        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
+
+        const eventId = parseId(req.params.id);
+        if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
+
+        const event = await prisma.event.findUnique({
+            where: { id: eventId },
+            select: { id: true, capacity: true },
+        });
+        if (!event) return res.status(404).json({ error: 'Event not found' });
+
+        const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+        if (rows.length === 0) {
+            return res.status(400).json({ error: 'At least one row is required for import' });
+        }
+        if (rows.length > 2000) {
+            return res.status(400).json({ error: 'Import is limited to 2000 rows per file' });
+        }
+
+        const newCustomFieldsInput = Array.isArray(req.body?.newCustomFields) ? req.body.newCustomFields : [];
+        const tiers = await prisma.eventTier.findMany({
+            where: { eventId, isActive: true },
+            select: { id: true, name: true, maxCapacity: true },
+        });
+        const tierByName = new Map(tiers.map((tier) => [tier.name.trim().toLowerCase(), tier]));
+
+        const result = {
+            created: 0,
+            updated: 0,
+            skipped: 0,
+            errors: [] as Array<{ row: number; email?: string; message: string }>,
+            createdRegistrationIds: [] as number[],
+        };
+
+        const newFieldIdByExcelColumn = new Map<string, number>();
+        let nextFieldOrder = await prisma.eventCustomField.aggregate({
+            where: { eventId },
+            _max: { order: true },
+        });
+
+        for (const spec of newCustomFieldsInput) {
+            const excelColumn = String(spec?.excelColumn || '').trim();
+            const label = String(spec?.label || '').trim();
+            const type = String(spec?.type || '').trim();
+            if (!excelColumn || !label || !type) {
+                return res.status(400).json({ error: 'Each new custom field requires excelColumn, label, and type' });
+            }
+
+            const order = (nextFieldOrder._max.order ?? -1) + 1;
+            nextFieldOrder = { _max: { order } };
+
+            const createdField = await prisma.eventCustomField.create({
+                data: {
+                    eventId,
+                    label,
+                    type,
+                    options: toJsonInput(spec?.options),
+                    required: Boolean(spec?.required),
+                    showOnPublic: false,
+                    order,
+                },
+            });
+            newFieldIdByExcelColumn.set(excelColumn, createdField.id);
+        }
+
+        const activeFields = await getActiveCustomFields(eventId);
+        const seenImportKeys = new Map<string, number>();
+        let registrationCount = await getEventRegistrationCount(eventId);
+
+        for (let index = 0; index < rows.length; index += 1) {
+            const rowNumber = index + 2;
+            const row = rows[index] as Record<string, unknown>;
+            const fullName = String(row?.fullName || '').trim();
+            const rawEmail = row?.email !== undefined && row?.email !== null
+                ? String(row.email).trim().toLowerCase()
+                : '';
+
+            if (!fullName) {
+                result.skipped += 1;
+                result.errors.push({
+                    row: rowNumber,
+                    email: rawEmail || undefined,
+                    message: 'Full name is required.',
+                });
+                continue;
+            }
+
+            const resolvedEmail = rawEmail || buildImportPlaceholderEmail(eventId, fullName);
+            const dedupKey = rawEmail || `name:${fullName.trim().toLowerCase()}`;
+
+            if (seenImportKeys.has(dedupKey)) {
+                result.errors.push({
+                    row: rowNumber,
+                    email: rawEmail || undefined,
+                    message: `Duplicate entry in file; row ${seenImportKeys.get(dedupKey)} will be used instead.`,
+                });
+            }
+            seenImportKeys.set(dedupKey, rowNumber);
+
+            const remappedValues = remapImportedCustomFieldValues(
+                row?.customFieldValues && typeof row.customFieldValues === 'object' && !Array.isArray(row.customFieldValues)
+                    ? row.customFieldValues as Record<string, unknown>
+                    : undefined,
+                newFieldIdByExcelColumn,
+            );
+
+            const coercedValues: Record<string, unknown> = {};
+            for (const field of activeFields) {
+                if (!(String(field.id) in remappedValues)) continue;
+                coercedValues[String(field.id)] = coerceImportCustomFieldValue(
+                    field.type,
+                    remappedValues[String(field.id)],
+                    field.options,
+                );
+            }
+
+            const fieldValidationError = validateImportCustomFieldValues(activeFields, coercedValues);
+            if (fieldValidationError) {
+                result.skipped += 1;
+                result.errors.push({ row: rowNumber, email: rawEmail || undefined, message: fieldValidationError });
+                continue;
+            }
+
+            let tierId: number | null = null;
+            const tierName = String(row?.tierName || '').trim();
+            if (tierName) {
+                const tier = tierByName.get(tierName.toLowerCase());
+                if (!tier) {
+                    result.skipped += 1;
+                    result.errors.push({ row: rowNumber, email: rawEmail || undefined, message: `Tier "${tierName}" was not found.` });
+                    continue;
+                }
+                tierId = tier.id;
+            }
+
+            const memberId = rawEmail ? await resolveMemberIdByEmail(rawEmail) : null;
+            const existing = await findActiveEventRegistrationForImport(eventId, { fullName, email: rawEmail || null });
+
+            if (existing) {
+                const mergedCustomFieldValues = Object.keys(coercedValues).length > 0
+                    ? mergeCustomFieldValues(existing.customFieldValues, coercedValues)
+                    : existing.customFieldValues;
+
+                await prisma.eventRegistration.update({
+                    where: { id: existing.id },
+                    data: {
+                        fullName,
+                        ...(rawEmail ? { email: rawEmail } : {}),
+                        phoneNumber: row?.phoneNumber !== undefined && row?.phoneNumber !== null
+                            ? String(row.phoneNumber).trim() || null
+                            : existing.phoneNumber,
+                        tierId: tierName ? tierId : existing.tierId,
+                        notes: row?.notes !== undefined && row?.notes !== null
+                            ? String(row.notes).trim() || null
+                            : existing.notes,
+                        ...(Object.keys(coercedValues).length > 0
+                            ? { customFieldValues: toJsonInput(mergedCustomFieldValues) }
+                            : {}),
+                        ...(memberId && !existing.memberId ? { memberId } : {}),
+                    },
+                });
+                result.updated += 1;
+                continue;
+            }
+
+            if (event.capacity != null && registrationCount >= event.capacity) {
+                result.skipped += 1;
+                result.errors.push({ row: rowNumber, email: rawEmail || undefined, message: 'Event capacity has been reached.' });
+                continue;
+            }
+
+            if (tierId) {
+                const tier = tiers.find((entry) => entry.id === tierId);
+                if (tier?.maxCapacity != null) {
+                    const tierRegistrationCount = await prisma.eventRegistration.count({
+                        where: { eventId, tierId, status: { not: 'CANCELLED' } },
+                    });
+                    if (tierRegistrationCount >= tier.maxCapacity) {
+                        result.skipped += 1;
+                        result.errors.push({ row: rowNumber, email: rawEmail || undefined, message: `Tier "${tier.name}" is at capacity.` });
+                        continue;
+                    }
+                }
+            }
+
+            const confirmationCode = await createRegistrationCodeWithRetry();
+            const createdRegistration = await prisma.eventRegistration.create({
+                data: {
+                    eventId,
+                    tierId,
+                    memberId,
+                    fullName,
+                    email: resolvedEmail,
+                    phoneNumber: row?.phoneNumber !== undefined && row?.phoneNumber !== null
+                        ? String(row.phoneNumber).trim() || null
+                        : null,
+                    confirmationCode,
+                    source: 'IMPORT',
+                    status: 'REGISTERED',
+                    isWalkIn: false,
+                    notes: row?.notes !== undefined && row?.notes !== null
+                        ? String(row.notes).trim() || null
+                        : null,
+                    customFieldValues: toJsonInput(coercedValues),
+                },
+            });
+
+            registrationCount += 1;
+            result.created += 1;
+            result.createdRegistrationIds.push(createdRegistration.id);
+        }
+
+        await logEventActivity({
+            eventId,
+            memberId: req.user!.memberId!,
+            actionType: 'IMPORT',
+            entityType: 'REGISTRATION',
+            newValue: {
+                created: result.created,
+                updated: result.updated,
+                skipped: result.skipped,
+            },
+            description: `Imported registrations: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`,
+        });
+
+        return res.json(result);
+    } catch (error) {
+        console.error(`POST /events/${req.params.id}/registrations/import error:`, error);
+        return res.status(500).json({ error: 'Failed to import registrations' });
     }
 });
 
@@ -1621,15 +2164,38 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
         const confirmationCode = String(req.body?.confirmationCode || '').trim().toUpperCase();
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
 
+        const event = await prisma.event.findUnique({
+            where: { id: eventId },
+            select: { eventDate: true, eventEndDate: true },
+        });
+        if (!event) return res.status(404).json({ error: 'Event not found' });
+
         const registration = registrationId
-            ? await prisma.eventRegistration.findFirst({ where: { id: registrationId, eventId } })
+            ? await prisma.eventRegistration.findFirst({
+                where: { id: registrationId, eventId },
+                include: { attendanceDays: true },
+            })
             : confirmationCode
-                ? await prisma.eventRegistration.findFirst({ where: { eventId, confirmationCode } })
+                ? await prisma.eventRegistration.findFirst({
+                    where: { eventId, confirmationCode },
+                    include: { attendanceDays: true },
+                })
                 : null;
 
         if (!registration) return res.status(404).json({ error: 'Registration not found' });
-        if (registration.status === 'CHECKED_IN') {
-            return res.status(409).json({ error: 'Attendee already checked in' });
+        if (registration.status === 'CANCELLED') {
+            return res.status(409).json({ error: 'Registration has been cancelled' });
+        }
+
+        const resolvedDay = resolveCheckInEventDay(event.eventDate, event.eventEndDate, {
+            eventDay: req.body?.eventDay,
+        });
+        if (!resolvedDay) {
+            return res.status(409).json({ error: 'Check-in is only available on event days' });
+        }
+
+        if (hasAttendanceOnDay(registration.attendanceDays ?? [], resolvedDay.eventDay)) {
+            return res.status(409).json({ error: 'Already checked in for this day' });
         }
 
         const mergedCustomFieldValues = req.body?.customFieldValues !== undefined
@@ -1645,15 +2211,27 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
             });
         }
 
-        const updated = await prisma.eventRegistration.update({
-            where: { id: registration.id },
-            data: {
-                status: 'CHECKED_IN',
-                checkedInAt: new Date(),
-                ...(req.body?.customFieldValues !== undefined
-                    ? { customFieldValues: toJsonInput(mergedCustomFieldValues) }
-                    : {}),
-            },
+        const checkedInAt = new Date();
+        const updated = await prisma.$transaction(async (tx) => {
+            await tx.eventRegistrationDay.create({
+                data: {
+                    registrationId: registration.id,
+                    eventDay: resolvedDay.eventDayDate,
+                    checkedInAt,
+                },
+            });
+
+            return tx.eventRegistration.update({
+                where: { id: registration.id },
+                data: {
+                    status: 'CHECKED_IN',
+                    ...(registration.status !== 'CHECKED_IN' ? { checkedInAt } : {}),
+                    ...(req.body?.customFieldValues !== undefined
+                        ? { customFieldValues: toJsonInput(mergedCustomFieldValues) }
+                        : {}),
+                },
+                include: registrationInclude,
+            });
         });
 
         await logEventActivity({
@@ -1662,14 +2240,226 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
             actionType: 'CHECKED_IN',
             entityType: 'REGISTRATION',
             oldValue: { status: registration.status },
-            newValue: { status: 'CHECKED_IN', fullName: registration.fullName },
-            description: `${registration.fullName} checked in`,
+            newValue: {
+                status: 'CHECKED_IN',
+                fullName: registration.fullName,
+                eventDay: resolvedDay.eventDay,
+            },
+            description: `${registration.fullName} checked in for ${resolvedDay.eventDay}`,
         });
 
-        return res.json(updated);
+        return res.json(serializeRegistration(updated));
     } catch (error) {
         console.error(`PATCH /events/${req.params.id}/registrations/${req.params.registrationId}/check-in error:`, error);
         return res.status(500).json({ error: 'Failed to check in registration' });
+    }
+});
+
+router.post('/:id/registrations/:registrationId/resend-ticket', authenticateToken, async (req, res) => {
+    try {
+        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
+
+        const eventId = parseId(req.params.id);
+        const registrationId = parseId(req.params.registrationId);
+        if (!eventId || !registrationId) return res.status(400).json({ error: 'Invalid registration ID' });
+
+        const registration = await prisma.eventRegistration.findFirst({
+            where: { id: registrationId, eventId },
+            select: { id: true, email: true, status: true },
+        });
+        if (!registration) return res.status(404).json({ error: 'Registration not found' });
+        if (registration.status === 'CANCELLED') {
+            return res.status(409).json({ error: 'Registration has been cancelled' });
+        }
+        if (!registration.email?.trim()) {
+            return res.status(400).json({ error: 'Registration has no email address' });
+        }
+
+        await sendEventTicketEmail(registrationId);
+
+        return res.json({ ok: true, message: 'Ticket email sent' });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to send ticket email';
+        console.error(`POST /events/${req.params.id}/registrations/${req.params.registrationId}/resend-ticket error:`, error);
+        if (message === 'Email service is not configured') {
+            return res.status(503).json({ error: 'Email service is not configured' });
+        }
+        if (process.env.NODE_ENV !== 'production') {
+            return res.status(502).json({ error: message });
+        }
+        return res.status(502).json({ error: 'Failed to send ticket email' });
+    }
+});
+
+router.post('/:id/registrations/:registrationId/resend-reminder', authenticateToken, async (req, res) => {
+    try {
+        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
+
+        const eventId = parseId(req.params.id);
+        const registrationId = parseId(req.params.registrationId);
+        if (!eventId || !registrationId) return res.status(400).json({ error: 'Invalid registration ID' });
+
+        const registration = await prisma.eventRegistration.findFirst({
+            where: { id: registrationId, eventId },
+            select: { id: true, email: true, status: true },
+        });
+        if (!registration) return res.status(404).json({ error: 'Registration not found' });
+        if (registration.status === 'CANCELLED') {
+            return res.status(409).json({ error: 'Registration has been cancelled' });
+        }
+        if (!registration.email?.trim()) {
+            return res.status(400).json({ error: 'Registration has no email address' });
+        }
+
+        await sendEventReminderEmail(registrationId);
+
+        return res.json({ ok: true, message: 'Reminder email sent' });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to send reminder email';
+        console.error(`POST /events/${req.params.id}/registrations/${req.params.registrationId}/resend-reminder error:`, error);
+        if (message === 'Email service is not configured') {
+            return res.status(503).json({ error: 'Email service is not configured' });
+        }
+        if (process.env.NODE_ENV !== 'production') {
+            return res.status(502).json({ error: message });
+        }
+        return res.status(502).json({ error: 'Failed to send reminder email' });
+    }
+});
+
+router.post('/:id/registrations/send-tickets', authenticateToken, async (req, res) => {
+    try {
+        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
+
+        const eventId = parseId(req.params.id);
+        if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
+
+        const rawIds = Array.isArray(req.body?.registrationIds) ? req.body.registrationIds : [];
+        const registrationIds = rawIds
+            .map((id) => parseId(id))
+            .filter((id): id is number => id != null);
+
+        if (registrationIds.length === 0) {
+            return res.status(400).json({ error: 'At least one registration ID is required' });
+        }
+        if (registrationIds.length > 2000) {
+            return res.status(400).json({ error: 'Ticket send is limited to 2000 registrations per request' });
+        }
+
+        const registrations = await prisma.eventRegistration.findMany({
+            where: {
+                eventId,
+                id: { in: registrationIds },
+                status: { not: 'CANCELLED' },
+            },
+            select: { id: true, email: true },
+        });
+        const registrationById = new Map(registrations.map((registration) => [registration.id, registration]));
+
+        const result = {
+            sent: 0,
+            skipped: 0,
+            failed: 0,
+            errors: [] as Array<{ registrationId: number; message: string }>,
+        };
+
+        for (const registrationId of registrationIds) {
+            const registration = registrationById.get(registrationId);
+            if (!registration) {
+                result.skipped += 1;
+                continue;
+            }
+
+            const email = registration.email?.trim() ?? '';
+            if (!email || isImportPlaceholderEmail(email)) {
+                result.skipped += 1;
+                continue;
+            }
+
+            try {
+                await sendEventTicketEmail(registrationId);
+                result.sent += 1;
+            } catch (error) {
+                result.failed += 1;
+                result.errors.push({
+                    registrationId,
+                    message: error instanceof Error ? error.message : 'Failed to send ticket email',
+                });
+            }
+        }
+
+        return res.json(result);
+    } catch (error) {
+        console.error(`POST /events/${req.params.id}/registrations/send-tickets error:`, error);
+        return res.status(500).json({ error: 'Failed to send ticket emails' });
+    }
+});
+
+router.post('/:id/registrations/send-reminders', authenticateToken, async (req, res) => {
+    try {
+        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
+
+        const eventId = parseId(req.params.id);
+        if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
+
+        const rawIds = Array.isArray(req.body?.registrationIds) ? req.body.registrationIds : [];
+        const registrationIds = rawIds
+            .map((id) => parseId(id))
+            .filter((id): id is number => id != null);
+
+        if (registrationIds.length === 0) {
+            return res.status(400).json({ error: 'At least one registration ID is required' });
+        }
+        if (registrationIds.length > 2000) {
+            return res.status(400).json({ error: 'Reminder send is limited to 2000 registrations per request' });
+        }
+
+        const registrations = await prisma.eventRegistration.findMany({
+            where: {
+                eventId,
+                id: { in: registrationIds },
+                status: { not: 'CANCELLED' },
+            },
+            select: { id: true, email: true },
+        });
+        const registrationById = new Map(registrations.map((registration) => [registration.id, registration]));
+
+        const result = {
+            sent: 0,
+            skipped: 0,
+            failed: 0,
+            errors: [] as Array<{ registrationId: number; message: string }>,
+        };
+
+        for (const registrationId of registrationIds) {
+            const registration = registrationById.get(registrationId);
+            if (!registration) {
+                result.skipped += 1;
+                continue;
+            }
+
+            const email = registration.email?.trim() ?? '';
+            if (!email || isImportPlaceholderEmail(email)) {
+                result.skipped += 1;
+                continue;
+            }
+
+            try {
+                await sendEventReminderEmail(registrationId);
+                result.sent += 1;
+            } catch (error) {
+                result.failed += 1;
+                result.errors.push({
+                    registrationId,
+                    message: error instanceof Error ? error.message : 'Failed to send reminder email',
+                });
+            }
+        }
+
+        return res.json(result);
+    } catch (error) {
+        console.error(`POST /events/${req.params.id}/registrations/send-reminders error:`, error);
+        return res.status(500).json({ error: 'Failed to send reminder emails' });
     }
 });
 
@@ -1704,6 +2494,7 @@ router.patch('/:id/registrations/:registrationId', authenticateToken, async (req
                 notes: req.body?.notes !== undefined ? String(req.body.notes).trim() || null : existing.notes,
                 customFieldValues: req.body?.customFieldValues !== undefined ? toJsonInput(req.body.customFieldValues) : (existing.customFieldValues as any),
             },
+            include: registrationInclude,
         });
 
         const registrationChanges = collectChangedFields(existing, updated, {
@@ -1726,7 +2517,7 @@ router.patch('/:id/registrations/:registrationId', authenticateToken, async (req
             });
         }
 
-        return res.json(updated);
+        return res.json(serializeRegistration(updated));
     } catch (error) {
         console.error(`PATCH /events/${req.params.id}/registrations/${req.params.registrationId} error:`, error);
         return res.status(500).json({ error: 'Failed to update registration' });
@@ -1779,7 +2570,7 @@ router.get('/:id/statistics', authenticateToken, async (req, res) => {
         const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, capacity: true } });
         if (!event) return res.status(404).json({ error: 'Event not found' });
 
-        const [totalRegistered, totalCheckedIn, walkInCount, noShowCount, byTier, registrationTimeline, attendanceTimeline] = await Promise.all([
+        const [totalRegistered, totalCheckedIn, walkInCount, noShowCount, byTier, registrationTimeline, attendanceDayRows] = await Promise.all([
             prisma.eventRegistration.count({ where: { eventId, isWalkIn: false, status: { not: 'CANCELLED' } } }),
             prisma.eventRegistration.count({ where: { eventId, isWalkIn: false, status: 'CHECKED_IN' } }),
             prisma.eventRegistration.count({ where: { eventId, isWalkIn: true, status: { not: 'CANCELLED' } } }),
@@ -1794,13 +2585,12 @@ router.get('/:id/statistics', authenticateToken, async (req, res) => {
                 select: { createdAt: true },
                 orderBy: { createdAt: 'asc' },
             }),
-            prisma.eventRegistration.findMany({
+            prisma.eventRegistrationDay.findMany({
                 where: {
-                    eventId,
-                    status: 'CHECKED_IN',
+                    registration: { eventId },
                 },
-                select: { checkedInAt: true, createdAt: true },
-                orderBy: { checkedInAt: 'asc' },
+                select: { eventDay: true },
+                orderBy: { eventDay: 'asc' },
             }),
         ]);
 
@@ -1811,9 +2601,8 @@ router.get('/:id/statistics', authenticateToken, async (req, res) => {
         }
 
         const attendanceByDay = new Map<string, number>();
-        for (const item of attendanceTimeline) {
-            const timestamp = item.checkedInAt ?? item.createdAt;
-            const day = timestamp.toISOString().slice(0, 10);
+        for (const item of attendanceDayRows) {
+            const day = formatEventDay(item.eventDay);
             attendanceByDay.set(day, (attendanceByDay.get(day) ?? 0) + 1);
         }
 

@@ -2,17 +2,19 @@
 
 import type { ComponentType } from 'react';
 import { useEffect, useState } from 'react';
-import { Layers3, ListChecks, RefreshCw, Users } from 'lucide-react';
+import { Layers3, ListChecks, Mail, RefreshCw, Users } from 'lucide-react';
 import type {
     EventCustomFieldRef,
     EventStatistics,
     EventTierRef,
     Id,
+    ImportRegistrationsResult,
 } from '@/types/backend-contracts';
 import { eventsAPI } from '@/services/api';
 import EventRegistrationsSection from './sections/EventRegistrationsSection';
 import EventStatisticsSection from './sections/EventStatisticsSection';
 import EventTasksSection from './sections/EventTasksSection';
+import EventTicketsSection from './sections/EventTicketsSection';
 import EventTiersSection from './sections/EventTiersSection';
 import type { EventTabKey } from '../eventUtils';
 import './EventExpandedContent.css';
@@ -21,11 +23,13 @@ const TABS: Array<{ key: EventTabKey; label: string; icon: ComponentType<{ size?
     { key: 'statistics', label: 'Statistics', icon: RefreshCw },
     { key: 'tiers', label: 'Tiers', icon: Layers3 },
     { key: 'registrations', label: 'Registrations', icon: Users },
+    { key: 'tickets', label: 'Tickets', icon: Mail },
     { key: 'tasks', label: 'Tasks', icon: ListChecks },
 ];
 
 interface EventExpandedContentProps {
     eventId: Id | string;
+    eventTitle?: string;
     initialTab?: EventTabKey | null;
     allowWalkIns?: boolean;
     eventDate?: string | null;
@@ -35,6 +39,7 @@ interface EventExpandedContentProps {
 
 export default function EventExpandedContent({
     eventId,
+    eventTitle,
     initialTab,
     allowWalkIns = false,
     eventDate,
@@ -44,11 +49,7 @@ export default function EventExpandedContent({
     const [stats, setStats] = useState<EventStatistics | null>(null);
     const [tiers, setTiers] = useState<EventTierRef[]>([]);
     const [fields, setFields] = useState<EventCustomFieldRef[]>([]);
-    const [activeTab, setActiveTab] = useState<EventTabKey>(initialTab ?? 'statistics');
-
-    useEffect(() => {
-        if (initialTab) setActiveTab(initialTab);
-    }, [initialTab]);
+    const [activeTab, setActiveTab] = useState<EventTabKey>(() => initialTab ?? 'statistics');
 
     useEffect(() => {
         let active = true;
@@ -88,6 +89,12 @@ export default function EventExpandedContent({
         onReload();
     };
 
+    const handleImportComplete = (result: ImportRegistrationsResult) => {
+        if (result.created > 0) {
+            setActiveTab('tickets');
+        }
+    };
+
     return (
         <div className="event-expanded-content">
             <nav className="event-expanded-tab-nav" aria-label="Event tabs">
@@ -107,30 +114,52 @@ export default function EventExpandedContent({
                 })}
             </nav>
 
-            {activeTab === 'statistics' && <EventStatisticsSection stats={stats} />}
+            {activeTab === 'statistics' && (
+                <div className="event-expanded-tab-panel">
+                    <EventStatisticsSection stats={stats} />
+                </div>
+            )}
             {activeTab === 'tiers' && (
-                <EventTiersSection eventId={eventId} tiers={tiers} onTiersChange={setTiers} />
+                <div className="event-expanded-tab-panel">
+                    <EventTiersSection eventId={eventId} tiers={tiers} onTiersChange={setTiers} />
+                </div>
             )}
             {activeTab === 'registrations' && (
-                <EventRegistrationsSection
-                    eventId={eventId}
-                    tiers={tiers}
-                    fields={fields}
-                    onFieldsChange={setFields}
-                    totalRegistered={(stats?.totalRegistered ?? 0) + (stats?.walkInCount ?? 0)}
-                    allowWalkIns={allowWalkIns}
-                    eventDate={eventDate}
-                    eventEndDate={eventEndDate}
-                    onRegistrationAdded={() => void reloadAll()}
-                    onCheckIn={() => void reloadAll()}
-                />
+                <div className="event-expanded-tab-panel">
+                    <EventRegistrationsSection
+                        eventId={eventId}
+                        eventTitle={eventTitle}
+                        tiers={tiers}
+                        fields={fields}
+                        onFieldsChange={setFields}
+                        totalRegistered={(stats?.totalRegistered ?? 0) + (stats?.walkInCount ?? 0)}
+                        allowWalkIns={allowWalkIns}
+                        eventDate={eventDate}
+                        eventEndDate={eventEndDate}
+                        onRegistrationAdded={() => void reloadAll()}
+                        onCheckIn={() => void reloadAll()}
+                        onImportComplete={handleImportComplete}
+                    />
+                </div>
+            )}
+            {activeTab === 'tickets' && (
+                <div className="event-expanded-tab-panel">
+                    <EventTicketsSection
+                        eventId={eventId}
+                        eventDate={eventDate}
+                        eventEndDate={eventEndDate}
+                    />
+                </div>
             )}
             {activeTab === 'tasks' && (
-                <EventTasksSection
-                    eventId={eventId}
-                    eventDate={eventDate}
-                    eventEndDate={eventEndDate}
-                />
+                <div className="event-expanded-tab-panel">
+                    <EventTasksSection
+                        eventId={eventId}
+                        eventTitle={eventTitle}
+                        eventDate={eventDate}
+                        eventEndDate={eventEndDate}
+                    />
+                </div>
             )}
         </div>
     );

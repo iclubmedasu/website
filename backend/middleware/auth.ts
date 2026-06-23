@@ -92,6 +92,24 @@ const authenticateToken = (req: Request, res: Response, next: NextFunction): Res
     });
 };
 
+const optionalAuthenticateToken = (req: Request, res: Response, next: NextFunction): Response | void => {
+    const token = extractAuthToken(req);
+
+    if (!token) {
+        req.user = undefined;
+        return next();
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ error: "Invalid or expired token" });
+        }
+
+        req.user = (user as RequestUser) ?? {};
+        return next();
+    });
+};
+
 /** Require user to be developer or in Administration team. Use after authenticateToken. */
 const requireAdmin = async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
     if (req.user?.isDeveloper) {
@@ -117,4 +135,4 @@ const requireAdmin = async (req: Request, res: Response, next: NextFunction): Pr
     return next();
 };
 
-export { authenticateToken, requireAdmin, JWT_SECRET, extractAuthToken };
+export { authenticateToken, optionalAuthenticateToken, requireAdmin, JWT_SECRET, extractAuthToken };

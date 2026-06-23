@@ -51,7 +51,10 @@ export default function EventStatisticsSection({ stats }: EventStatisticsSection
     const totalAttended = checkedIn + walkIns;
 
     const registrationTimeData = stats?.registrationsOverTime ?? [];
-    const attendanceTimeData = stats?.attendanceOverTime ?? [];
+    const attendanceTimeData = useMemo(
+        () => [...(stats?.attendanceOverTime ?? [])].sort((a, b) => a.date.localeCompare(b.date)),
+        [stats?.attendanceOverTime],
+    );
 
     const registrationLineSeries = useMemo(
         () => [{ name: 'Registrations', data: registrationTimeData.map((entry) => entry.count) }],
@@ -98,7 +101,7 @@ export default function EventStatisticsSection({ stats }: EventStatisticsSection
 
     return (
         <section className="event-expanded-panel">
-            <h2 className="expanded-section-title">Statistics</h2>
+           <h2 className="expanded-section-title">Statistics</h2>
             <div className="event-expanded-summary-grid event-expanded-summary-grid--stats">
                 <EventStatTile label="Registered" value={String(registered)} />
                 <EventStatTile label="Check-ins" value={String(checkedIn)} />
@@ -120,7 +123,7 @@ export default function EventStatisticsSection({ stats }: EventStatisticsSection
                 </div>
 
                 <div className="event-expanded-chart-cell">
-                    <h3 className="expanded-section-title expanded-section-title--sm">Attendance over time</h3>
+                    <h3 className="expanded-section-title expanded-section-title--sm">Daily attendance</h3>
                     <div className="event-expanded-chart-wrap">
                         {attendanceTimeData.length > 0 ? (
                             <LineChart series={attendanceLineSeries} options={attendanceLineOptions} />

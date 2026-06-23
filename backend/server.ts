@@ -17,6 +17,7 @@ console.log(
     "GITHUB_STORAGE_TOKEN:",
     process.env.GITHUB_STORAGE_TOKEN ? "loaded" : "NOT SET",
 );
+console.log("RESEND_API_KEY:", process.env.RESEND_API_KEY ? "loaded" : "NOT SET");
 
 const app = express();
 app.set("trust proxy", 1);

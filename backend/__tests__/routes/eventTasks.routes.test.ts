@@ -19,6 +19,7 @@ const notificationMocks = vi.hoisted(() => ({
 
 vi.mock('../../middleware/auth', () => ({
     authenticateToken: (_req: unknown, _res: unknown, next: () => void) => next(),
+    optionalAuthenticateToken: (_req: unknown, _res: unknown, next: () => void) => next(),
     JWT_SECRET: 'test-secret',
 }))
 
@@ -42,6 +43,20 @@ vi.mock('../../db', () => ({
 }))
 
 vi.mock('../../services/notificationService', () => notificationMocks)
+vi.mock('../../services/activityLogService', () => ({
+    logEventActivity: vi.fn().mockResolvedValue(undefined),
+    collectChangedFields: vi.fn(() => []),
+    changesToPayload: vi.fn(() => ({})),
+    summarizeChanges: vi.fn(() => ''),
+}))
+vi.mock('../../services/eventActivityHelpers', () => ({
+    buildAssignedDescription: vi.fn(() => 'Assigned member to task'),
+    buildAssignmentActivityValue: vi.fn(() => ({})),
+    buildUnassignedDescription: vi.fn(() => 'Unassigned member from task'),
+}))
+vi.mock('../../services/eventTicketEmailService', () => ({
+    sendEventTicketEmail: vi.fn().mockResolvedValue(undefined),
+}))
 vi.mock('../../services/eventCode', () => ({
     generateUniqueConfirmationCode: vi.fn(),
 }))
@@ -240,16 +255,19 @@ describe('event task assignment notifications', () => {
         prismaMocks.eventTaskFindFirst.mockResolvedValueOnce({
             id: TASK_ID,
             leaderId: 5,
-            assignments: [{ memberId: 5 }, { memberId: 7 }],
+            assignments: [
+                { memberId: 5, startDateTime: new Date(LEADER_SLOT.startDateTime), endDateTime: new Date(LEADER_SLOT.endDateTime) },
+                { memberId: 7, startDateTime: new Date(ASSIGNEE_SLOT.startDateTime), endDateTime: new Date(ASSIGNEE_SLOT.endDateTime) },
+            ],
         })
         prismaMocks.eventTaskFindUnique.mockResolvedValueOnce({
             id: TASK_ID,
             title: 'Setup booth',
             leaderId: 5,
             assignments: [
-                { memberId: 5 },
-                { memberId: 7 },
-                { memberId: 99 },
+                { memberId: 5, startDateTime: new Date(LEADER_SLOT.startDateTime), endDateTime: new Date(LEADER_SLOT.endDateTime) },
+                { memberId: 7, startDateTime: new Date(ASSIGNEE_SLOT.startDateTime), endDateTime: new Date(ASSIGNEE_SLOT.endDateTime) },
+                { memberId: 99, startDateTime: new Date('2026-06-10T11:00:00.000Z'), endDateTime: new Date('2026-06-10T12:00:00.000Z') },
             ],
         })
 
@@ -281,13 +299,19 @@ describe('event task assignment notifications', () => {
         prismaMocks.eventTaskFindFirst.mockResolvedValueOnce({
             id: TASK_ID,
             leaderId: 5,
-            assignments: [{ memberId: 5 }, { memberId: 7 }],
+            assignments: [
+                { memberId: 5, startDateTime: new Date(LEADER_SLOT.startDateTime), endDateTime: new Date(LEADER_SLOT.endDateTime) },
+                { memberId: 7, startDateTime: new Date(ASSIGNEE_SLOT.startDateTime), endDateTime: new Date(ASSIGNEE_SLOT.endDateTime) },
+            ],
         })
         prismaMocks.eventTaskFindUnique.mockResolvedValueOnce({
             id: TASK_ID,
             title: 'Setup booth',
             leaderId: 5,
-            assignments: [{ memberId: 5 }, { memberId: 7 }],
+            assignments: [
+                { memberId: 5, startDateTime: new Date(LEADER_SLOT.startDateTime), endDateTime: new Date(LEADER_SLOT.endDateTime) },
+                { memberId: 7, startDateTime: new Date(ASSIGNEE_SLOT.startDateTime), endDateTime: new Date(ASSIGNEE_SLOT.endDateTime) },
+            ],
         })
 
         const response = await request(buildRouteApp(eventsRouter, { memberId: 12, isLeadership: true }))
@@ -304,15 +328,18 @@ describe('event task assignment notifications', () => {
         prismaMocks.eventTaskFindFirst.mockResolvedValueOnce({
             id: TASK_ID,
             leaderId: 5,
-            assignments: [{ memberId: 5 }, { memberId: 7 }],
+            assignments: [
+                { memberId: 5, startDateTime: new Date(LEADER_SLOT.startDateTime), endDateTime: new Date(LEADER_SLOT.endDateTime) },
+                { memberId: 7, startDateTime: new Date(ASSIGNEE_SLOT.startDateTime), endDateTime: new Date(ASSIGNEE_SLOT.endDateTime) },
+            ],
         })
         prismaMocks.eventTaskFindUnique.mockResolvedValueOnce({
             id: TASK_ID,
             title: 'Setup booth',
             leaderId: 99,
             assignments: [
-                { memberId: 99 },
-                { memberId: 7 },
+                { memberId: 99, startDateTime: new Date(LEADER_SLOT.startDateTime), endDateTime: new Date(LEADER_SLOT.endDateTime) },
+                { memberId: 7, startDateTime: new Date(ASSIGNEE_SLOT.startDateTime), endDateTime: new Date(ASSIGNEE_SLOT.endDateTime) },
             ],
         })
 

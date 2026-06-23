@@ -1,16 +1,19 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Loader } from 'lucide-react';
+import { FileSpreadsheet, Loader } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { eventsAPI } from '@/services/api';
 import type { EventTaskRef, Id, MemberSummary } from '@/types/backend-contracts';
+import { exportEventTasksExcel } from '@/features/Events/components/eventTaskExcelExport';
 import RemoveEventTaskAssignmentModal from '../../../modals/RemoveEventTaskAssignmentModal';
 import EventTasksTimetable, { type RemoveAssignmentTarget } from '../EventTasksTimetable';
 import AddEventTaskModal from '../../../modals/AddEventTaskModal';
+import './EventTasksSection.css';
 
 interface EventTasksSectionProps {
     eventId: Id | string;
+    eventTitle?: string;
     eventDate?: string | null;
     eventEndDate?: string | null;
 }
@@ -66,13 +69,14 @@ function buildDays(eventDate?: string | null, eventEndDate?: string | null, task
     return days.sort((a, b) => a.getTime() - b.getTime());
 }
 
-export default function EventTasksSection({ eventId, eventDate, eventEndDate }: EventTasksSectionProps) {
+export default function EventTasksSection({ eventId, eventTitle, eventDate, eventEndDate }: EventTasksSectionProps) {
     const { user } = useAuth();
     const canManage = !!(user?.isDeveloper || user?.isAdmin || user?.isOfficer || user?.isLeadership);
 
     const [tasks, setTasks] = useState<EventTaskRef[]>([]);
     const [members, setMembers] = useState<MemberSummary[]>([]);
     const [loading, setLoading] = useState(true);
+    const [exporting, setExporting] = useState(false);
     const [error, setError] = useState('');
     const [modalDay, setModalDay] = useState<Date | null>(null);
     const [editTask, setEditTask] = useState<EventTaskRef | null>(null);
@@ -118,18 +122,54 @@ export default function EventTasksSection({ eventId, eventDate, eventEndDate }: 
         await loadTasks();
     };
 
+    const handleExportExcel = async () => {
+        setExporting(true);
+        try {
+            await exportEventTasksExcel({
+                days,
+                tasks,
+                fileName: eventTitle?.trim() || `event-${eventId}`,
+            });
+        } catch {
+            setError('Failed to export tasks to Excel.');
+        } finally {
+            setExporting(false);
+        }
+    };
+
     if (loading) {
         return (
-            <div className="empty-state">
-                <Loader size={16} className="file-status-processing" />
-                <p>Loading tasks…</p>
-            </div>
+            <section className="event-expanded-panel">
+                <div className="empty-state">
+                    <Loader size={16} className="file-status-processing" />
+                    <p>Loading tasks…</p>
+                </div>
+            </section>
         );
     }
 
     return (
-        <div className="event-tasks-section">
+        <section className="event-expanded-panel">
+                        <div className="event-expanded-header event-expanded-header--compact">
+               <div>
+                    <h2 className="expanded-section-title">Tasks</h2>
+                </div>
+            </div>
+            <div className="event-tasks-section">
             {error ? <p className="error-message">{error}</p> : null}
+
+            <div className="event-tasks-export-bar">
+                <button
+                    type="button"
+                    className="event-tasks-export-btn"
+                    onClick={() => void handleExportExcel()}
+                    disabled={exporting || days.length === 0}
+                    title="Export the task timetable as Excel"
+                >
+                    <FileSpreadsheet size={14} />
+                    <span>{exporting ? 'Exporting…' : 'Export Excel'}</span>
+                </button>
+            </div>
 
             <EventTasksTimetable
                 days={days}
@@ -174,6 +214,7 @@ export default function EventTasksSection({ eventId, eventDate, eventEndDate }: 
                     onClose={() => setRemoveTarget(null)}
                 />
             )}
-        </div>
+            </div>
+        </section>
     );
 }

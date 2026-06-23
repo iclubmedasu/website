@@ -45,6 +45,9 @@ Set these in your Hugging Face Space → Settings → Variables and secrets. The
 | GITHUB_USER_DATA_TOKEN    | Your GitHub PAT for user data                    |
 | FRONTEND_URL              | https://your-site.netlify.app                    |
 | FRONTEND_ORIGINS          | Same as above, or comma-separated list if needed |
+| RESEND_API_KEY            | Resend API key for ticket emails                 |
+| RESEND_FROM_EMAIL         | Verified sender in Resend (not @gmail.com); use your domain e.g. tickets@yourdomain.com |
+| RESEND_REPLY_TO           | Optional reply-to address e.g. asu.medicine.iclub@gmail.com |
 
 ### Netlify Environment Variables (Frontend)
 Set these in Netlify → Site configuration → Environment variables. These are used by your frontend at build time.

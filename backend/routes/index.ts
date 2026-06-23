@@ -1,5 +1,5 @@
 import express, { Request, Response } from "express";
-import { authenticateToken } from "../middleware/auth";
+import { authenticateToken, optionalAuthenticateToken } from "../middleware/auth";
 
 import authRoutes from "./auth";
 import teamsRoutes from "./teams";
@@ -56,7 +56,19 @@ router.use("/alumni", authenticateToken, alumniRoutes);
 router.use("/administration", authenticateToken, administrationRoutes);
 router.use("/projects", authenticateToken, projectsRoutes);
 router.use("/tasks", authenticateToken, tasksRoutes);
-router.use("/events", authenticateToken, eventsRoutes);
+
+function isPublicEventRegistrationRequest(req: Request): boolean {
+    if (req.method !== "POST") return false;
+    return /^\/\d+\/registrations\/?$/.test(req.path);
+}
+
+router.use("/events", (req, res, next) => {
+    if (isPublicEventRegistrationRequest(req)) {
+        return optionalAuthenticateToken(req, res, next);
+    }
+    return authenticateToken(req, res, next);
+}, eventsRoutes);
+
 router.use("/phases", authenticateToken, phasesRoutes);
 router.use("/schedule-slots", authenticateToken, scheduleSlotsRoutes);
 router.use("/project-files", authenticateToken, projectFilesRoutes);

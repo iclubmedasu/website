@@ -109,7 +109,42 @@ export function mergeCustomFieldValues(
 }
 
 export function formatRegistrationSource(registration: EventRegistrationRef): string {
-    return registration.isWalkIn || registration.source === 'WALK_IN' ? 'Walk-in' : 'Pre-registered';
+    if (registration.source === 'IMPORT') return 'Imported';
+    if (registration.isWalkIn || registration.source === 'WALK_IN') return 'Walk-in';
+    return 'Pre-registered';
+}
+
+export const REGISTRATION_SOURCE_GROUP_OPTIONS = [
+    { value: '', label: 'All sources' },
+    { value: 'PRE_REGISTERED', label: 'Pre-registered' },
+    { value: 'WALK_IN', label: 'Walk-in' },
+    { value: 'IMPORT', label: 'Imported' },
+] as const;
+
+export function isImportPlaceholderEmail(email: string | null | undefined): boolean {
+    return String(email || '').trim().toLowerCase().endsWith('@event-import.local');
+}
+
+export function formatTicketEmailStatus(registration: EventRegistrationRef): { label: string; sent: boolean; sentAt?: string | null } {
+    if (registration.ticketEmailSentAt) {
+        return { label: 'Sent', sent: true, sentAt: registration.ticketEmailSentAt };
+    }
+    return { label: 'Not sent', sent: false };
+}
+
+export function formatReminderEmailStatus(registration: EventRegistrationRef): { label: string; sent: boolean; sentAt?: string | null } {
+    if (registration.reminderEmailSentAt) {
+        return { label: 'Sent', sent: true, sentAt: registration.reminderEmailSentAt };
+    }
+    return { label: 'Not sent', sent: false };
+}
+
+export function getSendableRegistrations(registrations: EventRegistrationRef[]): EventRegistrationRef[] {
+    return registrations.filter(
+        (registration) => registration.status !== 'CANCELLED'
+            && Boolean(registration.email?.trim())
+            && !isImportPlaceholderEmail(registration.email),
+    );
 }
 
 export function formatRegistrationStatus(registration: EventRegistrationRef): string {

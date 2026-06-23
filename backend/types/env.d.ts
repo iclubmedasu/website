@@ -14,5 +14,8 @@ declare namespace NodeJS {
         GITHUB_STORAGE_TOKEN?: string;
         PORT?: string;
         NODE_ENV?: "development" | "test" | "production";
+        RESEND_API_KEY?: string;
+        RESEND_FROM_EMAIL?: string;
+        RESEND_REPLY_TO?: string;
     }
 }

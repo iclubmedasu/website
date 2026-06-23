@@ -60,10 +60,14 @@ export function useCheckInFlow({ eventId, onCheckIn }: UseCheckInFlowOptions) {
             confirmationCode,
             ...(customFieldValues ? { customFieldValues } : {}),
         });
+        const priorDays = checkedIn.attendanceDays?.length ?? 0;
         const via = source ? SOURCE_LABEL[source] : 'scan';
+        const dayNote = priorDays > 1
+            ? ` (day ${priorDays} of attendance)`
+            : '';
         setResult({
             type: 'success',
-            message: `Checked in ${checkedIn.fullName} (${checkedIn.confirmationCode}) via ${via}`,
+            message: `Checked in ${checkedIn.fullName} (${checkedIn.confirmationCode}) via ${via}${dayNote}`,
         });
         setManualCode('');
         resetFlow();
@@ -100,10 +104,10 @@ export function useCheckInFlow({ eventId, onCheckIn }: UseCheckInFlowOptions) {
         try {
             const lookup = await eventsAPI.lookupRegistrationByCode(eventId, parsed);
 
-            if (lookup.registration.status === 'CHECKED_IN') {
+            if (lookup.checkedInToday) {
                 setResult({
                     type: 'error',
-                    message: `${lookup.registration.fullName} is already checked in.`,
+                    message: `${lookup.registration.fullName} is already checked in today.`,
                 });
                 resetFlow();
                 return;

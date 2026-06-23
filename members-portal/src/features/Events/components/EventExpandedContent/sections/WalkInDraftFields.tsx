@@ -213,7 +213,7 @@ export default function WalkInDraftFields({
 
     return (
         <>
-            <td className={cellErrorClass(draftErrors, 'fullName').trim() || undefined}>
+            <td className={[cellErrorClass(draftErrors, 'fullName').trim(), 'event-registrations-name-cell'].filter(Boolean).join(' ')}>
                 <input
                     value={draft.fullName}
                     onChange={(event) => updateField('fullName', event.target.value)}
@@ -257,6 +257,8 @@ export default function WalkInDraftFields({
             <td>—</td>
             <td>—</td>
             <td>—</td>
+            <td className="event-registrations-actions-col">—</td>
+            <td className="event-registrations-add-field-col" aria-hidden="true" />
         </>
     );
 }

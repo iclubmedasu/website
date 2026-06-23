@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { FileSpreadsheet, Plus } from 'lucide-react';
 import { fmtDate } from '@/components/cards/LifecycleCardView/LifecycleCardView';
 import { eventsAPI } from '@/services/api';
 import AddCustomFieldModal from '@/features/Events/modals/AddCustomFieldModal';
+import ImportRegistrationsModal from '@/features/Events/modals/ImportRegistrationsModal';
+import { exportEventRegistrationsExcel } from '@/features/Events/components/registrationExcelExport';
 import type {
     EventCustomFieldRef,
     EventRegistrationRef,
+    EventRegistrationSourceGroup,
     EventTierRef,
     Id,
+    ImportRegistrationsResult,
     ReorderEventCustomFieldsPayload,
     UpdateEventCustomFieldPayload,
 } from '@/types/backend-contracts';
@@ -15,17 +19,20 @@ import {
     emptyAttendeeDraft,
     formatRegistrationSource,
     formatRegistrationStatus,
+    REGISTRATION_SOURCE_GROUP_OPTIONS,
     validateAttendeeDraft,
     type AttendeeDraft,
 } from '../customFieldUtils';
 import CustomFieldColumnMenu from './CustomFieldColumnMenu';
 import EditableCustomFieldCell from './EditableCustomFieldCell';
+import EditableRegistrationContactCell from './EditableRegistrationContactCell';
 import EventCheckInPanel from './EventCheckInSection';
 import WalkInDraftFields from './WalkInDraftFields';
-import { formatEventDuration, isWithinEventDays } from '../../eventDateUtils';
+import { formatEventDuration, formatAttendanceDayLabel, isMultiDayEvent, isWithinEventDays } from '../../eventDateUtils';
 
 interface EventRegistrationsSectionProps {
     eventId: Id | string;
+    eventTitle?: string;
     tiers: EventTierRef[];
     fields: EventCustomFieldRef[];
     onFieldsChange: (fields: EventCustomFieldRef[]) => void;
@@ -35,10 +42,12 @@ interface EventRegistrationsSectionProps {
     eventEndDate?: string | null;
     onRegistrationAdded?: () => void;
     onCheckIn?: () => void;
+    onImportComplete?: (result: ImportRegistrationsResult) => void;
 }
 
 export default function EventRegistrationsSection({
     eventId,
+    eventTitle,
     tiers,
     fields,
     onFieldsChange,
@@ -48,17 +57,20 @@ export default function EventRegistrationsSection({
     eventEndDate,
     onRegistrationAdded,
     onCheckIn,
+    onImportComplete,
 }: EventRegistrationsSectionProps) {
     const [registrations, setRegistrations] = useState<EventRegistrationRef[]>([]);
     const [registrationSearch, setRegistrationSearch] = useState('');
     const [registrationTier, setRegistrationTier] = useState('');
     const [registrationCheckIn, setRegistrationCheckIn] = useState('');
-    const [registrationWalkIn, setRegistrationWalkIn] = useState('');
+    const [registrationSourceGroup, setRegistrationSourceGroup] = useState<EventRegistrationSourceGroup | ''>('');
     const [isAddingAttendee, setIsAddingAttendee] = useState(false);
     const [draft, setDraft] = useState<AttendeeDraft>(emptyAttendeeDraft);
     const [draftErrors, setDraftErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
     const [fieldModalOpen, setFieldModalOpen] = useState(false);
+    const [importModalOpen, setImportModalOpen] = useState(false);
+    const [exporting, setExporting] = useState(false);
     const [editingField, setEditingField] = useState<EventCustomFieldRef | null>(null);
     const dragFieldId = useRef<number | null>(null);
     const tableScrollRef = useRef<HTMLDivElement>(null);
@@ -69,19 +81,22 @@ export default function EventRegistrationsSection({
     const walkInsEnabled = allowWalkIns && withinEventDays;
     const canEditCustomFieldValues = withinEventDays;
     const eventDurationLabel = formatEventDuration(eventDate, eventEndDate ?? eventDate);
+    const multiDayEvent = isMultiDayEvent(eventDate, eventEndDate);
 
     const loadRegistrations = useCallback(async () => {
         try {
             const result = await eventsAPI.getRegistrations(eventId, {
                 tierId: registrationTier || undefined,
-                checkInStatus: registrationCheckIn === 'CHECKED_IN' || registrationCheckIn === 'NOT_CHECKED_IN' ? registrationCheckIn : undefined,
-                walkIn: registrationWalkIn === 'true' ? true : registrationWalkIn === 'false' ? false : undefined,
+                checkInStatus: registrationCheckIn === 'CHECKED_IN' || registrationCheckIn === 'NOT_CHECKED_IN' || registrationCheckIn === 'CHECKED_IN_TODAY'
+                    ? registrationCheckIn
+                    : undefined,
+                sourceGroup: registrationSourceGroup || undefined,
             });
             setRegistrations(result);
         } catch {
             setRegistrations([]);
         }
-    }, [eventId, registrationCheckIn, registrationTier, registrationWalkIn]);
+    }, [eventId, registrationCheckIn, registrationSourceGroup, registrationTier]);
 
     useEffect(() => {
         void loadRegistrations();
@@ -184,7 +199,7 @@ export default function EventRegistrationsSection({
             const customFieldValues = Object.fromEntries(
                 sortedFields.map((field) => [String(field.id), draft.customFieldValues[String(field.id)] ?? null]),
             );
-            const created = await eventsAPI.createWalkInRegistration(eventId, {
+            const saved = await eventsAPI.createWalkInRegistration(eventId, {
                 fullName: draft.fullName.trim(),
                 email: draft.email.trim(),
                 phoneNumber: draft.phoneNumber.trim() || null,
@@ -192,7 +207,15 @@ export default function EventRegistrationsSection({
                 isWalkIn: true,
                 customFieldValues,
             });
-            setRegistrations((current) => [created, ...current]);
+            setRegistrations((current) => {
+                const existingIndex = current.findIndex((item) => item.id === saved.id);
+                if (existingIndex >= 0) {
+                    const next = [...current];
+                    next[existingIndex] = saved;
+                    return next;
+                }
+                return [saved, ...current];
+            });
             closeDraft();
             onRegistrationAdded?.();
         } catch (error) {
@@ -214,6 +237,29 @@ export default function EventRegistrationsSection({
         return [registration.fullName, registration.email, registration.confirmationCode].some((value) => String(value || '').toLowerCase().includes(query));
     });
 
+    const handleImportCompleted = (_importResult: ImportRegistrationsResult, refreshedFields: EventCustomFieldRef[]) => {
+        onFieldsChange(refreshedFields);
+        void loadRegistrations();
+        onRegistrationAdded?.();
+    };
+
+    const handleExportExcel = async () => {
+        setExporting(true);
+        try {
+            const allRegistrations = await eventsAPI.getRegistrations(eventId);
+            await exportEventRegistrationsExcel({
+                registrations: allRegistrations,
+                fields,
+                multiDayEvent,
+                fileName: eventTitle?.trim() || `event-${eventId}`,
+            });
+        } catch {
+            window.alert('Failed to export registrations to Excel.');
+        } finally {
+            setExporting(false);
+        }
+    };
+
     const walkInDraftFieldProps = {
         draft,
         draftErrors,
@@ -227,9 +273,8 @@ export default function EventRegistrationsSection({
     return (
         <section className="event-expanded-panel">
             <div className="event-expanded-header event-expanded-header--compact">
-                <div>
+               <div>
                     <h2 className="expanded-section-title">Registrations</h2>
-                    <p className="event-expanded-muted">Search, filter, and manage event attendees.</p>
                 </div>
             </div>
             <div className="event-expanded-form-grid">
@@ -242,23 +287,15 @@ export default function EventRegistrationsSection({
                     <option value="">Check-in status</option>
                     <option value="CHECKED_IN">Checked in</option>
                     <option value="NOT_CHECKED_IN">Not checked in</option>
+                    {multiDayEvent && withinEventDays ? <option value="CHECKED_IN_TODAY">Checked in today</option> : null}
                 </select>
-                <select aria-label="Filter by origin" value={registrationWalkIn} onChange={(e) => setRegistrationWalkIn(e.target.value)} className="form-input">
-                    <option value="">All origins</option>
-                    <option value="false">Pre-registered</option>
-                    <option value="true">Walk-ins</option>
+                <select aria-label="Filter by source" value={registrationSourceGroup} onChange={(e) => setRegistrationSourceGroup(e.target.value as EventRegistrationSourceGroup | '')} className="form-input">
+                    {REGISTRATION_SOURCE_GROUP_OPTIONS.map((option) => (
+                        <option key={option.value || 'all'} value={option.value}>{option.label}</option>
+                    ))}
                 </select>
             </div>
             {draftErrors._form ? <p className="error-message">{draftErrors._form}</p> : null}
-            <div className="event-registrations-table-toolbar">
-                <p className="event-registrations-table-toolbar__hint">
-                    Custom columns appear in the table and on the public registration form.
-                </p>
-                <button type="button" onClick={openFieldModal} className="btn btn-secondary event-registrations-table-toolbar__btn">
-                    <Plus size={16} />
-                    Add registration field
-                </button>
-            </div>
             <div className="event-registrations-layout">
                 <div className="event-registrations-table-column">
                     <div className={`event-registrations-table-shell${isAddingAttendee ? ' event-registrations-table-shell--drafting' : ''}`}>
@@ -266,7 +303,7 @@ export default function EventRegistrationsSection({
                             <table className="members-table event-registrations-table">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
+                                        <th className="event-registrations-name-cell">Name</th>
                                         <th>Email</th>
                                         <th>Phone</th>
                                         {sortedFields.map((field, index) => (
@@ -300,9 +337,16 @@ export default function EventRegistrationsSection({
                                         ))}
                                         <th>Tier</th>
                                         <th>Code</th>
+                                        {multiDayEvent ? <th>Attendance</th> : null}
                                         <th>Status</th>
                                         <th>Source</th>
                                         <th>Registered</th>
+                                        <th className="event-registrations-add-field-col">
+                                            <button type="button" className="event-registrations-add-field-btn" onClick={openFieldModal}>
+                                                <Plus size={14} />
+                                                Add field
+                                            </button>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -313,9 +357,29 @@ export default function EventRegistrationsSection({
                                     ) : null}
                                     {filtered.map((registration, index) => (
                                         <tr key={registration.id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
-                                            <td>{registration.fullName}</td>
-                                            <td className="email-cell">{registration.email}</td>
-                                            <td>{registration.phoneNumber || '—'}</td>
+                                            <EditableRegistrationContactCell
+                                                eventId={eventId}
+                                                registration={registration}
+                                                field="fullName"
+                                                editable={canEditCustomFieldValues}
+                                                className="event-registrations-name-cell"
+                                                onUpdated={handleRegistrationUpdated}
+                                            />
+                                            <EditableRegistrationContactCell
+                                                eventId={eventId}
+                                                registration={registration}
+                                                field="email"
+                                                editable={canEditCustomFieldValues}
+                                                className="email-cell"
+                                                onUpdated={handleRegistrationUpdated}
+                                            />
+                                            <EditableRegistrationContactCell
+                                                eventId={eventId}
+                                                registration={registration}
+                                                field="phoneNumber"
+                                                editable={canEditCustomFieldValues}
+                                                onUpdated={handleRegistrationUpdated}
+                                            />
                                             {sortedFields.map((field) => (
                                                 <EditableCustomFieldCell
                                                     key={field.id}
@@ -328,9 +392,23 @@ export default function EventRegistrationsSection({
                                             ))}
                                             <td>{registration.tier?.name || '—'}</td>
                                             <td><code>{registration.confirmationCode}</code></td>
+                                            {multiDayEvent ? (
+                                                <td>
+                                                    {registration.attendanceDays && registration.attendanceDays.length > 0 ? (
+                                                        <span className="event-attendance-days">
+                                                            {registration.attendanceDays.map((day) => (
+                                                                <span key={day.eventDay} className="event-attendance-day-chip">
+                                                                    {formatAttendanceDayLabel(day.eventDay)}
+                                                                </span>
+                                                            ))}
+                                                        </span>
+                                                    ) : '—'}
+                                                </td>
+                                            ) : null}
                                             <td>{formatRegistrationStatus(registration)}</td>
                                             <td>{formatRegistrationSource(registration)}</td>
                                             <td>{fmtDate(registration.createdAt) || '—'}</td>
+                                            <td className="event-registrations-add-field-col" aria-hidden="true" />
                                         </tr>
                                     ))}
                                 </tbody>
@@ -349,23 +427,46 @@ export default function EventRegistrationsSection({
                                 </div>
                             </div>
                         ) : null}
-                        {walkInsEnabled && !isAddingAttendee ? (
-                            <div className="event-registrations-table-footer">
-                                <button type="button" className="add-attendee-btn" onClick={openDraft}>
-                                    <Plus size={18} />
-                                    Add walk-in
-                                </button>
-                            </div>
-                        ) : null}
-                        {allowWalkIns && !withinEventDays && !isAddingAttendee ? (
-                            <div className="event-registrations-table-footer event-registrations-table-footer--muted">
-                                Walk-ins are available on event days only ({eventDurationLabel}).
-                            </div>
-                        ) : null}
-                        {!allowWalkIns && !isAddingAttendee ? (
-                            <div className="event-registrations-table-footer event-registrations-table-footer--muted">
-                                Enable walk-ins in event settings to add attendees here.
-                            </div>
+                        {!isAddingAttendee ? (
+                            <>
+                                <div className="event-registrations-table-footer">
+                                    {walkInsEnabled ? (
+                                        <button type="button" className="add-attendee-btn" onClick={openDraft}>
+                                            <Plus size={18} />
+                                            Add walk-in
+                                        </button>
+                                    ) : null}
+                                    {allowWalkIns && !withinEventDays ? (
+                                        <p className="event-registrations-table-footer--muted">
+                                            Walk-ins are available on event days only ({eventDurationLabel}).
+                                        </p>
+                                    ) : null}
+                                    {!allowWalkIns ? (
+                                        <p className="event-registrations-table-footer--muted">
+                                            Enable walk-ins in event settings to add attendees here.
+                                        </p>
+                                    ) : null}
+                                </div>
+                                <div className="event-registrations-io-bar">
+                                    <button
+                                        type="button"
+                                        className="event-registrations-io-btn"
+                                        onClick={() => setImportModalOpen(true)}
+                                    >
+                                        <FileSpreadsheet size={18} />
+                                        Import from Excel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="event-registrations-io-btn"
+                                        onClick={() => void handleExportExcel()}
+                                        disabled={exporting}
+                                    >
+                                        <FileSpreadsheet size={18} />
+                                        {exporting ? 'Exporting…' : 'Export Excel'}
+                                    </button>
+                                </div>
+                            </>
                         ) : null}
                     </div>
                 </div>
@@ -373,10 +474,23 @@ export default function EventRegistrationsSection({
                     <EventCheckInPanel
                         eventId={eventId}
                         onCheckIn={handleCheckInSuccess}
-                        suspended={fieldModalOpen || isAddingAttendee}
+                        suspended={fieldModalOpen || importModalOpen || isAddingAttendee}
                     />
                 </aside>
             </div>
+
+            {importModalOpen ? (
+                <ImportRegistrationsModal
+                    eventId={eventId}
+                    tiers={tiers}
+                    fields={fields}
+                    onClose={() => setImportModalOpen(false)}
+                    onImported={(importResult, refreshedFields) => {
+                        handleImportCompleted(importResult, refreshedFields);
+                    }}
+                    onImportComplete={onImportComplete}
+                />
+            ) : null}
 
             {fieldModalOpen ? (
                 <AddCustomFieldModal

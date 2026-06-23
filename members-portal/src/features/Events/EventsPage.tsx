@@ -111,16 +111,22 @@ export default function EventsPage() {
         scope: eventPermissions.canManageEvent() ? 'all' as const : 'published' as const,
     }), [dateFrom, dateTo, eventPermissions]);
 
-    const loadEvents = useCallback(async () => {
-        setLoading(true);
-        setError('');
+    const loadEvents = useCallback(async (options?: { silent?: boolean }) => {
+        if (!options?.silent) {
+            setLoading(true);
+            setError('');
+        }
         try {
             const result = await eventsAPI.getAll(filters);
             setEvents(result);
         } catch (loadError) {
-            setError(loadError instanceof Error ? loadError.message : 'Failed to load events');
+            if (!options?.silent) {
+                setError(loadError instanceof Error ? loadError.message : 'Failed to load events');
+            }
         } finally {
-            setLoading(false);
+            if (!options?.silent) {
+                setLoading(false);
+            }
         }
     }, [filters]);
 
@@ -184,14 +190,14 @@ export default function EventsPage() {
         try {
             const detail = await eventsAPI.getById(expandedEventId);
             setExpandedEventDetail(detail);
-            void loadEvents();
+            void loadEvents({ silent: true });
         } catch {
             /* swallow */
         }
     }, [expandedEventId, loadEvents]);
 
     const handleLifecycleRefresh = useCallback(() => {
-        void loadEvents();
+        void loadEvents({ silent: true });
         if (expandedEventId) {
             void eventsAPI.getById(expandedEventId).then(setExpandedEventDetail).catch(() => {});
         }

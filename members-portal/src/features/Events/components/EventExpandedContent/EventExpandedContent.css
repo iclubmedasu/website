@@ -2,15 +2,69 @@
 /* form-input, btn-*, info-label, info-value, exp-card-section: shared modal.css / page.css */
 
 .project-card--expanded .event-expanded-content {
-    display: grid;
-    gap: 1rem;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
     min-width: 0;
+    min-height: 0;
+    max-height: calc(100vh - 12rem);
+    overflow: hidden;
+    gap: 1rem;
+    --event-registrations-row-height: 3rem;
+    --event-registrations-header-height: 2.75rem;
+    --event-tab-table-max-height: calc(
+        var(--event-registrations-row-height) * 10 + var(--event-registrations-header-height)
+    );
+    --event-tab-body-min-height: calc(
+        14rem + var(--event-registrations-row-height) * 10 + var(--event-registrations-header-height)
+    );
+}
+
+.event-expanded-tab-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.event-expanded-tab-panel > .event-expanded-panel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    overflow: hidden;
+}
+
+.event-expanded-tab-panel > .event-expanded-panel:has(.event-registrations-layout) {
+    flex: 1;
+    min-height: 0;
+}
+
+.event-expanded-tab-panel > .event-expanded-panel:has(.event-registrations-layout) > .event-expanded-header,
+.event-expanded-tab-panel > .event-expanded-panel:has(.event-registrations-layout) > .event-expanded-form-grid {
+    flex-shrink: 0;
 }
 
 .event-expanded-content .event-tasks-section {
+    flex: 1;
+    min-height: 0;
     min-width: 0;
     max-width: 100%;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
+    gap: 0;
+}
+
+.event-expanded-content .ett-shell {
+    flex: 1;
+    min-height: 0;
+    max-height: calc(var(--event-tab-body-min-height) - 2.75rem);
+    overflow-y: auto;
 }
 
 .event-expanded-summary-grid {
@@ -34,12 +88,17 @@
     grid-template-columns: repeat(3, 1fr);
     gap: 1rem;
     margin-top: 1rem;
+    flex: 1;
+    min-height: 0;
+    align-items: stretch;
 }
 
 .event-expanded-chart-cell {
     display: grid;
+    grid-template-rows: auto 1fr;
     gap: 0.5rem;
     min-width: 0;
+    min-height: 0;
 }
 
 .event-expanded-chart-empty {
@@ -158,14 +217,26 @@
 }
 
 .event-expanded-chart-wrap {
-    height: 260px;
+    flex: 1;
+    min-height: 220px;
     width: 100%;
+}
+
+.event-expanded-tiers-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: grid;
+    gap: 0.75rem;
+    align-content: start;
+    padding-right: 0.15rem;
 }
 
 .event-expanded-tab-nav {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
+    flex-shrink: 0;
 }
 
 .event-expanded-tab-button {
@@ -379,52 +450,148 @@
     grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
     gap: 1rem;
     align-items: stretch;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .event-registrations-table-column {
     min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
-.event-registrations-table-toolbar {
+.import-registrations-modal {
+    width: min(920px, calc(100vw - 2rem));
+}
+
+.import-registrations-modal__body {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: min(70vh, 720px);
+    overflow: auto;
+}
+
+.import-registrations-modal__body .file-drop-area {
+    margin-top: 0.25rem;
+}
+
+.import-registrations-mapping-table {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.import-registrations-mapping-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 220px) 1fr;
     gap: 0.75rem;
-    margin-bottom: 0.5rem;
-}
-
-.event-registrations-table-toolbar__hint {
-    margin: 0;
-    font-family: var(--font-body);
-    font-size: 0.8rem;
-    color: var(--gray-500);
-    line-height: 1.35;
-}
-
-.event-registrations-table-toolbar__btn {
-    display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    flex-shrink: 0;
-    padding: 0.4rem 0.75rem;
-    font-size: 0.85rem;
+}
+
+.import-registrations-mapping-label--required::after {
+    content: ' *';
+    color: #b91c1c;
+}
+
+.import-registrations-divider {
+    border: 0;
+    border-top: 1px solid rgba(86, 23, 137, 0.15);
+    margin: 1rem 0;
+}
+
+.import-registrations-sample-preview {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.import-registrations-new-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.import-registrations-new-field-card {
+    border: 1px solid rgba(86, 23, 137, 0.12);
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.import-registrations-new-field-card__header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.import-registrations-preview .import-registrations-summary {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.import-registrations-result {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .event-registrations-checkin-column {
     min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
+    align-self: stretch;
+    overflow: hidden;
+}
+
+.event-attendance-days {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.event-attendance-day-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(22, 163, 74, 0.12);
+    color: #15803d;
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
 }
 
 .event-registrations-table-shell {
     --event-registrations-row-height: 3rem;
     --event-registrations-header-height: 2.75rem;
     flex: 1;
+    min-height: 0;
+    height: auto;
     display: flex;
     flex-direction: column;
-    min-height: 0;
     border: 1px solid rgba(86, 23, 137, 0.1);
     border-radius: var(--radius-md);
     background: var(--bg-card);
@@ -432,9 +599,20 @@
 }
 
 .event-registrations-table-scroll {
-    flex: 1;
+    flex: 1 1 0;
     min-height: 0;
     overflow: auto;
+    max-height: none;
+}
+
+.event-registrations-table th.event-registrations-name-cell,
+.event-registrations-table td.event-registrations-name-cell {
+    min-width: 10rem;
+    max-width: 14rem;
+    width: 14rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .event-registrations-table-scroll .event-registrations-table thead th {
@@ -445,8 +623,80 @@
     box-shadow: 0 1px 0 var(--gray-200);
 }
 
-.event-registrations-table-footer {
+.event-registrations-contact-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.event-registrations-contact-cell--editing {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+}
+
+.event-registrations-contact-cell__value {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.event-registrations-contact-cell__actions {
+    display: flex;
+    gap: 0.15rem;
     flex-shrink: 0;
+    justify-content: flex-end;
+}
+
+.event-registrations-contact-cell .table-action-btn {
+    width: 1.25rem;
+    height: 1.25rem;
+    min-width: 1.25rem;
+    padding: 0;
+}
+
+.event-registrations-contact-cell .table-action-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+.event-registrations-contact-cell__edit {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+.event-registrations-table tbody tr:hover .event-registrations-contact-cell__edit,
+.event-registrations-table tbody tr:focus-within .event-registrations-contact-cell__edit {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.event-registrations-contact-cell__save {
+    color: #16a34a;
+}
+
+.event-registrations-contact-cell__save:hover {
+    background: #16a34a;
+    color: white;
+}
+
+.event-registrations-contact-cell__cancel {
+    color: var(--gray-500);
+}
+
+.event-registrations-contact-cell__cancel:hover {
+    background: var(--error-bg);
+    color: var(--error-text);
+}
+
+.event-registrations-table-footer {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    z-index: 2;
     text-align: center;
     padding: 0.75rem 1rem;
     border-top: 1px solid rgba(86, 23, 137, 0.1);
@@ -454,8 +704,207 @@
 }
 
 .event-registrations-table-footer--muted {
+    margin: 0;
     color: var(--gray-500);
     font-size: 0.85rem;
+}
+
+.event-registrations-io-bar {
+    display: flex;
+    flex-shrink: 0;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid rgba(86, 23, 137, 0.1);
+    background: var(--bg-card);
+}
+
+.event-registrations-io-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.65rem 1rem;
+    border: none;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--purple-700);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.event-registrations-io-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--purple-700) 0%, #8b5cf6 100%);
+    color: white;
+}
+
+.event-registrations-io-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.event-registrations-add-field-col {
+    width: 8rem;
+    min-width: 8rem;
+    max-width: 8rem;
+    padding: 0.5rem;
+    border-left: 1px dashed rgba(86, 23, 137, 0.2);
+    background: var(--gray-50);
+    vertical-align: middle;
+    text-align: center;
+}
+
+.event-registrations-actions-col {
+    width: 7.5rem;
+    min-width: 7.5rem;
+    max-width: 7.5rem;
+    padding: 0.5rem;
+    vertical-align: middle;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.event-registrations-resend-btn {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.event-registrations-resend-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.event-tickets-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.event-tickets-table {
+    margin-top: 1rem;
+}
+
+.event-tickets-empty {
+    text-align: center;
+    color: var(--text-muted, #6b7280);
+    padding: 1.5rem;
+}
+
+.event-email-delivery-status {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    min-width: 5.5rem;
+}
+
+.event-email-delivery-status .status-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.55rem;
+}
+
+.event-email-delivery-status__date {
+    font-size: 0.72rem;
+    color: var(--gray-500);
+    line-height: 1.2;
+}
+
+.event-tickets-actions-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    align-items: flex-start;
+}
+
+.event-tickets-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    height: auto;
+    min-height: 1.75rem;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid rgba(86, 23, 137, 0.18);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--purple-700);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.event-tickets-action-btn:hover:not(:disabled) {
+    background: rgba(86, 23, 137, 0.08);
+    border-color: rgba(86, 23, 137, 0.35);
+    color: var(--purple-700);
+    transform: none;
+}
+
+.event-tickets-action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.event-tickets-io-bar {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid rgba(86, 23, 137, 0.1);
+    background: var(--bg-card);
+}
+
+.event-tickets-io-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    flex: 1 1 12rem;
+    min-width: 10rem;
+}
+
+.event-registrations-table tbody td.event-registrations-add-field-col {
+    padding: 0.5rem;
+}
+
+.event-registrations-table-scroll .event-registrations-table thead th.event-registrations-add-field-col {
+    background: var(--gray-50);
+}
+
+.event-registrations-add-field-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    width: auto;
+    margin: 0 auto;
+    min-height: 2.25rem;
+    padding: 0.4rem 0.65rem;
+    border: 2px dashed rgba(86, 23, 137, 0.25);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: #16a34a;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+
+.event-registrations-add-field-btn:hover {
+    border-color: transparent;
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+    color: white;
 }
 
 .event-registrations-table-footer--draft {
@@ -525,6 +974,7 @@
 
 .event-registrations-checkin-panel {
     flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
@@ -533,12 +983,34 @@
     border-radius: var(--radius-md);
     background: var(--bg-card);
     width: 100%;
+    overflow: hidden;
 }
 
-.event-registrations-checkin-scan,
-.event-registrations-checkin-manual {
+.event-checkin-divider {
+    border: 0;
+    border-top: 1px solid rgba(86, 23, 137, 0.15);
+    margin: 0.25rem 0;
+    flex-shrink: 0;
+}
+
+.event-registrations-checkin-scan {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
     display: grid;
     gap: 0.5rem;
+    align-content: start;
+}
+
+.event-registrations-checkin-manual {
+    flex-shrink: 0;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.event-registrations-checkin-panel > .error-message,
+.event-registrations-checkin-panel > .success-message {
+    flex-shrink: 0;
 }
 
 .event-qr-scanner {
@@ -631,16 +1103,33 @@
 @media (max-width: 900px) {
     .event-registrations-layout {
         grid-template-columns: 1fr;
-        align-items: start;
+        grid-template-rows: minmax(0, 1fr) minmax(0, auto);
+        align-items: stretch;
+        min-height: 0;
     }
 
-    .event-registrations-table-shell,
-    .event-registrations-checkin-panel {
-        flex: none;
+    .event-registrations-table-column {
+        min-height: 0;
+    }
+
+    .event-registrations-table-shell {
+        flex: 1;
+        min-height: 0;
+        height: auto;
     }
 
     .event-registrations-table-scroll {
-        max-height: calc(var(--event-registrations-row-height) * 10 + var(--event-registrations-header-height));
+        max-height: var(--event-tab-table-max-height);
+    }
+
+    .event-registrations-checkin-column {
+        flex-shrink: 0;
+        max-height: min(50vh, 28rem);
+    }
+
+    .event-registrations-checkin-panel {
+        flex: 1;
+        min-height: 0;
     }
 
     .event-registrations-row--draft {
@@ -657,12 +1146,6 @@
 
     .event-registrations-draft-footer-actions .btn {
         width: 100%;
-    }
-}
-
-@media (max-width: 480px) {
-    .event-registrations-table-toolbar__hint {
-        display: none;
     }
 }
 
