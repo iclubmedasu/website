@@ -107,10 +107,23 @@ Set these in GitHub → repo Settings → Secrets and variables → Actions. The
 ## Frontend Deployment (Netlify)
 
 1. The members portal (Next.js app) is deployed to Netlify: [Live site](https://iclubmedasu-members-portal.netlify.app/)
-2. Environment variables are set in the Netlify dashboard. Set NEXT_PUBLIC_API_URL = https://your-hf-space-url.hf.space/api
-3. Build command: `pnpm --filter members-portal build`
-4. Publish directory: `members-portal/.next`
+2. Environment variables are set in the Netlify dashboard. Set `NEXT_PUBLIC_API_URL` = `https://your-hf-space-url.hf.space/api`
+3. Netlify settings are defined in [`netlify.toml`](../netlify.toml) at the repo root:
+   - **Base directory:** repo root (not `members-portal`)
+   - **Build command:** `pnpm install && pnpm --filter members-portal build`
+   - **Publish directory:** `members-portal/.next`
+   - **Plugin:** `@netlify/plugin-nextjs` (required — publishes `public/` assets such as favicon and PWA icons to the CDN; publish dir alone is not sufficient)
+4. After changing static assets or PWA config, clear the Netlify build cache and redeploy
 5. Runtime: Node.js (Next.js server, not static export)
+
+### Post-deploy static asset check
+
+Verify these return HTTP 200:
+
+- `https://iclubmedasu-members-portal.netlify.app/favicon.ico`
+- `https://iclubmedasu-members-portal.netlify.app/icons/icon-192x192.png`
+
+If users still see favicon errors after deploy, unregister the old service worker (DevTools → Application → Service Workers) and hard-refresh.
 
 ## Local Docker Testing
 
