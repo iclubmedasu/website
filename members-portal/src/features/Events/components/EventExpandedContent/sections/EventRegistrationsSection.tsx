@@ -584,7 +584,6 @@ export default function EventRegistrationsSection({
             {importModalOpen ? (
                 <ImportRegistrationsModal
                     eventId={eventId}
-                    tiers={tiers}
                     fields={fields}
                     onClose={() => setImportModalOpen(false)}
                     onImported={(importResult, refreshedFields) => {

@@ -1,7 +1,6 @@
 import type {
     EventCustomFieldRef,
     EventCustomFieldType,
-    EventTierRef,
     RegistrationImportColumnMapping,
     RegistrationImportNewFieldSpec,
     RegistrationImportRow,
@@ -264,7 +263,6 @@ export function buildImportRows(
     mapping: RegistrationImportColumnMapping,
     newFields: NewFieldImportDraft[],
     existingFields: EventCustomFieldRef[],
-    _tiers: EventTierRef[],
 ): RegistrationImportRow[] {
     const activeNewFields = newFields.filter((field) => field.mode === 'import');
 

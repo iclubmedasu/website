@@ -9,7 +9,6 @@ import { FIELD_TYPES } from '@/features/Events/modals/AddCustomFieldModal';
 import type {
     EventCustomFieldRef,
     EventCustomFieldType,
-    EventTierRef,
     Id,
     ImportRegistrationsResult,
     RegistrationImportColumnMapping,
@@ -36,7 +35,6 @@ const NOT_IN_FILE = '';
 
 interface ImportRegistrationsModalProps {
     eventId: Id | string;
-    tiers: EventTierRef[];
     fields: EventCustomFieldRef[];
     onClose: () => void;
     onImported: (result: ImportRegistrationsResult, newFields: EventCustomFieldRef[]) => void;
@@ -65,7 +63,6 @@ function downloadErrorsCsv(errors: ImportRegistrationsResult['errors']) {
 
 export default function ImportRegistrationsModal({
     eventId,
-    tiers,
     fields,
     onClose,
     onImported,
@@ -109,12 +106,12 @@ export default function ImportRegistrationsModal({
 
     const previewRows = useMemo(() => {
         if (!parsed) return [];
-        return buildImportRows(parsed.rows, mapping, newFieldDrafts, sortedFields, tiers).slice(0, 5);
-    }, [parsed, mapping, newFieldDrafts, sortedFields, tiers]);
+        return buildImportRows(parsed.rows, mapping, newFieldDrafts, sortedFields).slice(0, 5);
+    }, [parsed, mapping, newFieldDrafts, sortedFields]);
 
     const importPayload = useMemo(() => {
         if (!parsed) return null;
-        const rows = buildImportRows(parsed.rows, mapping, newFieldDrafts, sortedFields, tiers);
+        const rows = buildImportRows(parsed.rows, mapping, newFieldDrafts, sortedFields);
         const newCustomFields = newFieldDrafts
             .filter((field) => field.mode === 'import')
             .map(({ excelColumn, label, type, optionRows, required }) => ({
@@ -125,7 +122,7 @@ export default function ImportRegistrationsModal({
                 required,
             }));
         return { rows, newCustomFields };
-    }, [parsed, mapping, newFieldDrafts, sortedFields, tiers]);
+    }, [parsed, mapping, newFieldDrafts, sortedFields]);
 
     const canContinueFromMapping = Boolean(mapping.fullName);
 
