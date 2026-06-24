@@ -29,6 +29,22 @@ const PURPLE = {
 
 export type EventRegistrationEmailVariant = 'ticket' | 'reminder';
 
+const DEFAULT_PUBLIC_WEBSITE_URL = 'http://localhost:3002';
+
+function getPublicWebsiteUrl(): string {
+    const configured = process.env.PUBLIC_WEBSITE_URL?.trim();
+    if (!configured) {
+        return DEFAULT_PUBLIC_WEBSITE_URL;
+    }
+    return configured.replace(/\/$/, '');
+}
+
+export function buildRegistrationConfirmationUrl(eventId: number, confirmationCode: string): string {
+    const baseUrl = getPublicWebsiteUrl();
+    const code = encodeURIComponent(confirmationCode.trim().toUpperCase());
+    return `${baseUrl}/events/${eventId}/confirmation?code=${code}`;
+}
+
 function escapeHtml(value: string): string {
     return value
         .replace(/&/g, '&amp;')
@@ -117,6 +133,7 @@ function buildRegistrationEmailHtml(input: {
     attendeeName: string;
     tierName: string;
     confirmationCode: string;
+    confirmationUrl: string;
     variant: EventRegistrationEmailVariant;
 }): string {
     const eventTitle = escapeHtml(input.eventTitle);
@@ -125,6 +142,7 @@ function buildRegistrationEmailHtml(input: {
     const attendeeName = escapeHtml(input.attendeeName);
     const tierName = escapeHtml(input.tierName);
     const confirmationCode = escapeHtml(input.confirmationCode);
+    const confirmationUrl = escapeHtml(input.confirmationUrl);
     const isReminder = input.variant === 'reminder';
 
     const pageTitle = isReminder ? `Reminder: ${eventTitle}` : `Your ticket for ${eventTitle}`;
@@ -225,6 +243,11 @@ function buildRegistrationEmailHtml(input: {
                   </td>
                 </tr>
                 <tr>
+                  <td align="center" style="padding:0 24px 18px;">
+                    <a href="${confirmationUrl}" style="display:inline-block;padding:12px 20px;background:${PURPLE[800]};color:#ffffff;text-decoration:none;border-radius:10px;font-size:12px;font-weight:700;letter-spacing:0.04em;">View registration online</a>
+                  </td>
+                </tr>
+                <tr>
                   <td style="background:#f8fafc;border-top:1px solid #eef2f7;padding:16px 24px;">
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                       <tr>
@@ -276,6 +299,7 @@ async function sendRegistrationEmail(
         include: {
             event: {
                 select: {
+                    id: true,
                     title: true,
                     venue: true,
                     eventDate: true,
@@ -308,6 +332,7 @@ async function sendRegistrationEmail(
         attendeeName: registration.fullName,
         tierName: registration.tier?.name || 'General',
         confirmationCode: registration.confirmationCode,
+        confirmationUrl: buildRegistrationConfirmationUrl(registration.event.id, registration.confirmationCode),
         variant,
     });
 

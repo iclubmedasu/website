@@ -34,6 +34,13 @@ interface EventExpandedContentProps {
     allowWalkIns?: boolean;
     eventDate?: string | null;
     eventEndDate?: string | null;
+    isPublished?: boolean;
+    canPublishEvent?: boolean;
+    canRemoveAttendance?: boolean;
+    onPublishedChange?: (eventId: Id, published: boolean) => Promise<void>;
+    canManageTiers?: boolean;
+    canManageTasks?: boolean;
+    canManageFields?: boolean;
     onReload: () => void;
 }
 
@@ -44,6 +51,13 @@ export default function EventExpandedContent({
     allowWalkIns = false,
     eventDate,
     eventEndDate,
+    isPublished = false,
+    canPublishEvent = false,
+    canRemoveAttendance = false,
+    onPublishedChange,
+    canManageTiers = false,
+    canManageTasks = false,
+    canManageFields = false,
     onReload,
 }: EventExpandedContentProps) {
     const [stats, setStats] = useState<EventStatistics | null>(null);
@@ -121,7 +135,12 @@ export default function EventExpandedContent({
             )}
             {activeTab === 'tiers' && (
                 <div className="event-expanded-tab-panel">
-                    <EventTiersSection eventId={eventId} tiers={tiers} onTiersChange={setTiers} />
+                    <EventTiersSection
+                        eventId={eventId}
+                        tiers={tiers}
+                        onTiersChange={setTiers}
+                        canManage={canManageTiers}
+                    />
                 </div>
             )}
             {activeTab === 'registrations' && (
@@ -136,6 +155,11 @@ export default function EventExpandedContent({
                         allowWalkIns={allowWalkIns}
                         eventDate={eventDate}
                         eventEndDate={eventEndDate}
+                        isPublished={isPublished}
+                        canPublishEvent={canPublishEvent}
+                        canRemoveAttendance={canRemoveAttendance}
+                        onPublishedChange={onPublishedChange}
+                        canManageFields={canManageFields}
                         onRegistrationAdded={() => void reloadAll()}
                         onCheckIn={() => void reloadAll()}
                         onImportComplete={handleImportComplete}
@@ -158,6 +182,7 @@ export default function EventExpandedContent({
                         eventTitle={eventTitle}
                         eventDate={eventDate}
                         eventEndDate={eventEndDate}
+                        canManage={canManageTasks}
                     />
                 </div>
             )}

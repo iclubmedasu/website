@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express";
 import { prisma } from "../db";
+import { looksLikePhone, sanitizePhoneForStorage } from "../lib/phoneUtils";
 
 const router = express.Router();
 
@@ -8,44 +9,6 @@ const ADMINISTRATION_ROLE_NAMES = ["Officer", "President", "Vice President"];
 const ADMINISTRATION_LEADERSHIP_ROLE_NAMES = ["President", "Vice President"];
 const OFFICIAL_EMAIL_REGEX = /^[^\s@]+@med\.asu\.edu\.eg$/i;
 const PLACEHOLDER_FULLNAME = "Pending";
-
-function looksLikePhone(value: unknown): value is string {
-    if (!value || typeof value !== "string") {
-        return false;
-    }
-
-    const stripped = value.replace(/\s/g, "");
-    return /^[+\d][\d\s\-().]{6,}$/.test(stripped) && !stripped.includes("@");
-}
-
-function normalizePhone(raw: unknown): string {
-    if (!raw || typeof raw !== "string") {
-        return "";
-    }
-
-    let cleaned = raw.replace(/[^\d+]/g, "");
-    if (cleaned.startsWith("+")) {
-        cleaned = "+" + cleaned.slice(1).replace(/\+/g, "");
-    } else {
-        cleaned = cleaned.replace(/\+/g, "");
-    }
-
-    const digits = cleaned.replace(/\+/g, "");
-    if (cleaned.startsWith("+20")) {
-        return cleaned;
-    }
-    if (!cleaned.startsWith("+") && digits.startsWith("20") && digits.length === 12) {
-        return "+" + digits;
-    }
-    if (digits.startsWith("0") && digits.length === 11) {
-        return "+20" + digits.slice(1);
-    }
-    if (digits.startsWith("1") && digits.length === 10) {
-        return "+20" + digits;
-    }
-
-    return cleaned.startsWith("+") ? cleaned : cleaned;
-}
 
 async function getOrCreateAdministrationTeam() {
     let team = await prisma.team.findFirst({
@@ -167,7 +130,7 @@ router.post("/officer", async (req: Request<unknown, unknown, OfficerPayload>, r
             return res.status(400).json({ error: "Email must be an official @med.asu.edu.eg address." });
         }
 
-        const normalizedPhone = isPhone ? normalizePhone(identifier) : null;
+        const normalizedPhone = isPhone ? sanitizePhoneForStorage(identifier) : null;
         const officerEmail = isEmail ? identifier : `pending-officer-${Date.now()}@med.asu.edu.eg`;
         const officerPhone = isPhone ? (normalizedPhone ?? `pending-${Date.now()}`) : `pending-${Date.now()}`;
 

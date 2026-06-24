@@ -26,6 +26,13 @@ model Member {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
+  // Contact visibility to other members / public (default hidden)
+  showPhoneNumber   Boolean   @default(false)
+  showPhoneNumber2  Boolean   @default(false)
+  showEmail2        Boolean   @default(false)
+  showEmail3        Boolean   @default(false)
+  showStudentId     Boolean   @default(false)
+
   // Relations
   user            User?
   teamMemberships TeamMember[]
@@ -299,6 +306,7 @@ model Project {
   isActive        Boolean   @default(true)
   isFinalized     Boolean   @default(false)
   isArchived      Boolean   @default(false)
+  isDisclosed     Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
@@ -322,6 +330,7 @@ model Project {
   @@index([projectTypeId])
   @@index([isFinalized])
   @@index([isArchived])
+  @@index([isDisclosed])
 }
 
 // ============================================
@@ -347,6 +356,8 @@ model Event {
   isActive            Boolean   @default(true)
   isFinalized         Boolean   @default(false)
   isArchived          Boolean   @default(false)
+  isPublished         Boolean   @default(false)
+  isDisclosed         Boolean   @default(false)
   deletedAt           DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
@@ -376,6 +387,8 @@ model Event {
   @@index([isActive])
   @@index([isFinalized])
   @@index([isArchived])
+  @@index([isPublished])
+  @@index([isDisclosed])
 }
 
 model EventTier {
@@ -388,6 +401,7 @@ model EventTier {
   currency        String    @default("EGP")
   order           Int       @default(0)
   isActive        Boolean   @default(true)
+  showOnPublic    Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

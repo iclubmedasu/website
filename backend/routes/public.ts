@@ -1,0 +1,557 @@
+import express, { Request, Response } from "express";
+import { prisma } from "../db";
+import { sendEmail } from "../services/emailService";
+
+const router = express.Router();
+
+const DEFAULT_CONTACT_INBOX = "asu.medicine.iclub@gmail.com";
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type EventCapacityRow = {
+    id: number;
+    title: string;
+    description: string | null;
+    eventDate: Date;
+    eventEndDate: Date;
+    venue: string | null;
+    registrationDeadline: Date | null;
+    capacity: number | null;
+    status: string;
+    isActive: boolean;
+    isArchived: boolean;
+    isPublished: boolean;
+    projectType?: { name: string } | null;
+};
+
+const publicEventSelect = {
+    id: true,
+    title: true,
+    description: true,
+    eventDate: true,
+    eventEndDate: true,
+    venue: true,
+    registrationDeadline: true,
+    capacity: true,
+    status: true,
+    isActive: true,
+    isArchived: true,
+    isPublished: true,
+    projectType: { select: { name: true } },
+} as const;
+
+const publicProjectSelect = {
+    id: true,
+    title: true,
+    description: true,
+    completedDate: true,
+    projectType: {
+        select: {
+            name: true,
+            category: true,
+        },
+    },
+    tags: {
+        select: {
+            tagName: true,
+        },
+    },
+} as const;
+
+function parseLimit(value: unknown, fallback: number, max = 50): number {
+    const parsed = Number.parseInt(String(value ?? ""), 10);
+    if (Number.isNaN(parsed) || parsed < 1) {
+        return fallback;
+    }
+    return Math.min(parsed, max);
+}
+
+function parseEventId(value: string): number | null {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+}
+
+function parseProjectId(value: string): number | null {
+    return parseEventId(value);
+}
+
+function isTruthyQuery(value: unknown): boolean {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    return normalized === "true" || normalized === "1";
+}
+
+function isUpcomingQuery(value: unknown): boolean {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    return normalized === "" || normalized === "true" || normalized === "1";
+}
+
+function canPublicViewEvent(event: { isPublished: boolean; isActive: boolean; isArchived: boolean }): boolean {
+    return event.isActive && !event.isArchived && event.isPublished;
+}
+
+function computeSpotsRemaining(capacity: number | null | undefined, registeredCount: number): number | null {
+    if (capacity == null) return null;
+    return Math.max(capacity - registeredCount, 0);
+}
+
+function isRegistrationOpen(
+    event: Pick<EventCapacityRow, "registrationDeadline" | "capacity" | "eventEndDate">,
+    registeredCount: number,
+    now: Date,
+): boolean {
+    if (event.registrationDeadline && event.registrationDeadline < now) {
+        return false;
+    }
+    if (event.eventEndDate < now) {
+        return false;
+    }
+    if (event.capacity != null && registeredCount >= event.capacity) {
+        return false;
+    }
+    return true;
+}
+
+async function getRegistrationCountsByEventIds(eventIds: number[]): Promise<Map<number, number>> {
+    if (eventIds.length === 0) {
+        return new Map();
+    }
+
+    const groups = await prisma.eventRegistration.groupBy({
+        by: ["eventId"],
+        where: {
+            eventId: { in: eventIds },
+            status: { not: "CANCELLED" },
+        },
+        _count: { _all: true },
+    });
+
+    return new Map(groups.map((group) => [group.eventId, group._count._all]));
+}
+
+async function getTierRegistrationCounts(eventId: number, tierIds: number[]): Promise<Map<number, number>> {
+    if (tierIds.length === 0) {
+        return new Map();
+    }
+
+    const groups = await prisma.eventRegistration.groupBy({
+        by: ["tierId"],
+        where: {
+            eventId,
+            tierId: { in: tierIds },
+            status: { not: "CANCELLED" },
+        },
+        _count: { _all: true },
+    });
+
+    return new Map(
+        groups
+            .filter((group) => group.tierId != null)
+            .map((group) => [group.tierId as number, group._count._all]),
+    );
+}
+
+function serializePublicEventListItem(
+    event: EventCapacityRow,
+    registeredCount: number,
+    now: Date,
+    options?: { includeDescription?: boolean },
+) {
+    const spotsRemaining = computeSpotsRemaining(event.capacity, registeredCount);
+    const registrationOpen = isRegistrationOpen(event, registeredCount, now);
+
+    return {
+        id: event.id,
+        title: event.title,
+        ...(options?.includeDescription ? { description: event.description } : {}),
+        eventDate: event.eventDate,
+        eventEndDate: event.eventEndDate,
+        venue: event.venue,
+        registrationDeadline: event.registrationDeadline,
+        capacity: event.capacity,
+        registeredCount,
+        spotsRemaining,
+        registrationOpen,
+        projectType: event.projectType ? { name: event.projectType.name } : null,
+    };
+}
+
+router.get("/events", async (req: Request, res: Response) => {
+    try {
+        const limit = parseLimit(req.query.limit, 3);
+        const past = isTruthyQuery(req.query.past);
+        const upcoming = isUpcomingQuery(req.query.upcoming);
+        const registerable = isTruthyQuery(req.query.registerable);
+        const now = new Date();
+
+        if (past) {
+            const events = await prisma.event.findMany({
+                where: {
+                    isArchived: true,
+                    isDisclosed: true,
+                },
+                select: publicEventSelect,
+                orderBy: { eventEndDate: "desc" },
+                take: limit,
+            });
+
+            const counts = await getRegistrationCountsByEventIds(events.map((event) => event.id));
+            const items = events.map((event) =>
+                serializePublicEventListItem(event, counts.get(event.id) ?? 0, now, { includeDescription: true }),
+            );
+
+            return res.json(items);
+        }
+
+        const where: Record<string, unknown> = {
+            isActive: true,
+            isArchived: false,
+            isPublished: true,
+        };
+
+        if (upcoming || registerable) {
+            where.eventEndDate = { gte: now };
+        }
+
+        if (registerable) {
+            where.OR = [
+                { registrationDeadline: null },
+                { registrationDeadline: { gte: now } },
+            ];
+        }
+
+        const events = await prisma.event.findMany({
+            where,
+            select: publicEventSelect,
+            orderBy: { eventDate: "asc" },
+            take: registerable ? limit * 3 : limit,
+        });
+
+        const counts = await getRegistrationCountsByEventIds(events.map((event) => event.id));
+        let items = events.map((event) =>
+            serializePublicEventListItem(event, counts.get(event.id) ?? 0, now, { includeDescription: true }),
+        );
+
+        if (registerable) {
+            items = items.filter((item) => item.registrationOpen).slice(0, limit);
+        } else {
+            items = items.slice(0, limit);
+        }
+
+        return res.json(items);
+    } catch (error) {
+        console.error("GET /public/events error:", error);
+        return res.status(500).json({ error: "Failed to load events" });
+    }
+});
+
+router.get("/events/:id", async (req: Request, res: Response) => {
+    try {
+        const eventId = parseEventId(String(req.params.id));
+        if (eventId == null) {
+            return res.status(400).json({ error: "Invalid event id" });
+        }
+
+        const event = await prisma.event.findUnique({
+            where: { id: eventId },
+            select: publicEventSelect,
+        });
+
+        if (!event || event.isArchived || !canPublicViewEvent(event)) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+
+        const registeredCount = await prisma.eventRegistration.count({
+            where: { eventId, status: { not: "CANCELLED" } },
+        });
+
+        return res.json(
+            serializePublicEventListItem(event, registeredCount, new Date(), { includeDescription: true }),
+        );
+    } catch (error) {
+        console.error("GET /public/events/:id error:", error);
+        return res.status(500).json({ error: "Failed to load event" });
+    }
+});
+
+router.get("/events/:id/tiers", async (req: Request, res: Response) => {
+    try {
+        const eventId = parseEventId(String(req.params.id));
+        if (eventId == null) {
+            return res.status(400).json({ error: "Invalid event id" });
+        }
+
+        const event = await prisma.event.findUnique({
+            where: { id: eventId },
+            select: { id: true, isActive: true, isArchived: true, isPublished: true },
+        });
+
+        if (!event || event.isArchived || !canPublicViewEvent(event)) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+
+        const tiers = await prisma.eventTier.findMany({
+            where: { eventId, isActive: true, showOnPublic: true },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                price: true,
+                currency: true,
+                maxCapacity: true,
+                isActive: true,
+                showOnPublic: true,
+            },
+            orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        });
+
+        const tierCounts = await getTierRegistrationCounts(
+            eventId,
+            tiers.map((tier) => tier.id),
+        );
+
+        const payload = tiers.map((tier) => {
+            const registeredCount = tierCounts.get(tier.id) ?? 0;
+            return {
+                ...tier,
+                registeredCount,
+                spotsRemaining: computeSpotsRemaining(tier.maxCapacity, registeredCount),
+            };
+        });
+
+        return res.json(payload);
+    } catch (error) {
+        console.error("GET /public/events/:id/tiers error:", error);
+        return res.status(500).json({ error: "Failed to load event tiers" });
+    }
+});
+
+router.get("/events/:id/custom-fields", async (req: Request, res: Response) => {
+    try {
+        const eventId = parseEventId(String(req.params.id));
+        if (eventId == null) {
+            return res.status(400).json({ error: "Invalid event id" });
+        }
+
+        const event = await prisma.event.findUnique({
+            where: { id: eventId },
+            select: { id: true, isActive: true, isArchived: true, isPublished: true },
+        });
+
+        if (!event || event.isArchived || !canPublicViewEvent(event)) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+
+        const fields = await prisma.eventCustomField.findMany({
+            where: {
+                eventId,
+                showOnPublic: true,
+                isActive: true,
+            },
+            select: {
+                id: true,
+                label: true,
+                type: true,
+                options: true,
+                required: true,
+                order: true,
+            },
+            orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        });
+
+        return res.json(fields);
+    } catch (error) {
+        console.error("GET /public/events/:id/custom-fields error:", error);
+        return res.status(500).json({ error: "Failed to load custom fields" });
+    }
+});
+
+router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
+    try {
+        const eventId = parseEventId(String(req.params.id));
+        const confirmationCode = String(req.query.code ?? "").trim().toUpperCase();
+
+        if (eventId == null) {
+            return res.status(400).json({ error: "Invalid event id" });
+        }
+        if (!confirmationCode) {
+            return res.status(400).json({ error: "code is required" });
+        }
+
+        const registration = await prisma.eventRegistration.findFirst({
+            where: {
+                eventId,
+                confirmationCode: { equals: confirmationCode, mode: "insensitive" },
+            },
+            select: {
+                confirmationCode: true,
+                fullName: true,
+                email: true,
+                status: true,
+                event: {
+                    select: {
+                        id: true,
+                        title: true,
+                        eventDate: true,
+                        eventEndDate: true,
+                        venue: true,
+                        isActive: true,
+                        isArchived: true,
+                        isPublished: true,
+                    },
+                },
+                tier: {
+                    select: {
+                        name: true,
+                    },
+                },
+            },
+        });
+
+        if (
+            !registration
+            || registration.status === "CANCELLED"
+            || registration.event.isArchived
+            || !canPublicViewEvent(registration.event)
+        ) {
+            return res.status(404).json({ error: "Registration not found" });
+        }
+
+        return res.json({
+            confirmationCode: registration.confirmationCode,
+            fullName: registration.fullName,
+            email: registration.email,
+            event: {
+                id: registration.event.id,
+                title: registration.event.title,
+                eventDate: registration.event.eventDate,
+                eventEndDate: registration.event.eventEndDate,
+                venue: registration.event.venue,
+            },
+            tier: registration.tier ? { name: registration.tier.name } : null,
+        });
+    } catch (error) {
+        console.error("GET /public/events/:id/confirmation error:", error);
+        return res.status(500).json({ error: "Failed to load registration confirmation" });
+    }
+});
+
+router.get("/projects", async (req: Request, res: Response) => {
+    try {
+        const limit = parseLimit(req.query.limit, 3);
+
+        const projects = await prisma.project.findMany({
+            where: {
+                isArchived: true,
+                isDisclosed: true,
+            },
+            select: publicProjectSelect,
+            orderBy: [
+                { completedDate: "desc" },
+                { updatedAt: "desc" },
+            ],
+            take: limit,
+        });
+
+        return res.json(projects);
+    } catch (error) {
+        console.error("GET /public/projects error:", error);
+        return res.status(500).json({ error: "Failed to load projects" });
+    }
+});
+
+router.get("/projects/:id", async (req: Request, res: Response) => {
+    try {
+        const projectId = parseProjectId(String(req.params.id));
+        if (projectId == null) {
+            return res.status(400).json({ error: "Invalid project id" });
+        }
+
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: {
+                ...publicProjectSelect,
+                isArchived: true,
+                isDisclosed: true,
+            },
+        });
+
+        if (!project || !project.isArchived || !project.isDisclosed) {
+            return res.status(404).json({ error: "Project not found" });
+        }
+
+        const { isArchived: _isArchived, isDisclosed: _isDisclosed, ...payload } = project;
+        return res.json(payload);
+    } catch (error) {
+        console.error("GET /public/projects/:id error:", error);
+        return res.status(500).json({ error: "Failed to load project" });
+    }
+});
+
+function getContactInbox(): string {
+    return process.env.RESEND_REPLY_TO?.trim() || DEFAULT_CONTACT_INBOX;
+}
+
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+router.post("/contact", async (req: Request, res: Response) => {
+    try {
+        const body = req.body as Record<string, unknown>;
+        const name = String(body.name ?? "").trim();
+        const email = String(body.email ?? "").trim();
+        const subject = String(body.subject ?? "").trim();
+        const message = String(body.message ?? "").trim();
+        const honeypot = String(body.website ?? "").trim();
+
+        if (honeypot) {
+            return res.json({ success: true });
+        }
+
+        if (!name || !email || !subject || !message) {
+            return res.status(400).json({ error: "Name, email, subject, and message are required" });
+        }
+
+        if (name.length > 120 || subject.length > 200 || message.length > 5000) {
+            return res.status(400).json({ error: "One or more fields exceed the maximum length" });
+        }
+
+        if (!EMAIL_PATTERN.test(email)) {
+            return res.status(400).json({ error: "A valid email address is required" });
+        }
+
+        const safeName = escapeHtml(name);
+        const safeEmail = escapeHtml(email);
+        const safeSubject = escapeHtml(subject);
+        const safeMessage = escapeHtml(message).replace(/\n/g, "<br />");
+
+        await sendEmail({
+            to: getContactInbox(),
+            replyTo: email,
+            subject: `[iClub Contact] ${subject}`,
+            html: `
+                <p><strong>Name:</strong> ${safeName}</p>
+                <p><strong>Email:</strong> ${safeEmail}</p>
+                <p><strong>Subject:</strong> ${safeSubject}</p>
+                <p><strong>Message:</strong></p>
+                <p>${safeMessage}</p>
+            `,
+        });
+
+        return res.json({ success: true });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to send message";
+        if (message === "Email service is not configured") {
+            return res.status(503).json({ error: "Contact form is temporarily unavailable" });
+        }
+
+        console.error("POST /public/contact error:", error);
+        return res.status(500).json({ error: "Failed to send message" });
+    }
+});
+
+export default router;

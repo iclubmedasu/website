@@ -6,6 +6,16 @@ import {
     deleteProfilePhoto,
     invalidatePhotoCache
 } from '../services/githubStorage';
+import {
+    sanitizePhoneForStorage,
+    sanitizeOptionalPhoneForStorage,
+    validateStoredPhone,
+} from '../lib/phoneUtils';
+import {
+    buildMemberTimeline,
+    toMemberProfileView,
+    validateVisibilityUpdates,
+} from '../lib/memberProfileVisibility';
 
 const router: any = express.Router();
 
@@ -70,6 +80,63 @@ router.get('/', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch members' });
+    }
+});
+
+// GET /api/members/:id/profile - Filtered member profile for viewing by other members
+router.get('/:id/profile', async (req, res) => {
+    try {
+        const memberId = parseInt(req.params.id, 10);
+        if (Number.isNaN(memberId)) {
+            return res.status(400).json({ error: 'Invalid member ID' });
+        }
+
+        const member = await prisma.member.findUnique({
+            where: { id: memberId },
+            select: {
+                id: true,
+                fullName: true,
+                email: true,
+                email2: true,
+                email3: true,
+                phoneNumber: true,
+                phoneNumber2: true,
+                studentId: true,
+                profilePhotoUrl: true,
+                linkedInUrl: true,
+                joinDate: true,
+                showPhoneNumber: true,
+                showPhoneNumber2: true,
+                showEmail2: true,
+                showEmail3: true,
+                showStudentId: true,
+                isActive: true,
+            },
+        });
+
+        if (!member || !member.isActive) {
+            return res.status(404).json({ error: 'Member not found' });
+        }
+
+        const history = await prisma.memberRoleHistory.findMany({
+            where: { memberId },
+            include: {
+                team: true,
+                role: true,
+                member: true,
+                subteam: true,
+            },
+            orderBy: { startDate: 'asc' },
+        });
+
+        const profile = toMemberProfileView(member);
+        res.json({
+            ...profile,
+            roleHistory: buildMemberTimeline(history),
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch member profile' });
     }
 });
 
@@ -142,7 +209,13 @@ router.post('/', async (req, res) => {
 
         const usePlaceholders = !fullName?.trim() || !phoneNumber?.trim();
         const finalFullName = usePlaceholders ? PLACEHOLDER_FULLNAME : toTitleCase(fullName.trim());
-        const finalPhone = usePlaceholders ? placeholderPhone(sid) : phoneNumber.trim();
+        let finalPhone = usePlaceholders ? placeholderPhone(sid) : sanitizePhoneForStorage(phoneNumber);
+        if (!usePlaceholders) {
+            const phoneValidation = validateStoredPhone(finalPhone);
+            if (!phoneValidation.valid) {
+                return res.status(400).json({ error: phoneValidation.error });
+            }
+        }
         const primaryEmail = officialEmail(sid);
 
         const data: any = {
@@ -156,7 +229,16 @@ router.post('/', async (req, res) => {
         };
         if (email2?.trim()) data.email2 = email2.trim();
         if (email3?.trim()) data.email3 = email3.trim();
-        if (phoneNumber2?.trim()) data.phoneNumber2 = phoneNumber2.trim();
+        if (phoneNumber2?.trim()) {
+            const sanitizedPhone2 = sanitizeOptionalPhoneForStorage(phoneNumber2);
+            if (sanitizedPhone2) {
+                const phone2Validation = validateStoredPhone(sanitizedPhone2);
+                if (!phone2Validation.valid) {
+                    return res.status(400).json({ error: 'Second phone number is invalid' });
+                }
+                data.phoneNumber2 = sanitizedPhone2;
+            }
+        }
 
         const newMember = await prisma.member.create({ data });
 
@@ -220,11 +302,29 @@ router.put('/:id', async (req, res) => {
 
         if (isSelf) {
             // Self-update: primary email is NOT editable (official = studentId@med.asu.edu.eg)
-            const allowed = ['fullName', 'phoneNumber', 'phoneNumber2', 'profilePhotoUrl', 'linkedInUrl', 'email2', 'email3'];
+            const allowed = [
+                'fullName',
+                'phoneNumber',
+                'phoneNumber2',
+                'profilePhotoUrl',
+                'linkedInUrl',
+                'email2',
+                'email3',
+                'showPhoneNumber',
+                'showPhoneNumber2',
+                'showEmail2',
+                'showEmail3',
+                'showStudentId',
+            ];
             Object.keys(updateData).forEach((key) => {
                 if (!allowed.includes(key)) delete updateData[key];
             });
             delete updateData.email;
+        }
+
+        const visibilityError = validateVisibilityUpdates(updateData);
+        if (visibilityError) {
+            return res.status(400).json({ error: visibilityError });
         }
 
         if (Object.keys(updateData).length === 0) {
@@ -263,9 +363,15 @@ router.put('/:id', async (req, res) => {
 
         // Validate phone number uniqueness (excluding this member)
         if (updateData.phoneNumber !== undefined) {
-            const phone = typeof updateData.phoneNumber === 'string' ? updateData.phoneNumber.trim() : '';
+            const phone = typeof updateData.phoneNumber === 'string'
+                ? sanitizePhoneForStorage(updateData.phoneNumber)
+                : '';
             if (!phone) {
                 return res.status(400).json({ error: 'Phone number is required' });
+            }
+            const phoneValidation = validateStoredPhone(phone);
+            if (!phoneValidation.valid) {
+                return res.status(400).json({ error: phoneValidation.error });
             }
             const existingPhone = await prisma.member.findFirst({
                 where: { phoneNumber: phone, id: { not: memberId } }
@@ -278,9 +384,15 @@ router.put('/:id', async (req, res) => {
 
         // Validate phoneNumber2 uniqueness (excluding this member; allow null/empty to clear)
         if (updateData.phoneNumber2 !== undefined) {
-            const phone2 = typeof updateData.phoneNumber2 === 'string' ? updateData.phoneNumber2.trim() : '';
-            updateData.phoneNumber2 = phone2 || null;
+            const phone2 = typeof updateData.phoneNumber2 === 'string'
+                ? sanitizeOptionalPhoneForStorage(updateData.phoneNumber2)
+                : null;
+            updateData.phoneNumber2 = phone2;
             if (phone2) {
+                const phone2Validation = validateStoredPhone(phone2);
+                if (!phone2Validation.valid) {
+                    return res.status(400).json({ error: 'Second phone number is invalid' });
+                }
                 const existingPhone2 = await prisma.member.findFirst({
                     where: { OR: [{ phoneNumber: phone2 }, { phoneNumber2: phone2 }], id: { not: memberId } }
                 });

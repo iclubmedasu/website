@@ -20,6 +20,7 @@ export function eventToCardViewModel(event: EventSummary | EventDetail): CardVie
         isActive: event.isActive,
         isFinalized: event.isFinalized,
         isArchived: event.isArchived,
+        isDisclosed: event.isDisclosed,
         projectType: event.projectType,
         projectTeams: event.eventTeams?.map((eventTeam, index) => ({
             id: index,

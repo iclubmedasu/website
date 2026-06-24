@@ -44,6 +44,7 @@ export interface ProjectSummary {
     isActive?: boolean;
     isFinalized?: boolean;
     isArchived?: boolean;
+    isDisclosed?: boolean;
     projectTeams?: ProjectTeamRef[];
     tags?: ProjectTag[];
 }

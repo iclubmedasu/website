@@ -158,6 +158,15 @@ export default function PastProjectsPage() {
         }
     }, [expandedProjectId, loadProjects]);
 
+    const handleToggleDisclose = useCallback(async (project: { id: Id; isDisclosed?: boolean }) => {
+        try {
+            await projectsAPI.setDisclosed(project.id, !project.isDisclosed);
+            handleLifecycleRefresh();
+        } catch (discloseError) {
+            setError(discloseError instanceof Error ? discloseError.message : 'Failed to update website visibility');
+        }
+    }, [handleLifecycleRefresh]);
+
     useEffect(() => { loadProjects(); }, [loadProjects]);
     useEffect(() => { setCurrentPage(1); }, [filterTeam, filterCategory, filterPriority, filterStatus, dateFrom, dateTo, searchQuery]);
 
@@ -261,6 +270,7 @@ export default function PastProjectsPage() {
                                 onAbort={(proj) => setActionProject({ type: 'abort', project: proj })}
                                 onFinalize={(proj) => setActionProject({ type: 'finalize', project: proj })}
                                 onArchive={(proj) => setActionProject({ type: 'archive', project: proj })}
+                                onToggleDisclose={canManageProjectLifecycle ? handleToggleDisclose : undefined}
                                 onViewActivity={(proj) => setActionProject({ type: 'activity', project: proj })}
                             />
                         ))}

@@ -34,6 +34,7 @@ export interface CardViewModel {
     isActive?: boolean;
     isFinalized?: boolean;
     isArchived?: boolean;
+    isDisclosed?: boolean;
     projectType?: ProjectTypeRef | null;
     projectTeams?: CardTeamView[];
     createdBy?: MemberSummary | null;
@@ -50,4 +51,5 @@ export interface LifecycleItemTarget {
     isActive?: boolean;
     isFinalized?: boolean;
     isArchived?: boolean;
+    isDisclosed?: boolean;
 }

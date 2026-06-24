@@ -17,11 +17,25 @@ import {
     buildAssignmentActivityValue,
     buildUnassignedDescription,
 } from '../services/eventActivityHelpers';
+import {
+    assertAssigneesOnEventTeams,
+    buildActiveEventVisibilityWhere,
+    canUserAccessEventOperations,
+    canUserEditEvent,
+    canUserManageCustomFields,
+    canUserManageEventLifecycle,
+    canUserManageEventTasks,
+    canUserManageEventTiers,
+    canUserPublishEvent,
+    canUserRemoveAttendance,
+    canUserViewAllEvents,
+    canUserViewEvent,
+    isPrivilegedUser,
+} from '../lib/eventPermissions';
 
 const router = express.Router();
 
-const MANAGER_ROLES = ['isDeveloper', 'isOfficer', 'isAdmin', 'isLeadership'];
-const PUBLIC_VISIBLE_STATUSES = ['PUBLISHED', 'COMPLETED'];
+// Active events visible on the public registration site use isPublished.
 const VALID_EVENT_STATUSES = new Set(['DRAFT', 'PUBLISHED', 'COMPLETED', 'CANCELLED']);
 const VALID_PROGRESS_STATUSES = new Set(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD', 'CANCELLED']);
 const VALID_PRIORITIES = new Set(['LOW', 'MEDIUM', 'HIGH', 'URGENT', 'CRITICAL']);
@@ -175,18 +189,61 @@ async function findActiveEventRegistrationForImport(
     });
 }
 
-function hasManagerAccess(req: Request): boolean {
-    return !!req.user?.memberId && MANAGER_ROLES.some((key) => Boolean((req.user as Record<string, unknown>)[key]));
+async function ensureCanViewEvent(res: Response, req: Request, eventId: number, isArchived: boolean): Promise<boolean> {
+    const allowed = await canUserViewEvent(req.user, eventId, isArchived);
+    if (!allowed) {
+        res.status(403).json({ error: 'Access denied' });
+        return false;
+    }
+    return true;
+}
+
+async function ensureCanAccessEventOperations(res: Response, req: Request, eventId: number, isArchived: boolean): Promise<boolean> {
+    const allowed = await canUserAccessEventOperations(req.user, eventId, isArchived);
+    if (!allowed) {
+        res.status(403).json({ error: 'Access denied' });
+        return false;
+    }
+    return true;
+}
+
+async function ensureEventOperationsAccess(res: Response, req: Request, eventId: number): Promise<boolean> {
+    const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        select: { id: true, isArchived: true },
+    });
+    if (!event) {
+        res.status(404).json({ error: 'Event not found' });
+        return false;
+    }
+    return ensureCanAccessEventOperations(res, req, eventId, event.isArchived);
+}
+
+async function ensureCanManageCustomFields(res: Response, req: Request, eventId: number): Promise<boolean> {
+    const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        select: { id: true, isArchived: true },
+    });
+    if (!event) {
+        res.status(404).json({ error: 'Event not found' });
+        return false;
+    }
+    const allowed = await canUserManageCustomFields(req.user, eventId, event.isArchived);
+    if (!allowed) {
+        res.status(403).json({ error: 'Access denied' });
+        return false;
+    }
+    return true;
 }
 
 async function buildEventWhere(req: Request) {
-    const where: Record<string, unknown> = {};
+    const whereAnd: Record<string, unknown>[] = [];
     const isArchivedQuery = String(req.query.archived || '').trim().toLowerCase() === 'true';
 
     if (isArchivedQuery) {
-        where.isArchived = true;
+        whereAnd.push({ isArchived: true });
     } else {
-        where.isArchived = false;
+        whereAnd.push({ isArchived: false });
     }
 
     const status = String(req.query.status || '').trim().toUpperCase();
@@ -196,13 +253,13 @@ async function buildEventWhere(req: Request) {
     const scope = String(req.query.scope || '').trim().toLowerCase();
 
     if (status && VALID_EVENT_STATUSES.has(status)) {
-        where.status = status;
-    } else if (!hasManagerAccess(req) || scope !== 'all') {
-        where.status = { in: PUBLIC_VISIBLE_STATUSES };
+        whereAnd.push({ status });
+    } else if (canUserViewAllEvents(req.user) && scope === 'all') {
+        // Global admin roles may request all statuses when scope=all.
     }
 
     if (projectId) {
-        where.projectId = projectId;
+        whereAnd.push({ projectId });
     }
 
     if (dateFrom || dateTo) {
@@ -214,13 +271,18 @@ async function buildEventWhere(req: Request) {
             dateFilters.push({ eventEndDate: { gte: new Date(dateFrom) } });
         }
         if (dateFilters.length === 1) {
-            Object.assign(where, dateFilters[0]);
+            whereAnd.push(dateFilters[0]);
         } else if (dateFilters.length > 1) {
-            where.AND = [...(Array.isArray(where.AND) ? where.AND : []), ...dateFilters];
+            whereAnd.push(...dateFilters);
         }
     }
 
-    return where;
+    if (!isArchivedQuery) {
+        const visibilityWhere = await buildActiveEventVisibilityWhere(req.user);
+        if (visibilityWhere) whereAnd.push(visibilityWhere);
+    }
+
+    return whereAnd.length ? { AND: whereAnd } : {};
 }
 
 function eventInclude() {
@@ -262,8 +324,8 @@ async function getEventOr404(res: Response, eventId: number) {
     return event;
 }
 
-function canPublicView(event: { status: string; isActive: boolean }): boolean {
-    return event.isActive && PUBLIC_VISIBLE_STATUSES.includes(event.status);
+function canPublicView(event: { isPublished: boolean; isActive: boolean; isArchived?: boolean }): boolean {
+    return event.isActive && !event.isArchived && event.isPublished;
 }
 
 function normalizeOptions(options: unknown): unknown {
@@ -397,6 +459,7 @@ const TIER_FIELD_LABELS: Record<string, string> = {
     currency: 'currency',
     order: 'order',
     isActive: 'active',
+    showOnPublic: 'show on public',
 };
 
 const CUSTOM_FIELD_LABELS: Record<string, string> = {
@@ -595,11 +658,10 @@ router.get('/:id', async (req, res) => {
         const event = await getEventOr404(res, eventId);
         if (!event) return;
 
-        if (!hasManagerAccess(req) && !canPublicView(event)) {
-            return res.status(404).json({ error: 'Event not found' });
-        }
+        if (!(await ensureCanViewEvent(res, req, eventId, event.isArchived))) return;
 
-        return res.json(event);
+        const canEdit = await canUserEditEvent(req.user, eventId);
+        return res.json({ ...event, canEdit });
     } catch (error) {
         console.error(`GET /events/${req.params.id} error:`, error);
         return res.status(500).json({ error: 'Failed to fetch event' });
@@ -616,9 +678,7 @@ router.get('/:id/activity', async (req, res) => {
         const event = await getEventOr404(res, eventId);
         if (!event) return;
 
-        if (!hasManagerAccess(req) && !canPublicView(event)) {
-            return res.status(404).json({ error: 'Event not found' });
-        }
+        if (!(await ensureCanViewEvent(res, req, eventId, event.isArchived))) return;
 
         const activity = await prisma.eventActivityLog.findMany({
             where: { eventId },
@@ -638,7 +698,7 @@ router.get('/:id/activity', async (req, res) => {
 
 router.post('/', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) {
+        if (!canUserManageEventLifecycle(req.user)) {
             return res.status(403).json({ error: 'Event management access required' });
         }
 
@@ -722,13 +782,17 @@ router.post('/', authenticateToken, async (req, res) => {
 
 router.put('/:id', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) {
+        if (!canUserManageEventLifecycle(req.user)) {
             return res.status(403).json({ error: 'Event management access required' });
         }
 
         const eventId = parseId(req.params.id);
         if (!eventId) {
             return res.status(400).json({ error: 'Invalid event ID' });
+        }
+
+        if (!(await canUserEditEvent(req.user, eventId))) {
+            return res.status(403).json({ error: 'Event management access required' });
         }
 
         const existing = await prisma.event.findUnique({
@@ -859,7 +923,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
 router.patch('/:id/deactivate', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) {
+        if (!canUserManageEventLifecycle(req.user)) {
             return res.status(403).json({ error: 'Event management access required' });
         }
 
@@ -901,7 +965,7 @@ router.patch('/:id/deactivate', authenticateToken, async (req, res) => {
 
 router.patch('/:id/reactivate', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) {
+        if (!canUserManageEventLifecycle(req.user)) {
             return res.status(403).json({ error: 'Event management access required' });
         }
 
@@ -950,7 +1014,7 @@ router.patch('/:id/reactivate', authenticateToken, async (req, res) => {
 
 router.patch('/:id/abort', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) {
+        if (!canUserManageEventLifecycle(req.user)) {
             return res.status(403).json({ error: 'Event management access required' });
         }
 
@@ -998,7 +1062,7 @@ router.patch('/:id/abort', authenticateToken, async (req, res) => {
 
 router.patch('/:id/finalize', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) {
+        if (!canUserManageEventLifecycle(req.user)) {
             return res.status(403).json({ error: 'Event management access required' });
         }
 
@@ -1021,6 +1085,7 @@ router.patch('/:id/finalize', authenticateToken, async (req, res) => {
                 isFinalized: true,
                 isActive: true,
                 isArchived: false,
+                isDisclosed: false,
                 progressStatus: 'COMPLETED',
                 status: 'COMPLETED',
             },
@@ -1046,7 +1111,7 @@ router.patch('/:id/finalize', authenticateToken, async (req, res) => {
 
 router.patch('/:id/archive', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) {
+        if (!canUserManageEventLifecycle(req.user)) {
             return res.status(403).json({ error: 'Event management access required' });
         }
 
@@ -1092,9 +1157,113 @@ router.patch('/:id/archive', authenticateToken, async (req, res) => {
     }
 });
 
+router.patch('/:id/disclose', authenticateToken, async (req, res) => {
+    try {
+        if (!canUserManageEventLifecycle(req.user)) {
+            return res.status(403).json({ error: 'Event management access required' });
+        }
+
+        const eventId = parseId(req.params.id);
+        if (!eventId) {
+            return res.status(400).json({ error: 'Invalid event ID' });
+        }
+
+        const disclosed = req.body?.disclosed;
+        if (typeof disclosed !== 'boolean') {
+            return res.status(400).json({ error: 'disclosed must be a boolean' });
+        }
+
+        const current = await prisma.event.findUnique({ where: { id: eventId } });
+        if (!current) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+        if (!current.isArchived) {
+            return res.status(400).json({ error: 'Only archived events can be disclosed on the public website' });
+        }
+
+        const updated = await prisma.event.update({
+            where: { id: eventId },
+            data: { isDisclosed: disclosed },
+            include: eventInclude(),
+        });
+
+        await logEventActivity({
+            eventId,
+            memberId: req.user!.memberId!,
+            actionType: disclosed ? 'DISCLOSED' : 'UNDISCLOSED',
+            entityType: 'EVENT',
+            oldValue: { isDisclosed: current.isDisclosed },
+            newValue: { isDisclosed: disclosed },
+            description: disclosed
+                ? `Event "${current.title}" disclosed on the public website`
+                : `Event "${current.title}" hidden from the public website`,
+        });
+
+        return res.json(updated);
+    } catch (error) {
+        console.error(`PATCH /events/${req.params.id}/disclose error:`, error);
+        return res.status(500).json({ error: 'Failed to update event disclosure' });
+    }
+});
+
+router.patch('/:id/publish', authenticateToken, async (req, res) => {
+    try {
+        if (!canUserPublishEvent(req.user)) {
+            return res.status(403).json({ error: 'Event publish access required' });
+        }
+
+        const eventId = parseId(req.params.id);
+        if (!eventId) {
+            return res.status(400).json({ error: 'Invalid event ID' });
+        }
+
+        const published = req.body?.published;
+        if (typeof published !== 'boolean') {
+            return res.status(400).json({ error: 'published must be a boolean' });
+        }
+
+        const current = await prisma.event.findUnique({ where: { id: eventId } });
+        if (!current) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+        if (current.isArchived) {
+            return res.status(400).json({ error: 'Archived events cannot be published' });
+        }
+        if (current.isFinalized) {
+            return res.status(400).json({ error: 'Finalized events cannot be published' });
+        }
+        if (!current.isActive || current.status === 'CANCELLED') {
+            return res.status(400).json({ error: 'Inactive or cancelled events cannot be published' });
+        }
+
+        const updated = await prisma.event.update({
+            where: { id: eventId },
+            data: { isPublished: published },
+            include: eventInclude(),
+        });
+
+        await logEventActivity({
+            eventId,
+            memberId: req.user!.memberId!,
+            actionType: published ? 'PUBLISHED' : 'UNPUBLISHED',
+            entityType: 'EVENT',
+            oldValue: { isPublished: current.isPublished },
+            newValue: { isPublished: published },
+            description: published
+                ? `Event "${current.title}" published for public registration`
+                : `Event "${current.title}" unpublished from the public website`,
+        });
+
+        return res.json(updated);
+    } catch (error) {
+        console.error(`PATCH /events/${req.params.id}/publish error:`, error);
+        return res.status(500).json({ error: 'Failed to update event publish status' });
+    }
+});
+
 router.patch('/:id/status', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) {
+        if (!canUserManageEventLifecycle(req.user)) {
             return res.status(403).json({ error: 'Event management access required' });
         }
 
@@ -1118,6 +1287,7 @@ router.patch('/:id/status', authenticateToken, async (req, res) => {
             data: {
                 status: nextStatus,
                 isActive: nextStatus !== 'CANCELLED',
+                isPublished: nextStatus === 'PUBLISHED' && !current.isArchived,
                 deletedAt: nextStatus === 'CANCELLED' ? new Date() : null,
             },
             include: eventInclude(),
@@ -1142,7 +1312,7 @@ router.patch('/:id/status', authenticateToken, async (req, res) => {
 
 router.delete('/:id', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) {
+        if (!canUserManageEventLifecycle(req.user)) {
             return res.status(403).json({ error: 'Event management access required' });
         }
 
@@ -1191,9 +1361,11 @@ router.get('/:id/tiers', async (req, res) => {
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
 
-        const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, status: true, isActive: true } });
+        const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, isArchived: true, isActive: true, isPublished: true } });
         if (!event) return res.status(404).json({ error: 'Event not found' });
-        if (!hasManagerAccess(req) && !canPublicView(event)) return res.status(404).json({ error: 'Event not found' });
+
+        const canView = await canUserViewEvent(req.user, eventId, event.isArchived);
+        if (!canView && !canPublicView(event)) return res.status(404).json({ error: 'Event not found' });
 
         const tiers = await prisma.eventTier.findMany({
             where: { eventId },
@@ -1210,7 +1382,7 @@ router.get('/:id/tiers', async (req, res) => {
 
 router.post('/:id/tiers', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
+        if (!canUserManageEventTiers(req.user)) return res.status(403).json({ error: 'Access denied' });
 
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
@@ -1234,6 +1406,7 @@ router.post('/:id/tiers', authenticateToken, async (req, res) => {
                 price: Number.isFinite(priceValue) ? priceValue : null,
                 currency: normalizeTierCurrency(req.body?.currency),
                 order: Number.isInteger(Number(req.body?.order)) ? Number(req.body.order) : 0,
+                showOnPublic: Boolean(req.body?.showOnPublic),
             },
             include: { _count: { select: { registrations: true } } },
         });
@@ -1256,7 +1429,7 @@ router.post('/:id/tiers', authenticateToken, async (req, res) => {
 
 router.put('/:id/tiers/:tierId', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
+        if (!canUserManageEventTiers(req.user)) return res.status(403).json({ error: 'Access denied' });
 
         const eventId = parseId(req.params.id);
         const tierId = parseId(req.params.tierId);
@@ -1279,6 +1452,7 @@ router.put('/:id/tiers/:tierId', authenticateToken, async (req, res) => {
                 currency: req.body?.currency !== undefined ? normalizeTierCurrency(req.body.currency) : existing.currency,
                 order: req.body?.order !== undefined && Number.isInteger(Number(req.body.order)) ? Number(req.body.order) : existing.order,
                 isActive: req.body?.isActive !== undefined ? Boolean(req.body.isActive) : existing.isActive,
+                showOnPublic: req.body?.showOnPublic !== undefined ? Boolean(req.body.showOnPublic) : existing.showOnPublic,
             },
             include: { _count: { select: { registrations: true } } },
         });
@@ -1306,7 +1480,7 @@ router.put('/:id/tiers/:tierId', authenticateToken, async (req, res) => {
 
 router.delete('/:id/tiers/:tierId', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
+        if (!canUserManageEventTiers(req.user)) return res.status(403).json({ error: 'Access denied' });
 
         const eventId = parseId(req.params.id);
         const tierId = parseId(req.params.tierId);
@@ -1346,14 +1520,16 @@ router.get('/:id/custom-fields', async (req, res) => {
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
 
-        const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, status: true, isActive: true } });
+        const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, isArchived: true, isActive: true, isPublished: true } });
         if (!event) return res.status(404).json({ error: 'Event not found' });
-        if (!hasManagerAccess(req) && !canPublicView(event)) return res.status(404).json({ error: 'Event not found' });
+
+        const canView = await canUserViewEvent(req.user, eventId, event.isArchived);
+        if (!canView && !canPublicView(event)) return res.status(404).json({ error: 'Event not found' });
 
         const fields = await prisma.eventCustomField.findMany({
             where: {
                 eventId,
-                ...(req.query.publicOnly === 'true' && !hasManagerAccess(req)
+                ...(req.query.publicOnly === 'true' && !canView
                     ? { showOnPublic: true, isActive: true }
                     : {}),
             },
@@ -1369,10 +1545,9 @@ router.get('/:id/custom-fields', async (req, res) => {
 
 router.post('/:id/custom-fields', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
+        if (!(await ensureCanManageCustomFields(res, req, eventId))) return;
 
         const label = String(req.body?.label || '').trim();
         const type = String(req.body?.type || '').trim();
@@ -1414,11 +1589,10 @@ router.post('/:id/custom-fields', authenticateToken, async (req, res) => {
 
 router.put('/:id/custom-fields/:fieldId', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         const fieldId = parseId(req.params.fieldId);
         if (!eventId || !fieldId) return res.status(400).json({ error: 'Invalid event or field ID' });
+        if (!(await ensureCanManageCustomFields(res, req, eventId))) return;
 
         const existing = await prisma.eventCustomField.findFirst({ where: { id: fieldId, eventId } });
         if (!existing) return res.status(404).json({ error: 'Custom field not found' });
@@ -1459,10 +1633,9 @@ router.put('/:id/custom-fields/:fieldId', authenticateToken, async (req, res) =>
 
 router.patch('/:id/custom-fields/reorder', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
+        if (!(await ensureCanManageCustomFields(res, req, eventId))) return;
 
         const order = Array.isArray(req.body?.order) ? req.body.order : [];
         if (order.length === 0) return res.status(400).json({ error: 'order array is required' });
@@ -1501,11 +1674,10 @@ router.patch('/:id/custom-fields/reorder', authenticateToken, async (req, res) =
 
 router.delete('/:id/custom-fields/:fieldId', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         const fieldId = parseId(req.params.fieldId);
         if (!eventId || !fieldId) return res.status(400).json({ error: 'Invalid event or field ID' });
+        if (!(await ensureCanManageCustomFields(res, req, eventId))) return;
 
         const field = await prisma.eventCustomField.findFirst({ where: { id: fieldId, eventId }, select: { label: true } });
         if (!field) return res.status(404).json({ error: 'Custom field not found' });
@@ -1538,10 +1710,9 @@ router.delete('/:id/custom-fields/:fieldId', authenticateToken, async (req, res)
 // ============================================
 router.get('/:id/registrations', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
+        if (!(await ensureEventOperationsAccess(res, req, eventId))) return;
 
         const tierId = parseId(req.query.tierId);
         const checkInStatus = String(req.query.checkInStatus || '').trim().toUpperCase();
@@ -1606,12 +1777,11 @@ router.get('/:id/registrations', authenticateToken, async (req, res) => {
 
 router.get('/:id/registrations/lookup', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         const confirmationCode = String(req.query.confirmationCode || '').trim().toUpperCase();
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
         if (!confirmationCode) return res.status(400).json({ error: 'confirmationCode is required' });
+        if (!(await ensureEventOperationsAccess(res, req, eventId))) return;
 
         const registration = await prisma.eventRegistration.findFirst({
             where: { eventId, confirmationCode },
@@ -1648,11 +1818,10 @@ router.get('/:id/registrations/lookup', authenticateToken, async (req, res) => {
 
 router.get('/:id/registrations/:registrationId', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         const registrationId = parseId(req.params.registrationId);
         if (!eventId || !registrationId) return res.status(400).json({ error: 'Invalid registration ID' });
+        if (!(await ensureEventOperationsAccess(res, req, eventId))) return;
 
         const registration = await prisma.eventRegistration.findFirst({
             where: { id: registrationId, eventId },
@@ -1675,7 +1844,7 @@ router.post('/:id/registrations', optionalAuthenticateToken, async (req, res) =>
         const event = await prisma.event.findUnique({ where: { id: eventId } });
         if (!event) return res.status(404).json({ error: 'Event not found' });
 
-        const isManager = hasManagerAccess(req);
+        const isManager = isPrivilegedUser(req.user);
         if (!isManager && !canPublicView(event)) {
             return res.status(403).json({ error: 'Registration is not open for this event' });
         }
@@ -1689,11 +1858,30 @@ router.post('/:id/registrations', optionalAuthenticateToken, async (req, res) =>
             return res.status(409).json({ error: 'Event capacity has been reached' });
         }
 
+        const publicTiers = !isManager
+            ? await prisma.eventTier.findMany({
+                where: { eventId, isActive: true, showOnPublic: true },
+                select: { id: true, maxCapacity: true },
+            })
+            : [];
+
         const tierId = parseId(req.body?.tierId);
         const tier = tierId
-            ? await prisma.eventTier.findFirst({ where: { id: tierId, eventId }, select: { id: true, maxCapacity: true } })
+            ? await prisma.eventTier.findFirst({
+                where: { id: tierId, eventId },
+                select: { id: true, maxCapacity: true, isActive: true, showOnPublic: true },
+            })
             : null;
         if (tierId && !tier) return res.status(400).json({ error: 'Invalid tier for this event' });
+
+        if (!isManager) {
+            if (publicTiers.length > 0) {
+                if (!tierId || !tier?.isActive || !tier.showOnPublic) {
+                    return res.status(400).json({ error: 'A valid registration tier is required' });
+                }
+            }
+        }
+
         if (tier?.maxCapacity != null) {
             const tierRegistrationCount = await prisma.eventRegistration.count({ where: { eventId, tierId, status: { not: 'CANCELLED' } } });
             if (tierRegistrationCount >= tier.maxCapacity) {
@@ -1775,10 +1963,9 @@ router.post('/:id/registrations', optionalAuthenticateToken, async (req, res) =>
 
 router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
+        if (!(await ensureEventOperationsAccess(res, req, eventId))) return;
 
         const event = await prisma.event.findUnique({ where: { id: eventId } });
         if (!event) return res.status(404).json({ error: 'Event not found' });
@@ -1923,10 +2110,9 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
 
 router.post('/:id/registrations/import', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
+        if (!(await ensureEventOperationsAccess(res, req, eventId))) return;
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
@@ -2157,12 +2343,11 @@ router.post('/:id/registrations/import', authenticateToken, async (req, res) => 
 
 router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         const registrationId = parseId(req.params.registrationId);
         const confirmationCode = String(req.body?.confirmationCode || '').trim().toUpperCase();
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
+        if (!(await ensureEventOperationsAccess(res, req, eventId))) return;
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
@@ -2255,13 +2440,80 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
     }
 });
 
-router.post('/:id/registrations/:registrationId/resend-ticket', authenticateToken, async (req, res) => {
+router.delete('/:id/registrations/:registrationId/attendance', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         const registrationId = parseId(req.params.registrationId);
         if (!eventId || !registrationId) return res.status(400).json({ error: 'Invalid registration ID' });
+        if (!canUserRemoveAttendance(req.user)) {
+            return res.status(403).json({ error: 'Attendance removal access required' });
+        }
+
+        const eventDay = parseEventDayString(req.body?.eventDay);
+        if (!eventDay) return res.status(400).json({ error: 'Invalid event day' });
+
+        const registration = await prisma.eventRegistration.findFirst({
+            where: { id: registrationId, eventId },
+            include: { attendanceDays: true },
+        });
+        if (!registration) return res.status(404).json({ error: 'Registration not found' });
+        if (registration.status === 'CANCELLED') {
+            return res.status(409).json({ error: 'Registration has been cancelled' });
+        }
+
+        const dayRecord = registration.attendanceDays.find(
+            (day) => formatEventDay(day.eventDay) === eventDay,
+        );
+        if (!dayRecord) return res.status(404).json({ error: 'Attendance record not found' });
+
+        const updated = await prisma.$transaction(async (tx) => {
+            await tx.eventRegistrationDay.delete({ where: { id: dayRecord.id } });
+
+            const remainingCount = await tx.eventRegistrationDay.count({
+                where: { registrationId },
+            });
+
+            if (remainingCount === 0) {
+                return tx.eventRegistration.update({
+                    where: { id: registrationId },
+                    data: { status: 'REGISTERED', checkedInAt: null },
+                    include: registrationInclude,
+                });
+            }
+
+            return tx.eventRegistration.findUniqueOrThrow({
+                where: { id: registrationId },
+                include: registrationInclude,
+            });
+        });
+
+        await logEventActivity({
+            eventId,
+            memberId: req.user!.memberId!,
+            actionType: 'ATTENDANCE_REMOVED',
+            entityType: 'REGISTRATION',
+            oldValue: { eventDay, status: registration.status },
+            newValue: {
+                eventDay,
+                status: updated.status,
+                fullName: registration.fullName,
+            },
+            description: `Removed check-in for ${registration.fullName} on ${eventDay}`,
+        });
+
+        return res.json(serializeRegistration(updated));
+    } catch (error) {
+        console.error(`DELETE /events/${req.params.id}/registrations/${req.params.registrationId}/attendance error:`, error);
+        return res.status(500).json({ error: 'Failed to remove attendance' });
+    }
+});
+
+router.post('/:id/registrations/:registrationId/resend-ticket', authenticateToken, async (req, res) => {
+    try {
+        const eventId = parseId(req.params.id);
+        const registrationId = parseId(req.params.registrationId);
+        if (!eventId || !registrationId) return res.status(400).json({ error: 'Invalid registration ID' });
+        if (!(await ensureEventOperationsAccess(res, req, eventId))) return;
 
         const registration = await prisma.eventRegistration.findFirst({
             where: { id: registrationId, eventId },
@@ -2293,11 +2545,10 @@ router.post('/:id/registrations/:registrationId/resend-ticket', authenticateToke
 
 router.post('/:id/registrations/:registrationId/resend-reminder', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         const registrationId = parseId(req.params.registrationId);
         if (!eventId || !registrationId) return res.status(400).json({ error: 'Invalid registration ID' });
+        if (!(await ensureEventOperationsAccess(res, req, eventId))) return;
 
         const registration = await prisma.eventRegistration.findFirst({
             where: { id: registrationId, eventId },
@@ -2329,10 +2580,9 @@ router.post('/:id/registrations/:registrationId/resend-reminder', authenticateTo
 
 router.post('/:id/registrations/send-tickets', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
+        if (!(await ensureEventOperationsAccess(res, req, eventId))) return;
 
         const rawIds = Array.isArray(req.body?.registrationIds) ? req.body.registrationIds : [];
         const registrationIds = rawIds
@@ -2397,10 +2647,9 @@ router.post('/:id/registrations/send-tickets', authenticateToken, async (req, re
 
 router.post('/:id/registrations/send-reminders', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
+        if (!(await ensureEventOperationsAccess(res, req, eventId))) return;
 
         const rawIds = Array.isArray(req.body?.registrationIds) ? req.body.registrationIds : [];
         const registrationIds = rawIds
@@ -2465,11 +2714,10 @@ router.post('/:id/registrations/send-reminders', authenticateToken, async (req, 
 
 router.patch('/:id/registrations/:registrationId', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         const registrationId = parseId(req.params.registrationId);
         if (!eventId || !registrationId) return res.status(400).json({ error: 'Invalid registration ID' });
+        if (!(await ensureEventOperationsAccess(res, req, eventId))) return;
 
         const existing = await prisma.eventRegistration.findFirst({ where: { id: registrationId, eventId } });
         if (!existing) return res.status(404).json({ error: 'Registration not found' });
@@ -2484,13 +2732,39 @@ router.patch('/:id/registrations/:registrationId', authenticateToken, async (req
             }
         }
 
+        let nextTierId = existing.tierId;
+        if (req.body?.tierId !== undefined) {
+            nextTierId = parseId(req.body.tierId);
+            if (nextTierId) {
+                const tier = await prisma.eventTier.findFirst({
+                    where: { id: nextTierId, eventId },
+                    select: { id: true, maxCapacity: true },
+                });
+                if (!tier) return res.status(400).json({ error: 'Invalid tier for this event' });
+
+                if (tier.maxCapacity != null && nextTierId !== existing.tierId) {
+                    const tierRegistrationCount = await prisma.eventRegistration.count({
+                        where: {
+                            eventId,
+                            tierId: nextTierId,
+                            status: { not: 'CANCELLED' },
+                            id: { not: registrationId },
+                        },
+                    });
+                    if (tierRegistrationCount >= tier.maxCapacity) {
+                        return res.status(409).json({ error: 'Selected tier is at capacity' });
+                    }
+                }
+            }
+        }
+
         const updated = await prisma.eventRegistration.update({
             where: { id: registrationId },
             data: {
                 fullName: req.body?.fullName !== undefined ? String(req.body.fullName).trim() : existing.fullName,
                 email: req.body?.email !== undefined ? String(req.body.email).trim().toLowerCase() : existing.email,
                 phoneNumber: req.body?.phoneNumber !== undefined ? String(req.body.phoneNumber).trim() || null : existing.phoneNumber,
-                tierId: req.body?.tierId !== undefined ? parseId(req.body.tierId) : existing.tierId,
+                tierId: req.body?.tierId !== undefined ? nextTierId : existing.tierId,
                 notes: req.body?.notes !== undefined ? String(req.body.notes).trim() || null : existing.notes,
                 customFieldValues: req.body?.customFieldValues !== undefined ? toJsonInput(req.body.customFieldValues) : (existing.customFieldValues as any),
             },
@@ -2526,11 +2800,10 @@ router.patch('/:id/registrations/:registrationId', authenticateToken, async (req
 
 router.delete('/:id/registrations/:registrationId', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         const registrationId = parseId(req.params.registrationId);
         if (!eventId || !registrationId) return res.status(400).json({ error: 'Invalid registration ID' });
+        if (!(await ensureEventOperationsAccess(res, req, eventId))) return;
 
         const existing = await prisma.eventRegistration.findFirst({ where: { id: registrationId, eventId } });
         if (!existing) return res.status(404).json({ error: 'Registration not found' });
@@ -2562,13 +2835,12 @@ router.delete('/:id/registrations/:registrationId', authenticateToken, async (re
 // ============================================
 router.get('/:id/statistics', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
 
-        const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, capacity: true } });
+        const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, capacity: true, isArchived: true } });
         if (!event) return res.status(404).json({ error: 'Event not found' });
+        if (!(await ensureCanViewEvent(res, req, eventId, event.isArchived))) return;
 
         const [totalRegistered, totalCheckedIn, walkInCount, noShowCount, byTier, registrationTimeline, attendanceDayRows] = await Promise.all([
             prisma.eventRegistration.count({ where: { eventId, isWalkIn: false, status: { not: 'CANCELLED' } } }),
@@ -2701,7 +2973,7 @@ function parseAssignments(value: unknown): { assignments: ParsedAssignment[]; er
 
 router.get('/:id/assignable-members', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
+        if (!canUserManageEventTasks(req.user)) return res.status(403).json({ error: 'Access denied' });
 
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
@@ -2741,13 +3013,12 @@ router.get('/:id/assignable-members', authenticateToken, async (req, res) => {
 
 router.get('/:id/tasks', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
-
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
 
-        const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true } });
+        const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, isArchived: true } });
         if (!event) return res.status(404).json({ error: 'Event not found' });
+        if (!(await ensureCanViewEvent(res, req, eventId, event.isArchived))) return;
 
         const tasks = await prisma.eventTask.findMany({
             where: { eventId, isActive: true },
@@ -2764,7 +3035,7 @@ router.get('/:id/tasks', authenticateToken, async (req, res) => {
 
 router.post('/:id/tasks', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
+        if (!canUserManageEventTasks(req.user)) return res.status(403).json({ error: 'Access denied' });
 
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
@@ -2783,6 +3054,12 @@ router.post('/:id/tasks', authenticateToken, async (req, res) => {
         const { assignments, error: assignmentError } = parseAssignments(req.body?.assignments);
         if (assignmentError) return res.status(400).json({ error: assignmentError });
         if (assignments.length === 0) return res.status(400).json({ error: 'At least one assignment is required' });
+
+        const assigneeError = await assertAssigneesOnEventTeams(eventId, {
+            leaderId,
+            memberIds: assignments.map((assignment) => assignment.memberId),
+        });
+        if (assigneeError) return res.status(400).json({ error: assigneeError });
 
         const created = await prisma.eventTask.create({
             data: {
@@ -2899,7 +3176,7 @@ router.post('/:id/tasks', authenticateToken, async (req, res) => {
 
 router.put('/:id/tasks/:taskId', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
+        if (!canUserManageEventTasks(req.user)) return res.status(403).json({ error: 'Access denied' });
 
         const eventId = parseId(req.params.id);
         const taskId = parseId(req.params.taskId);
@@ -2958,6 +3235,19 @@ router.put('/:id/tasks/:taskId', authenticateToken, async (req, res) => {
             if (assignments.length === 0) return res.status(400).json({ error: 'At least one assignment is required' });
             parsedAssignments = assignments;
         }
+
+        const nextLeaderId = req.body?.leaderId !== undefined
+            ? parseId(req.body.leaderId)
+            : existing.leaderId;
+        const nextMemberIds = parsedAssignments !== null
+            ? parsedAssignments.map((assignment) => assignment.memberId)
+            : existing.assignments.map((assignment) => assignment.memberId);
+
+        const assigneeError = await assertAssigneesOnEventTeams(eventId, {
+            leaderId: nextLeaderId,
+            memberIds: nextMemberIds,
+        });
+        if (assigneeError) return res.status(400).json({ error: assigneeError });
 
         const updated = await prisma.$transaction(async (tx) => {
             await tx.eventTask.update({ where: { id: taskId }, data });
@@ -3121,7 +3411,7 @@ router.put('/:id/tasks/:taskId', authenticateToken, async (req, res) => {
 
 router.delete('/:id/tasks/:taskId/assignments/:assignmentId', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
+        if (!canUserManageEventTasks(req.user)) return res.status(403).json({ error: 'Access denied' });
 
         const eventId = parseId(req.params.id);
         const taskId = parseId(req.params.taskId);
@@ -3183,7 +3473,7 @@ router.delete('/:id/tasks/:taskId/assignments/:assignmentId', authenticateToken,
 
 router.delete('/:id/tasks/:taskId', authenticateToken, async (req, res) => {
     try {
-        if (!hasManagerAccess(req)) return res.status(403).json({ error: 'Event management access required' });
+        if (!canUserManageEventTasks(req.user)) return res.status(403).json({ error: 'Access denied' });
 
         const eventId = parseId(req.params.id);
         const taskId = parseId(req.params.taskId);

@@ -150,6 +150,17 @@
     box-shadow: var(--shadow-md);
 }
 
+.icon-btn.publish-website-btn {
+    color: var(--purple-700);
+}
+
+.icon-btn.publish-website-btn:hover {
+    background: var(--purple-700);
+    color: white;
+    transform: scale(1.05);
+    box-shadow: var(--shadow-md);
+}
+
 .icon-btn.reactivate-btn:hover {
     background: #2563eb;
     color: white;

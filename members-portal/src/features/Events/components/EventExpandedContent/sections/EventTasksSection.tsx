@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { FileSpreadsheet, Loader } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
 import { eventsAPI } from '@/services/api';
 import type { EventTaskRef, Id, MemberSummary } from '@/types/backend-contracts';
 import { exportEventTasksExcel } from '@/features/Events/components/eventTaskExcelExport';
@@ -16,6 +15,7 @@ interface EventTasksSectionProps {
     eventTitle?: string;
     eventDate?: string | null;
     eventEndDate?: string | null;
+    canManage?: boolean;
 }
 
 function startOfDay(date: Date): Date {
@@ -69,10 +69,7 @@ function buildDays(eventDate?: string | null, eventEndDate?: string | null, task
     return days.sort((a, b) => a.getTime() - b.getTime());
 }
 
-export default function EventTasksSection({ eventId, eventTitle, eventDate, eventEndDate }: EventTasksSectionProps) {
-    const { user } = useAuth();
-    const canManage = !!(user?.isDeveloper || user?.isAdmin || user?.isOfficer || user?.isLeadership);
-
+export default function EventTasksSection({ eventId, eventTitle, eventDate, eventEndDate, canManage = false }: EventTasksSectionProps) {
     const [tasks, setTasks] = useState<EventTaskRef[]>([]);
     const [members, setMembers] = useState<MemberSummary[]>([]);
     const [loading, setLoading] = useState(true);
@@ -96,7 +93,7 @@ export default function EventTasksSection({ eventId, eventTitle, eventDate, even
             try {
                 const [tasksResult, membersResult] = await Promise.all([
                     eventsAPI.getTasks(eventId),
-                    eventsAPI.getAssignableMembers(eventId).catch(() => []),
+                    canManage ? eventsAPI.getAssignableMembers(eventId).catch(() => []) : Promise.resolve([]),
                 ]);
                 if (!active) return;
                 setTasks(Array.isArray(tasksResult) ? tasksResult : []);
@@ -112,7 +109,7 @@ export default function EventTasksSection({ eventId, eventTitle, eventDate, even
 
         void load();
         return () => { active = false; };
-    }, [eventId]);
+    }, [eventId, canManage]);
 
     const days = useMemo(() => buildDays(eventDate, eventEndDate, tasks), [eventDate, eventEndDate, tasks]);
 

@@ -9,6 +9,7 @@ import type {
     CreateEventTierPayload,
     CreateEventTaskPayload,
     CheckInRegistrationPayload,
+    RemoveRegistrationAttendancePayload,
     CreateProjectPayload,
     CreateScheduleSlotPayload,
     CreateTaskPayload,
@@ -627,6 +628,14 @@ export const membersAPI: ApiNamespace = {
         return handleResponse(response);
     },
 
+    // Get filtered member profile for viewing by other members
+    getProfile: async (id) => {
+        const response = await apiFetch(`${API_BASE_URL}/members/${id}/profile`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
     // Create new member
     create: async (memberData) => {
         const response = await apiFetch(`${API_BASE_URL}/members`, {
@@ -827,6 +836,15 @@ export const projectsAPI = {
         const response = await apiFetch(`${API_BASE_URL}/projects/${id}/archive`, {
             method: 'PATCH',
             headers: getAuthHeaders(),
+        });
+        return handleResponse<ProjectDetail>(response);
+    },
+
+    setDisclosed: async (id: Id | string, disclosed: boolean): Promise<ProjectDetail> => {
+        const response = await apiFetch(`${API_BASE_URL}/projects/${id}/disclose`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ disclosed }),
         });
         return handleResponse<ProjectDetail>(response);
     },
@@ -1790,6 +1808,26 @@ export const eventsAPI = {
         return handleResponse<EventDetail>(response);
     },
 
+    setDisclosed: async (id: Id | string, disclosed: boolean): Promise<EventDetail> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${id}/disclose`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ disclosed }),
+        });
+
+        return handleResponse<EventDetail>(response);
+    },
+
+    setPublished: async (id: Id | string, published: boolean): Promise<EventDetail> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${id}/publish`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ published }),
+        });
+
+        return handleResponse<EventDetail>(response);
+    },
+
     remove: async (id: Id | string): Promise<EventDetail> => {
         const response = await apiFetch(`${API_BASE_URL}/events/${id}`, {
             method: 'DELETE',
@@ -1986,6 +2024,20 @@ export const eventsAPI = {
         const safeRegistrationId = String(registrationId || 'code');
         const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${safeRegistrationId}/check-in`, {
             method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+
+        return handleResponse<EventRegistrationRef>(response);
+    },
+
+    removeRegistrationAttendance: async (
+        eventId: Id | string,
+        registrationId: Id | string,
+        payload: RemoveRegistrationAttendancePayload,
+    ): Promise<EventRegistrationRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${registrationId}/attendance`, {
+            method: 'DELETE',
             headers: getAuthHeaders(),
             body: JSON.stringify(payload),
         });

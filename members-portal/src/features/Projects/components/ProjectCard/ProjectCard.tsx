@@ -10,6 +10,7 @@ import LifecycleCardView, {
     fmtDate,
     getArchiveOutcomeBadge,
     getLifecycleBadge,
+    getWebsiteDisclosedBadge,
 } from '@/components/cards/LifecycleCardView/LifecycleCardView';
 import LifecycleCardActions from '@/components/cards/LifecycleCardView/LifecycleCardActions';
 import GanttChart from '../GanttChart/GanttChart';
@@ -51,6 +52,7 @@ export interface ProjectCardProps {
     onAbort?: (project: any) => void;
     onFinalize?: (project: any) => void;
     onArchive?: (project: any) => void;
+    onToggleDisclose?: (project: any) => void;
     onEdit?: (project: any) => void;
     onDeactivate?: (project: any) => void;
     onRefreshDetail?: (projectId: Id) => void;
@@ -74,6 +76,7 @@ export default function ProjectCard({
     onAbort,
     onFinalize,
     onArchive,
+    onToggleDisclose,
     onEdit,
     onDeactivate,
     onRefreshDetail,
@@ -148,7 +151,9 @@ export default function ProjectCard({
     const lifecycleBadge = getLifecycleBadge(cardItem);
     const LifecycleIcon = lifecycleBadge.icon;
     const archiveOutcomeBadge = archivedView ? getArchiveOutcomeBadge(cardItem) : null;
+    const websiteDisclosedBadge = archivedView ? getWebsiteDisclosedBadge(cardItem) : null;
     const ArchiveOutcomeIcon = archiveOutcomeBadge?.icon ?? Archive;
+    const WebsiteDisclosedIcon = websiteDisclosedBadge?.icon ?? Archive;
     const lifecycleMode = archivedView ? 'archived' as const : 'active' as const;
 
     const detailTarget = detail
@@ -160,6 +165,7 @@ export default function ProjectCard({
         onAbort: () => onAbort?.({ id: project.id, title: project.title }),
         onFinalize: () => onFinalize?.({ id: project.id, title: project.title }),
         onArchive: () => onArchive?.({ id: project.id, title: project.title }),
+        onToggleDisclose: onToggleDisclose ? () => onToggleDisclose({ id: project.id, title: project.title, isDisclosed: project.isDisclosed }) : undefined,
         onViewActivity: () => onViewActivity(project),
     } : {
         onEdit,
@@ -176,6 +182,7 @@ export default function ProjectCard({
         onAbort: () => onAbort?.(detailTarget),
         onFinalize: () => onFinalize?.(detailTarget),
         onArchive: () => onArchive?.(detailTarget),
+        onToggleDisclose: onToggleDisclose ? () => onToggleDisclose(detail || project) : undefined,
         onViewActivity: () => onViewActivity(detail || project),
     } : collapsedLifecycleHandlers;
 
@@ -205,6 +212,12 @@ export default function ProjectCard({
                         <LifecycleIcon size={12} />
                         {lifecycleBadge.label}
                     </span>
+                    {websiteDisclosedBadge && (
+                        <span className={`badge ${websiteDisclosedBadge.className}`} title={websiteDisclosedBadge.title}>
+                            <WebsiteDisclosedIcon size={12} />
+                            {websiteDisclosedBadge.label}
+                        </span>
+                    )}
                 </>
             )}
             collapsedActions={(
@@ -253,6 +266,12 @@ export default function ProjectCard({
                         <LifecycleIcon size={14} />
                         {lifecycleBadge.label}
                     </span>
+                    {websiteDisclosedBadge && (
+                        <span className={`badge badge--compact ${websiteDisclosedBadge.className}`} title={websiteDisclosedBadge.title}>
+                            <WebsiteDisclosedIcon size={14} />
+                            {websiteDisclosedBadge.label}
+                        </span>
+                    )}
                 </>
             )}
             expandedActions={detail ? (

@@ -1,4 +1,4 @@
-import { AlertCircle, Archive, CheckCircle, CheckSquare, PauseCircle } from 'lucide-react';
+import { AlertCircle, Archive, CheckCircle, CheckSquare, Globe, PauseCircle } from 'lucide-react';
 import type { CardViewModel } from './types';
 
 export function isProjectAborted(project: CardViewModel | null | undefined): boolean {
@@ -44,4 +44,19 @@ export function getArchiveOutcomeBadge(project: CardViewModel | null | undefined
         return { className: 'badge-lifecycle-aborted', label: 'Aborted', icon: AlertCircle, title: 'Archived after being aborted' };
     }
     return null;
+}
+
+export function getWebsiteDisclosedBadge(item: CardViewModel | null | undefined): {
+    className: string;
+    label: string;
+    icon: typeof Globe;
+    title: string;
+} | null {
+    if (!item?.isArchived || !item?.isDisclosed) return null;
+    return {
+        className: 'badge-website-disclosed',
+        label: 'On website',
+        icon: Globe,
+        title: 'Visible on the public website',
+    };
 }

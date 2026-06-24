@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileSpreadsheet, Plus } from 'lucide-react';
+import Toggle from '@/components/toggle/Toggle';
 import { fmtDate } from '@/components/cards/LifecycleCardView/LifecycleCardView';
 import { eventsAPI } from '@/services/api';
 import AddCustomFieldModal from '@/features/Events/modals/AddCustomFieldModal';
 import ImportRegistrationsModal from '@/features/Events/modals/ImportRegistrationsModal';
+import RemoveAttendanceModal from '@/features/Events/modals/RemoveAttendanceModal';
 import { exportEventRegistrationsExcel } from '@/features/Events/components/registrationExcelExport';
 import type {
     EventCustomFieldRef,
@@ -26,6 +28,7 @@ import {
 import CustomFieldColumnMenu from './CustomFieldColumnMenu';
 import EditableCustomFieldCell from './EditableCustomFieldCell';
 import EditableRegistrationContactCell from './EditableRegistrationContactCell';
+import EditableRegistrationTierCell from './EditableRegistrationTierCell';
 import EventCheckInPanel from './EventCheckInSection';
 import WalkInDraftFields from './WalkInDraftFields';
 import { formatEventDuration, formatAttendanceDayLabel, isMultiDayEvent, isWithinEventDays } from '../../eventDateUtils';
@@ -40,6 +43,11 @@ interface EventRegistrationsSectionProps {
     allowWalkIns?: boolean;
     eventDate?: string | null;
     eventEndDate?: string | null;
+    isPublished?: boolean;
+    canPublishEvent?: boolean;
+    canRemoveAttendance?: boolean;
+    onPublishedChange?: (eventId: Id, published: boolean) => Promise<void>;
+    canManageFields?: boolean;
     onRegistrationAdded?: () => void;
     onCheckIn?: () => void;
     onImportComplete?: (result: ImportRegistrationsResult) => void;
@@ -55,6 +63,11 @@ export default function EventRegistrationsSection({
     allowWalkIns = false,
     eventDate,
     eventEndDate,
+    isPublished = false,
+    canPublishEvent = false,
+    canRemoveAttendance = false,
+    onPublishedChange,
+    canManageFields = false,
     onRegistrationAdded,
     onCheckIn,
     onImportComplete,
@@ -71,6 +84,13 @@ export default function EventRegistrationsSection({
     const [fieldModalOpen, setFieldModalOpen] = useState(false);
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [exporting, setExporting] = useState(false);
+    const [publishing, setPublishing] = useState(false);
+    const [attendanceRemovalTarget, setAttendanceRemovalTarget] = useState<{
+        registration: EventRegistrationRef;
+        eventDay: string;
+        dayLabel: string;
+    } | null>(null);
+    const [removingAttendance, setRemovingAttendance] = useState(false);
     const [editingField, setEditingField] = useState<EventCustomFieldRef | null>(null);
     const dragFieldId = useRef<number | null>(null);
     const tableScrollRef = useRef<HTMLDivElement>(null);
@@ -112,6 +132,18 @@ export default function EventRegistrationsSection({
     const handleCheckInSuccess = () => {
         void loadRegistrations();
         onCheckIn?.();
+    };
+
+    const handlePublishToggle = async (nextPublished: boolean) => {
+        if (!onPublishedChange || publishing) return;
+        setPublishing(true);
+        try {
+            await onPublishedChange(eventId as Id, nextPublished);
+        } catch {
+            window.alert('Failed to update registration publish status.');
+        } finally {
+            setPublishing(false);
+        }
     };
 
     const handleUpdateField = async (field: EventCustomFieldRef, patch: UpdateEventCustomFieldPayload) => {
@@ -231,10 +263,39 @@ export default function EventRegistrationsSection({
         setRegistrations((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     };
 
+    const handleConfirmRemoveAttendance = async () => {
+        if (!attendanceRemovalTarget || removingAttendance) return;
+        setRemovingAttendance(true);
+        try {
+            const updated = await eventsAPI.removeRegistrationAttendance(
+                eventId,
+                attendanceRemovalTarget.registration.id,
+                { eventDay: attendanceRemovalTarget.eventDay },
+            );
+            handleRegistrationUpdated(updated);
+            onCheckIn?.();
+        } finally {
+            setRemovingAttendance(false);
+        }
+    };
+
     const filtered = registrations.filter((registration) => {
         const query = registrationSearch.trim().toLowerCase();
         if (!query) return true;
-        return [registration.fullName, registration.email, registration.confirmationCode].some((value) => String(value || '').toLowerCase().includes(query));
+        const normalizedQuery = query.replace(/[\s\-()]/g, '');
+        return [
+            registration.fullName,
+            registration.email,
+            registration.confirmationCode,
+            registration.phoneNumber,
+        ].some((value) => {
+            const text = String(value || '').toLowerCase();
+            if (text.includes(query)) return true;
+            if (registration.phoneNumber) {
+                return text.replace(/[\s\-()]/g, '').includes(normalizedQuery);
+            }
+            return false;
+        });
     });
 
     const handleImportCompleted = (_importResult: ImportRegistrationsResult, refreshedFields: EventCustomFieldRef[]) => {
@@ -273,12 +334,22 @@ export default function EventRegistrationsSection({
     return (
         <section className="event-expanded-panel">
             <div className="event-expanded-header event-expanded-header--compact">
-               <div>
-                    <h2 className="expanded-section-title">Registrations</h2>
-                </div>
+                <h2 className="expanded-section-title">Registrations</h2>
+                {canPublishEvent ? (
+                    <div className="event-expanded-publish-toggle">
+                        <span className="event-expanded-publish-toggle-label">Accept registrations</span>
+                        <Toggle
+                            color="purple"
+                            checked={isPublished}
+                            disabled={publishing}
+                            onChange={(next) => void handlePublishToggle(next)}
+                            aria-label="Accept registrations on public website"
+                        />
+                    </div>
+                ) : null}
             </div>
             <div className="event-expanded-form-grid">
-                <input value={registrationSearch} onChange={(e) => setRegistrationSearch(e.target.value)} placeholder="Search by name, email, or code" className="form-input" />
+                <input value={registrationSearch} onChange={(e) => setRegistrationSearch(e.target.value)} placeholder="Search by name, email, phone, or code" className="form-input" />
                 <select aria-label="Filter by tier" value={registrationTier} onChange={(e) => setRegistrationTier(e.target.value)} className="form-input">
                     <option value="">All tiers</option>
                     {tiers.map((tier) => <option key={tier.id} value={tier.id}>{tier.name}</option>)}
@@ -310,29 +381,31 @@ export default function EventRegistrationsSection({
                                             <th
                                                 key={field.id}
                                                 className="event-registrations-col-th"
-                                                draggable
-                                                onDragStart={() => { dragFieldId.current = Number(field.id); }}
-                                                onDragOver={(event) => event.preventDefault()}
-                                                onDrop={() => {
+                                                draggable={canManageFields}
+                                                onDragStart={canManageFields ? () => { dragFieldId.current = Number(field.id); } : undefined}
+                                                onDragOver={canManageFields ? (event) => event.preventDefault() : undefined}
+                                                onDrop={canManageFields ? () => {
                                                     const fromIndex = sortedFields.findIndex((item) => Number(item.id) === dragFieldId.current);
                                                     dragFieldId.current = null;
                                                     if (fromIndex >= 0) void moveField(fromIndex, index);
-                                                }}
+                                                } : undefined}
                                             >
-                                                <CustomFieldColumnMenu
-                                                    field={field}
-                                                    index={index}
-                                                    total={sortedFields.length}
-                                                    onEdit={() => {
-                                                        setEditingField(field);
-                                                        setFieldModalOpen(true);
-                                                    }}
-                                                    onToggleRequired={() => void handleUpdateField(field, { required: !field.required })}
-                                                    onToggleShowOnPublic={() => void handleUpdateField(field, { showOnPublic: !field.showOnPublic })}
-                                                    onDelete={() => void handleRemoveField(Number(field.id))}
-                                                    onMoveLeft={() => void moveField(index, Math.max(0, index - 1))}
-                                                    onMoveRight={() => void moveField(index, Math.min(sortedFields.length - 1, index + 1))}
-                                                />
+                                                {canManageFields ? (
+                                                    <CustomFieldColumnMenu
+                                                        field={field}
+                                                        index={index}
+                                                        total={sortedFields.length}
+                                                        onEdit={() => {
+                                                            setEditingField(field);
+                                                            setFieldModalOpen(true);
+                                                        }}
+                                                        onToggleRequired={() => void handleUpdateField(field, { required: !field.required })}
+                                                        onToggleShowOnPublic={() => void handleUpdateField(field, { showOnPublic: !field.showOnPublic })}
+                                                        onDelete={() => void handleRemoveField(Number(field.id))}
+                                                        onMoveLeft={() => void moveField(index, Math.max(0, index - 1))}
+                                                        onMoveRight={() => void moveField(index, Math.min(sortedFields.length - 1, index + 1))}
+                                                    />
+                                                ) : field.label}
                                             </th>
                                         ))}
                                         <th>Tier</th>
@@ -342,10 +415,12 @@ export default function EventRegistrationsSection({
                                         <th>Source</th>
                                         <th>Registered</th>
                                         <th className="event-registrations-add-field-col">
-                                            <button type="button" className="event-registrations-add-field-btn" onClick={openFieldModal}>
-                                                <Plus size={14} />
-                                                Add field
-                                            </button>
+                                            {canManageFields ? (
+                                                <button type="button" className="event-registrations-add-field-btn" onClick={openFieldModal}>
+                                                    <Plus size={14} />
+                                                    Add field
+                                                </button>
+                                            ) : null}
                                         </th>
                                     </tr>
                                 </thead>
@@ -390,17 +465,44 @@ export default function EventRegistrationsSection({
                                                     onUpdated={handleRegistrationUpdated}
                                                 />
                                             ))}
-                                            <td>{registration.tier?.name || '—'}</td>
+                                            <EditableRegistrationTierCell
+                                                eventId={eventId}
+                                                registration={registration}
+                                                tiers={tiers}
+                                                editable={canEditCustomFieldValues}
+                                                onUpdated={handleRegistrationUpdated}
+                                            />
                                             <td><code>{registration.confirmationCode}</code></td>
                                             {multiDayEvent ? (
                                                 <td>
                                                     {registration.attendanceDays && registration.attendanceDays.length > 0 ? (
                                                         <span className="event-attendance-days">
-                                                            {registration.attendanceDays.map((day) => (
-                                                                <span key={day.eventDay} className="event-attendance-day-chip">
-                                                                    {formatAttendanceDayLabel(day.eventDay)}
-                                                                </span>
-                                                            ))}
+                                                            {registration.attendanceDays.map((day) => {
+                                                                const dayLabel = formatAttendanceDayLabel(day.eventDay);
+                                                                if (canRemoveAttendance) {
+                                                                    return (
+                                                                        <button
+                                                                            key={day.eventDay}
+                                                                            type="button"
+                                                                            className="event-attendance-day-chip event-attendance-day-chip--removable"
+                                                                            title={`Remove check-in for ${dayLabel}`}
+                                                                            onClick={() => setAttendanceRemovalTarget({
+                                                                                registration,
+                                                                                eventDay: day.eventDay,
+                                                                                dayLabel,
+                                                                            })}
+                                                                        >
+                                                                            {dayLabel}
+                                                                            <span className="event-attendance-day-chip__remove" aria-hidden="true">×</span>
+                                                                        </button>
+                                                                    );
+                                                                }
+                                                                return (
+                                                                    <span key={day.eventDay} className="event-attendance-day-chip">
+                                                                        {dayLabel}
+                                                                    </span>
+                                                                );
+                                                            })}
                                                         </span>
                                                     ) : '—'}
                                                 </td>
@@ -502,6 +604,17 @@ export default function EventRegistrationsSection({
                         setEditingField(null);
                     }}
                     onSaved={handleFieldSaved}
+                />
+            ) : null}
+
+            {attendanceRemovalTarget ? (
+                <RemoveAttendanceModal
+                    attendeeName={attendanceRemovalTarget.registration.fullName}
+                    dayLabel={attendanceRemovalTarget.dayLabel}
+                    onClose={() => {
+                        if (!removingAttendance) setAttendanceRemovalTarget(null);
+                    }}
+                    onConfirm={handleConfirmRemoveAttendance}
                 />
             ) : null}
         </section>

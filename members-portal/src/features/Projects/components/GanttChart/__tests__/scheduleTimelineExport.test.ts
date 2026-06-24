@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import * as XLSX from 'xlsx-js-style';
 import {
+    buildScheduleTimelineSheet,
     collectScheduleTimelineSlots,
     getScheduleMemberLabel,
     groupScheduleSlotsByMember,
@@ -45,5 +47,22 @@ describe('schedule timeline export helpers', () => {
         expect(grouped[0].slots).toHaveLength(1);
         expect(grouped[1].slots).toHaveLength(1);
         expect(grouped[2].slots).toHaveLength(1);
+    });
+
+    it('writes member names into the Schedule Timeline sheet cells', () => {
+        const slots = [
+            {
+                id: 1,
+                title: 'host',
+                member: { id: 7, fullName: 'Mona Ali' },
+                startDateTime: '2026-03-31T17:00:00.000Z',
+                endDateTime: '2026-03-31T18:00:00.000Z',
+            },
+        ];
+
+        const sheet = buildScheduleTimelineSheet(XLSX, slots);
+        const memberCellRef = XLSX.utils.encode_cell({ r: 2, c: 0 });
+
+        expect(sheet[memberCellRef]?.v).toBe('Mona Ali\n1 slot');
     });
 });

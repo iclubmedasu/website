@@ -98,6 +98,11 @@
     color: #64748b;
 }
 
+.badge-website-disclosed {
+    background: #f3ecfb;
+    color: var(--purple-800);
+}
+
 
 /* ============================================
    PRIORITY BADGES

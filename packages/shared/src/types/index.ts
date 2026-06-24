@@ -6,3 +6,4 @@ export * from "./project";
 export * from "./event";
 export * from "./auth";
 export * from "./notification";
+export * from "./public";

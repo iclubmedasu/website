@@ -319,6 +319,7 @@ export { fmtDate, getCategoryClass, StatusBadge, PriorityBadge } from './badges'
 export {
     getArchiveOutcomeBadge,
     getLifecycleBadge,
+    getWebsiteDisclosedBadge,
     isProjectAborted,
     isProjectInactive,
 } from './lifecycleBadges';

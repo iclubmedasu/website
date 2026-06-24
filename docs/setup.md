@@ -14,6 +14,7 @@
    - Copy .env.example to .env
    - Copy backend/.env.example to backend/.env (if exists)
    - Copy members-portal/.env.example to members-portal/.env.local (if exists)
+   - Copy public-website/.env.local.example to public-website/.env.local (if exists)
 4. Fill in all environment variables (see .env.example for descriptions)
 5. Install all dependencies from the root:
    ```
@@ -21,8 +22,9 @@
    ```
 6. Set up the database:
    ```
-   pnpm --filter backend prisma migrate dev
+   pnpm --filter backend prisma:migrate
    ```
+   This runs Prisma migrations and automatically enables Row-Level Security on all `public` tables (required for Supabase).
 7. Start all services:
    ```
    pnpm dev
@@ -32,7 +34,10 @@
 - Backend API: http://localhost:3000
 - Members Portal: http://localhost:3001
 - Public Website: http://localhost:3002
- 
+
+Public event registration confirmation URLs:
+`http://localhost:3002/events/{eventId}/confirmation?code={confirmationCode}`
+
 ## Individual Services
 ```
 pnpm dev:api      # Backend only

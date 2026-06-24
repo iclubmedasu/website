@@ -146,6 +146,8 @@ export const BADGE_LABEL_OVERRIDES: Record<string, string> = {
     REACTIVATED: 'Reactivated',
     ABORTED: 'Aborted',
     PUBLISHED: 'Published',
+    DISCLOSED: 'Disclosed on website',
+    UNDISCLOSED: 'Hidden from website',
     DEACTIVATED: 'On Hold',
     ACTIVATED: 'Activated',
     STATUS_CHANGED: 'Status Changed',

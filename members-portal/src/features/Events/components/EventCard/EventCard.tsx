@@ -5,6 +5,7 @@ import { Archive, Calendar, Paperclip, Users } from 'lucide-react';
 import LifecycleCardView, {
     getArchiveOutcomeBadge,
     getLifecycleBadge,
+    getWebsiteDisclosedBadge,
 } from '@/components/cards/LifecycleCardView/LifecycleCardView';
 import LifecycleCardActions from '@/components/cards/LifecycleCardView/LifecycleCardActions';
 import FileUploadZone from '@/components/FileUpload/FileUploadZone';
@@ -33,9 +34,16 @@ export interface EventCardProps {
     onReactivate: (event: EventSummary | EventDetail) => void;
     onAbort: (event: EventSummary | EventDetail) => void;
     onViewActivity: (event: EventSummary | EventDetail) => void;
+    onToggleDisclose?: (event: EventSummary | EventDetail) => void;
     onReloadDetail?: () => void;
     archivedView?: boolean;
     canUpload?: boolean;
+    canManageTiers?: boolean;
+    canManageTasks?: boolean;
+    canManageFields?: boolean;
+    canPublishEvent?: boolean;
+    canRemoveAttendance?: boolean;
+    onPublishedChange?: (eventId: Id, published: boolean) => Promise<void>;
 }
 
 export default function EventCard({
@@ -54,9 +62,16 @@ export default function EventCard({
     onReactivate,
     onAbort,
     onViewActivity,
+    onToggleDisclose,
     onReloadDetail,
     archivedView = false,
     canUpload = false,
+    canManageTiers = false,
+    canManageTasks = false,
+    canManageFields = false,
+    canPublishEvent = false,
+    canRemoveAttendance = false,
+    onPublishedChange,
 }: EventCardProps) {
     const { user } = useAuth();
     const [eventFiles, setEventFiles] = useState<EventFileRef[]>([]);
@@ -78,12 +93,21 @@ export default function EventCard({
     const lifecycleBadge = getLifecycleBadge(cardItem);
     const LifecycleIcon = lifecycleBadge.icon;
     const archiveOutcomeBadge = archivedView ? getArchiveOutcomeBadge(cardItem) : null;
+    const websiteDisclosedBadge = archivedView ? getWebsiteDisclosedBadge(cardItem) : null;
     const ArchiveOutcomeIcon = archiveOutcomeBadge?.icon ?? Archive;
+    const WebsiteDisclosedIcon = websiteDisclosedBadge?.icon ?? Archive;
 
     const detailTarget = fullDetail ?? event;
     const lifecycleMode = archivedView ? 'archived' as const : 'active' as const;
 
-    const collapsedHandlers = {
+    const collapsedHandlers = archivedView ? {
+        onReactivate: () => onReactivate(event),
+        onAbort: () => onAbort(event),
+        onFinalize: () => onFinalize(event),
+        onArchive: () => onArchive(event),
+        onToggleDisclose: onToggleDisclose ? () => onToggleDisclose(event) : undefined,
+        onViewActivity: () => onViewActivity(event),
+    } : {
         onEdit: () => onEdit(event),
         onDeactivate: () => onDeactivate(event),
         onFinalize: () => onFinalize(event),
@@ -93,7 +117,14 @@ export default function EventCard({
         onViewActivity: () => onViewActivity(event),
     };
 
-    const expandedHandlers = {
+    const expandedHandlers = archivedView ? {
+        onReactivate: () => onReactivate(detailTarget),
+        onAbort: () => onAbort(detailTarget),
+        onFinalize: () => onFinalize(detailTarget),
+        onArchive: () => onArchive(detailTarget),
+        onToggleDisclose: onToggleDisclose ? () => onToggleDisclose(detailTarget) : undefined,
+        onViewActivity: () => onViewActivity(detailTarget),
+    } : {
         onEdit: () => onEdit(detailTarget),
         onDeactivate: () => onDeactivate(detailTarget),
         onFinalize: () => onFinalize(detailTarget),
@@ -126,6 +157,18 @@ export default function EventCard({
                         <LifecycleIcon size={12} />
                         {lifecycleBadge.label}
                     </span>
+                    {websiteDisclosedBadge && (
+                        <span className={`badge ${websiteDisclosedBadge.className}`} title={websiteDisclosedBadge.title}>
+                            <WebsiteDisclosedIcon size={12} />
+                            {websiteDisclosedBadge.label}
+                        </span>
+                    )}
+                    {/* {!archivedView && event.isPublished ? (
+                        <span className="badge badge--info" title="Accepting public registrations on the website">
+                            <Globe size={12} />
+                            On website
+                        </span>
+                    ) : null} */}
                 </>
             )}
             collapsedActions={(
@@ -163,6 +206,12 @@ export default function EventCard({
                         <LifecycleIcon size={14} />
                         {lifecycleBadge.label}
                     </span>
+                    {websiteDisclosedBadge && (
+                        <span className={`badge badge--compact ${websiteDisclosedBadge.className}`} title={websiteDisclosedBadge.title}>
+                            <WebsiteDisclosedIcon size={14} />
+                            {websiteDisclosedBadge.label}
+                        </span>
+                    )}
                 </>
             )}
             expandedActions={fullDetail ? (
@@ -207,6 +256,13 @@ export default function EventCard({
                             allowWalkIns={fullDetail.allowWalkIns ?? false}
                             eventDate={fullDetail.eventDate}
                             eventEndDate={fullDetail.eventEndDate}
+                            isPublished={fullDetail.isPublished ?? false}
+                            canPublishEvent={canPublishEvent}
+                            canRemoveAttendance={canRemoveAttendance}
+                            onPublishedChange={onPublishedChange}
+                            canManageTiers={canManageTiers}
+                            canManageTasks={canManageTasks}
+                            canManageFields={canManageFields}
                             onReload={() => onReloadDetail?.()}
                         />
                     </div>

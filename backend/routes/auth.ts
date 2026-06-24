@@ -4,6 +4,13 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../db';
 import { JWT_SECRET, authenticateToken } from '../middleware/auth';
 import type { RequestUser } from '../types/auth';
+import {
+    normalizePhone,
+    looksLikePhone,
+    sanitizePhoneForStorage,
+    sanitizeOptionalPhoneForStorage,
+    validateStoredPhone,
+} from '../lib/phoneUtils';
 
 const router: any = express.Router();
 
@@ -81,45 +88,6 @@ function isValidEmail(value) {
 
 // Official @med.asu.edu.eg email regex
 const OFFICIAL_EMAIL_REGEX = /^[^\s@]+@med\.asu\.edu\.eg$/i;
-
-// Detect if a string looks like a phone number (after stripping spaces)
-function looksLikePhone(value) {
-    if (!value || typeof value !== 'string') return false;
-    const stripped = value.replace(/\s/g, '');
-    return /^[+\d][\d\s\-().]{6,}$/.test(stripped) && !stripped.includes('@');
-}
-
-// Phone normalization utility (Task 3.2)
-function normalizePhone(raw) {
-    if (!raw || typeof raw !== 'string') return raw;
-    let cleaned = raw.replace(/[^\d+]/g, '');
-    // Ensure only one leading +
-    if (cleaned.startsWith('+')) {
-        cleaned = '+' + cleaned.slice(1).replace(/\+/g, '');
-    } else {
-        cleaned = cleaned.replace(/\+/g, '');
-    }
-    const digits = cleaned.replace(/\+/g, '');
-    // Egyptian number handling
-    if (cleaned.startsWith('+20')) {
-        // Already correct format
-        return cleaned;
-    }
-    if (!cleaned.startsWith('+') && digits.startsWith('20') && digits.length === 12) {
-        // e.g. 201012345678 → +201012345678
-        return '+' + digits;
-    }
-    if (digits.startsWith('0') && digits.length === 11) {
-        // e.g. 01012345678 → +201012345678
-        return '+20' + digits.slice(1);
-    }
-    if (digits.startsWith('1') && digits.length === 10) {
-        // e.g. 1012345678 → +201012345678
-        return '+20' + digits;
-    }
-    // International or other format — return with digits only (or with + if it was there)
-    return cleaned.startsWith('+') ? cleaned : cleaned;
-}
 
 // Find member by phone number (normalized). Searches phoneNumber and phoneNumber2.
 async function findMemberByPhone(phone) {
@@ -384,6 +352,18 @@ router.post('/update-invited-profile', async (req, res) => {
         if (!phoneNumber || !phoneNumber.trim()) {
             return res.status(400).json({ error: 'Phone number is required' });
         }
+        const trimmedPhone = sanitizePhoneForStorage(phoneNumber);
+        const phoneValidation = validateStoredPhone(trimmedPhone);
+        if (!phoneValidation.valid) {
+            return res.status(400).json({ error: phoneValidation.error });
+        }
+        const trimmedPhone2 = sanitizeOptionalPhoneForStorage(phoneNumber2);
+        if (trimmedPhone2) {
+            const phone2Validation = validateStoredPhone(trimmedPhone2);
+            if (!phone2Validation.valid) {
+                return res.status(400).json({ error: 'Second phone number is invalid' });
+            }
+        }
         const trimmedEmail2 = email2?.trim() || null;
         const trimmedEmail3 = email3?.trim() || null;
         if (trimmedEmail2 && !isValidEmail(trimmedEmail2)) {
@@ -392,9 +372,8 @@ router.post('/update-invited-profile', async (req, res) => {
         if (trimmedEmail3 && !isValidEmail(trimmedEmail3)) {
             return res.status(400).json({ error: 'Please enter a valid email for additional email 3 (e.g. name@domain.com).' });
         }
-        const trimmedPhone2 = phoneNumber2?.trim() || null;
         const existingPhone = await prisma.member.findFirst({
-            where: { phoneNumber: phoneNumber.trim(), id: { not: member.id } }
+            where: { phoneNumber: trimmedPhone, id: { not: member.id } }
         });
         if (existingPhone) {
             return res.status(400).json({ error: 'This phone number is already in use.' });
@@ -421,7 +400,7 @@ router.post('/update-invited-profile', async (req, res) => {
             where: { id: member.id },
             data: {
                 fullName: fullName.trim(),
-                phoneNumber: phoneNumber.trim(),
+                phoneNumber: trimmedPhone,
                 phoneNumber2: trimmedPhone2,
                 email2: trimmedEmail2,
                 email3: trimmedEmail3
@@ -520,7 +499,11 @@ router.post('/complete-profile', async (req, res) => {
             return res.status(400).json({ error: 'Use the email flow to set your password.' });
         }
 
-        const trimmedPhone = phoneNumber.trim();
+        const trimmedPhone = sanitizePhoneForStorage(phoneNumber);
+        const phoneValidation = validateStoredPhone(trimmedPhone);
+        if (!phoneValidation.valid) {
+            return res.status(400).json({ error: phoneValidation.error });
+        }
         const trimmedName = toTitleCase(fullName.trim());
         const trimmedEmail2 = email2?.trim() || null;
         const trimmedEmail3 = email3?.trim() || null;
@@ -532,7 +515,13 @@ router.post('/complete-profile', async (req, res) => {
             return res.status(400).json({ error: 'Please enter a valid email for additional email 3 (e.g. name@domain.com).' });
         }
 
-        const trimmedPhone2 = phoneNumber2?.trim() || null;
+        const trimmedPhone2 = sanitizeOptionalPhoneForStorage(phoneNumber2);
+        if (trimmedPhone2) {
+            const phone2Validation = validateStoredPhone(trimmedPhone2);
+            if (!phone2Validation.valid) {
+                return res.status(400).json({ error: 'Second phone number is invalid' });
+            }
+        }
         const existingPhone = await prisma.member.findFirst({
             where: { phoneNumber: trimmedPhone, id: { not: member.id } }
         });
@@ -737,8 +726,18 @@ router.post('/complete-officer-profile', async (req, res) => {
         }
 
         const trimmedName = toTitleCase(fullName.trim());
-        const trimmedPhone = phoneNumber.trim();
-        const trimmedPhone2 = phoneNumber2?.trim() || null;
+        const trimmedPhone = sanitizePhoneForStorage(phoneNumber);
+        const phoneValidation = validateStoredPhone(trimmedPhone);
+        if (!phoneValidation.valid) {
+            return res.status(400).json({ error: phoneValidation.error });
+        }
+        const trimmedPhone2 = sanitizeOptionalPhoneForStorage(phoneNumber2);
+        if (trimmedPhone2) {
+            const phone2Validation = validateStoredPhone(trimmedPhone2);
+            if (!phone2Validation.valid) {
+                return res.status(400).json({ error: 'Second phone number is invalid' });
+            }
+        }
         const trimmedEmail2 = email2?.trim() || null;
         const trimmedEmail3 = email3?.trim() || null;
 
@@ -1046,6 +1045,11 @@ router.get('/me', async (req, res) => {
                 isActive: true,
                 assignmentStatus: true,
                 joinDate: true,
+                showPhoneNumber: true,
+                showPhoneNumber2: true,
+                showEmail2: true,
+                showEmail3: true,
+                showStudentId: true,
                 createdAt: true,
                 teamMemberships: {
                     where: { isActive: true },

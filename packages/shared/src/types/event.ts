@@ -37,6 +37,7 @@ export interface EventTierRef {
     currency?: EventTierCurrency | string;
     order?: number;
     isActive?: boolean;
+    showOnPublic?: boolean;
     registrationCount?: number;
     _count?: {
         registrations: number;
@@ -105,6 +106,8 @@ export interface EventSummary {
     isActive?: boolean;
     isFinalized?: boolean;
     isArchived?: boolean;
+    isPublished?: boolean;
+    isDisclosed?: boolean;
     deletedAt?: ISODateTime | null;
     createdAt?: ISODateTime;
     updatedAt?: ISODateTime;
@@ -204,6 +207,7 @@ export interface CreateEventTierPayload {
 
 export interface UpdateEventTierPayload extends Partial<CreateEventTierPayload> {
     isActive?: boolean;
+    showOnPublic?: boolean;
 }
 
 export interface CreateEventCustomFieldPayload {
@@ -326,6 +330,10 @@ export interface CheckInRegistrationPayload {
     confirmationCode?: string;
     eventDay?: string;
     customFieldValues?: Record<string, unknown> | unknown;
+}
+
+export interface RemoveRegistrationAttendancePayload {
+    eventDay: string;
 }
 
 export interface EventRegistrationLookupResult {

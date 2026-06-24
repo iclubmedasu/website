@@ -20,6 +20,17 @@ interface EditableRegistrationContactCellProps {
     onUpdated: (updated: EventRegistrationRef) => void;
 }
 
+function truncateDisplay(value: string, max: number): string {
+    if (value.length <= max) return value;
+    return `${value.slice(0, max)}...`;
+}
+
+const DISPLAY_LIMITS: Record<ContactField, number> = {
+    fullName: 20,
+    email: 20,
+    phoneNumber: 15,
+};
+
 function readFieldValue(registration: EventRegistrationRef, field: ContactField): string {
     if (field === 'phoneNumber') return registration.phoneNumber || '';
     return registration[field] || '';
@@ -53,7 +64,7 @@ export default function EditableRegistrationContactCell({
         if (!editing) setDraft(storedValue);
     }, [editing, storedValue]);
 
-    const displayValue = storedValue || '—';
+    const displayValue = storedValue ? truncateDisplay(storedValue, DISPLAY_LIMITS[field]) : '—';
     const label = FIELD_LABELS[field];
     const cellClass = [
         className,
@@ -63,7 +74,7 @@ export default function EditableRegistrationContactCell({
 
     if (!editable) {
         return (
-            <td className={className} title={field === 'fullName' ? storedValue : undefined}>
+            <td className={className} title={storedValue || undefined}>
                 {displayValue}
             </td>
         );
@@ -164,7 +175,7 @@ export default function EditableRegistrationContactCell({
     }
 
     return (
-        <td className={cellClass} title={field === 'fullName' ? storedValue : undefined}>
+        <td className={cellClass} title={storedValue || undefined}>
             <div className="event-registrations-contact-cell">
                 <span className="event-registrations-contact-cell__value">{displayValue}</span>
                 <button

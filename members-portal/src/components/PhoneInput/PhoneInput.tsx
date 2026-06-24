@@ -1,6 +1,6 @@
 'use client';
-import { useEffect, useState, type ChangeEvent } from "react";
-import { COUNTRY_CODES, parsePhoneValue, formatPhoneValue } from "@/utils/countryCodes";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { COUNTRY_CODES, parsePhoneValue, formatPhoneValue, dedupeRepeatedPhoneDigits } from "@/utils/countryCodes";
 import "./PhoneInput.css";
 
 interface ParsedPhoneValue {
@@ -43,25 +43,35 @@ export function PhoneInput({
     const parsed = parsePhoneValue(value) as ParsedPhoneValue;
     const [countryCode, setCountryCode] = useState(parsed.countryCode);
     const [nationalNumber, setNationalNumber] = useState(parsed.nationalNumber);
+    const isInternalChange = useRef(false);
 
     useEffect(() => {
+        if (isInternalChange.current) {
+            isInternalChange.current = false;
+            return;
+        }
         const p = parsePhoneValue(value) as ParsedPhoneValue;
         setCountryCode(p.countryCode);
         setNationalNumber(p.nationalNumber);
     }, [value]);
 
+    const emitChange = (code: string, rawDigits: string) => {
+        const deduped = dedupeRepeatedPhoneDigits(rawDigits);
+        setNationalNumber(deduped);
+        const full = formatPhoneValue(code, deduped) as string;
+        isInternalChange.current = true;
+        onChange?.(full);
+    };
+
     const handleCountryChange = (e: ChangeEvent<HTMLSelectElement>) => {
         const code = e.target.value;
         setCountryCode(code);
-        const full = formatPhoneValue(code, nationalNumber) as string;
-        onChange?.(full);
+        emitChange(code, nationalNumber);
     };
 
     const handleNumberChange = (e: ChangeEvent<HTMLInputElement>) => {
         const raw = e.target.value.replace(/\D/g, "");
-        setNationalNumber(raw);
-        const full = formatPhoneValue(countryCode, raw) as string;
-        onChange?.(full);
+        emitChange(countryCode, raw);
     };
 
     return (
@@ -96,8 +106,9 @@ export function PhoneInput({
                     placeholder={placeholder}
                     disabled={disabled}
                     required={required}
-                    autoComplete="tel-national"
+                    autoComplete="off"
                     inputMode="numeric"
+                    maxLength={15}
                 />
             </div>
             {error && <span className="phone-input-error">{error}</span>}

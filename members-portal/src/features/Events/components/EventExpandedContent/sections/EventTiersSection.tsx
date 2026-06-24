@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Toggle from '@/components/toggle/Toggle';
 import { eventsAPI } from '@/services/api';
 import type { CreateEventTierPayload, EventTierCurrency, EventTierRef, Id, UpdateEventTierPayload } from '@/types/backend-contracts';
 import {
@@ -13,9 +14,10 @@ interface EventTiersSectionProps {
     eventId: Id | string;
     tiers: EventTierRef[];
     onTiersChange: (tiers: EventTierRef[]) => void;
+    canManage?: boolean;
 }
 
-export default function EventTiersSection({ eventId, tiers, onTiersChange }: EventTiersSectionProps) {
+export default function EventTiersSection({ eventId, tiers, onTiersChange, canManage = false }: EventTiersSectionProps) {
     const [tierName, setTierName] = useState('');
     const [tierDescription, setTierDescription] = useState('');
     const [tierCapacity, setTierCapacity] = useState('');
@@ -92,6 +94,7 @@ export default function EventTiersSection({ eventId, tiers, onTiersChange }: Eve
     return (
         <section className="event-expanded-panel">
             <h2 className="expanded-section-title">Tiers</h2>
+            {canManage ? (
             <div className="event-expanded-form-grid">
                 <input value={tierName} onChange={(e) => setTierName(e.target.value)} placeholder="Tier name" className="form-input" disabled={isEditing} />
                 <input value={tierDescription} onChange={(e) => setTierDescription(e.target.value)} placeholder="Description" className="form-input" disabled={isEditing} />
@@ -106,6 +109,7 @@ export default function EventTiersSection({ eventId, tiers, onTiersChange }: Eve
                 />
                 <button type="button" onClick={() => void handleCreateTier()} className="btn btn-primary" disabled={isEditing}>Add tier</button>
             </div>
+            ) : null}
             <div className="event-expanded-tiers-list">
                 {tiers.map((tier) => {
                     const tierIsEditing = editingTierId === Number(tier.id);
@@ -114,7 +118,7 @@ export default function EventTiersSection({ eventId, tiers, onTiersChange }: Eve
 
                     if (tierIsEditing) {
                         return (
-                            <div key={tier.id} className="event-expanded-list-item event-expanded-list-item--muted">
+                            <div key={tier.id} className="event-expanded-list-item event-expanded-list-item--editing">
                                 <div className="event-expanded-form-grid" style={{ flex: 1 }}>
                                     <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Tier name" className="form-input" />
                                     <input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="Description" className="form-input" />
@@ -126,10 +130,10 @@ export default function EventTiersSection({ eventId, tiers, onTiersChange }: Eve
                                         onPriceChange={setEditPrice}
                                         onCurrencyChange={setEditCurrency}
                                     />
-                                </div>
-                                <div className="event-expanded-inline-actions">
-                                    <button type="button" onClick={() => void saveEdit(tier)} className="btn btn-primary">Save</button>
-                                    <button type="button" onClick={cancelEdit} className="btn btn-secondary">Cancel</button>
+                                    <div className="event-expanded-tier-actions">
+                                        <button type="button" onClick={() => void saveEdit(tier)} className="btn btn-primary">Save</button>
+                                        <button type="button" onClick={cancelEdit} className="btn btn-secondary">Cancel</button>
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -144,12 +148,27 @@ export default function EventTiersSection({ eventId, tiers, onTiersChange }: Eve
                                     Capacity: {tier.maxCapacity ?? 'Unlimited'}
                                     {priceLabel ? ` · Price: ${priceLabel}` : ''}
                                     {' · '}Registrations: {tier._count?.registrations ?? tier.registrationCount ?? 0}
+                                    {tier.showOnPublic ? ' · On public form' : ''}
                                 </p>
                             </div>
                             <div className="event-expanded-inline-actions">
-                                <button type="button" onClick={() => startEdit(tier)} className="btn btn-secondary" disabled={actionsDisabled}>Edit</button>
-                                <button type="button" onClick={() => void handleUpdateTier(tier, { isActive: !tier.isActive })} className="btn btn-secondary" disabled={actionsDisabled}>{tier.isActive === false ? 'Enable' : 'Disable'}</button>
-                                <button type="button" onClick={() => void handleRemoveTier(Number(tier.id))} className="btn btn-danger" disabled={actionsDisabled}>Delete</button>
+                                {canManage ? (
+                                    <>
+                                        <div className="event-expanded-tier-public-toggle" title="Show on public registration form">
+                                            <span className="event-expanded-tier-public-toggle-label">Public form</span>
+                                            <Toggle
+                                                color="purple"
+                                                checked={Boolean(tier.showOnPublic)}
+                                                disabled={actionsDisabled || tier.isActive === false}
+                                                onChange={() => void handleUpdateTier(tier, { showOnPublic: !tier.showOnPublic })}
+                                                aria-label={`Show ${tier.name} on public registration form`}
+                                            />
+                                        </div>
+                                        <button type="button" onClick={() => startEdit(tier)} className="btn btn-secondary" disabled={actionsDisabled}>Edit</button>
+                                        <button type="button" onClick={() => void handleUpdateTier(tier, { isActive: !tier.isActive })} className="btn btn-secondary" disabled={actionsDisabled}>{tier.isActive === false ? 'Enable' : 'Disable'}</button>
+                                        <button type="button" onClick={() => void handleRemoveTier(Number(tier.id))} className="btn btn-danger" disabled={actionsDisabled}>Delete</button>
+                                    </>
+                                ) : null}
                             </div>
                         </div>
                     );

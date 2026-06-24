@@ -25,13 +25,14 @@ import {
 import { membersAPI, authAPI, roleHistoryAPI, getProfilePhotoUrl, notificationsAPI } from '@/services/api';
 import { PhoneInput } from '@/components/PhoneInput/PhoneInput';
 import UploadPhotoModal from '@/components/UploadPhotoModal/UploadPhotoModal';
-import { normalizePhoneDisplay } from '@/utils/countryCodes';
+import Toggle from '@/components/toggle/Toggle';
+import { normalizePhoneDisplay, sanitizePhoneForStorage } from '@/utils/countryCodes';
 import '@/components/modal/modal.css';
-import type { Id, NotificationItem } from '@/types/backend-contracts';
+import type { Id, NotificationItem, MemberContactVisibility } from '@/types/backend-contracts';
 
 import './UserPage.css';
 
-type TabKey = 'personal' | 'history' | 'security' | 'settings' | 'notifications' | 'achievements';
+type TabKey = 'personal' | 'history' | 'security' | 'settings' | 'notifications' | 'achievements' | 'privacy';
 
 interface TabDefinition {
     key: TabKey;
@@ -79,10 +80,41 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 const TABS: TabDefinition[] = [
     { key: 'personal', label: 'Personal Details' },
+    { key: 'privacy', label: 'Privacy' },
     { key: 'history', label: 'History' },
     { key: 'security', label: 'Sign-in & Security' },
     { key: 'notifications', label: 'Notifications' },
     { key: 'achievements', label: 'Achievements' },
+];
+
+type VisibilityField = keyof MemberContactVisibility;
+
+const VISIBILITY_FIELDS: { key: VisibilityField; label: string; hint: string }[] = [
+    {
+        key: 'showPhoneNumber',
+        label: 'Show phone number to others',
+        hint: 'Primary phone number',
+    },
+    {
+        key: 'showPhoneNumber2',
+        label: 'Show second phone to others',
+        hint: 'Optional second phone number',
+    },
+    {
+        key: 'showEmail2',
+        label: 'Show additional email 2 to others',
+        hint: 'Secondary email address',
+    },
+    {
+        key: 'showEmail3',
+        label: 'Show additional email 3 to others',
+        hint: 'Tertiary email address',
+    },
+    {
+        key: 'showStudentId',
+        label: 'Show student ID to others',
+        hint: 'Your official student ID number',
+    },
 ];
 
 function UserPage() {
@@ -125,6 +157,8 @@ function UserPage() {
     const [showCurrentPwd, setShowCurrentPwd] = useState(false);
     const [showNewPwd, setShowNewPwd] = useState(false);
     const [showConfirmPwd, setShowConfirmPwd] = useState(false);
+    const [visibilitySaving, setVisibilitySaving] = useState<VisibilityField | null>(null);
+    const [visibilityError, setVisibilityError] = useState('');
 
     const fetchHistory = async () => {
         if (!user?.id) return;
@@ -215,6 +249,24 @@ function UserPage() {
         }
     }, [activeTab, notificationsFetched, showUnreadOnly, user?.id]);
 
+    const handleVisibilityToggle = async (field: VisibilityField, checked: boolean) => {
+        if (!user?.id) return;
+        setVisibilityError('');
+        setVisibilitySaving(field);
+        try {
+            await membersAPI.update(user.id, { [field]: checked });
+            await refreshUser();
+        } catch (err: unknown) {
+            setVisibilityError(getErrorMessage(err, 'Failed to update privacy setting'));
+        } finally {
+            setVisibilitySaving(null);
+        }
+    };
+
+    const getVisibilityValue = (field: VisibilityField): boolean => {
+        return Boolean(user?.[field]);
+    };
+
     if (!user) return null;
 
     const isDeveloper = user.isDeveloper === true;
@@ -260,8 +312,10 @@ function UserPage() {
         try {
             await membersAPI.update(user.id, {
                 fullName: formData.fullName.trim(),
-                phoneNumber: formData.phoneNumber.trim(),
-                phoneNumber2: formData.phoneNumber2.trim() || null,
+                phoneNumber: sanitizePhoneForStorage(formData.phoneNumber),
+                phoneNumber2: formData.phoneNumber2.trim()
+                    ? sanitizePhoneForStorage(formData.phoneNumber2)
+                    : null,
                 linkedInUrl: formData.linkedInUrl.trim() || null,
                 email2: formData.email2.trim() || null,
                 email3: formData.email3.trim() || null,
@@ -639,6 +693,33 @@ function UserPage() {
                                 </div>
                             )}
                         </>
+                    )}
+
+                    {activeTab === 'privacy' && (
+                        <div className="user-page-section-card">
+                            <h3 className="user-security-section-title">Contact visibility</h3>
+                            <p className="user-privacy-intro">
+                                Contact details are hidden from other members and the public website unless enabled.
+                                Your official email, name, photo, LinkedIn, history, and achievements are always visible.
+                            </p>
+                            {visibilityError && <div className="error-message">{visibilityError}</div>}
+                            <div className="user-privacy-list">
+                                {VISIBILITY_FIELDS.map(({ key, label, hint }) => (
+                                    <div key={key} className="user-privacy-row">
+                                        <div>
+                                            <span className="user-privacy-label">{label}</span>
+                                            <span className="user-privacy-hint">{hint}</span>
+                                        </div>
+                                        <Toggle
+                                            checked={getVisibilityValue(key)}
+                                            onChange={(checked) => void handleVisibilityToggle(key, checked)}
+                                            disabled={!canEdit || visibilitySaving === key}
+                                            aria-label={label}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     )}
 
                     {activeTab === 'history' && (

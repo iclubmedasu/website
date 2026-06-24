@@ -1,0 +1,71 @@
+.site-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    width: 100%;
+    border-bottom: 1px solid var(--purple-300);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+}
+
+.site-header-inner {
+    margin: 0 auto;
+    display: flex;
+    max-width: 72rem;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.875rem 1rem;
+    gap: 1rem;
+}
+
+.site-header-logo {
+    height: 2.5rem;
+    width: auto;
+}
+
+.site-nav-link {
+    padding: 0.5rem 0.875rem;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-heading);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-600);
+    transition: color 0.2s, background 0.2s;
+}
+
+.site-nav-link:hover {
+    color: var(--purple-800);
+    background: var(--purple-50);
+}
+
+.site-nav-link--active {
+    color: var(--purple-900);
+    background: var(--purple-50);
+    font-weight: 600;
+}
+
+.site-nav-link--mobile {
+    display: block;
+    padding: 0.625rem 0.75rem;
+}
+
+.site-main {
+    flex: 1;
+    padding-top: var(--site-header-height);
+}
+
+@media (min-width: 640px) {
+    .site-header-inner {
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .site-header-inner {
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+}

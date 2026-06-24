@@ -21,6 +21,15 @@ type LoginStep =
 
 type IdentifierMode = 'text' | 'phone';
 
+function resolveSignupPhonePrefill(
+    identifierMode: IdentifierMode,
+    storedPhone: string | null | undefined,
+): string {
+    if (identifierMode === 'phone') return '';
+    if (!storedPhone?.trim() || storedPhone.startsWith('pending-')) return '';
+    return storedPhone;
+}
+
 // Password: at least 8 chars, one upper, one lower, one number, one symbol
 function validatePassword(pwd: string): string | null {
     if (!pwd || pwd.length < 8) return 'Password must be at least 8 characters';
@@ -126,7 +135,7 @@ function LoginPage() {
                         // Filter out placeholder emails (pending-officer-*)
                         const rawEmail = result.data.email || '';
                         setOfficerEmail(rawEmail.startsWith('pending-officer-') ? '' : rawEmail);
-                        setOfficerPhone(result.data.phoneNumber || '');
+                        setOfficerPhone(resolveSignupPhonePrefill(identifierMode, result.data.phoneNumber));
                         setOfficerFullName(result.data.fullName || '');
                         setOfficerEmail2(result.data.email2 || '');
                         setOfficerEmail3(result.data.email3 || '');
@@ -134,7 +143,7 @@ function LoginPage() {
                     } else {
                         setMemberName(result.data.fullName || '');
                         setSetupFullName(result.data.fullName || '');
-                        setSetupPhone(result.data.phoneNumber || '');
+                        setSetupPhone(resolveSignupPhonePrefill(identifierMode, result.data.phoneNumber));
                         setSetupPhone2(result.data.phoneNumber2 || '');
                         setSetupEmail2(result.data.email2 || '');
                         setSetupEmail3(result.data.email3 || '');

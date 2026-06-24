@@ -4,6 +4,7 @@ import {
     AlertCircle,
     Archive,
     CheckSquare,
+    Globe,
     History,
     PauseCircle,
     Pencil,
@@ -20,6 +21,7 @@ export interface LifecycleCardHandlers {
     onReactivate?: (item: LifecycleItemTarget) => void;
     onAbort?: (item: LifecycleItemTarget) => void;
     onViewActivity?: (item: LifecycleItemTarget) => void;
+    onToggleDisclose?: (item: LifecycleItemTarget) => void;
 }
 
 interface LifecycleCardActionsProps extends LifecycleCardHandlers {
@@ -53,6 +55,7 @@ export default function LifecycleCardActions({
     onReactivate,
     onAbort,
     onViewActivity,
+    onToggleDisclose,
     iconSize,
 }: LifecycleCardActionsProps) {
     const target = detail ?? item;
@@ -72,6 +75,17 @@ export default function LifecycleCardActions({
     if (mode === 'archived') {
         return (
             <>
+                {canManage && item.isArchived && onToggleDisclose && (
+                    <button
+                        className={`${btnClass} publish-website-btn`}
+                        title={item.isDisclosed ? 'Hide from website' : 'Disclose on website'}
+                        type="button"
+                        onClick={stop(onToggleDisclose)}
+                    >
+                        <Globe size={size} />
+                        {label(item.isDisclosed ? 'Hide from website' : 'Disclose on website')}
+                    </button>
+                )}
                 {canManage && inactive && (
                     <>
                         <button className={`${btnClass} reactivate-btn`} title="Reactivate" type="button" onClick={stop(onReactivate)}>

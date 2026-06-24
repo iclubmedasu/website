@@ -18,12 +18,14 @@ import scheduleSlotsRoutes from "./scheduleSlots";
 import projectFilesRoutes from "./projectFiles";
 import eventFilesRoutes from "./eventFiles";
 import notificationsRoutes from "./notifications";
+import publicRoutes from "./public";
 
 import { downloadProfilePhoto } from "../services/githubStorage";
 
 const router = express.Router();
 
 router.use("/auth", authRoutes);
+router.use("/public", publicRoutes);
 
 router.get("/members/:id/profile-photo", async (req: Request, res: Response) => {
     try {
@@ -97,6 +99,7 @@ router.get("/", (_req: Request, res: Response) => {
             projectFiles: "/api/project-files",
             eventFiles: "/api/event-files",
             notifications: "/api/notifications",
+            public: "/api/public",
         },
     });
 });

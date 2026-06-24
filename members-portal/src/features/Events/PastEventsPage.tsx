@@ -55,7 +55,24 @@ export default function PastEventsPage() {
     const [abortingEvent, setAbortingEvent] = useState<EventSummary | EventDetail | null>(null);
     const [activityEvent, setActivityEvent] = useState<EventSummary | EventDetail | null>(null);
 
-    const canManageLifecycle = !!(user?.isDeveloper || user?.isOfficer || user?.isAdmin || user?.isLeadership);
+    const eventPermissions = useMemo(() => {
+        const isLifecycleRole = !!(user?.isDeveloper || user?.isOfficer || user?.isAdmin || user?.isLeadership);
+        const canViewAllEvents = !!(user?.isDeveloper || user?.isOfficer || user?.isAdmin);
+        const isElevatedWorkItemRole = isLifecycleRole || !!user?.isSpecial;
+
+        return {
+            isLifecycleRole,
+            canViewAllEvents,
+            isElevatedWorkItemRole,
+            canManageLifecycle: isLifecycleRole,
+            canManageTiers: isElevatedWorkItemRole,
+            canManageTasks: isElevatedWorkItemRole,
+            canManageFields: true,
+            canUploadToEvent: () => !!user?.id,
+        };
+    }, [user?.id, user?.isAdmin, user?.isDeveloper, user?.isLeadership, user?.isOfficer, user?.isSpecial]);
+
+    const canManageLifecycle = eventPermissions.canManageLifecycle;
     const hasActiveFilters = status !== '' || dateFrom !== '' || dateTo !== ''
         || filterTeam !== '' || filterCategory !== '' || filterPriority !== '';
 
@@ -150,6 +167,15 @@ export default function PastEventsPage() {
         }
     }, [expandedEventId, loadEvents]);
 
+    const handleToggleDisclose = useCallback(async (event: EventSummary | EventDetail) => {
+        try {
+            await eventsAPI.setDisclosed(event.id, !event.isDisclosed);
+            handleLifecycleRefresh();
+        } catch (discloseError) {
+            setError(discloseError instanceof Error ? discloseError.message : 'Failed to update website visibility');
+        }
+    }, [handleLifecycleRefresh]);
+
     const handleApplyFilters = (nextFilters: {
         status: EventQueryParams['status'] | '';
         dateFrom: string;
@@ -230,6 +256,10 @@ export default function PastEventsPage() {
                                 detailLoading={expandedEventId === event.id && detailLoading}
                                 canEdit={false}
                                 canManage={canManageLifecycle}
+                                canUpload={eventPermissions.canUploadToEvent()}
+                                canManageTiers={eventPermissions.canManageTiers}
+                                canManageTasks={eventPermissions.canManageTasks}
+                                canManageFields={eventPermissions.canManageFields}
                                 archivedView
                                 onToggle={handleToggleExpand}
                                 onEdit={() => {}}
@@ -238,6 +268,7 @@ export default function PastEventsPage() {
                                 onArchive={setArchivingEvent}
                                 onReactivate={setReactivatingEvent}
                                 onAbort={setAbortingEvent}
+                                onToggleDisclose={canManageLifecycle ? handleToggleDisclose : undefined}
                                 onViewActivity={setActivityEvent}
                             />
                         ))}

@@ -6,9 +6,10 @@ const { prisma }: { prisma: any } = require('../db');
 const githubStorage = require('../services/githubStorageService');
 const { logEventActivity } = require('../services/activityLogService');
 const { extractAuthToken, JWT_SECRET } = require('../middleware/auth');
-
-const MANAGER_ROLES = ['isDeveloper', 'isOfficer', 'isAdmin', 'isLeadership'];
-const PUBLIC_VISIBLE_STATUSES = ['PUBLISHED', 'COMPLETED'];
+const {
+    canUserViewEvent,
+    canUserAccessEventOperations,
+} = require('../lib/eventPermissions');
 
 // Multer: memory storage, 25MB limit (GitHub Contents API limit)
 const upload = multer({
@@ -63,59 +64,6 @@ async function deleteFolderGitkeep(folder) {
 }
 
 // ── Permission helpers ──────────────
-async function getUserTeamIds(memberId) {
-    const rows = await prisma.teamMember.findMany({
-        where: {
-            memberId,
-            isActive: true,
-            team: { isActive: true },
-        },
-        select: { teamId: true },
-    });
-    return rows.map((r) => r.teamId);
-}
-
-/**
- * Is the user a privileged role (developer, officer, administration, leadership)?
- */
-function isPrivilegedUser(req) {
-    return !!(req.user.isDeveloper || req.user.isOfficer || req.user.isAdmin || req.user.isLeadership);
-}
-
-function hasManagerAccess(user) {
-    return !!user?.memberId && MANAGER_ROLES.some((key) => Boolean(user[key]));
-}
-
-function canPublicView(event) {
-    return event.isActive && PUBLIC_VISIBLE_STATUSES.includes(event.status);
-}
-
-async function canUserViewEvent(user, eventId, isArchived) {
-    if (!user?.memberId) return false;
-    if (isArchived) return true;
-    if (hasManagerAccess(user)) return true;
-
-    const event = await prisma.event.findUnique({
-        where: { id: eventId },
-        select: { status: true, isActive: true },
-    });
-    if (!event) return false;
-    if (canPublicView(event)) return true;
-
-    const teamIds = await getUserTeamIds(user.memberId);
-    if (teamIds.length === 0) return false;
-
-    const teamAccess = await prisma.eventTeam.findFirst({
-        where: {
-            eventId,
-            teamId: { in: teamIds },
-        },
-        select: { id: true },
-    });
-
-    return teamAccess !== null;
-}
-
 async function ensureCanViewEvent(res, user, eventId) {
     const event = await prisma.event.findUnique({
         where: { id: eventId },
@@ -152,11 +100,24 @@ async function canUserUploadToEvent(req, eventId) {
 
 /**
  * Can the user manage files (delete/rename/restore)?
- * Only privileged users.
+ * Anyone who can view the event may manage files.
  */
-function canUserManageFiles(req) {
-    if (!req.user.memberId) return false;
-    return isPrivilegedUser(req);
+async function canUserManageEventFiles(req, eventId) {
+    const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        select: { id: true, isArchived: true },
+    });
+    if (!event) return false;
+
+    return canUserAccessEventOperations(req.user, eventId, event.isArchived);
+}
+
+async function ensureCanManageEventFiles(res, req, eventId) {
+    if (!(await canUserManageEventFiles(req, eventId))) {
+        res.status(403).json({ error: 'Access denied' });
+        return false;
+    }
+    return true;
 }
 
 // ============================================
@@ -321,12 +282,9 @@ router.delete('/folders/:id', async (req, res) => {
         const id = parseInt(req.params.id);
         if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid folder ID' });
 
-        if (!canUserManageFiles(req)) {
-            return res.status(403).json({ error: 'You do not have permission to delete folders in this event' });
-        }
-
         const folder = await getFolderById(id);
         if (!folder) return res.status(404).json({ error: 'Folder not found' });
+        if (!(await ensureCanManageEventFiles(res, req, folder.eventId))) return;
         if (!folder.isActive) return res.status(400).json({ error: 'Folder is already deleted' });
 
         const updated = await prisma.eventFolder.update({
@@ -356,12 +314,9 @@ router.post('/folders/:id/restore', async (req, res) => {
         const id = parseInt(req.params.id);
         if (Number.isNaN(id)) return res.status(400).json({ error: 'Invalid folder ID' });
 
-        if (!canUserManageFiles(req)) {
-            return res.status(403).json({ error: 'You do not have permission to restore folders in this event' });
-        }
-
         const folder = await getFolderById(id);
         if (!folder) return res.status(404).json({ error: 'Folder not found' });
+        if (!(await ensureCanManageEventFiles(res, req, folder.eventId))) return;
         if (folder.isActive) return res.status(400).json({ error: 'Folder is not deleted' });
 
         const githubSha = await restoreFolderGitkeep(folder);
@@ -398,10 +353,7 @@ router.patch('/folders/:id/rename', async (req, res) => {
 
         const folder = await getFolderById(id);
         if (!folder) return res.status(404).json({ error: 'Folder not found' });
-
-        if (!canUserManageFiles(req)) {
-            return res.status(403).json({ error: 'You do not have permission to rename folders in this event' });
-        }
+        if (!(await ensureCanManageEventFiles(res, req, folder.eventId))) return;
 
         const normalizedName = folderName.trim();
         const duplicate = await prisma.eventFolder.findFirst({
@@ -763,10 +715,6 @@ router.put('/:id/comments/:commentId', async (req, res) => {
         });
         if (!existing) return res.status(404).json({ error: 'Comment not found' });
 
-        if (existing.memberId !== req.user.memberId && !canUserManageFiles(req)) {
-            return res.status(403).json({ error: 'Can only edit your own comments' });
-        }
-
         const { comment } = req.body;
         if (!comment?.trim()) return res.status(400).json({ error: 'comment is required' });
 
@@ -817,10 +765,6 @@ router.delete('/:id/comments/:commentId', async (req, res) => {
             where: { id: commentId, fileId: id },
         });
         if (!existing) return res.status(404).json({ error: 'Comment not found' });
-
-        if (existing.memberId !== req.user.memberId && !canUserManageFiles(req)) {
-            return res.status(403).json({ error: 'Can only delete your own comments' });
-        }
 
         await prisma.eventFileComment.delete({ where: { id: commentId } });
 
@@ -899,11 +843,7 @@ router.delete('/:id', async (req, res) => {
             include: { folder: { select: { id: true, folderName: true, githubPath: true, isActive: true } } },
         });
         if (!file) return res.status(404).json({ error: 'File not found' });
-
-        // Permission check — only privileged users can delete files
-        if (!canUserManageFiles(req)) {
-            return res.status(403).json({ error: 'You do not have permission to delete files from this event' });
-        }
+        if (!(await ensureCanManageEventFiles(res, req, file.eventId))) return;
 
         // Soft-delete in DB
         await prisma.eventFile.update({
@@ -944,11 +884,7 @@ router.patch('/:id/rename', async (req, res) => {
             include: { folder: { select: { id: true, folderName: true, githubPath: true, isActive: true } } },
         });
         if (!file) return res.status(404).json({ error: 'File not found' });
-
-        // Permission check — only privileged users can rename files
-        if (!canUserManageFiles(req)) {
-            return res.status(403).json({ error: 'You do not have permission to rename files in this event' });
-        }
+        if (!(await ensureCanManageEventFiles(res, req, file.eventId))) return;
 
         // Check for duplicate name in the same project
         const duplicate = await prisma.eventFile.findFirst({
@@ -1002,10 +938,7 @@ router.patch('/:id/move', async (req, res) => {
             include: { folder: { select: { id: true, folderName: true, githubPath: true, isActive: true } } },
         });
         if (!file) return res.status(404).json({ error: 'File not found' });
-
-        if (!canUserManageFiles(req)) {
-            return res.status(403).json({ error: 'You do not have permission to move files in this event' });
-        }
+        if (!(await ensureCanManageEventFiles(res, req, file.eventId))) return;
 
         let targetFolder: any = null;
         if (parsedFolderId !== null) {
@@ -1078,11 +1011,7 @@ router.post('/:id/restore', async (req, res) => {
         });
         if (!file) return res.status(404).json({ error: 'File not found' });
         if (file.isActive) return res.status(400).json({ error: 'File is not deleted' });
-
-        // Permission check — only privileged users can restore files
-        if (!canUserManageFiles(req)) {
-            return res.status(403).json({ error: 'You do not have permission to restore files in this event' });
-        }
+        if (!(await ensureCanManageEventFiles(res, req, file.eventId))) return;
 
         if (file.folderId && file.folder && !file.folder.isActive) {
             const restoredFolderSha = await restoreFolderGitkeep(file.folder);

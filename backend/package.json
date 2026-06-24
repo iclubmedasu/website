@@ -12,7 +12,8 @@
     "test": "vitest run --config ./vitest.config.ts",
     "test:watch": "vitest --config ./vitest.config.ts",
     "prisma:generate": "npx prisma generate",
-    "prisma:migrate": "npx prisma migrate dev",
+    "prisma:deploy": "npx prisma migrate deploy && tsx scripts/enablePublicRls.ts",
+    "prisma:migrate": "npx prisma migrate dev && tsx scripts/enablePublicRls.ts",
     "prisma:studio": "npx prisma studio"
   },
   "keywords": [],

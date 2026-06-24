@@ -112,13 +112,13 @@ export function formatPhoneValue(
     return code ? `+${code}${digits}` : digits;
 }
 
-export function normalizePhoneDisplay(value: string | null | undefined): string {
+/**
+ * Detect and collapse exact repeated digit chunks (e.g. tripled Egyptian numbers).
+ */
+export function dedupeRepeatedPhoneDigits(value: string | null | undefined): string {
     const trimmed = value?.trim();
     if (!trimmed) return '';
-
-    if (!/^[+\d]+$/.test(trimmed)) {
-        return trimmed;
-    }
+    if (!/^[+\d]+$/.test(trimmed)) return trimmed;
 
     for (let chunkLength = 8; chunkLength <= Math.min(15, Math.floor(trimmed.length / 2)); chunkLength += 1) {
         if (trimmed.length % chunkLength !== 0) continue;
@@ -133,4 +133,48 @@ export function normalizePhoneDisplay(value: string | null | undefined): string 
     }
 
     return trimmed;
+}
+
+function normalizePhoneForStorage(raw: string): string {
+    let cleaned = raw.replace(/[^\d+]/g, '');
+    if (cleaned.startsWith('+')) {
+        cleaned = '+' + cleaned.slice(1).replace(/\+/g, '');
+    } else {
+        cleaned = cleaned.replace(/\+/g, '');
+    }
+    const digits = cleaned.replace(/\+/g, '');
+    if (cleaned.startsWith('+20')) {
+        return cleaned;
+    }
+    if (!cleaned.startsWith('+') && digits.startsWith('20') && digits.length === 12) {
+        return '+' + digits;
+    }
+    if (digits.startsWith('0') && digits.length === 11) {
+        return '+20' + digits.slice(1);
+    }
+    if (digits.startsWith('1') && digits.length === 10) {
+        return '+20' + digits;
+    }
+    if (cleaned.startsWith('+')) {
+        return cleaned;
+    }
+    const parsed = parsePhoneValue(cleaned);
+    return formatPhoneValue(parsed.countryCode, parsed.nationalNumber);
+}
+
+/**
+ * Dedupe repeated chunks and normalize for API/database storage.
+ */
+export function sanitizePhoneForStorage(value: string | null | undefined): string {
+    const trimmed = value?.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('pending-')) return trimmed;
+    return normalizePhoneForStorage(dedupeRepeatedPhoneDigits(trimmed));
+}
+
+export function normalizePhoneDisplay(value: string | null | undefined): string {
+    const trimmed = value?.trim();
+    if (!trimmed) return '';
+    if (!/^[+\d]+$/.test(trimmed)) return trimmed;
+    return sanitizePhoneForStorage(trimmed);
 }

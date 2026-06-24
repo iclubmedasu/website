@@ -1,6 +1,87 @@
+@import "tailwindcss";
+@import "../components/form/form.css";
+@import "../components/cards/event-card.css";
+@import "../components/registration/registration.css";
+@import "../components/layout/layout.css";
+@import "../components/layout/footer.css";
+@import "../components/navigation/back-link.css";
+@import "../components/ui/ui.css";
+@import "../components/home/rubiks-cube.css";
+
+@theme {
+  --color-purple-900: #561789;
+  --color-purple-800: #662f91;
+  --color-purple-700: #7a47a3;
+  --color-purple-600: #9063b3;
+  --color-purple-500: #af8fc8;
+  --color-purple-400: #c4b0d8;
+  --color-purple-300: #d6c8e5;
+  --color-purple-50: #f5f3ff;
+
+  --font-heading: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  --font-body: ui-sans-serif, system-ui, sans-serif;
+}
+
 :root {
-  --background: #eef4fb;
-  --foreground: #10263f;
+  --purple-900: #561789;
+  --purple-800: #662f91;
+  --purple-700: #7a47a3;
+  --purple-600: #9063b3;
+  --purple-500: #af8fc8;
+  --purple-400: #c4b0d8;
+  --purple-300: #d6c8e5;
+  --purple-50: #f5f3ff;
+
+  --gray-50: #fafafa;
+  --gray-100: #f5f5f5;
+  --gray-80: #e5e5e5;
+  --gray-300: #d4d4d4;
+  --gray-400: #a3a3a3;
+  --gray-500: #737373;
+  --gray-600: #525252;
+  --gray-700: #404040;
+  --gray-800: #262626;
+  --gray-900: #171717;
+
+  --bg-subtle: #f8f7f9;
+  --bg-card: #ffffff;
+  --background: #f8f7fc;
+  --foreground: #1a1230;
+
+  --surface-plain: #ffffff;
+  --surface-subtle: #f8f7fc;
+  --surface-tint: #f3f0f8;
+  --surface-band: linear-gradient(135deg, var(--purple-900) 0%, var(--purple-800) 55%, var(--purple-700) 100%);
+
+  --section-py: 4.5rem;
+  --section-py-sm: 3rem;
+
+  --gradient-primary: linear-gradient(135deg, var(--purple-900) 0%, var(--purple-800) 100%);
+  --gradient-secondary: linear-gradient(135deg, var(--purple-800) 0%, var(--purple-700) 100%);
+
+  --success-bg: #dcfce7;
+  --success-text: #166534;
+  --success-border: #10c55e;
+  --error-bg: #fef2f2;
+  --error-text: #991b1b;
+  --error-border: #fecaca;
+  --info-bg: #eff6ff;
+  --info-text: #1d4ed8;
+  --info-border: #bfdbfe;
+
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 8px;
+  --radius-xl: 24px;
+
+  --shadow-sm: 0 1px 2px 0 rgba(86, 11, 137, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(86, 11, 137, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(86, 11, 137, 0.1);
+  --shadow-xl: 0 8px 25px -5px rgba(86, 11, 137, 0.15);
+  --shadow-focus: 0 0 0 3px rgba(110, 71, 163, 0.1);
+  --shadow-focus-error: 0 0 0 3px rgba(153, 27, 27, 0.1);
+
+  --site-header-height: 4.5625rem;
 }
 
 html {
@@ -17,18 +98,98 @@ body {
   min-height: 100%;
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-geist-sans), sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 * {
   box-sizing: border-box;
-  padding: 0;
-  margin: 0;
 }
 
 a {
   color: inherit;
   text-decoration: none;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading);
+}
+
+.gradient-text {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.gradient-bar {
+  background: var(--gradient-primary);
+}
+
+.btn-primary,
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: var(--gradient-secondary);
+  color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--purple-900);
+  border: 1px solid var(--purple-300);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--purple-50);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.empty-state {
+  border: 1px dashed var(--purple-300);
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius-xl);
+  padding: 2rem;
+  text-align: center;
+}
+
+.empty-state-title {
+  font-family: var(--font-heading);
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--purple-900);
+}
+
+.empty-state-text {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--gray-600);
 }

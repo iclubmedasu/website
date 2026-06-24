@@ -9,6 +9,7 @@ import type {
     CheckEmailResponse,
     CheckStudentIdResponse,
 } from "../types/backend-contracts";
+import { sanitizePhoneForStorage } from "@/utils/countryCodes";
 
 type AlumniCode = "ALUMNI_ACCESS";
 
@@ -261,8 +262,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 body: JSON.stringify({
                     studentId: String(studentId).trim(),
                     fullName: fullName.trim(),
-                    phoneNumber: phoneNumber.trim(),
-                    phoneNumber2: phoneNumber2?.trim() || undefined,
+                    phoneNumber: sanitizePhoneForStorage(phoneNumber),
+                    phoneNumber2: phoneNumber2?.trim() ? sanitizePhoneForStorage(phoneNumber2) : undefined,
                     password,
                     email2: email2?.trim() || undefined,
                     email3: email3?.trim() || undefined,
@@ -306,8 +307,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 body: JSON.stringify({
                     identifier: identifier.trim(),
                     fullName: fullName.trim(),
-                    phoneNumber: phoneNumber.trim(),
-                    phoneNumber2: phoneNumber2?.trim() || undefined,
+                    phoneNumber: sanitizePhoneForStorage(phoneNumber),
+                    phoneNumber2: phoneNumber2?.trim() ? sanitizePhoneForStorage(phoneNumber2) : undefined,
                     email2: email2?.trim() || undefined,
                     email3: email3?.trim() || undefined,
                     officerEmail: officerEmail?.trim() || undefined,
@@ -350,8 +351,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 body: JSON.stringify({
                     email: email.trim(),
                     fullName: fullName.trim(),
-                    phoneNumber: phoneNumber.trim(),
-                    phoneNumber2: phoneNumber2?.trim() || undefined,
+                    phoneNumber: sanitizePhoneForStorage(phoneNumber),
+                    phoneNumber2: phoneNumber2?.trim() ? sanitizePhoneForStorage(phoneNumber2) : undefined,
                     email2: email2?.trim() || undefined,
                     email3: email3?.trim() || undefined,
                 }),

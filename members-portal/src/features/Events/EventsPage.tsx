@@ -86,30 +86,41 @@ export default function EventsPage() {
     }, []);
 
     const eventPermissions = useMemo(() => {
-        const isPrivileged = !!(user?.isDeveloper || user?.isAdmin || user?.isOfficer || user?.isLeadership);
+        const isLifecycleRole = !!(user?.isDeveloper || user?.isAdmin || user?.isOfficer || user?.isLeadership);
+        const canViewAllEvents = !!(user?.isDeveloper || user?.isAdmin || user?.isOfficer);
+        const isElevatedWorkItemRole = isLifecycleRole || !!user?.isSpecial;
 
         return {
-            isPrivileged,
-            canCreateEvent: isPrivileged && !!user?.id,
+            isLifecycleRole,
+            canViewAllEvents,
+            isElevatedWorkItemRole,
+            canCreateEvent: isLifecycleRole && !!user?.id,
             canEditEvent: (event: EventSummary | EventDetail) => (
-                isPrivileged
+                isLifecycleRole
                 && !!event?.isActive
                 && !event?.isFinalized
                 && !event?.isArchived
                 && event?.status !== 'CANCELLED'
             ),
-            canManageEvent: () => isPrivileged,
+            canManageEvent: () => isLifecycleRole,
+            canManageTiers: isElevatedWorkItemRole,
+            canManageTasks: isElevatedWorkItemRole,
+            canManageFields: true,
+            canManageRegistrations: true,
+            canManageTickets: true,
             canUploadToEvent: () => !!user?.id,
+            canPublishEvent: isElevatedWorkItemRole,
+            canRemoveAttendance: isElevatedWorkItemRole,
         };
-    }, [user?.id, user?.isAdmin, user?.isDeveloper, user?.isLeadership, user?.isOfficer]);
+    }, [user?.id, user?.isAdmin, user?.isDeveloper, user?.isLeadership, user?.isOfficer, user?.isSpecial]);
 
     const canCreateEvent = eventPermissions.canCreateEvent;
 
     const filters = useMemo(() => ({
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
-        scope: eventPermissions.canManageEvent() ? 'all' as const : 'published' as const,
-    }), [dateFrom, dateTo, eventPermissions]);
+        scope: eventPermissions.canViewAllEvents ? 'all' as const : undefined,
+    }), [dateFrom, dateTo, eventPermissions.canViewAllEvents]);
 
     const loadEvents = useCallback(async (options?: { silent?: boolean }) => {
         if (!options?.silent) {
@@ -195,6 +206,16 @@ export default function EventsPage() {
             /* swallow */
         }
     }, [expandedEventId, loadEvents]);
+
+    const handlePublishedChange = useCallback(async (eventId: Id, published: boolean) => {
+        const updated = await eventsAPI.setPublished(eventId, published);
+        setEvents((current) => current.map((item) => (
+            String(item.id) === String(updated.id) ? { ...item, isPublished: updated.isPublished } : item
+        )));
+        if (expandedEventId != null && String(expandedEventId) === String(updated.id)) {
+            setExpandedEventDetail(updated);
+        }
+    }, [expandedEventId]);
 
     const handleLifecycleRefresh = useCallback(() => {
         void loadEvents({ silent: true });
@@ -379,6 +400,12 @@ export default function EventsPage() {
                                 canEdit={eventPermissions.canEditEvent(event)}
                                 canManage={eventPermissions.canManageEvent()}
                                 canUpload={eventPermissions.canUploadToEvent()}
+                                canManageTiers={eventPermissions.canManageTiers}
+                                canManageTasks={eventPermissions.canManageTasks}
+                                canManageFields={eventPermissions.canManageFields}
+                                canPublishEvent={eventPermissions.canPublishEvent}
+                                canRemoveAttendance={eventPermissions.canRemoveAttendance}
+                                onPublishedChange={handlePublishedChange}
                                 onToggle={handleToggleExpand}
                                 onEdit={(target) => setEditingEvent(target as EventDetail)}
                                 onDeactivate={setHoldingEvent}
@@ -458,6 +485,12 @@ export default function EventsPage() {
                     canEdit={eventPermissions.canEditEvent(expandedEventSummary)}
                     canManage={eventPermissions.canManageEvent()}
                     canUpload={eventPermissions.canUploadToEvent()}
+                    canManageTiers={eventPermissions.canManageTiers}
+                    canManageTasks={eventPermissions.canManageTasks}
+                    canManageFields={eventPermissions.canManageFields}
+                    canPublishEvent={eventPermissions.canPublishEvent}
+                    canRemoveAttendance={eventPermissions.canRemoveAttendance}
+                    onPublishedChange={handlePublishedChange}
                     onToggle={handleToggleExpand}
                     onEdit={(target) => setEditingEvent(target as EventDetail)}
                     onDeactivate={setHoldingEvent}

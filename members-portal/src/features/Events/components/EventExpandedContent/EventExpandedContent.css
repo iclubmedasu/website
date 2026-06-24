@@ -339,6 +339,32 @@
     background: var(--gray-50);
 }
 
+.event-expanded-list-item--editing {
+    flex-direction: column;
+    align-items: stretch;
+    background: var(--gray-50);
+}
+
+.event-expanded-edit-actions {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 0.75rem;
+}
+
+.event-expanded-tier-actions {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.event-expanded-tier-actions .btn {
+    flex: 1;
+    min-width: 0;
+}
+
 .event-expanded-muted {
     margin: 0;
     color: var(--gray-600);
@@ -368,6 +394,34 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+}
+
+.event-expanded-publish-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin-left: auto;
+}
+
+.event-expanded-publish-toggle-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary, #64748b);
+    white-space: nowrap;
+}
+
+.event-expanded-tier-public-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-right: 0.25rem;
+}
+
+.event-expanded-tier-public-toggle-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-secondary, #64748b);
+    white-space: nowrap;
 }
 
 /* Registrations table — custom column headers */
@@ -582,6 +636,27 @@
     font-size: 0.75rem;
     font-weight: 500;
     white-space: nowrap;
+}
+
+.event-attendance-day-chip--removable {
+    gap: 0.25rem;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font: inherit;
+}
+
+.event-attendance-day-chip--removable:hover,
+.event-attendance-day-chip--removable:focus-visible {
+    background: rgba(220, 38, 38, 0.1);
+    border-color: rgba(220, 38, 38, 0.25);
+    color: #b91c1c;
+    outline: none;
+}
+
+.event-attendance-day-chip__remove {
+    font-size: 0.875rem;
+    line-height: 1;
+    opacity: 0.75;
 }
 
 .event-registrations-table-shell {

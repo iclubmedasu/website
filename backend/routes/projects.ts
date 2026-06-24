@@ -211,7 +211,7 @@ function buildTaskHierarchyInclude(depth = 0) {
 async function getProjectById(projectId) {
     return prisma.project.findUnique({
         where: { id: projectId },
-        select: { id: true, isActive: true, isFinalized: true, isArchived: true, status: true },
+        select: { id: true, title: true, isActive: true, isFinalized: true, isArchived: true, isDisclosed: true, status: true },
     });
 }
 
@@ -732,6 +732,7 @@ router.patch('/:id/finalize', async (req, res) => {
                 isFinalized: true,
                 isActive: true,
                 isArchived: false,
+                isDisclosed: false,
                 status: 'COMPLETED',
                 completedDate: new Date(),
             },
@@ -942,6 +943,7 @@ router.patch('/:id/publish', async (req, res) => {
                 isActive: true,
                 isFinalized: false,
                 isArchived: false,
+                isDisclosed: false,
                 status: 'NOT_STARTED',
                 completedDate: null,
             },
@@ -972,6 +974,53 @@ router.patch('/:id/publish', async (req, res) => {
     } catch (error) {
         console.error('PATCH /projects/:id/publish', error);
         res.status(500).json({ error: 'Failed to publish project' });
+    }
+});
+
+// ============================================
+// PATCH /api/projects/:id/disclose  –  show/hide archived project on public website
+// ============================================
+router.patch('/:id/disclose', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ error: 'Invalid project ID' });
+        if (!canUserManageProject(req)) {
+            return res.status(403).json({ error: 'Only developer, officer, administration and leadership can disclose projects' });
+        }
+
+        const disclosed = req.body?.disclosed;
+        if (typeof disclosed !== 'boolean') {
+            return res.status(400).json({ error: 'disclosed must be a boolean' });
+        }
+
+        const current = await getProjectById(id);
+        if (!current) return res.status(404).json({ error: 'Project not found' });
+        if (!current.isArchived) {
+            return res.status(400).json({ error: 'Only archived projects can be disclosed on the public website' });
+        }
+
+        const project = await prisma.project.update({
+            where: { id },
+            data: { isDisclosed: disclosed },
+            include: buildProjectInclude(),
+        });
+
+        await logProjectActivity({
+            projectId: id,
+            memberId: req.user.memberId,
+            actionType: disclosed ? 'DISCLOSED' : 'UNDISCLOSED',
+            entityType: 'PROJECT',
+            oldValue: { isDisclosed: current.isDisclosed },
+            newValue: { isDisclosed: disclosed },
+            description: disclosed
+                ? `Project "${current.title}" disclosed on the public website`
+                : `Project "${current.title}" hidden from the public website`,
+        });
+
+        res.json(project);
+    } catch (error) {
+        console.error('PATCH /projects/:id/disclose', error);
+        res.status(500).json({ error: 'Failed to update project disclosure' });
     }
 });
 

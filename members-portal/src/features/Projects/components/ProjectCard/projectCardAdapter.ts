@@ -15,6 +15,7 @@ export function projectToCardViewModel(project: ProjectSummary | ProjectDetail |
         isActive: source.isActive,
         isFinalized: source.isFinalized,
         isArchived: source.isArchived,
+        isDisclosed: source.isDisclosed,
         projectType: source.projectType,
         projectTeams: source.projectTeams,
         createdBy: source.createdBy ?? null,

@@ -1,38 +1,12 @@
 ﻿'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Calendar, Briefcase, MapPin, MessageCircle } from 'lucide-react';
-import { roleHistoryAPI, membersAPI, getProfilePhotoUrl } from '../../../../services/api';
-import { normalizePhoneDisplay } from '../../../../utils/countryCodes';
+import { useRouter } from 'next/navigation';
+import { X } from 'lucide-react';
+import { membersAPI, getProfilePhotoUrl } from '../../../../services/api';
+import { MemberRoleHistory } from '@/components/MemberRoleHistory/MemberRoleHistory';
+import type { MemberPublicProfile } from '@iclub/shared';
 import type { Id } from '../../../../types/backend-contracts';
-
-interface MemberDetails {
-    id: Id;
-    fullName: string;
-    email?: string | null;
-    phoneNumber?: string | null;
-    phoneNumber2?: string | null;
-    studentId?: number | null;
-    joinDate?: string | null;
-    profilePhotoUrl?: string | null;
-}
-
-interface RoleHistoryPeriod {
-    start: string;
-    end?: string | null;
-    duration?: number | 'Ongoing' | null;
-}
-
-interface RoleHistoryEntry {
-    id: Id;
-    changeType: string;
-    roleName?: string | null;
-    teamName?: string | null;
-    subteamName?: string | null;
-    changeReason?: string | null;
-    notes?: string | null;
-    period: RoleHistoryPeriod;
-}
 
 interface ViewMemberModalProps {
     isOpen: boolean;
@@ -47,9 +21,20 @@ function getErrorMessage(error: unknown, fallback: string): string {
     return fallback;
 }
 
+function formatDate(date: string | null | undefined): string {
+    if (!date) return '—';
+    const parsedDate = new Date(date);
+    if (Number.isNaN(parsedDate.getTime())) return '—';
+    return parsedDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    });
+}
+
 const ViewMemberModal = ({ isOpen, onClose, memberId }: ViewMemberModalProps) => {
-    const [member, setMember] = useState<MemberDetails | null>(null);
-    const [roleHistory, setRoleHistory] = useState<RoleHistoryEntry[]>([]);
+    const router = useRouter();
+    const [profile, setProfile] = useState<MemberPublicProfile | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -66,12 +51,8 @@ const ViewMemberModal = ({ isOpen, onClose, memberId }: ViewMemberModalProps) =>
         try {
             setIsLoading(true);
             setError('');
-
-            const memberData = await membersAPI.getById(memberId);
-            setMember(memberData as MemberDetails);
-
-            const historyData = await roleHistoryAPI.getMemberTimeline(memberId);
-            setRoleHistory(Array.isArray(historyData) ? (historyData as RoleHistoryEntry[]) : []);
+            const data = await membersAPI.getProfile(memberId);
+            setProfile(data as MemberPublicProfile);
         } catch (err: unknown) {
             setError(getErrorMessage(err, 'Failed to load member data'));
             console.error(err);
@@ -80,50 +61,10 @@ const ViewMemberModal = ({ isOpen, onClose, memberId }: ViewMemberModalProps) =>
         }
     };
 
-    const getChangeTypeColor = (changeType: string): string => {
-        const colors: Record<string, string> = {
-            New: 'change-type-new',
-            Promotion: 'change-type-promotion',
-            Demotion: 'change-type-demotion',
-            Transfer: 'change-type-transfer',
-            Resignation: 'change-type-resignation',
-            Expelled: 'change-type-expelled',
-            Graduated: 'change-type-graduated',
-        };
-        return colors[changeType] || 'change-type-default';
-    };
-
-    const formatDate = (date: string | null | undefined): string => {
-        if (!date) return '—';
-
-        const parsedDate = new Date(date);
-        if (Number.isNaN(parsedDate.getTime())) {
-            return '—';
-        }
-
-        return parsedDate.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
-    };
-
-    const getTimelineLineClass = (items: RoleHistoryEntry[]): string => {
-        if (!Array.isArray(items) || items.length < 2) return 'timeline-line--ascending';
-
-        const firstStart = new Date(items[0]?.period?.start).getTime();
-        const lastStart = new Date(items[items.length - 1]?.period?.start).getTime();
-
-        if (Number.isNaN(firstStart) || Number.isNaN(lastStart)) return 'timeline-line--ascending';
-        return firstStart <= lastStart ? 'timeline-line--ascending' : 'timeline-line--descending';
-    };
-
-    const getDurationText = (duration: RoleHistoryPeriod['duration']): string => {
-        if (duration === 'Ongoing') return 'Ongoing';
-        if (duration === 0) return 'Less than a day';
-        if (duration === 1) return '1 day';
-        if (typeof duration === 'number') return `${duration} days`;
-        return '—';
+    const handleViewFullProfile = () => {
+        if (memberId == null) return;
+        onClose();
+        router.push(`/members/${memberId}`);
     };
 
     if (!isOpen) return null;
@@ -149,116 +90,47 @@ const ViewMemberModal = ({ isOpen, onClose, memberId }: ViewMemberModalProps) =>
                         <div className="error-state">
                             <p className="error-message">{error}</p>
                         </div>
-                    ) : member ? (
+                    ) : profile ? (
                         <>
                             <div className="member-info-card">
                                 <div className="member-avatar">
-                                    {member.profilePhotoUrl ? (
-                                        <img src={getProfilePhotoUrl(member.id) ?? undefined} alt={member.fullName} />
+                                    {profile.profilePhotoUrl ? (
+                                        <img src={getProfilePhotoUrl(profile.id) ?? undefined} alt={profile.fullName} />
                                     ) : (
                                         <div className="avatar-placeholder">
-                                            {(member.fullName || 'U').charAt(0).toUpperCase()}
+                                            {(profile.fullName || 'U').charAt(0).toUpperCase()}
                                         </div>
                                     )}
                                 </div>
 
                                 <div className="member-info-details">
-                                    <h3 className="member-name">{member.fullName}</h3>
-                                    <p className="member-email">{member.email || 'N/A'}</p>
-                                    <p className="member-phone">{normalizePhoneDisplay(member.phoneNumber) || 'N/A'}</p>
-                                    {member.phoneNumber2 && <p className="member-phone">{normalizePhoneDisplay(member.phoneNumber2)}</p>}
-                                    <p className="member-student-id">ID: {member.studentId ?? 'N/A'}</p>
+                                    <h3 className="member-name">{profile.fullName}</h3>
+                                    <p className="member-email">{profile.email || 'N/A'}</p>
                                     <p className="member-join-date">
-                                        Joined: {formatDate(member.joinDate)}
+                                        Joined: {formatDate(profile.joinDate)}
                                     </p>
                                 </div>
                             </div>
 
                             <div className="timeline-section">
                                 <h4 className="timeline-title">Role History</h4>
-
-                                {roleHistory.length > 0 ? (
-                                    (() => {
-                                        const timelineLineClass = getTimelineLineClass(roleHistory);
-                                        return (
-                                            <div className="vertical-timeline">
-                                                {roleHistory.map((entry, index) => (
-                                                    <div key={entry.id} className="timeline-item">
-                                                        <div className="timeline-marker">
-                                                            <div className={`timeline-dot ${getChangeTypeColor(entry.changeType)}`} />
-                                                            {index < roleHistory.length - 1 && (
-                                                                <div className={`timeline-line ${timelineLineClass}`} />
-                                                            )}
-                                                        </div>
-
-                                                        <div className="timeline-content">
-                                                            <div className="timeline-header">
-                                                                <span className={`change-type-badge ${getChangeTypeColor(entry.changeType)}`}>
-                                                                    {entry.changeType}
-                                                                </span>
-                                                                <span className="timeline-date">
-                                                                    {formatDate(entry.period.start)}
-                                                                </span>
-                                                            </div>
-
-                                                            <div className="role-info">
-                                                                <div className="role-item">
-                                                                    <Briefcase size={14} />
-                                                                    <span className="role-item-label">Role:</span>
-                                                                    <span className="role-name">{entry.roleName || 'N/A'}</span>
-                                                                </div>
-                                                                <div className="role-item">
-                                                                    <MapPin size={14} />
-                                                                    <span className="role-item-label">Team:</span>
-                                                                    <span className="team-name">{entry.teamName || 'N/A'}</span>
-                                                                </div>
-                                                                {entry.subteamName && (
-                                                                    <div className="role-item">
-                                                                        <Briefcase size={14} />
-                                                                        <span className="role-item-label">Subteam:</span>
-                                                                        <span className="subteam-name">{entry.subteamName}</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-
-                                                            <div className="duration-info">
-                                                                <Calendar size={14} />
-                                                                <span className="duration-text">
-                                                                    {entry.period.end
-                                                                        ? `${formatDate(entry.period.start)} - ${formatDate(entry.period.end)} (${getDurationText(entry.period.duration)})`
-                                                                        : `${formatDate(entry.period.start)} - Ongoing`
-                                                                    }
-                                                                </span>
-                                                            </div>
-
-                                                            {entry.changeReason && (
-                                                                <div className="reason-info">
-                                                                    <MessageCircle size={14} />
-                                                                    <span className="reason-text">{entry.changeReason}</span>
-                                                                </div>
-                                                            )}
-
-                                                            {entry.notes && (
-                                                                <div className="notes-info">
-                                                                    <p className="notes-label">Notes:</p>
-                                                                    <p className="notes-text">{entry.notes}</p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        );
-                                    })()
-                                ) : (
-                                    <div className="empty-state">
-                                        <p>No role history available</p>
-                                    </div>
-                                )}
+                                <MemberRoleHistory
+                                    entries={profile.roleHistory || []}
+                                    emptyTitle="No role history available"
+                                    emptySubtitle=""
+                                />
                             </div>
                         </>
                     ) : null}
                 </div>
+
+                {profile && memberId != null && (
+                    <div className="modal-footer">
+                        <button type="button" className="btn btn-primary" onClick={handleViewFullProfile}>
+                            View full profile
+                        </button>
+                    </div>
+                )}
             </div>
         </>
     );

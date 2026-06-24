@@ -1,0 +1,108 @@
+import type { Metadata } from "next";
+import { CalendarDays, MapPin, Users } from "lucide-react";
+import { notFound } from "next/navigation";
+import { EventDetailActions } from "@/components/events/EventDetailActions";
+import { BackLink } from "@/components/navigation/BackLink";
+import { PageContainer, Badge } from "@/components/ui";
+import { publicAPI } from "@/lib/api";
+import {
+    formatCapacityLabel,
+    formatEventDateRange,
+    formatRegistrationDeadline,
+    formatTierPrice,
+} from "@/lib/customFieldUtils";
+
+interface EventDetailPageProps {
+    params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata({ params }: EventDetailPageProps): Promise<Metadata> {
+    const { id } = await params;
+    const event = await publicAPI.getEvent(Number(id));
+    return {
+        title: event?.title ?? "Event",
+        description: event?.description ?? undefined,
+    };
+}
+
+export default async function EventDetailPage({ params }: EventDetailPageProps) {
+    const { id } = await params;
+    const eventId = Number(id);
+    if (Number.isNaN(eventId)) {
+        notFound();
+    }
+
+    const [event, tiers] = await Promise.all([
+        publicAPI.getEvent(eventId),
+        publicAPI.getEventTiers(eventId),
+    ]);
+
+    if (!event) {
+        notFound();
+    }
+
+    const deadlineLabel = formatRegistrationDeadline(event.registrationDeadline);
+    const capacityLabel = formatCapacityLabel(event.spotsRemaining, event.capacity);
+
+    return (
+        <PageContainer className="space-y-10 py-10 sm:py-14">
+            <BackLink href="/events" label="Back to Events" />
+            <section className="max-w-3xl space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-purple-700">Event</p>
+                    {event.projectType?.name ? (
+                        <Badge variant="purple">{event.projectType.name}</Badge>
+                    ) : null}
+                </div>
+                <h1 className="text-4xl font-bold text-purple-900">{event.title}</h1>
+                {event.description ? (
+                    <p className="text-lg leading-8 text-slate-600">{event.description}</p>
+                ) : null}
+                <div className="flex flex-col gap-3 text-sm text-slate-600">
+                    <p className="inline-flex items-start gap-2">
+                        <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-purple-700" />
+                        {formatEventDateRange(event.eventDate, event.eventEndDate)}
+                    </p>
+                    {event.venue ? (
+                        <p className="inline-flex items-start gap-2">
+                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-purple-700" />
+                            {event.venue}
+                        </p>
+                    ) : null}
+                    <p className="inline-flex items-center gap-2">
+                        <Users className="h-4 w-4 shrink-0 text-purple-700" />
+                        {capacityLabel}
+                    </p>
+                    {deadlineLabel ? <p>Registration deadline: {deadlineLabel}</p> : null}
+                </div>
+                <div className="pt-2">
+                    <EventDetailActions eventId={event.id} registrationOpen={event.registrationOpen} />
+                </div>
+            </section>
+
+            {tiers.length > 0 ? (
+                <section className="space-y-4">
+                    <h2 className="text-2xl font-semibold text-purple-900">Registration Tiers</h2>
+                    <div className="grid gap-4 md:grid-cols-2">
+                        {tiers.map((tier) => {
+                            const priceLabel = formatTierPrice(tier.price, tier.currency);
+                            const tierCapacity = formatCapacityLabel(tier.spotsRemaining, tier.maxCapacity);
+                            return (
+                                <article key={tier.id} className="tier-card">
+                                    <h3 className="tier-card-title">{tier.name}</h3>
+                                    {tier.description ? (
+                                        <p className="tier-card-description">{tier.description}</p>
+                                    ) : null}
+                                    <div className="tier-card-meta">
+                                        <p>Price: {priceLabel}</p>
+                                        <p>{tierCapacity}</p>
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
+                </section>
+            ) : null}
+        </PageContainer>
+    );
+}

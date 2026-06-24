@@ -35,8 +35,7 @@ jobs:
         run: pnpm --filter backend exec prisma generate
 
       - name: Run Prisma migrations
-        working-directory: backend
-        run: npx prisma migrate deploy
+        run: pnpm --filter backend prisma:deploy
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 

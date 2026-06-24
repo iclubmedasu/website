@@ -36,6 +36,7 @@ const registrationFixture = {
     confirmationCode: 'ABC123',
     status: 'REGISTERED',
     event: {
+        id: 42,
         title: 'Summit',
         venue: 'Hall A',
         eventDate: new Date('2026-06-20T10:00:00.000Z'),
@@ -88,6 +89,7 @@ describe('eventTicketEmailService', () => {
 
         expect(payload.subject).toBe('Your ticket for Summit');
         expect(payload.html).toContain('iClub Med-asu · Event Ticket');
+        expect(payload.html).toContain('/events/42/confirmation?code=ABC123');
         expect(payload.html).toContain('Issued for personal use only');
         expect(payload.html).toContain('Present this code or QR code at the event entrance.');
         expect(payload.html).toContain('Jane Doe');

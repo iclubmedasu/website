@@ -13,6 +13,7 @@ const prismaMocks = vi.hoisted(() => ({
     eventRegistrationDayCreate: vi.fn(),
     memberFindFirst: vi.fn(),
     eventTierFindFirst: vi.fn(),
+    eventTierFindMany: vi.fn(),
     transaction: vi.fn(),
 }))
 
@@ -54,6 +55,7 @@ vi.mock('../../db', () => ({
         },
         eventTier: {
             findFirst: prismaMocks.eventTierFindFirst,
+            findMany: prismaMocks.eventTierFindMany,
         },
         $transaction: prismaMocks.transaction,
     },
@@ -98,6 +100,8 @@ const publishedEvent = {
     title: 'Summit',
     status: 'PUBLISHED',
     isActive: true,
+    isArchived: false,
+    isPublished: true,
     allowWalkIns: true,
     eventDate: new Date('2026-06-20T10:00:00.000Z'),
     eventEndDate: new Date('2026-06-24T18:00:00.000Z'),
@@ -117,6 +121,7 @@ describe('event registration deduplication', () => {
         prismaMocks.memberFindFirst.mockResolvedValue(null)
         prismaMocks.eventRegistrationCount.mockResolvedValue(0)
         prismaMocks.eventTierFindFirst.mockResolvedValue(null)
+        prismaMocks.eventTierFindMany.mockResolvedValue([])
         eventCodeMocks.generateUniqueConfirmationCode.mockResolvedValue('ABC123')
         activityMocks.logEventActivity.mockResolvedValue(undefined)
         prismaMocks.transaction.mockImplementation(async (fn: (tx: {
@@ -295,6 +300,25 @@ describe('event registration deduplication', () => {
 
         expect(response.status).toBe(409)
         expect(response.body).toEqual({ error: 'Already registered for this event' })
+        expect(prismaMocks.eventRegistrationCreate).not.toHaveBeenCalled()
+    })
+
+    it('requires a public tier when public tiers exist', async () => {
+        prismaMocks.eventFindUnique.mockResolvedValue(publishedEvent)
+        prismaMocks.eventRegistrationFindFirst.mockResolvedValue(null)
+        prismaMocks.eventTierFindMany.mockResolvedValue([
+            { id: 3, maxCapacity: null },
+        ])
+
+        const response = await request(createApp())
+            .post('/events/10/registrations')
+            .send({
+                fullName: 'Eve',
+                email: 'eve@example.com',
+            })
+
+        expect(response.status).toBe(400)
+        expect(response.body).toEqual({ error: 'A valid registration tier is required' })
         expect(prismaMocks.eventRegistrationCreate).not.toHaveBeenCalled()
     })
 
