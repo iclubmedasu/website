@@ -218,6 +218,9 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0
     devDependencies:
+      '@next/eslint-plugin-next':
+        specifier: ^15.0.0
+        version: 15.5.19
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.39
@@ -230,6 +233,9 @@ importers:
       babel-loader:
         specifier: ^10.1.1
         version: 10.1.1(@babel/core@7.29.0)(webpack@5.105.4)
+      eslint:
+        specifier: ^9
+        version: 9.39.4(jiti@2.7.0)
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
@@ -1292,6 +1298,9 @@ packages:
 
   '@next/env@16.2.2':
     resolution: {integrity: sha512-LqSGz5+xGk9EL/iBDr2yo/CgNQV6cFsNhRR2xhSXYh7B/hb4nePCxlmDvGEKG30NMHDFf0raqSyOZiQrO7BkHQ==}
+
+  '@next/eslint-plugin-next@15.5.19':
+    resolution: {integrity: sha512-Ctwb4qYuMbHN/1oXLlTdMchwG8h8Xzwq+wGZZMgF3o6+uwyBKAI2c96bdOsl+C62PaUD0Jkh+QpNkhUeDlam0Q==}
 
   '@next/eslint-plugin-next@16.2.2':
     resolution: {integrity: sha512-IOPbWzDQ+76AtjZioaCjpIY72xNSDMnarZ2GMQ4wjNLvnJEJHqxQwGFhgnIWLV9klb4g/+amg88Tk5OXVpyLTw==}
@@ -6642,6 +6651,10 @@ snapshots:
   '@next/env@15.5.14': {}
 
   '@next/env@16.2.2': {}
+
+  '@next/eslint-plugin-next@15.5.19':
+    dependencies:
+      fast-glob: 3.3.1
 
   '@next/eslint-plugin-next@16.2.2':
     dependencies:

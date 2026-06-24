@@ -13,6 +13,14 @@ const pwaConfig = withPWA({
     skipWaiting: true,
     // Disable PWA in development — service workers cause confusion
     disable: process.env.NODE_ENV === 'development',
+    // Do not cache/intercept the start URL — server redirects (e.g. / → /login)
+    // produce opaqueredirect responses that break NetworkFirst navigation caching.
+    cacheStartUrl: false,
+    dynamicStartUrl: false,
+    // Serve offline.html only when a navigation truly fails (no network).
+    fallbacks: {
+        document: '/offline.html',
+    },
     // Exclude build artifacts not served at runtime to avoid install failures.
     buildExcludes: [/middleware-manifest\.json$/, /app-build-manifest\.json$/],
     navigateFallbackDenylist: [
@@ -20,6 +28,8 @@ const pwaConfig = withPWA({
         /^\/icons\//,
         /^\/manifest\.json$/,
         /^\/sw\.js$/,
+        /^\/workbox-.*\.js$/,
+        /^\/fallback-.*\.js$/,
         /^\/offline\.html$/,
         /\.(?:png|ico|svg|webp|jpg|jpeg|gif|woff2?)$/i,
     ],
@@ -36,18 +46,6 @@ const pwaConfig = withPWA({
                 },
                 cacheableResponse: {
                     statuses: [0, 200],
-                },
-            },
-        },
-        {
-            // Cache the app shell (HTML pages)
-            urlPattern: /^https?:\/\/[^/]+\/(?!api|_next|favicon\.ico|icons\/|manifest\.json|sw\.js|offline\.html|screenshots\/).*/,
-            handler: 'NetworkFirst',
-            options: {
-                cacheName: 'pages-cache',
-                expiration: {
-                    maxEntries: 20,
-                    maxAgeSeconds: 24 * 60 * 60, // 24 hours
                 },
             },
         },

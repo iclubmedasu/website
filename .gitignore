@@ -41,3 +41,10 @@ common git commands.md
 list of common commands.md
 
 project_structure.txt
+
+# next-pwa generated service worker artifacts (regenerated on each build)
+members-portal/public/sw.js
+members-portal/public/sw.js.map
+members-portal/public/workbox-*.js
+members-portal/public/workbox-*.js.map
+members-portal/public/fallback-*.js
