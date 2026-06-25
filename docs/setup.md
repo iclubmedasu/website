@@ -22,8 +22,10 @@
 6. Set up the database:
    ```
    pnpm --filter backend prisma:migrate
+   pnpm --filter backend seed:site-content
+   pnpm --filter backend seed:support-content
    ```
-   This runs Prisma migrations and automatically enables Row-Level Security on all `public` tables (required for Supabase).
+   This runs Prisma migrations, enables Row-Level Security on all `public` tables (required for Supabase), and seeds default site and support page content.
 7. Start all services:
    ```
    pnpm dev

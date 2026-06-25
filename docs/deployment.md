@@ -13,7 +13,7 @@ This project is deployed using GitHub Actions, with the following services:
 
 ## Deployment Flow
 
-1. **GitHub Actions**: CI/CD pipeline builds and deploys both backend and frontend on push to main.
+1. **GitHub Actions**: CI/CD pipeline builds and deploys the backend, members portal, and public website on push to main.
 2. **Backend**: Deployed as a Hugging Face Space (Docker container). API and health endpoints:
 	- [API](https://iclubmedasu-backend.hf.space/api)
 	- [Health check](https://iclubmedasu-backend.hf.space/health)
@@ -47,11 +47,11 @@ Set these in your backend Hugging Face Space → Settings → Variables and secr
 | GITHUB_USER_DATA_REPO     | e.g. user-data                                   |
 | GITHUB_USER_DATA_TOKEN    | Your GitHub PAT for user data                    |
 | FRONTEND_URL              | https://iclubmedasu-members-portal.hf.space      |
-| FRONTEND_ORIGINS          | Same as above, or comma-separated list if needed |
+| FRONTEND_ORIGINS          | Comma-separated origins, e.g. `https://iclubmedasu-members-portal.hf.space,https://iclubmedasu-public-website.hf.space` (`*.hf.space` is also allowed at runtime) |
 | RESEND_API_KEY            | Resend API key for ticket emails                 |
 | RESEND_FROM_EMAIL         | Verified sender in Resend (not @gmail.com); use your domain e.g. tickets@yourdomain.com |
 | RESEND_REPLY_TO           | Optional reply-to address e.g. asu.medicine.iclub@gmail.com |
-| PUBLIC_WEBSITE_URL        | Base URL for ticket email confirmation links (e.g. https://iclubmedasu-public-website.hf.space or http://localhost:3002 locally) |
+| PUBLIC_WEBSITE_URL        | `https://iclubmedasu-public-website.hf.space` in production (ticket email confirmation links); `http://localhost:3002` locally |
 
 ### Hugging Face Space Settings (Members Portal)
 Set these in the members portal Hugging Face Space → Settings → **Variables** (not Secrets — build-time vars must be Variables).
@@ -118,15 +118,16 @@ The members portal previously deployed to Netlify. If you have not already:
 1. Create a new Supabase project and PostgreSQL database.
 2. Set the `DATABASE_URL` in Hugging Face and local `.env` files.
 3. Run migrations using `prisma migrate deploy`.
-4. The Prisma migration set enables Row-Level Security on every app table so Supabase's public REST API cannot read or modify data directly.
-5. If you need to edit data manually as the project owner, use the Supabase SQL editor or dashboard with a privileged account rather than the public anon API.
+4. The deploy workflow also runs `seed:support-content` after migrations so the support page CMS rows exist in production (migrations create tables only; default notice blocks are seeded separately).
+5. The Prisma migration set enables Row-Level Security on every app table so Supabase's public REST API cannot read or modify data directly.
+6. If you need to edit data manually as the project owner, use the Supabase SQL editor or dashboard with a privileged account rather than the public anon API.
 
 ## Frontend Deployment (Members Portal — Hugging Face Spaces)
 
 1. The members portal (Next.js app) is deployed as a Docker Space: [Live site](https://iclubmedasu-members-portal.hf.space)
 2. Set `NEXT_PUBLIC_API_URL` = `https://iclubmedasu-backend.hf.space/api` in the frontend Space → Settings → Variables
 3. The Dockerfile lives at [`members-portal/Dockerfile`](../members-portal/Dockerfile). CI copies it to the repo root before uploading to the Space.
-4. Next.js runs in `standalone` output mode on port 7860 (required by HF Spaces).
+4. Next.js runs in `standalone` output mode on port 7860 (required by HF Spaces). The runner stage uses `--chown=nextjs:nodejs` so ISR cache writes do not hit `EACCES` at runtime.
 5. Space config is in [`members-portal/README.hf.md`](../members-portal/README.hf.md) (copied to `README.md` during deploy).
 
 ### Post-deploy static asset check (Members Portal)
@@ -143,15 +144,17 @@ If users still see favicon errors after deploy, unregister the old service worke
 1. The public website (Next.js app) is deployed as a Docker Space: [Live site](https://iclubmedasu-public-website.hf.space)
 2. Set `NEXT_PUBLIC_API_URL` = `https://iclubmedasu-backend.hf.space/api` in the Space → Settings → Variables
 3. The Dockerfile lives at [`public-website/Dockerfile`](../public-website/Dockerfile). CI copies it to the repo root before uploading to the Space.
-4. Next.js runs in `standalone` output mode on port 7860 (required by HF Spaces).
+4. Next.js runs in `standalone` output mode on port 7860 (required by HF Spaces). Production builds use `next build --webpack` (Turbopack rejects some PNG assets on HF).
 5. Space config is in [`public-website/README.hf.md`](../public-website/README.hf.md) (copied to `README.md` during deploy).
-6. After first deploy, set backend `PUBLIC_WEBSITE_URL` = `https://iclubmedasu-public-website.hf.space` in the backend HF Space so ticket confirmation emails link to the live site.
+6. Set backend `PUBLIC_WEBSITE_URL` = `https://iclubmedasu-public-website.hf.space` in the backend HF Space so ticket confirmation emails link to the live site.
+7. Binary assets (PNG, etc.) are stored via Xet — see root [`.gitattributes`](../.gitattributes) (`filter=xet`). CI uses `huggingface_hub[hf_xet]` when uploading to Spaces.
 
 ### Post-deploy static asset check (Public Website)
 
-Verify these return HTTP 200:
+Verify these return HTTP 200 with real image bytes (not a short Git LFS pointer body):
 
 - `https://iclubmedasu-public-website.hf.space/favicon.ico`
+- Footer logos are bundled from `src/assets` at build time; after deploy, open the live site footer on a phone-sized viewport and confirm both iClub and iHub logos render.
 
 ## Local Docker Testing
 
@@ -189,4 +192,5 @@ docker build -f public-website/Dockerfile \
 - [ ] API health endpoint returns 200 ([check here](https://iclubmedasu-backend.hf.space/health))
 - [ ] Members portal loads ([check here](https://iclubmedasu-members-portal.hf.space))
 - [ ] Public website loads ([check here](https://iclubmedasu-public-website.hf.space))
+- [ ] Backend `PUBLIC_WEBSITE_URL` set to `https://iclubmedasu-public-website.hf.space` on the backend HF Space
 - [ ] Login works (cookie set, API calls succeed, no CORS errors)

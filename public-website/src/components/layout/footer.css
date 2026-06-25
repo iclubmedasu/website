@@ -97,7 +97,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+    max-width: 100%;
 }
 
 .brand-logos-slot {
@@ -105,6 +107,9 @@
     align-items: center;
     justify-content: center;
     height: 2rem;
+    min-width: 0;
+    overflow: hidden;
+    flex-shrink: 1;
 }
 
 .brand-logos-slot--iclub {
@@ -116,8 +121,10 @@
 }
 
 .brand-logos-image {
+    display: block;
     height: 100%;
-    width: 100%;
+    width: auto;
+    max-width: 100%;
     object-fit: contain;
     object-position: center;
 }
@@ -139,6 +146,10 @@
 }
 
 @media (min-width: 640px) {
+    .brand-logos {
+        gap: 2rem;
+    }
+
     .brand-logos-slot {
         height: 2.25rem;
     }

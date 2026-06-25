@@ -39,6 +39,11 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      - name: Seed support content
+        run: pnpm --filter backend seed:support-content
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
   # ─────────────────────────────────────────────────────────────
   # JOB 2 — Upload to Hugging Face Space
   # Uses huggingface_hub with Xet support — handles binary files
