@@ -268,6 +268,21 @@ jobs:
           echo "Workspace cleaned. Remaining files:"
           find . -not -path "./.git/*" -type f | head -50
 
+      - name: Materialize public website image assets
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' path; do
+            git show "HEAD:${path}" > "${path}"
+          done < <(find public-website/public/images -type f -name '*.png' -print0)
+          python3 - <<'PY'
+          import pathlib
+
+          for path in sorted(pathlib.Path("public-website/public/images").glob("*.png")):
+              if path.read_bytes()[:4] != b"\x89PNG":
+                  raise SystemExit(f"{path} is not a valid PNG after materialization")
+          print("Public website logo PNGs materialized.")
+          PY
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

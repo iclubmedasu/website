@@ -147,14 +147,15 @@ If users still see favicon errors after deploy, unregister the old service worke
 4. Next.js runs in `standalone` output mode on port 7860 (required by HF Spaces). Production builds use `next build --webpack` (Turbopack rejects some PNG assets on HF).
 5. Space config is in [`public-website/README.hf.md`](../public-website/README.hf.md) (copied to `README.md` during deploy).
 6. Set backend `PUBLIC_WEBSITE_URL` = `https://iclubmedasu-public-website.hf.space` in the backend HF Space so ticket confirmation emails link to the live site.
-7. Binary assets (PNG, etc.) are stored via Xet — see root [`.gitattributes`](../.gitattributes) (`filter=xet`). CI uses `huggingface_hub[hf_xet]` when uploading to Spaces.
+7. Binary assets (PNG, etc.) are stored via Xet — see root [`.gitattributes`](../.gitattributes) (`filter=xet`). CI uses `huggingface_hub[hf_xet]` when uploading to Spaces. The public-website deploy job materializes `public/images/*.png` from git blobs with `git show` before upload so HF Docker builds receive real PNG bytes (not pointer stubs).
 
 ### Post-deploy static asset check (Public Website)
 
-Verify these return HTTP 200 with real image bytes (not a short Git LFS pointer body):
+Verify these return HTTP 200 with real PNG bytes (Content-Length well over 1 KB, not ~131-byte pointer stubs):
 
 - `https://iclubmedasu-public-website.hf.space/favicon.ico`
-- Footer logos are bundled from `src/assets` at build time; after deploy, open the live site footer on a phone-sized viewport and confirm both iClub and iHub logos render.
+- `https://iclubmedasu-public-website.hf.space/images/iclub_full_colored_transparent_outlined_logo.png`
+- `https://iclubmedasu-public-website.hf.space/images/ihub_full_colored_transparent_logo_outlined.png`
 
 ## Local Docker Testing
 

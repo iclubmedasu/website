@@ -29,10 +29,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
-# Materialize footer logos from src/assets so /public/images is not relied on at runtime
-# (large PNGs can end up as pointer stubs in the HF upload context).
-RUN cp -f public-website/src/assets/iclub_full_colored_transparent_outlined_logo.png public-website/public/images/ \
-    && cp -f public-website/src/assets/ihub_full_colored_transparent_logo_outlined.png public-website/public/images/
+# Fail fast if footer logos were uploaded as Xet/LFS pointer stubs instead of real PNGs.
+RUN node -e "const fs=require('fs'); for (const p of ['public-website/public/images/iclub_full_colored_transparent_outlined_logo.png','public-website/public/images/ihub_full_colored_transparent_logo_outlined.png']) { const b=fs.readFileSync(p); if (b.length<8||b[0]!==0x89||b[1]!==0x50) throw new Error(p+' is not a PNG ('+b.length+' bytes)'); }"
 
 RUN pnpm --filter @iclub/shared build
 RUN pnpm --filter public-website build
