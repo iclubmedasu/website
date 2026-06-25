@@ -1,4 +1,4 @@
-import type { Id, ISODateTime } from './member';
+import type { Id } from './member';
 
 export type RealtimeResourceType = 'event' | 'project';
 

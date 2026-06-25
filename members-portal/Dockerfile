@@ -9,12 +9,10 @@ RUN npm install -g pnpm
 # Dependencies stage
 FROM base AS deps
 WORKDIR /app
-COPY pnpm-workspace.yaml ./
+COPY members-portal/pnpm-workspace.docker.yaml ./pnpm-workspace.yaml
 COPY package.json ./
 COPY pnpm-lock.yaml ./
 COPY members-portal/package.json ./members-portal/
-COPY backend/package.json ./backend/
-COPY public-website/package.json ./public-website/
 COPY packages/shared/package.json ./packages/shared/
 RUN pnpm install --frozen-lockfile --filter members-portal...
 

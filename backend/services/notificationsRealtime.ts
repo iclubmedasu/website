@@ -1,7 +1,7 @@
 import type { IncomingMessage } from 'http';
 import type { Duplex } from 'stream';
 import jwt from 'jsonwebtoken';
-import { WebSocketServer, WebSocket } from 'ws';
+import { WebSocketServer, WebSocket, type RawData } from 'ws';
 import { JWT_SECRET, extractAuthToken } from '../middleware/auth';
 import type { NotificationEventType, NotificationRealtimeMessage, RealtimeSubscribeMessage } from '../types/contracts';
 import type { RequestUser } from '../types/auth';
@@ -107,7 +107,7 @@ export function publishToTopic(topic: string, message: NotificationRealtimeMessa
     }
 }
 
-function handleSocketMessage(socket: WebSocket, raw: WebSocket.RawData): void {
+function handleSocketMessage(socket: WebSocket, raw: RawData): void {
     try {
         const payload = JSON.parse(String(raw)) as RealtimeSubscribeMessage;
         if (payload.action === 'subscribe') {

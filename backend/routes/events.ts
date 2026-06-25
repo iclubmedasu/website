@@ -2346,7 +2346,8 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
                 : null;
 
         if (!registration) return res.status(404).json({ error: 'Registration not found' });
-        if (registration.status === 'CANCELLED') {
+        const activeRegistration = registration;
+        if (activeRegistration.status === 'CANCELLED') {
             return res.status(409).json({ error: 'Registration has been cancelled' });
         }
 
@@ -2357,14 +2358,14 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
             return res.status(409).json({ error: 'Check-in is only available on event days' });
         }
 
-        if (hasAttendanceOnDay(registration.attendanceDays ?? [], resolvedDay.eventDay)) {
+        if (hasAttendanceOnDay(activeRegistration.attendanceDays ?? [], resolvedDay.eventDay)) {
             return res.status(409).json({ error: 'Already checked in for this day' });
         }
 
         const customFieldPatch = req.body?.customFieldValues;
         const mergedCustomFieldValues = customFieldPatch !== undefined
-            ? mergeCustomFieldValues(registration.customFieldValues, customFieldPatch)
-            : mergeCustomFieldValues(registration.customFieldValues, {});
+            ? mergeCustomFieldValues(activeRegistration.customFieldValues, customFieldPatch)
+            : mergeCustomFieldValues(activeRegistration.customFieldValues, {});
 
         const requiredFields = await getActiveCustomFields(eventId);
         const missingRequiredFields = getMissingRequiredCustomFieldsFromValues(requiredFields, mergedCustomFieldValues);
@@ -2379,24 +2380,24 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
         const updated = await prisma.$transaction(async (tx) => {
             await tx.eventRegistrationDay.create({
                 data: {
-                    registrationId: registration.id,
+                    registrationId: activeRegistration.id,
                     eventDay: resolvedDay.eventDayDate,
                     checkedInAt,
                 },
             });
 
             if (customFieldPatch !== undefined) {
-                await mergeRegistrationCustomFieldValues(registration.id, customFieldPatch, {
+                await mergeRegistrationCustomFieldValues(activeRegistration.id, customFieldPatch, {
                     tx,
                     incrementVersion: false,
                 });
             }
 
             return tx.eventRegistration.update({
-                where: { id: registration.id },
+                where: { id: activeRegistration.id },
                 data: {
                     status: 'CHECKED_IN',
-                    ...(registration.status !== 'CHECKED_IN' ? { checkedInAt } : {}),
+                    ...(activeRegistration.status !== 'CHECKED_IN' ? { checkedInAt } : {}),
                     version: { increment: 1 },
                 },
                 include: registrationInclude,
@@ -2765,8 +2766,10 @@ router.patch('/:id/registrations/:registrationId', authenticateToken, async (req
                 fullName: req.body?.fullName !== undefined ? String(req.body.fullName).trim() : existing.fullName,
                 email: req.body?.email !== undefined ? String(req.body.email).trim().toLowerCase() : existing.email,
                 phoneNumber: req.body?.phoneNumber !== undefined ? String(req.body.phoneNumber).trim() || null : existing.phoneNumber,
-                tierId: req.body?.tierId !== undefined ? nextTierId : existing.tierId,
                 notes: req.body?.notes !== undefined ? String(req.body.notes).trim() || null : existing.notes,
+                ...(req.body?.tierId !== undefined
+                    ? { tier: nextTierId ? { connect: { id: nextTierId } } : { disconnect: true } }
+                    : {}),
             };
 
             const scalarResult = await updateEventRegistrationOptimistic(
