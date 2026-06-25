@@ -15,6 +15,9 @@ RUN pnpm install --frozen-lockfile --filter backend...
 COPY backend ./backend
 COPY packages/shared ./packages/shared
 
+WORKDIR /app/packages/shared
+RUN pnpm exec tsc -p tsconfig.json
+
 WORKDIR /app/backend
 RUN pnpm exec prisma generate
 RUN pnpm run build

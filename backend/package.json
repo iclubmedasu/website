@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon --watch . --ext ts,js --exec tsx server.ts",
     "tsc": "tsc -p tsconfig.json",
-    "build": "tsc -p tsconfig.json",
+    "build": "pnpm --filter @iclub/shared build && tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "start": "node -e \"process.env.PORT = process.env.PORT || '8080'; require('./dist/server.js');\"",
     "test": "vitest run --config ./vitest.config.ts",

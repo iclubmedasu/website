@@ -2,9 +2,18 @@
     "name": "@iclub/shared",
     "version": "0.1.0",
     "private": true,
-    "main": "./src/types/index.ts",
-    "types": "./src/types/index.ts",
+    "main": "./dist/types/index.js",
+    "types": "./dist/types/index.d.ts",
     "exports": {
-        ".": "./src/types/index.ts"
+        ".": {
+            "types": "./dist/types/index.d.ts",
+            "default": "./dist/types/index.js"
+        }
+    },
+    "scripts": {
+        "build": "tsc -p tsconfig.json"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0"
     }
 }
