@@ -47,13 +47,13 @@ export function useResourceChannel({
         return realtime.subscribe(topic, (message: NotificationRealtimeMessage) => {
             if (message.type !== 'resource.changed') return;
             const actorId = message.actorMemberId != null ? String(message.actorMemberId) : null;
-            const currentMemberId = user?.memberId != null ? String(user.memberId) : null;
+            const currentMemberId = user?.id != null ? String(user.id) : null;
             if (actorId && currentMemberId && actorId === currentMemberId) {
                 return;
             }
             scheduleRefresh();
         });
-    }, [enabled, realtime, resource, resourceId, scheduleRefresh, user?.memberId]);
+    }, [enabled, realtime, resource, resourceId, scheduleRefresh, user?.id]);
 
     useEffect(() => {
         if (!enabled || resourceId == null || resourceId === '') return;

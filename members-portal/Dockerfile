@@ -25,6 +25,9 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+WORKDIR /app/packages/shared
+RUN pnpm exec tsc -p tsconfig.json
+WORKDIR /app
 RUN pnpm --filter members-portal build
 
 # Production stage
