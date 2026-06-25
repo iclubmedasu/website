@@ -14,7 +14,7 @@ COPY package.json ./
 COPY pnpm-lock.yaml ./
 COPY members-portal/package.json ./members-portal/
 COPY packages/shared/package.json ./packages/shared/
-RUN pnpm install --frozen-lockfile --filter members-portal...
+RUN pnpm install --frozen-lockfile --filter members-portal... --filter @iclub/shared
 
 # Build stage
 FROM base AS builder
@@ -25,9 +25,7 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-WORKDIR /app/packages/shared
-RUN pnpm exec tsc -p tsconfig.json
-WORKDIR /app
+RUN pnpm --filter @iclub/shared build
 RUN pnpm --filter members-portal build
 
 # Production stage
