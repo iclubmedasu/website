@@ -82,6 +82,7 @@ export interface EventRegistrationRef {
     reminderEmailSentAt?: ISODateTime | null;
     createdAt?: ISODateTime;
     updatedAt?: ISODateTime;
+    version?: number;
     tier?: EventTierRef | null;
     member?: MemberSummary | null;
     attendanceDays?: EventAttendanceDayRef[];
@@ -246,6 +247,7 @@ export interface UpdateEventRegistrationPayload {
     tierId?: Id | string | null;
     notes?: string | null;
     customFieldValues?: Record<string, unknown> | unknown;
+    version?: number;
 }
 
 export interface WalkInRegistrationResult extends EventRegistrationRef {

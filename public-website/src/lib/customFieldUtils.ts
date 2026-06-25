@@ -16,12 +16,15 @@ export const emptyRegistrationDraft = (): RegistrationDraft => ({
     customFieldValues: {},
 });
 
-export function dropdownOptions(field: PublicEventCustomField): string[] {
+export function dropdownOptions(field: Pick<PublicEventCustomField, "options">): string[] {
     if (!Array.isArray(field.options)) return [];
     return field.options.map((option) => String(option));
 }
 
-export function isCustomFieldValueEmpty(field: PublicEventCustomField, value: unknown): boolean {
+export function isCustomFieldValueEmpty(
+    field: Pick<PublicEventCustomField, "type">,
+    value: unknown,
+): boolean {
     if (field.type === "checkbox") {
         return value !== true && value !== "true";
     }
@@ -31,14 +34,14 @@ export function isCustomFieldValueEmpty(field: PublicEventCustomField, value: un
 
 export function getCustomFieldValueFromRecord(
     customFieldValues: Record<string, unknown>,
-    field: PublicEventCustomField,
+    field: Pick<PublicEventCustomField, "id" | "label">,
 ): unknown {
     return customFieldValues[String(field.id)] ?? customFieldValues[field.label];
 }
 
 export function validateRequiredCustomFields(
     customFieldValues: Record<string, unknown>,
-    fields: PublicEventCustomField[],
+    fields: Array<Pick<PublicEventCustomField, "id" | "label" | "type" | "required">>,
 ): Record<string, string> {
     const errors: Record<string, string> = {};
 
@@ -79,7 +82,10 @@ export function validateRegistrationDraft(
     };
 }
 
-export function parseCustomFieldInputValue(field: PublicEventCustomField, raw: string): unknown {
+export function parseCustomFieldInputValue(
+    field: Pick<PublicEventCustomField, "type">,
+    raw: string,
+): unknown {
     if (field.type === "number") {
         return raw === "" ? null : Number(raw);
     }

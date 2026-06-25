@@ -10,23 +10,11 @@
 
 /* Filter dropdowns are handled by the manage-* classes imported from TeamsPage.css */
 
+/* projects-grid, pagination, add-card, error/loading: now in shared page.css */
+
 /* ============================================
-   PROJECT CARDS GRID
+   PROJECT CARDS GRID — now in shared page.css
    ============================================ */
-.projects-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1.25rem;
-    margin-top: 0.5rem;
-    position: relative;
-}
-
-@media (max-width: 900px) {
-    .projects-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
 
 /* ── Expanded card task rows ── */
 .exp-task {
@@ -432,18 +420,7 @@
 }
 
 
-.project-detail-loading-indicator {
-    position: fixed;
-    bottom: 1.5rem;
-    right: 1.5rem;
-    background: var(--bg-card);
-    border-radius: var(--radius-md);
-    padding: 0.6rem 1rem;
-    box-shadow: var(--shadow-md);
-    font-size: 0.82rem;
-    font-family: var(--font-heading);
-    color: var(--gray-500);
-}
+/* project-detail-loading-indicator: now in shared page.css */
 
 /* ── task detail panel (nested inside project panel) ── */
 .task-detail-section {
@@ -497,19 +474,7 @@
 /* icon-btn base, icon-btn--text, edit-btn, deactivate-btn, danger: now in shared buttons.css */
 
 
-/* ── loading / error states ── */
-.projects-loading,
-.projects-error {
-    text-align: center;
-    padding: 4rem 2rem;
-    color: var(--gray-400);
-    font-family: var(--font-heading);
-    font-size: 0.95rem;
-}
-
-.projects-error {
-    color: var(--error-text);
-}
+/* ── loading / error states — now in shared page.css */
 
 /* status-dot, status-dot-*, status-select-inline, status-select-inline.s-*: now in shared badge.css */
 
@@ -587,147 +552,11 @@
     color: var(--purple-800);
 }
 
-/* ── Add Project Card ── */
-.project-add-card {
-    border: 2px dashed var(--gray-300);
-    border-radius: var(--radius-lg);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 2rem 1rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    min-height: 10rem;
-}
-
-.project-add-card:hover {
-    border-color: var(--purple-400);
-    background: rgba(139, 92, 246, 0.04);
-}
-
-.project-add-card-icon {
-    width: 2rem;
-    height: 2rem;
-    color: var(--gray-300);
-    transition: color 0.2s ease;
-}
-
-.project-add-card:hover .project-add-card-icon {
-    color: var(--purple-500);
-}
-
-.project-add-card-text {
-    font-family: var(--font-heading);
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--gray-400);
-    transition: color 0.2s ease;
-}
-
-.project-add-card:hover .project-add-card-text {
-    color: var(--purple-700);
-}
+/* ── Add Project Card — now in shared page.css */
 
 /* ============================================
-   PAGINATION CONTROLS
+   PAGINATION CONTROLS — now in shared page.css
    ============================================ */
-.pagination-controls {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    margin-top: 1.5rem;
-    padding: 1rem 0;
-}
-
-.pagination-btn {
-    font-family: var(--font-heading);
-    font-size: 0.85rem;
-    font-weight: 600;
-    padding: 0.5rem 1.2rem;
-    border: 2px solid var(--purple-400);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--purple-700);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.pagination-btn:hover:not(:disabled) {
-    background: var(--purple-50);
-    border-color: var(--purple-600);
-    color: var(--purple-900);
-}
-
-.pagination-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    border-color: var(--gray-300);
-    color: var(--gray-400);
-}
-
-.pagination-pages {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.pagination-page-btn {
-    min-width: 2rem;
-    height: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 0.4rem;
-    border: 2px solid transparent;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--gray-600);
-    font-family: var(--font-heading);
-    font-size: 0.82rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.pagination-page-btn:hover {
-    background: var(--purple-50);
-    color: var(--purple-700);
-}
-
-.pagination-page-btn--active {
-    border: 2px solid var(--purple-400);
-    background: transparent;
-    color: var(--purple-700);
-    cursor: default;
-}
-
-.pagination-page-btn--active:hover {
-    background: var(--purple-50);
-    border-color: var(--purple-600);
-    color: var(--purple-900);
-}
-
-.pagination-ellipsis {
-    min-width: 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--gray-400);
-    font-family: var(--font-heading);
-    font-size: 0.85rem;
-    font-weight: 600;
-    pointer-events: none;
-}
-
-.pagination-info {
-    font-family: var(--font-heading);
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--gray-500);
-}
 
 /* ── Finalized badge ── */
 .badge-finalized {

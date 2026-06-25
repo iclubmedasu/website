@@ -6,6 +6,7 @@
 @import "../components/layout/footer.css";
 @import "../components/navigation/back-link.css";
 @import "../components/ui/ui.css";
+@import "../components/members/members.css";
 @import "../components/home/rubiks-cube.css";
 
 @theme {

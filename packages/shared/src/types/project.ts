@@ -45,6 +45,7 @@ export interface ProjectSummary {
     isFinalized?: boolean;
     isArchived?: boolean;
     isDisclosed?: boolean;
+    version?: number;
     projectTeams?: ProjectTeamRef[];
     tags?: ProjectTag[];
 }
@@ -108,6 +109,7 @@ export interface UpdateProjectPayload {
     isActive?: boolean;
     isFinalized?: boolean;
     isArchived?: boolean;
+    version?: number;
 }
 
 export interface AddProjectTagPayload {

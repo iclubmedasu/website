@@ -110,6 +110,11 @@
   --gradient-danger: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
   --gradient-success: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
 
+  /* Borders */
+  --border-default: var(--gray-80);
+  --border-subtle: var(--gray-100);
+  --border-brand: rgba(86, 11, 137, 0.08);
+
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(86, 23, 137, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(86, 23, 137, 0.1);

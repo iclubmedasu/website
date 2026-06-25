@@ -8,8 +8,6 @@ import AlumniFiltersModal, { type AlumniFiltersState } from './modals/AlumniFilt
 import { isDateWithinRange } from '../../../utils/filterDateRange';
 import type { Id } from '../../../types/backend-contracts';
 import { buildSearchText, matchesSearchQuery } from '../../../utils/search';
-import '../../Projects/ProjectsPage.css';
-
 type PageToken = number | '...';
 
 interface TeamOption {

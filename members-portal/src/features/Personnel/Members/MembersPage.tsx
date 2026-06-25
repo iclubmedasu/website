@@ -10,7 +10,6 @@ import AssignToTeamModal from './modals/AssignToTeamModal';
 import MembersFiltersModal, { type MembersFiltersState } from './modals/MembersFiltersModal';
 import { isDateWithinRange } from '../../../utils/filterDateRange';
 import { buildSearchText, matchesSearchQuery } from '../../../utils/search';
-import '../../Projects/ProjectsPage.css';
 import type { Id } from '../../../types/backend-contracts';
 
 type PageNumberToken = number | '...';

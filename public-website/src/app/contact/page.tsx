@@ -1,39 +1,42 @@
 import type { Metadata } from "next";
-import { Mail } from "lucide-react";
 import { ContactForm } from "@/components/contact/ContactForm";
+import { ContactMethods } from "@/components/contact/ContactMethods";
 import { SocialLinks } from "@/components/layout/SocialLinks";
 import { BackLink } from "@/components/navigation/BackLink";
 import { PageHeader, Section } from "@/components/ui";
+import { publicAPI } from "@/lib/api";
+import { fallbackContactPage } from "@/lib/siteContentFallback";
 import { siteConfig } from "@/lib/site";
 
-export const metadata: Metadata = {
-    title: "Contact",
-    description: `Get in touch with ${siteConfig.name}.`,
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const page = await publicAPI.getContactPage();
+    const header = page?.header ?? fallbackContactPage.header;
 
-export default function ContactPage() {
+    return {
+        title: "Contact",
+        description: header.description || `Get in touch with ${siteConfig.name}.`,
+    };
+}
+
+export default async function ContactPage() {
+    const data = (await publicAPI.getContactPage()) ?? fallbackContactPage;
+
     return (
         <>
             <Section variant="subtle" tight>
                 <BackLink href="/" label="Back to Home" />
                 <PageHeader
-                    eyebrow="Contact"
-                    title="We would love to hear from you"
-                    description={`Reach out with questions about events, partnerships, or getting involved with ${siteConfig.shortName}.`}
+                    eyebrow={data.header.eyebrow}
+                    title={data.header.title}
+                    description={data.header.description}
                 >
-                    <a
-                        href={`mailto:${siteConfig.contactEmail}`}
-                        className="mt-6 inline-flex items-center gap-2 text-base font-medium text-purple-800 hover:underline"
-                    >
-                        <Mail className="h-5 w-5" />
-                        {siteConfig.contactEmail}
-                    </a>
-                    <div className="mt-6">
+                  {/*  <ContactMethods methods={data.methods} />
+                     <div className="mt-6">
                         <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-purple-700">
                             Community & social
                         </p>
-                        <SocialLinks />
-                    </div>
+                        <SocialLinks links={data.socialLinks} />
+                    </div> */}
                 </PageHeader>
             </Section>
             <Section variant="plain">

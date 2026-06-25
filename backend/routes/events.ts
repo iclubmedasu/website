@@ -1,6 +1,14 @@
 import { Prisma } from '@prisma/client';
-import express, { Request, Response } from 'express';
+import {
+    coerceImportCustomFieldValue,
+    CustomFieldRow,
+    getDropdownOptions,
+    getMissingRequiredCustomFieldsFromValues,
+    toJsonInput,
+    validateRequiredCustomFieldValues,
+} from '../lib/customFields';
 import { prisma } from '../db';
+import express, { Request, Response } from 'express';
 import { authenticateToken, optionalAuthenticateToken } from '../middleware/auth';
 import { generateUniqueConfirmationCode } from '../services/eventCode';
 import { formatEventDay, isWithinEventDays, parseEventDayString, resolveCheckInEventDay, eventDayStringToDate, shouldSendWalkInTicket } from '../services/eventDates';
@@ -32,6 +40,14 @@ import {
     canUserViewEvent,
     isPrivilegedUser,
 } from '../lib/eventPermissions';
+import { mergeRegistrationCustomFieldValues } from '../lib/atomicJsonMerge';
+import { respondWithPrismaConflict, sendConflictResponse } from '../lib/conflictResponse';
+import {
+    parseExpectedVersion,
+    respondVersionConflict,
+    updateEventRegistrationOptimistic,
+} from '../lib/optimisticLock';
+import { publishEventChanged } from '../lib/resourceRealtime';
 
 const router = express.Router();
 
@@ -328,27 +344,6 @@ function canPublicView(event: { isPublished: boolean; isActive: boolean; isArchi
     return event.isActive && !event.isArchived && event.isPublished;
 }
 
-function normalizeOptions(options: unknown): unknown {
-    if (options == null) return null;
-    if (Array.isArray(options)) return options;
-    if (typeof options === 'string') {
-        const trimmed = options.trim();
-        if (!trimmed) return null;
-        try {
-            return JSON.parse(trimmed);
-        } catch {
-            return trimmed.split(',').map((item) => item.trim()).filter(Boolean);
-        }
-    }
-    if (typeof options === 'object') return options;
-    return null;
-}
-
-function toJsonInput(value: unknown): any {
-    const normalized = normalizeOptions(value);
-    return normalized === null ? Prisma.DbNull : normalized;
-}
-
 async function createRegistrationCodeWithRetry(): Promise<string> {
     for (let attempt = 0; attempt < 5; attempt += 1) {
         const confirmationCode = await generateUniqueConfirmationCode();
@@ -494,28 +489,6 @@ async function logEventFieldUpdate(
     });
 }
 
-type CustomFieldRow = {
-    id: number;
-    label: string;
-    type: string;
-    required: boolean;
-    showOnPublic: boolean;
-    isActive: boolean;
-    options?: unknown;
-};
-
-function getCustomFieldValueFromRecord(customFieldValues: unknown, field: { id: number; label: string }): unknown {
-    if (!customFieldValues || typeof customFieldValues !== 'object' || Array.isArray(customFieldValues)) return undefined;
-    const record = customFieldValues as Record<string, unknown>;
-    return record[String(field.id)] ?? record[field.label];
-}
-
-function isCustomFieldValueEmpty(type: string, value: unknown): boolean {
-    if (type === 'checkbox') return value !== true && value !== 'true';
-    if (value === null || value === undefined || value === '') return true;
-    return false;
-}
-
 function mergeCustomFieldValues(existing: unknown, incoming: unknown): Record<string, unknown> {
     const base = existing && typeof existing === 'object' && !Array.isArray(existing)
         ? { ...(existing as Record<string, unknown>) }
@@ -535,63 +508,6 @@ async function getActiveCustomFields(eventId: number, options?: { publicOnly?: b
         },
         orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
     });
-}
-
-function getMissingRequiredCustomFieldsFromValues(
-    fields: CustomFieldRow[],
-    customFieldValues: unknown,
-    options?: { publicOnly?: boolean },
-): CustomFieldRow[] {
-    return fields.filter((field) => {
-        if (!field.required) return false;
-        if (options?.publicOnly && !field.showOnPublic) return false;
-        const value = getCustomFieldValueFromRecord(customFieldValues, field);
-        return isCustomFieldValueEmpty(field.type, value);
-    });
-}
-
-function validateRequiredCustomFieldValues(
-    fields: CustomFieldRow[],
-    customFieldValues: unknown,
-    options?: { publicOnly?: boolean },
-): Record<string, string> {
-    const errors: Record<string, string> = {};
-    for (const field of getMissingRequiredCustomFieldsFromValues(fields, customFieldValues, options)) {
-        errors[String(field.id)] = `${field.label} is required.`;
-    }
-    return errors;
-}
-
-function getDropdownOptions(options: unknown): string[] {
-    if (!Array.isArray(options)) return [];
-    return options.map((option) => String(option));
-}
-
-function coerceImportCustomFieldValue(type: string, value: unknown, options?: unknown): unknown {
-    if (value === null || value === undefined || value === '') return null;
-
-    if (type === 'checkbox') {
-        if (typeof value === 'boolean') return value;
-        const normalized = String(value).trim().toLowerCase();
-        if (['true', 'yes', 'y', '1', 'x', 'checked'].includes(normalized)) return true;
-        if (['false', 'no', 'n', '0'].includes(normalized)) return false;
-        return null;
-    }
-
-    if (type === 'number') {
-        const parsed = typeof value === 'number' ? value : Number(String(value).trim());
-        return Number.isFinite(parsed) ? parsed : null;
-    }
-
-    if (type === 'dropdown') {
-        const raw = String(value).trim();
-        if (!raw) return null;
-        const allowed = getDropdownOptions(options);
-        const match = allowed.find((option) => option.toLowerCase() === raw.toLowerCase());
-        return match ?? null;
-    }
-
-    return String(value).trim();
 }
 
 function validateImportCustomFieldValues(
@@ -1913,25 +1829,43 @@ router.post('/:id/registrations', optionalAuthenticateToken, async (req, res) =>
 
         const confirmationCode = await createRegistrationCodeWithRetry();
 
-        const registration = await prisma.eventRegistration.create({
-            data: {
-                eventId,
-                tierId,
-                memberId: registrationMemberId,
-                fullName,
-                email,
-                phoneNumber: String(req.body?.phoneNumber || '').trim() || null,
-                confirmationCode,
-                source: isManager ? 'PORTAL' : 'PUBLIC',
-                status: 'REGISTERED',
-                isWalkIn: Boolean(req.body?.isWalkIn),
-                notes: String(req.body?.notes || '').trim() || null,
-                customFieldValues: toJsonInput(req.body?.customFieldValues),
-            },
-            include: {
-                tier: { select: { id: true, name: true } },
-                member: { select: { id: true, fullName: true, email: true } },
-            },
+        const registration = await prisma.$transaction(async (tx) => {
+            const registrationCount = await tx.eventRegistration.count({
+                where: { eventId, status: { not: 'CANCELLED' } },
+            });
+            if (event.capacity != null && registrationCount >= event.capacity) {
+                throw Object.assign(new Error('Event capacity has been reached'), { code: 'CAPACITY_REACHED' });
+            }
+
+            if (tier?.maxCapacity != null) {
+                const tierRegistrationCount = await tx.eventRegistration.count({
+                    where: { eventId, tierId, status: { not: 'CANCELLED' } },
+                });
+                if (tierRegistrationCount >= tier.maxCapacity) {
+                    throw Object.assign(new Error('Selected tier is at capacity'), { code: 'CAPACITY_REACHED' });
+                }
+            }
+
+            return tx.eventRegistration.create({
+                data: {
+                    eventId,
+                    tierId,
+                    memberId: registrationMemberId,
+                    fullName,
+                    email,
+                    phoneNumber: String(req.body?.phoneNumber || '').trim() || null,
+                    confirmationCode,
+                    source: isManager ? 'PORTAL' : 'PUBLIC',
+                    status: 'REGISTERED',
+                    isWalkIn: Boolean(req.body?.isWalkIn),
+                    notes: String(req.body?.notes || '').trim() || null,
+                    customFieldValues: toJsonInput(req.body?.customFieldValues),
+                },
+                include: {
+                    tier: { select: { id: true, name: true } },
+                    member: { select: { id: true, fullName: true, email: true } },
+                },
+            });
         });
 
         await logEventActivity({
@@ -1954,8 +1888,23 @@ router.post('/:id/registrations', optionalAuthenticateToken, async (req, res) =>
             queueTicketEmail(registration.id, 'public-registration');
         }
 
+        publishEventChanged({
+            eventId,
+            version: registration.version,
+            actorMemberId: req.user?.memberId ?? registration.memberId ?? null,
+        });
+
         return res.status(201).json(registration);
     } catch (error) {
+        if (error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'CAPACITY_REACHED') {
+            return sendConflictResponse(
+                res,
+                'CAPACITY_REACHED',
+                error instanceof Error ? error.message : 'Event capacity has been reached',
+            );
+        }
+        const prismaConflict = respondWithPrismaConflict(res, error);
+        if (prismaConflict) return prismaConflict;
         console.error(`POST /events/${req.params.id}/registrations error:`, error);
         return res.status(500).json({ error: 'Failed to create registration' });
     }
@@ -2020,13 +1969,19 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
                     },
                 });
 
+                await mergeRegistrationCustomFieldValues(
+                    existingRegistration.id,
+                    req.body?.customFieldValues ?? {},
+                    { tx, incrementVersion: false },
+                );
+
                 return tx.eventRegistration.update({
                     where: { id: existingRegistration.id },
                     data: {
                         status: 'CHECKED_IN',
                         ...(existingRegistration.status !== 'CHECKED_IN' ? { checkedInAt: walkInCheckedInAt } : {}),
                         ...(resolvedMemberId && !existingRegistration.memberId ? { memberId: resolvedMemberId } : {}),
-                        customFieldValues: toJsonInput(mergedCustomFieldValues),
+                        version: { increment: 1 },
                     },
                     include: registrationInclude,
                 });
@@ -2045,6 +2000,12 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
                     source: 'WALK_IN',
                 },
                 description: `${updated.fullName} checked in for ${resolvedDay.eventDay} via walk-in`,
+            });
+
+            publishEventChanged({
+                eventId,
+                version: updated.version,
+                actorMemberId: req.user!.memberId!,
             });
 
             return res.status(200).json({
@@ -2098,11 +2059,19 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
             queueTicketEmail(registration.id, 'walk-in');
         }
 
+        publishEventChanged({
+            eventId,
+            version: registration.version,
+            actorMemberId: req.user!.memberId!,
+        });
+
         return res.status(201).json({
             ...serializeRegistration(registration),
             action: 'created',
         });
     } catch (error) {
+        const prismaConflict = respondWithPrismaConflict(res, error);
+        if (prismaConflict) return prismaConflict;
         console.error(`POST /events/${req.params.id}/registrations/walk-in error:`, error);
         return res.status(500).json({ error: 'Failed to create walk-in registration' });
     }
@@ -2334,14 +2303,23 @@ router.post('/:id/registrations/import', authenticateToken, async (req, res) => 
             description: `Imported registrations: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`,
         });
 
+        publishEventChanged({
+            eventId,
+            version: 0,
+            actorMemberId: req.user!.memberId!,
+        });
+
         return res.json(result);
     } catch (error) {
+        const prismaConflict = respondWithPrismaConflict(res, error);
+        if (prismaConflict) return prismaConflict;
         console.error(`POST /events/${req.params.id}/registrations/import error:`, error);
         return res.status(500).json({ error: 'Failed to import registrations' });
     }
 });
 
 router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, async (req, res) => {
+    let registration: RegistrationWithDays | null = null;
     try {
         const eventId = parseId(req.params.id);
         const registrationId = parseId(req.params.registrationId);
@@ -2355,15 +2333,15 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
         });
         if (!event) return res.status(404).json({ error: 'Event not found' });
 
-        const registration = registrationId
+        registration = registrationId
             ? await prisma.eventRegistration.findFirst({
                 where: { id: registrationId, eventId },
-                include: { attendanceDays: true },
+                include: registrationInclude,
             })
             : confirmationCode
                 ? await prisma.eventRegistration.findFirst({
                     where: { eventId, confirmationCode },
-                    include: { attendanceDays: true },
+                    include: registrationInclude,
                 })
                 : null;
 
@@ -2383,8 +2361,9 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
             return res.status(409).json({ error: 'Already checked in for this day' });
         }
 
-        const mergedCustomFieldValues = req.body?.customFieldValues !== undefined
-            ? mergeCustomFieldValues(registration.customFieldValues, req.body.customFieldValues)
+        const customFieldPatch = req.body?.customFieldValues;
+        const mergedCustomFieldValues = customFieldPatch !== undefined
+            ? mergeCustomFieldValues(registration.customFieldValues, customFieldPatch)
             : mergeCustomFieldValues(registration.customFieldValues, {});
 
         const requiredFields = await getActiveCustomFields(eventId);
@@ -2406,14 +2385,19 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
                 },
             });
 
+            if (customFieldPatch !== undefined) {
+                await mergeRegistrationCustomFieldValues(registration.id, customFieldPatch, {
+                    tx,
+                    incrementVersion: false,
+                });
+            }
+
             return tx.eventRegistration.update({
                 where: { id: registration.id },
                 data: {
                     status: 'CHECKED_IN',
                     ...(registration.status !== 'CHECKED_IN' ? { checkedInAt } : {}),
-                    ...(req.body?.customFieldValues !== undefined
-                        ? { customFieldValues: toJsonInput(mergedCustomFieldValues) }
-                        : {}),
+                    version: { increment: 1 },
                 },
                 include: registrationInclude,
             });
@@ -2433,8 +2417,20 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
             description: `${registration.fullName} checked in for ${resolvedDay.eventDay}`,
         });
 
+        publishEventChanged({
+            eventId,
+            version: updated.version,
+            actorMemberId: req.user!.memberId!,
+        });
+
         return res.json(serializeRegistration(updated));
     } catch (error) {
+        const prismaConflict = respondWithPrismaConflict(
+            res,
+            error,
+            registration ? serializeRegistration(registration) : undefined,
+        );
+        if (prismaConflict) return prismaConflict;
         console.error(`PATCH /events/${req.params.id}/registrations/${req.params.registrationId}/check-in error:`, error);
         return res.status(500).json({ error: 'Failed to check in registration' });
     }
@@ -2722,7 +2718,13 @@ router.patch('/:id/registrations/:registrationId', authenticateToken, async (req
         const existing = await prisma.eventRegistration.findFirst({ where: { id: registrationId, eventId } });
         if (!existing) return res.status(404).json({ error: 'Registration not found' });
 
-        if (req.body?.customFieldValues !== undefined) {
+        const expectedVersion = parseExpectedVersion(req.body);
+        const hasCustomFieldPatch = req.body?.customFieldValues !== undefined;
+        const hasScalarPatch = ['fullName', 'email', 'phoneNumber', 'tierId', 'notes'].some(
+            (key) => req.body?.[key] !== undefined,
+        );
+
+        if (hasCustomFieldPatch) {
             const event = await prisma.event.findUnique({
                 where: { id: eventId },
                 select: { eventDate: true, eventEndDate: true },
@@ -2752,47 +2754,90 @@ router.patch('/:id/registrations/:registrationId', authenticateToken, async (req
                         },
                     });
                     if (tierRegistrationCount >= tier.maxCapacity) {
-                        return res.status(409).json({ error: 'Selected tier is at capacity' });
+                        return sendConflictResponse(res, 'CAPACITY_REACHED', 'Selected tier is at capacity');
                     }
                 }
             }
         }
 
-        const updated = await prisma.eventRegistration.update({
-            where: { id: registrationId },
-            data: {
+        if (hasScalarPatch) {
+            const scalarData: Prisma.EventRegistrationUpdateInput = {
                 fullName: req.body?.fullName !== undefined ? String(req.body.fullName).trim() : existing.fullName,
                 email: req.body?.email !== undefined ? String(req.body.email).trim().toLowerCase() : existing.email,
                 phoneNumber: req.body?.phoneNumber !== undefined ? String(req.body.phoneNumber).trim() || null : existing.phoneNumber,
                 tierId: req.body?.tierId !== undefined ? nextTierId : existing.tierId,
                 notes: req.body?.notes !== undefined ? String(req.body.notes).trim() || null : existing.notes,
-                customFieldValues: req.body?.customFieldValues !== undefined ? toJsonInput(req.body.customFieldValues) : (existing.customFieldValues as any),
-            },
-            include: registrationInclude,
-        });
+            };
 
-        const registrationChanges = collectChangedFields(existing, updated, {
-            fullName: 'name',
-            email: 'email',
-            phoneNumber: 'phone',
-            tierId: 'tier',
-            notes: 'notes',
-        });
-        if (registrationChanges.length > 0) {
-            const { oldValue, newValue } = changesToPayload(registrationChanges);
-            await logEventActivity({
-                eventId,
-                memberId: req.user!.memberId!,
-                actionType: 'UPDATED',
-                entityType: 'REGISTRATION',
-                oldValue,
-                newValue,
-                description: summarizeChanges(registrationChanges) || `Registration for ${updated.fullName} updated`,
+            const scalarResult = await updateEventRegistrationOptimistic(
+                registrationId,
+                expectedVersion,
+                scalarData,
+                registrationInclude,
+            );
+            if (!scalarResult.ok) {
+                return respondVersionConflict(
+                    res,
+                    scalarResult.latest ? serializeRegistration(scalarResult.latest) : null,
+                );
+            }
+
+            const registrationChanges = collectChangedFields(existing, scalarResult.record, {
+                fullName: 'name',
+                email: 'email',
+                phoneNumber: 'phone',
+                tierId: 'tier',
+                notes: 'notes',
+            });
+            if (registrationChanges.length > 0) {
+                const { oldValue, newValue } = changesToPayload(registrationChanges);
+                await logEventActivity({
+                    eventId,
+                    memberId: req.user!.memberId!,
+                    actionType: 'UPDATED',
+                    entityType: 'REGISTRATION',
+                    oldValue,
+                    newValue,
+                    description: summarizeChanges(registrationChanges) || `Registration for ${scalarResult.record.fullName} updated`,
+                });
+            }
+        } else if (hasCustomFieldPatch && expectedVersion !== null) {
+            const versionResult = await updateEventRegistrationOptimistic(
+                registrationId,
+                expectedVersion,
+                {},
+                registrationInclude,
+            );
+            if (!versionResult.ok) {
+                return respondVersionConflict(
+                    res,
+                    versionResult.latest ? serializeRegistration(versionResult.latest) : null,
+                );
+            }
+        }
+
+        if (hasCustomFieldPatch) {
+            await mergeRegistrationCustomFieldValues(registrationId, req.body.customFieldValues, {
+                incrementVersion: !hasScalarPatch && expectedVersion === null,
             });
         }
 
+        const updated = await prisma.eventRegistration.findFirst({
+            where: { id: registrationId, eventId },
+            include: registrationInclude,
+        });
+        if (!updated) return res.status(404).json({ error: 'Registration not found' });
+
+        publishEventChanged({
+            eventId,
+            version: updated.version,
+            actorMemberId: req.user!.memberId!,
+        });
+
         return res.json(serializeRegistration(updated));
     } catch (error) {
+        const prismaConflict = respondWithPrismaConflict(res, error);
+        if (prismaConflict) return prismaConflict;
         console.error(`PATCH /events/${req.params.id}/registrations/${req.params.registrationId} error:`, error);
         return res.status(500).json({ error: 'Failed to update registration' });
     }

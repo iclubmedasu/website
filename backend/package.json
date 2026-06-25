@@ -14,7 +14,10 @@
     "prisma:generate": "npx prisma generate",
     "prisma:deploy": "npx prisma migrate deploy && tsx scripts/enablePublicRls.ts",
     "prisma:migrate": "npx prisma migrate dev && tsx scripts/enablePublicRls.ts",
-    "prisma:studio": "npx prisma studio"
+    "prisma:studio": "npx prisma studio",
+    "seed:site-content": "tsx scripts/seedSiteContent.ts",
+    "seed:support-content": "tsx scripts/seedSupportContent.ts",
+    "seed:finance": "tsx scripts/seedFinance.ts"
   },
   "keywords": [],
   "author": "",
@@ -37,7 +40,8 @@
     "qrcode": "^1.5.4",
     "resend": "^6.14.0",
     "uuid": "^13.0.0",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",

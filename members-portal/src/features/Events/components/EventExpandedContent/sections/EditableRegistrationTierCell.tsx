@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { eventsAPI } from '@/services/api';
 import type { EventRegistrationRef, EventTierRef, Id } from '@/types/backend-contracts';
+import { handleRegistrationConflict } from '../registrationConflictUtils';
 
 interface EditableRegistrationTierCellProps {
     eventId: Id | string;
@@ -52,11 +53,12 @@ export default function EditableRegistrationTierCell({
         try {
             const updated = await eventsAPI.updateRegistration(eventId, registration.id, {
                 tierId: normalizedNext,
+                version: registration.version,
             });
             onUpdated(updated);
         } catch (saveError) {
             setLocalTierId(storedTierId);
-            setError(saveError instanceof Error ? saveError.message : 'Failed to update tier.');
+            handleRegistrationConflict(saveError, onUpdated, setError, 'Failed to update tier.');
         } finally {
             setSaving(false);
         }

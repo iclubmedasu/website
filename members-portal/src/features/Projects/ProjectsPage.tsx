@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useResourceChannel } from '@/hooks/useResourceChannel';
 import {
     Plus,
     ChevronDown,
@@ -437,6 +438,19 @@ export default function ProjectsPage() {
             setExpandedProjectDetail(detail);
         } catch { /* swallow */ }
     };
+
+    const handleRemoteProjectRefresh = useCallback(() => {
+        if (!expandedProjectId) return;
+        void handleRefreshDetail(expandedProjectId);
+        void loadProjects();
+    }, [expandedProjectId, loadProjects]);
+
+    useResourceChannel({
+        resource: 'project',
+        resourceId: expandedProjectId,
+        enabled: expandedProjectId != null,
+        onRefresh: handleRemoteProjectRefresh,
+    });
 
     // ── Permission helpers ──
     // Privileged roles: developer, officer, admin, leadership

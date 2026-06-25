@@ -9,10 +9,10 @@ export const EVENT_TABS = [
 ];
 
 export const EVENT_STATUS_CLASS: Record<string, string> = {
-    DRAFT: 'event-status-badge event-status-badge--draft',
-    PUBLISHED: 'event-status-badge event-status-badge--published',
-    COMPLETED: 'event-status-badge event-status-badge--completed',
-    CANCELLED: 'event-status-badge event-status-badge--cancelled',
+    DRAFT: 'badge badge-event-DRAFT',
+    PUBLISHED: 'badge badge-event-PUBLISHED',
+    COMPLETED: 'badge badge-event-COMPLETED',
+    CANCELLED: 'badge badge-event-CANCELLED',
 };
 
 export function parseEventTab(value: string | null): EventTabKey | null {

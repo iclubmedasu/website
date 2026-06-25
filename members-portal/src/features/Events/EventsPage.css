@@ -1,38 +1,6 @@
 /* .events-page container: max-width and centering defined in shared page.css */
-/* event-specific styles; grid/card expansion: ProjectsPage.css */
-
-.event-status-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 99px;
-    padding: 0.3rem 0.7rem;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-family: var(--font-heading);
-}
-
-.event-status-badge--draft {
-    background: var(--status-not-started-bg);
-    color: var(--status-not-started-text);
-}
-
-.event-status-badge--published {
-    background: var(--success-bg);
-    color: var(--success-text);
-}
-
-.event-status-badge--completed {
-    background: var(--status-in-progress-bg);
-    color: var(--status-in-progress-text);
-}
-
-.event-status-badge--cancelled {
-    background: var(--status-cancelled-bg);
-    color: var(--status-cancelled-text);
-}
+/* grid, pagination, add-card, error/loading: now in shared page.css */
+/* event status badges: now in shared badge.css */
 
 @media (max-width: 640px) {
     .page-search-filter-label {

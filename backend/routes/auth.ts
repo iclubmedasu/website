@@ -2,6 +2,8 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../db';
+import { computeIsSupportFormsEditor } from '../lib/supportPermissions';
+import { computeIsFinanceViewer } from '../lib/financePermissions';
 import { JWT_SECRET, authenticateToken } from '../middleware/auth';
 import type { RequestUser } from '../types/auth';
 import {
@@ -129,6 +131,33 @@ function computeAuthorityFlags(teamMemberships, isDeveloper = false) {
     return { isOfficer, isAdmin, isLeadership, isSpecial };
 }
 
+function buildSessionAuthority(teamMemberships, isDeveloper = false) {
+    const teamIds = (teamMemberships || []).map((tm) => tm.teamId);
+    const { isOfficer, isAdmin, isLeadership, isSpecial } = computeAuthorityFlags(teamMemberships, isDeveloper);
+    const leadershipTeamIds = getLeadershipTeamIds(teamMemberships);
+    const isSupportFormsEditor = computeIsSupportFormsEditor(teamMemberships, {
+        isDeveloper,
+        isOfficer,
+        isAdmin,
+    });
+    const isFinanceViewer = computeIsFinanceViewer(teamMemberships, {
+        isDeveloper,
+        isOfficer,
+        isAdmin,
+    });
+
+    return {
+        teamIds,
+        leadershipTeamIds,
+        isOfficer: !!isOfficer,
+        isAdmin: !!isAdmin,
+        isLeadership: !!isLeadership,
+        isSpecial: !!isSpecial,
+        isSupportFormsEditor: !!isSupportFormsEditor,
+        isFinanceViewer: !!isFinanceViewer,
+    };
+}
+
 // Team IDs where the user is Head or Vice Head (non-Administration). Used so leadership can edit their own team.
 function getLeadershipTeamIds(teamMemberships) {
     const list = teamMemberships || [];
@@ -205,13 +234,11 @@ router.post('/setup-password', async (req, res) => {
                 role: { select: { roleName: true, systemRoleKey: true } }
             }
         });
-        const teamIds = teamMemberships.map((tm) => tm.teamId);
-        const { isOfficer, isAdmin, isLeadership, isSpecial } = computeAuthorityFlags(teamMemberships, false);
-        const leadershipTeamIds = getLeadershipTeamIds(teamMemberships);
+        const authority = buildSessionAuthority(teamMemberships, false);
 
         // Generate token with authority flags
         const token = jwt.sign(
-            { userId: user.id, memberId: member.id, email: member.email, isOfficer: !!isOfficer, isAdmin: !!isAdmin, isLeadership: !!isLeadership, isSpecial: !!isSpecial, teamIds, leadershipTeamIds },
+            { userId: user.id, memberId: member.id, email: member.email, ...authority },
             JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -230,12 +257,7 @@ router.post('/setup-password', async (req, res) => {
                 studentId: member.studentId ?? null,
                 profilePhotoUrl: member.profilePhotoUrl ?? null,
                 linkedInUrl: member.linkedInUrl ?? null,
-                teamIds,
-                leadershipTeamIds,
-                isOfficer: !!isOfficer,
-                isAdmin: !!isAdmin,
-                isLeadership: !!isLeadership,
-                isSpecial: !!isSpecial
+                ...authority,
             }
         });
     } catch (error) {
@@ -579,12 +601,10 @@ router.post('/complete-profile', async (req, res) => {
                 role: { select: { roleName: true, systemRoleKey: true } }
             }
         });
-        const teamIds = teamMemberships.map((tm) => tm.teamId);
-        const { isOfficer, isAdmin, isLeadership, isSpecial } = computeAuthorityFlags(teamMemberships, false);
-        const leadershipTeamIds = getLeadershipTeamIds(teamMemberships);
+        const authority = buildSessionAuthority(teamMemberships, false);
 
         const token = jwt.sign(
-            { userId: userRecord.id, memberId: member.id, email: primaryEmail, isOfficer: !!isOfficer, isAdmin: !!isAdmin, isLeadership: !!isLeadership, isSpecial: !!isSpecial, teamIds, leadershipTeamIds },
+            { userId: userRecord.id, memberId: member.id, email: primaryEmail, ...authority },
             JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -603,12 +623,7 @@ router.post('/complete-profile', async (req, res) => {
                 studentId: member.studentId ?? null,
                 profilePhotoUrl: member.profilePhotoUrl ?? null,
                 linkedInUrl: member.linkedInUrl ?? null,
-                teamIds,
-                leadershipTeamIds,
-                isOfficer: !!isOfficer,
-                isAdmin: !!isAdmin,
-                isLeadership: !!isLeadership,
-                isSpecial: !!isSpecial
+                ...authority,
             },
             token
         });
@@ -825,12 +840,10 @@ router.post('/complete-officer-profile', async (req, res) => {
                 role: { select: { roleName: true, systemRoleKey: true } }
             }
         });
-        const teamIds = teamMemberships.map((tm) => tm.teamId);
-        const { isOfficer, isAdmin, isLeadership, isSpecial } = computeAuthorityFlags(teamMemberships, false);
-        const leadershipTeamIds = getLeadershipTeamIds(teamMemberships);
+        const authority = buildSessionAuthority(teamMemberships, false);
 
         const token = jwt.sign(
-            { userId: userRecord.id, memberId: member.id, email: updatedMember.email, isOfficer: !!isOfficer, isAdmin: !!isAdmin, isLeadership: !!isLeadership, isSpecial: !!isSpecial, teamIds, leadershipTeamIds },
+            { userId: userRecord.id, memberId: member.id, email: updatedMember.email, ...authority },
             JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -849,12 +862,7 @@ router.post('/complete-officer-profile', async (req, res) => {
                 studentId: member.studentId ?? null,
                 profilePhotoUrl: member.profilePhotoUrl ?? null,
                 linkedInUrl: member.linkedInUrl ?? null,
-                teamIds,
-                leadershipTeamIds,
-                isOfficer: !!isOfficer,
-                isAdmin: !!isAdmin,
-                isLeadership: !!isLeadership,
-                isSpecial: !!isSpecial
+                ...authority,
             },
             token
         });
@@ -877,7 +885,9 @@ router.post('/login', async (req, res) => {
                         userId: 0,
                         memberId: 0,
                         email: DEVELOPER_EMAIL,
-                        isDeveloper: true
+                        isDeveloper: true,
+                        isSupportFormsEditor: true,
+                        isFinanceViewer: true,
                     },
                     JWT_SECRET,
                     { expiresIn: '7d' }
@@ -895,6 +905,8 @@ router.post('/login', async (req, res) => {
                         isAdmin: false,
                         isLeadership: false,
                         isSpecial: false,
+                        isSupportFormsEditor: true,
+                        isFinanceViewer: true,
                         teamIds: []
                     }
                 });
@@ -956,13 +968,11 @@ router.post('/login', async (req, res) => {
                 role: { select: { roleName: true, systemRoleKey: true } }
             }
         });
-        const teamIds = teamMemberships.map((tm) => tm.teamId);
-        const { isOfficer, isAdmin, isLeadership, isSpecial } = computeAuthorityFlags(teamMemberships, false);
-        const leadershipTeamIds = getLeadershipTeamIds(teamMemberships);
+        const authority = buildSessionAuthority(teamMemberships, false);
 
         // Generate token with authority flags
         const token = jwt.sign(
-            { userId: member.user.id, memberId: member.id, email: member.email, isOfficer: !!isOfficer, isAdmin: !!isAdmin, isLeadership: !!isLeadership, isSpecial: !!isSpecial, teamIds, leadershipTeamIds },
+            { userId: member.user.id, memberId: member.id, email: member.email, ...authority },
             JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -983,12 +993,7 @@ router.post('/login', async (req, res) => {
                 linkedInUrl: member.linkedInUrl ?? null,
                 assignmentStatus: member.assignmentStatus ?? 'UNASSIGNED',
                 isActive: member.isActive,
-                teamIds,
-                leadershipTeamIds,
-                isOfficer: !!isOfficer,
-                isAdmin: !!isAdmin,
-                isLeadership: !!isLeadership,
-                isSpecial: !!isSpecial
+                ...authority,
             },
             token
         });
@@ -1023,6 +1028,8 @@ router.get('/me', async (req, res) => {
                     isAdmin: false,
                     isLeadership: false,
                     isSpecial: false,
+                    isSupportFormsEditor: true,
+                    isFinanceViewer: true,
                     teamIds: [],
                     leadershipTeamIds: []
                 }
@@ -1074,9 +1081,7 @@ router.get('/me', async (req, res) => {
             });
         }
 
-        const teamIds = (member.teamMemberships || []).map((tm) => tm.teamId);
-        const { isOfficer, isAdmin, isLeadership, isSpecial } = computeAuthorityFlags(member.teamMemberships, false);
-        const leadershipTeamIds = getLeadershipTeamIds(member.teamMemberships || []);
+        const authority = buildSessionAuthority(member.teamMemberships, false);
 
         const { teamMemberships, ...memberData } = member;
         void teamMemberships;
@@ -1086,12 +1091,7 @@ router.get('/me', async (req, res) => {
             phoneNumber: isPlaceholderPhone(memberData.phoneNumber) ? null : (memberData.phoneNumber ?? null),
             phoneNumber2: isPlaceholderPhone(memberData.phoneNumber2) ? null : (memberData.phoneNumber2 ?? null),
             assignmentStatus: memberData.assignmentStatus ?? 'UNASSIGNED',
-            teamIds,
-            leadershipTeamIds,
-            isOfficer: !!isOfficer,
-            isAdmin: !!isAdmin,
-            isLeadership: !!isLeadership,
-            isSpecial: !!isSpecial
+            ...authority,
         };
         res.json({ user: userPayload });
     } catch (error) {

@@ -55,6 +55,8 @@ export interface MemberRoleFlags {
     isAdmin?: boolean;
     isLeadership?: boolean;
     isSpecial?: boolean;
+    isSupportFormsEditor?: boolean;
+    isFinanceViewer?: boolean;
 }
 
 export interface CreateMemberInput {

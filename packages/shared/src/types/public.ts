@@ -1,4 +1,4 @@
-import type { Id, ISODateTime } from "./member";
+import type { Id, ISODateTime, MemberPublicProfile } from "./member";
 import type { EventCustomFieldType } from "./event";
 
 export interface PublicEventTypeRef {
@@ -94,3 +94,44 @@ export interface PublicContactRequest {
 export interface PublicContactResponse {
     success: boolean;
 }
+
+export interface PublicMemberCard {
+    id: Id;
+    fullName: string;
+    roleLabel: string;
+    teamName?: string | null;
+    profilePhotoUrl?: string | null;
+}
+
+export interface PublicTeamLeadershipRow {
+    teamId: Id;
+    teamName: string;
+    head: PublicMemberCard | null;
+    vice: PublicMemberCard | null;
+}
+
+export interface PublicMemberDirectory {
+    officer: PublicMemberCard | null;
+    president: PublicMemberCard | null;
+    vicePresident: PublicMemberCard | null;
+    teamLeadership: PublicTeamLeadershipRow[];
+    members: PublicMemberCard[];
+}
+
+export type PublicMemberProfile = MemberPublicProfile;
+
+export type {
+    AboutSectionType,
+    ContactMethodType,
+    SocialPlatform,
+    SitePageHeader,
+    PublicAboutPage,
+    PublicAboutSection,
+    PublicAboutTwoColumnSection,
+    PublicAboutBulletListSection,
+    PublicAboutSponsorsSection,
+    PublicAboutSponsor,
+    PublicContactPage,
+    PublicContactMethod,
+    PublicSocialLink,
+} from "./siteContent";

@@ -47,3 +47,31 @@
     outline: 2px solid var(--purple-500, #9063b3);
     outline-offset: 2px;
 }
+
+.form-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.25rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    background: var(--gray-50);
+}
+
+.form-toggle-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.form-toggle-label {
+    margin-bottom: 0;
+}
+
+.form-toggle-hint {
+    font-size: 0.8rem;
+    color: var(--gray-500);
+}

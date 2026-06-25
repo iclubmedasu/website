@@ -7,6 +7,8 @@ export type RequestUser = {
     isAdmin?: boolean;
     isLeadership?: boolean;
     isSpecial?: boolean;
+    isSupportFormsEditor?: boolean;
+    isFinanceViewer?: boolean;
     teamIds?: number[];
     leadershipTeamIds?: number[];
 };

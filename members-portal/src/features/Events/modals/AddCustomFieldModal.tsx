@@ -13,6 +13,13 @@ import type {
 
 export const FIELD_TYPES = ['text', 'dropdown', 'checkbox', 'number'] as const;
 
+const FIELD_TYPE_LABELS: Record<(typeof FIELD_TYPES)[number], string> = {
+    text: 'text',
+    dropdown: 'dropdown',
+    checkbox: 'Yes/No toggle',
+    number: 'number',
+};
+
 const DEFAULT_OPTION_ROWS = ['', ''];
 
 function normalizeOptionRows(options: unknown): string[] {
@@ -152,7 +159,7 @@ export default function AddCustomFieldModal({
                             disabled={lockTypeChange}
                         >
                             {FIELD_TYPES.map((fieldType) => (
-                                <option key={fieldType} value={fieldType}>{fieldType}</option>
+                                <option key={fieldType} value={fieldType}>{FIELD_TYPE_LABELS[fieldType]}</option>
                             ))}
                         </select>
                     </div>

@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
+import { YesNoField } from '@/components/YesNoField/YesNoField';
 import { eventsAPI } from '@/services/api';
 import type { EventCustomFieldRef, EventRegistrationRef, Id } from '@/types/backend-contracts';
 import {
     dropdownOptions,
     formatCustomFieldValue,
     getCustomFieldValue,
-    mergeCustomFieldValues,
     parseCustomFieldInputValue,
 } from '../customFieldUtils';
+import { handleRegistrationConflict } from '../registrationConflictUtils';
 
 interface EditableCustomFieldCellProps {
     eventId: Id | string;
@@ -30,6 +31,7 @@ export default function EditableCustomFieldCell({
         storedValue != null && storedValue !== '' ? String(storedValue) : ''
     ));
     const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
 
     useEffect(() => {
         if (field.type === 'checkbox') return;
@@ -37,17 +39,19 @@ export default function EditableCustomFieldCell({
     }, [field.type, storedValue]);
 
     const saveValue = async (nextValue: unknown) => {
-        const existing = registration.customFieldValues as Record<string, unknown> | null | undefined;
-        const merged = mergeCustomFieldValues(existing, { [fieldKey]: nextValue });
         setSaving(true);
+        setError('');
         try {
             const updated = await eventsAPI.updateRegistration(eventId, registration.id, {
-                customFieldValues: merged,
+                customFieldValues: { [fieldKey]: nextValue },
+                version: registration.version,
             });
             onUpdated(updated);
-        } catch {
-            if (field.type !== 'checkbox') {
-                setLocalValue(storedValue != null && storedValue !== '' ? String(storedValue) : '');
+        } catch (saveError) {
+            if (!handleRegistrationConflict(saveError, onUpdated, setError)) {
+                if (field.type !== 'checkbox') {
+                    setLocalValue(storedValue != null && storedValue !== '' ? String(storedValue) : '');
+                }
             }
         } finally {
             setSaving(false);
@@ -63,27 +67,25 @@ export default function EditableCustomFieldCell({
     }
 
     const savingClass = saving ? ' event-registrations-cell--saving' : '';
+    const errorClass = error ? ' event-registrations-cell--error' : '';
 
     if (field.type === 'checkbox') {
         return (
-            <td className={savingClass.trim() || undefined}>
-                <label className="event-registrations-table-checkbox">
-                    <input
-                        type="checkbox"
-                        checked={Boolean(storedValue)}
-                        disabled={saving}
-                        onChange={(event) => void saveValue(event.target.checked)}
-                        className="event-registrations-table-input"
-                        aria-label={field.label}
-                    />
-                </label>
+            <td className={`${savingClass}${errorClass}`.trim() || undefined} title={error || undefined}>
+                <YesNoField
+                    label={field.label}
+                    checked={Boolean(storedValue)}
+                    onChange={(next) => void saveValue(next)}
+                    disabled={saving}
+                    variant="inline"
+                />
             </td>
         );
     }
 
     if (field.type === 'dropdown') {
         return (
-            <td className={savingClass.trim() || undefined}>
+            <td className={`${savingClass}${errorClass}`.trim() || undefined} title={error || undefined}>
                 <select
                     aria-label={field.label}
                     value={storedValue != null ? String(storedValue) : ''}

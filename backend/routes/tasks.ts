@@ -27,6 +27,12 @@ import {
     buildTaskUnassignedActivityValue,
     buildTaskUnassignedDescription,
 } from '../services/taskActivityHelpers';
+import {
+    parseExpectedVersion,
+    respondVersionConflict,
+    updateTaskOptimistic,
+} from '../lib/optimisticLock';
+import { publishProjectChanged } from '../lib/resourceRealtime';
 
 const router: any = express.Router();
 
@@ -753,23 +759,31 @@ router.put('/:id', async (req, res) => {
             }
         }
 
-        const task = await prisma.task.update({
-            where: { id },
-            data,
-            include: {
-                project: { select: { id: true, title: true } },
-                leader: {
-                    select: { id: true, fullName: true, profilePhotoUrl: true },
-                },
-                taskTeams: { include: { team: { select: { id: true, name: true } } } },
-                assignments: {
-                    include: {
-                        member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
-                    },
-                },
-                tags: true,
+        const expectedVersion = parseExpectedVersion(req.body);
+        const taskInclude = {
+            project: { select: { id: true, title: true } },
+            leader: {
+                select: { id: true, fullName: true, profilePhotoUrl: true },
             },
-        });
+            taskTeams: { include: { team: { select: { id: true, name: true } } } },
+            assignments: {
+                include: {
+                    member: { select: { id: true, fullName: true, profilePhotoUrl: true } },
+                },
+            },
+            tags: true,
+        } as const;
+
+        const taskResult = await updateTaskOptimistic(
+            id,
+            expectedVersion,
+            data,
+            taskInclude,
+        );
+        if (!taskResult.ok) {
+            return respondVersionConflict(res, taskResult.latest);
+        }
+        const task = taskResult.record;
 
         const after = {
             title: task.title,
@@ -925,6 +939,12 @@ router.put('/:id', async (req, res) => {
         // Recompute WBS codes for the project
         await recomputeProjectWbs(task.project.id);
 
+        publishProjectChanged({
+            projectId: task.projectId,
+            version: task.version,
+            actorMemberId: req.user.memberId ?? null,
+        });
+
         res.json(task);
     } catch (error) {
         console.error('PUT /tasks/:id', error);
@@ -953,11 +973,21 @@ router.patch('/:id/status', async (req, res) => {
             where: { id },
             select: { status: true, title: true, projectId: true },
         });
-        const data: any = { status };
-        if (status === 'COMPLETED') data.completedDate = new Date();
-        else data.completedDate = null;
+        const expectedVersion = parseExpectedVersion(req.body);
+        const statusData: any = { status };
+        if (status === 'COMPLETED') statusData.completedDate = new Date();
+        else statusData.completedDate = null;
 
-        const task = await prisma.task.update({ where: { id }, data });
+        const taskResult = await updateTaskOptimistic(
+            id,
+            expectedVersion,
+            statusData,
+            { project: { select: { id: true, title: true } } },
+        );
+        if (!taskResult.ok) {
+            return respondVersionConflict(res, taskResult.latest);
+        }
+        const task = taskResult.record;
 
         await logActivity(id, req.user.memberId, 'STATUS_CHANGED', {
             oldValue: old?.status,
@@ -988,6 +1018,12 @@ router.patch('/:id/status', async (req, res) => {
 
         // Sync parent task status if this is a subtask
         await syncParentTaskStatus(id, req.user.memberId);
+
+        publishProjectChanged({
+            projectId: old?.projectId ?? task.projectId,
+            version: task.version,
+            actorMemberId: req.user.memberId ?? null,
+        });
 
         res.json(task);
     } catch (error) {

@@ -13,7 +13,6 @@ import FinalizeEventModal from './modals/FinalizeEventModal';
 import ReactivateEventModal from './modals/ReactivateEventModal';
 import type { EventDetail, EventQueryParams, EventSummary, Id, TeamRef } from '@/types/backend-contracts';
 import './EventsPage.css';
-import '../Projects/ProjectsPage.css';
 
 const EVENTS_PER_PAGE = 10;
 
@@ -205,7 +204,7 @@ export default function PastEventsPage() {
     return (
         <main className="events-page">
             <div className="page-header">
-                <h1 className="projects-title">Past Events</h1>
+                <h1 className="events-title">Past Events</h1>
             </div>
             <hr className="title-divider" />
 
@@ -246,7 +245,7 @@ export default function PastEventsPage() {
                 </div>
             ) : (
                 <>
-                    <div className="projects-grid">
+                    <div className="events-grid">
                         {paginatedEvents.map((event) => (
                             <EventCard
                                 key={event.id}

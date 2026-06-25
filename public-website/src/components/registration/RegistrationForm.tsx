@@ -4,6 +4,7 @@ import type { PublicEventCustomField, PublicEventTier } from "@iclub/shared";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiRequestError, publicAPI } from "@/lib/api";
+import { YesNoField } from "@/components/ui/YesNoToggle";
 import { saveRegistrationCache } from "@/lib/registrationCache";
 import {
     dropdownOptions,
@@ -32,18 +33,14 @@ function renderCustomFieldInput(
     if (field.type === "checkbox") {
         return (
             <div key={field.id} className="form-group">
-                <label className="form-checkbox-row">
-                    <input
-                        type="checkbox"
-                        checked={Boolean(value)}
-                        onChange={(event) => onCustomFieldChange(fieldKey, event.target.checked)}
-                    />
-                    <span className="form-label" style={{ marginBottom: 0 }}>
-                        {field.label}
-                        {field.required ? " *" : ""}
-                    </span>
-                </label>
-                {errors[fieldKey] ? <p className="field-error">{errors[fieldKey]}</p> : null}
+                <YesNoField
+                    id={`field-${field.id}`}
+                    label={field.label}
+                    required={field.required}
+                    checked={Boolean(value)}
+                    onChange={(next) => onCustomFieldChange(fieldKey, next)}
+                    error={errors[fieldKey]}
+                />
             </div>
         );
     }

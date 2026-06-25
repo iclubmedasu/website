@@ -64,6 +64,32 @@
 
 
 /* ============================================
+   EVENT STATUS BADGES
+   Used by: EventsPage (event cards)
+   ============================================ */
+
+.badge-event-DRAFT {
+    background: var(--status-not-started-bg);
+    color: var(--status-not-started-text);
+}
+
+.badge-event-PUBLISHED {
+    background: var(--success-bg);
+    color: var(--success-text);
+}
+
+.badge-event-COMPLETED {
+    background: var(--status-in-progress-bg);
+    color: var(--status-in-progress-text);
+}
+
+.badge-event-CANCELLED {
+    background: var(--status-cancelled-bg);
+    color: var(--status-cancelled-text);
+}
+
+
+/* ============================================
    PROJECT LIFECYCLE BADGES
    ============================================ */
 

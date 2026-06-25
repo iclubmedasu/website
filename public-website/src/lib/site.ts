@@ -21,6 +21,8 @@ export const navLinks = [
     { label: "Home", href: "/" },
     { label: "Events", href: "/events" },
     { label: "Projects", href: "/projects" },
+    { label: "Members", href: "/members" },
     { label: "About", href: "/about" },
     { label: "Contact", href: "/contact" },
+    { label: "Support", href: "/support" },
 ] as const;

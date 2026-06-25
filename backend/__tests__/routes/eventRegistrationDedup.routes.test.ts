@@ -126,10 +126,18 @@ describe('event registration deduplication', () => {
         activityMocks.logEventActivity.mockResolvedValue(undefined)
         prismaMocks.transaction.mockImplementation(async (fn: (tx: {
             eventRegistrationDay: { create: typeof prismaMocks.eventRegistrationDayCreate }
-            eventRegistration: { update: typeof prismaMocks.eventRegistrationUpdate }
+            eventRegistration: {
+                update: typeof prismaMocks.eventRegistrationUpdate
+                create: typeof prismaMocks.eventRegistrationCreate
+                count: typeof prismaMocks.eventRegistrationCount
+            }
         }) => Promise<unknown>) => fn({
             eventRegistrationDay: { create: prismaMocks.eventRegistrationDayCreate },
-            eventRegistration: { update: prismaMocks.eventRegistrationUpdate },
+            eventRegistration: {
+                update: prismaMocks.eventRegistrationUpdate,
+                create: prismaMocks.eventRegistrationCreate,
+                count: prismaMocks.eventRegistrationCount,
+            },
         }))
         eventDatesMocks.resolveCheckInEventDay.mockReturnValue({
             eventDay: '2026-06-22',

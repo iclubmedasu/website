@@ -112,6 +112,7 @@ export interface TaskSummary {
     dependencies?: TaskDependencyRef[];
     dependsOn?: TaskDependencyRef[];
     scheduleSlots?: ScheduleSlot[];
+    version?: number;
 }
 
 export interface Task {
@@ -175,6 +176,7 @@ export interface UpdateTaskPayload {
     order?: number;
     leaderId?: Id | null;
     assigneeIds?: Id[];
+    version?: number;
 }
 
 export interface TaskQueryParams {

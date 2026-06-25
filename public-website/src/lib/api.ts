@@ -1,14 +1,21 @@
 import type {
     CreateEventRegistrationPayload,
+    PublicAboutPage,
+    PublicContactPage,
     PublicContactRequest,
     PublicContactResponse,
     PublicEventCustomField,
     PublicEventDetail,
     PublicEventListItem,
     PublicEventTier,
+    PublicMemberDirectory,
+    PublicMemberProfile,
     PublicProjectSummary,
     PublicProjectDetail,
     PublicRegistrationConfirmation,
+    PublicSocialLink,
+    PublicSupportPage,
+    SubmitIncidentReportPayload,
 } from "@iclub/shared";
 
 function isLoopbackHost(hostname: string): boolean {
@@ -42,6 +49,11 @@ export function resolveApiBaseUrl(): string {
 }
 
 const API_BASE_URL = resolveApiBaseUrl();
+
+export function getPublicProfilePhotoUrl(memberId: number | string | null | undefined): string | null {
+    if (!memberId) return null;
+    return `${API_BASE_URL}/members/${memberId}/profile-photo`;
+}
 
 export class ApiRequestError extends Error {
     fieldErrors?: Record<string, string>;
@@ -155,6 +167,45 @@ export const publicAPI = {
 
     async getProject(id: number): Promise<PublicProjectDetail | null> {
         return fetchPublicOrThrow<PublicProjectDetail>(`/public/projects/${id}`);
+    },
+
+    async getMembersDirectory(): Promise<PublicMemberDirectory> {
+        return fetchPublic<PublicMemberDirectory>("/public/members/directory", {
+            officer: null,
+            president: null,
+            vicePresident: null,
+            teamLeadership: [],
+            members: [],
+        });
+    },
+
+    async getMemberProfile(id: number): Promise<PublicMemberProfile | null> {
+        return fetchPublicOrThrow<PublicMemberProfile>(`/public/members/${id}/profile`);
+    },
+
+    async getAboutPage(): Promise<PublicAboutPage | null> {
+        return fetchPublicOrThrow<PublicAboutPage>("/public/site/about");
+    },
+
+    async getContactPage(): Promise<PublicContactPage | null> {
+        return fetchPublicOrThrow<PublicContactPage>("/public/site/contact");
+    },
+
+    async getSocialLinks(): Promise<PublicSocialLink[]> {
+        return fetchPublic<PublicSocialLink[]>("/public/site/social-links", []);
+    },
+
+    async getSupportPage(): Promise<PublicSupportPage | null> {
+        return fetchPublicOrThrow<PublicSupportPage>("/public/site/support");
+    },
+
+    async submitIncidentReport(payload: SubmitIncidentReportPayload): Promise<{ id: number }> {
+        const response = await fetch(`${API_BASE_URL}/public/support/incident-reports`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        return handleResponse<{ id: number }>(response);
     },
 
     async sendContact(payload: PublicContactRequest): Promise<PublicContactResponse> {

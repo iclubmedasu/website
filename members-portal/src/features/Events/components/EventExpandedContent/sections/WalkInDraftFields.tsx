@@ -1,4 +1,5 @@
 import type { EventCustomFieldRef, EventTierRef } from '@/types/backend-contracts';
+import { YesNoField } from '@/components/YesNoField/YesNoField';
 import {
     dropdownOptions,
     parseCustomFieldInputValue,
@@ -32,14 +33,16 @@ function renderCustomFieldStackInput(
 
     if (field.type === 'checkbox') {
         return (
-            <label key={field.id} className={`event-registrations-walkin-stack-checkbox${errorClass}`}>
-                <input
-                    type="checkbox"
+            <div key={field.id} className={errorClass.trim() ? 'event-registrations-walkin-stack-field--error' : undefined}>
+                <YesNoField
+                    id={`walkin-stack-${field.id}`}
+                    label={field.label}
+                    required={field.required}
                     checked={Boolean(value)}
-                    onChange={(event) => onCustomFieldChange(fieldKey, event.target.checked)}
+                    onChange={(next) => onCustomFieldChange(fieldKey, next)}
+                    variant="stacked"
                 />
-                <span>{field.label}{field.required ? ' *' : ''}</span>
-            </label>
+            </div>
         );
     }
 
@@ -96,15 +99,12 @@ function renderCustomFieldTableCell(
     if (field.type === 'checkbox') {
         return (
             <td key={field.id} className={errorClass.trim() || undefined}>
-                <label className="event-registrations-table-checkbox">
-                    <input
-                        type="checkbox"
-                        checked={Boolean(value)}
-                        onChange={(event) => onCustomFieldChange(fieldKey, event.target.checked)}
-                        className="event-registrations-table-input"
-                        aria-label={field.label}
-                    />
-                </label>
+                <YesNoField
+                    label={field.label}
+                    checked={Boolean(value)}
+                    onChange={(next) => onCustomFieldChange(fieldKey, next)}
+                    variant="inline"
+                />
             </td>
         );
     }

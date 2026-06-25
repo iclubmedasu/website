@@ -1,0 +1,46 @@
+.yes-no-field {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.yes-no-field--stacked {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.375rem;
+}
+
+.yes-no-field--inline {
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.yes-no-field-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--gray-900);
+}
+
+.yes-no-field-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.yes-no-field-state {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    min-width: 1.75rem;
+}
+
+.yes-no-field--error .yes-no-field-state {
+    color: var(--error-text);
+}
+
+.yes-no-field-error {
+    width: 100%;
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--error-text);
+}

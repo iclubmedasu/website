@@ -19,6 +19,9 @@ import projectFilesRoutes from "./projectFiles";
 import eventFilesRoutes from "./eventFiles";
 import notificationsRoutes from "./notifications";
 import publicRoutes from "./public";
+import siteContentRoutes from "./siteContent";
+import supportContentRoutes from "./supportContent";
+import financeRoutes from "./finance";
 
 import { downloadProfilePhoto } from "../services/githubStorage";
 
@@ -76,6 +79,9 @@ router.use("/schedule-slots", authenticateToken, scheduleSlotsRoutes);
 router.use("/project-files", authenticateToken, projectFilesRoutes);
 router.use("/event-files", authenticateToken, eventFilesRoutes);
 router.use("/notifications", authenticateToken, notificationsRoutes);
+router.use("/site-content", authenticateToken, siteContentRoutes);
+router.use("/site-content/support", authenticateToken, supportContentRoutes);
+router.use("/finance", authenticateToken, financeRoutes);
 
 router.get("/", (_req: Request, res: Response) => {
     res.json({
@@ -99,6 +105,8 @@ router.get("/", (_req: Request, res: Response) => {
             projectFiles: "/api/project-files",
             eventFiles: "/api/event-files",
             notifications: "/api/notifications",
+            siteContent: "/api/site-content",
+            finance: "/api/finance",
             public: "/api/public",
         },
     });

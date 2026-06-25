@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthGuard } from '@/components/AuthGuard/AuthGuard'
 import { UnassignedGate } from '@/components/UnassignedGate/UnassignedGate'
 import { AlumniGate } from '@/components/AlumniGate/AlumniGate'
 import { SideBarNavigationSlim } from '@/components/SideBarNavigationSlim/SideBarNavigationSlim'
 import { useAuth } from '@/context/AuthContext'
-import { getNotificationsWebSocketUrl, notificationsAPI } from '@/services/api'
+import { RealtimeProvider, useOptionalRealtimeContext } from '@/context/RealtimeContext'
+import { notificationsAPI } from '@/services/api'
 import type { NotificationRealtimeMessage } from '@/types/backend-contracts'
 import {
     Users,
@@ -20,7 +21,12 @@ import {
     LayoutDashboard,
     Archive,
     Menu,
-    X
+    X,
+    Globe,
+    Info,
+    Mail,
+    LifeBuoy,
+    Wallet,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -56,14 +62,47 @@ const NAV_ITEMS = [
         ],
     },
     {
-        label: 'Help & Support',
-        href: '/help',
-        icon: HelpCircle
+        label: 'Finance',
+        href: '/finance',
+        icon: Wallet,
+        requiresFinanceAccess: true,
+    },
+    {
+        label: 'General',
+        icon: Globe,
+        items: [
+            { label: 'Help & Support', href: '/help', icon: HelpCircle },
+            { label: 'Support page', href: '/general/support', icon: LifeBuoy },
+            { label: 'About', href: '/general/about', icon: Info },
+            { label: 'Contact', href: '/general/contact', icon: Mail },
+        ],
     }
 ]
 
+function getNavItems(user: ReturnType<typeof useAuth>['user']) {
+    const canEditSite = !!(user?.isDeveloper || user?.isOfficer || user?.isAdmin)
+    const canEditSupport = canEditSite || !!user?.isSupportFormsEditor
+    const canViewFinance = canEditSite || !!user?.isFinanceViewer
+
+    return NAV_ITEMS
+        .filter((item) => !item.requiresFinanceAccess || canViewFinance)
+        .map((item) => {
+        if (item.label !== 'General' || !item.items) return item
+        return {
+            ...item,
+            items: item.items.filter((subItem) => {
+                if (subItem.href === '/help') return true
+                if (subItem.href === '/general/about' || subItem.href === '/general/contact') return canEditSite
+                if (subItem.href === '/general/support') return canEditSupport
+                return true
+            }),
+        }
+    })
+}
+
 function PortalLayout({ children }: { children: React.ReactNode }) {
     const { user, logout } = useAuth()
+    const navItems = useMemo(() => getNavItems(user), [user])
     const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
     const [unreadCount, setUnreadCount] = useState(0)
     const mobileNavTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -115,55 +154,19 @@ function PortalLayout({ children }: { children: React.ReactNode }) {
         void refreshUnreadCount()
     }, [refreshUnreadCount])
 
+    const realtime = useOptionalRealtimeContext()
+
     useEffect(() => {
-        if (!user?.id) {
+        if (!realtime || !user?.id) {
             return
         }
 
-        let isDisposed = false
-        let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-        let socket: WebSocket | null = null
-
-        const connect = () => {
-            if (isDisposed) return
-
-            socket = new WebSocket(getNotificationsWebSocketUrl())
-
-            socket.onopen = () => {
+        return realtime.subscribe('__notifications__', (payload: NotificationRealtimeMessage) => {
+            if (payload.type === 'notification.created') {
                 void refreshUnreadCount()
             }
-
-            socket.onmessage = (event) => {
-                try {
-                    const payload = JSON.parse(String(event.data)) as NotificationRealtimeMessage
-                    if (payload.type === 'notification.created') {
-                        void refreshUnreadCount()
-                    }
-                } catch {
-                    // Ignore malformed websocket payloads.
-                }
-            }
-
-            socket.onerror = () => {
-                socket?.close()
-            }
-
-            socket.onclose = () => {
-                if (isDisposed) return
-                reconnectTimer = setTimeout(connect, 2000)
-            }
-        }
-
-        connect()
-
-        return () => {
-            isDisposed = true
-            if (reconnectTimer) {
-                clearTimeout(reconnectTimer)
-            }
-            socket?.close()
-        }
-    }, [refreshUnreadCount, user?.id])
+        })
+    }, [realtime, refreshUnreadCount, user?.id])
 
     const footerItems = [
         {
@@ -193,7 +196,7 @@ function PortalLayout({ children }: { children: React.ReactNode }) {
                         {isMobileNavOpen ? <X size={20} /> : <Menu size={20} />}
                     </button>
                     <SideBarNavigationSlim
-                        items={NAV_ITEMS}
+                        items={navItems}
                         footerItems={footerItems}
                         user={user}
                         onLogout={logout}
@@ -217,9 +220,11 @@ export default function ProtectedLayout({
 }) {
     return (
         <AuthGuard>
-            <PortalLayout>
-                {children}
-            </PortalLayout>
+            <RealtimeProvider>
+                <PortalLayout>
+                    {children}
+                </PortalLayout>
+            </RealtimeProvider>
         </AuthGuard>
     )
 }

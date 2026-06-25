@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useResourceChannel } from '@/hooks/useResourceChannel';
 import { FileSpreadsheet, Plus } from 'lucide-react';
 import Toggle from '@/components/toggle/Toggle';
 import { fmtDate } from '@/components/cards/LifecycleCardView/LifecycleCardView';
@@ -121,6 +122,17 @@ export default function EventRegistrationsSection({
     useEffect(() => {
         void loadRegistrations();
     }, [loadRegistrations]);
+
+    const handleRemoteRefresh = useCallback(() => {
+        void loadRegistrations();
+        onCheckIn?.();
+    }, [loadRegistrations, onCheckIn]);
+
+    useResourceChannel({
+        resource: 'event',
+        resourceId: eventId,
+        onRefresh: handleRemoteRefresh,
+    });
 
     useEffect(() => {
         if (isAddingAttendee && tableScrollRef.current) {
@@ -337,7 +349,7 @@ export default function EventRegistrationsSection({
                 <h2 className="expanded-section-title">Registrations</h2>
                 {canPublishEvent ? (
                     <div className="event-expanded-publish-toggle">
-                        <span className="event-expanded-publish-toggle-label">Accept registrations</span>
+                        <span className="event-expanded-publish-toggle-label">Accept registrations (publish to public website)</span>
                         <Toggle
                             color="purple"
                             checked={isPublished}

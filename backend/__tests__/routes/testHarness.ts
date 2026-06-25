@@ -8,6 +8,8 @@ export interface TestRequestUser {
     isAdmin: boolean
     isLeadership: boolean
     isSpecial: boolean
+    isSupportFormsEditor: boolean
+    isFinanceViewer: boolean
 }
 
 const defaultUser: TestRequestUser = {
@@ -16,7 +18,9 @@ const defaultUser: TestRequestUser = {
     isOfficer: false,
     isAdmin: false,
     isLeadership: false,
-    isSpecial: false
+    isSpecial: false,
+    isSupportFormsEditor: false,
+    isFinanceViewer: false,
 }
 
 export function buildRouteApp(router: Router, user: Partial<TestRequestUser> = {}): express.Express {

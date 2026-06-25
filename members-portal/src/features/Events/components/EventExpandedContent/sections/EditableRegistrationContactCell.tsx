@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Check, Pencil, X } from 'lucide-react';
 import { eventsAPI } from '@/services/api';
 import type { EventRegistrationRef, Id } from '@/types/backend-contracts';
+import { handleRegistrationConflict } from '../registrationConflictUtils';
 
 type ContactField = 'fullName' | 'email' | 'phoneNumber';
 
@@ -119,11 +120,14 @@ export default function EditableRegistrationContactCell({
         setSaving(true);
         setError('');
         try {
-            const updated = await eventsAPI.updateRegistration(eventId, registration.id, payload);
+            const updated = await eventsAPI.updateRegistration(eventId, registration.id, {
+                ...payload,
+                version: registration.version,
+            });
             onUpdated(updated);
             setEditing(false);
         } catch (saveError) {
-            setError(saveError instanceof Error ? saveError.message : 'Failed to save.');
+            handleRegistrationConflict(saveError, onUpdated, setError);
         } finally {
             setSaving(false);
         }

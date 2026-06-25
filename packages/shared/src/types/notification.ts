@@ -64,8 +64,12 @@ export interface NotificationMarkAllReadResponse {
 }
 
 export interface NotificationRealtimeMessage {
-    type: "notification.created" | "notification.ping";
+    type: "notification.created" | "notification.ping" | "resource.changed";
     notificationId?: Id;
     eventType?: NotificationEventType;
     createdAt?: ISODateTime;
+    resource?: "event" | "project";
+    id?: Id;
+    version?: number;
+    actorMemberId?: Id | null;
 }

@@ -58,8 +58,10 @@ model Member {
   eventTaskAssignments EventTaskAssignment[]   // Event task time slots assigned to this member
   eventTasksLed       EventTask[]             @relation("EventTaskLeader")
   eventTasksCreated   EventTask[]             @relation("EventTaskCreatedBy")
+  financeTransactionsCreated FinanceTransaction[]
   notificationEventsAuthored NotificationEvent[] @relation("NotificationEventActor")
   notifications      Notification[]
+  incidentReports    IncidentReport[]
 }
 
 // ============================================
@@ -307,6 +309,7 @@ model Project {
   isFinalized     Boolean   @default(false)
   isArchived      Boolean   @default(false)
   isDisclosed     Boolean   @default(false)
+  version         Int       @default(0)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
@@ -359,6 +362,7 @@ model Event {
   isPublished         Boolean   @default(false)
   isDisclosed         Boolean   @default(false)
   deletedAt           DateTime?
+  version             Int       @default(0)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
@@ -424,6 +428,7 @@ model EventCustomField {
   order           Int       @default(0)
   isLocked        Boolean   @default(false)
   isActive        Boolean   @default(true)
+  version         Int       @default(0)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -451,6 +456,7 @@ model EventRegistration {
   customFieldValues  Json?
   ticketEmailSentAt  DateTime?
   reminderEmailSentAt DateTime?
+  version            Int       @default(0)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -651,6 +657,7 @@ model ProjectPhase {
   order       Int       @default(0)
   wbs         String    @default("")
   isActive    Boolean   @default(true)
+  version     Int       @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -688,6 +695,7 @@ model Task {
   estimatedHours  Float?
   actualHours     Float?
   isActive        Boolean   @default(true)
+  version         Int       @default(0)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
@@ -1051,4 +1059,244 @@ model EventFolder {
   @@index([eventId])
   @@index([eventId, isActive])
   @@index([createdByMemberId])
+}
+
+// ============================================
+// SITE CONTENT - Public website About & Contact pages
+// ============================================
+enum AboutSectionType {
+  TWO_COLUMN
+  BULLET_LIST
+  SPONSORS
+}
+
+enum ContactMethodType {
+  EMAIL
+  PHONE
+  ADDRESS
+  OTHER
+}
+
+enum SocialPlatform {
+  INSTAGRAM
+  FACEBOOK
+  WHATSAPP
+  LINKEDIN
+  IHUB
+  OTHER
+}
+
+model SitePage {
+  id          String   @id
+  eyebrow     String
+  title       String
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AboutSection {
+  id           Int              @id @default(autoincrement())
+  sortOrder    Int
+  type         AboutSectionType
+  title        String
+  leftLabel    String?
+  leftText     String?
+  rightLabel   String?
+  rightText    String?
+  bullets      Json?
+  emptyMessage String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  sponsors     AboutSponsor[]
+
+  @@index([sortOrder])
+}
+
+model AboutSponsor {
+  id          Int          @id @default(autoincrement())
+  sectionId   Int
+  sortOrder   Int
+  name        String
+  description String?
+  logoUrl     String?
+  websiteUrl  String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  section     AboutSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@index([sectionId])
+  @@index([sectionId, sortOrder])
+}
+
+model ContactMethod {
+  id        Int              @id @default(autoincrement())
+  sortOrder Int
+  type      ContactMethodType
+  label     String
+  value     String
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([sortOrder])
+}
+
+model SocialLink {
+  id        Int            @id @default(autoincrement())
+  sortOrder Int
+  platform  SocialPlatform
+  url       String
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([sortOrder])
+}
+
+enum SupportLocale {
+  EN
+  AR
+}
+
+enum IncidentReportSource {
+  PUBLIC
+  PORTAL
+}
+
+model SupportNoticeBlock {
+  id        Int           @id @default(autoincrement())
+  sortOrder Int
+  locale    SupportLocale
+  content   String        @db.Text
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([sortOrder])
+  @@index([locale, sortOrder])
+}
+
+model IncidentReportField {
+  id        Int      @id @default(autoincrement())
+  formId    Int
+  label     String
+  type      String
+  options   Json?
+  required  Boolean  @default(false)
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  form IncidentReportType @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@index([formId, order])
+}
+
+model IncidentReportType {
+  id        Int                   @id @default(autoincrement())
+  slug      String?               @unique
+  label     String
+  sortOrder Int
+  isSystem  Boolean               @default(false)
+  isActive  Boolean               @default(true)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+  fields    IncidentReportField[]
+
+  @@index([sortOrder])
+}
+
+model IncidentReport {
+  id                Int                  @id @default(autoincrement())
+  answers           Json
+  source            IncidentReportSource
+  submitterMemberId Int?
+  createdAt         DateTime             @default(now())
+  submitter         Member?              @relation(fields: [submitterMemberId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([submitterMemberId])
+}
+
+// ============================================
+// FINANCE - Club money tracking (FR team)
+// ============================================
+model FinanceAccount {
+  id             Int       @id @default(autoincrement())
+  name           String
+  accountType    String    @default("BANK")
+  currency       String    @default("EGP")
+  openingBalance Decimal   @default(0) @db.Decimal(12, 2)
+  isActive       Boolean   @default(true)
+  description    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  transactions   FinanceTransaction[]
+  scheduledItems FinanceScheduledItem[]
+  liabilities    FinanceLiability[]
+
+  @@index([isActive])
+}
+
+model FinanceTransaction {
+  id                Int      @id @default(autoincrement())
+  accountId         Int
+  type              String
+  amount            Decimal  @db.Decimal(12, 2)
+  category          String
+  description       String?
+  transactionDate   DateTime @db.Date
+  reference         String?
+  createdByMemberId Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  account   FinanceAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  createdBy Member?        @relation(fields: [createdByMemberId], references: [id], onDelete: SetNull)
+
+  @@index([accountId])
+  @@index([transactionDate])
+  @@index([type])
+  @@index([category])
+}
+
+model FinanceLiability {
+  id          Int       @id @default(autoincrement())
+  creditor    String
+  description String?
+  totalAmount Decimal   @db.Decimal(12, 2)
+  paidAmount  Decimal   @default(0) @db.Decimal(12, 2)
+  dueDate     DateTime? @db.Date
+  status      String    @default("ACTIVE")
+  currency    String    @default("EGP")
+  accountId   Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  account FinanceAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([status])
+  @@index([dueDate])
+  @@index([accountId])
+}
+
+model FinanceScheduledItem {
+  id          Int      @id @default(autoincrement())
+  title       String
+  type        String
+  amount      Decimal  @db.Decimal(12, 2)
+  dueDate     DateTime @db.Date
+  recurrence  String?
+  accountId   Int
+  isCompleted Boolean  @default(false)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  account FinanceAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([dueDate])
+  @@index([isCompleted])
 }

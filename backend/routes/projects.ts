@@ -8,6 +8,12 @@ import {
     summarizeChanges,
 } from '../services/activityLogService';
 import { emitNotificationEvent, resolveTeamMemberIds } from '../services/notificationService';
+import {
+    parseExpectedVersion,
+    respondVersionConflict,
+    updateProjectOptimistic,
+} from '../lib/optimisticLock';
+import { publishProjectChanged } from '../lib/resourceRealtime';
 
 const router: any = express.Router();
 
@@ -611,18 +617,27 @@ router.put('/:id', async (req, res) => {
             }
         }
 
-        const project = await prisma.project.update({
-            where: { id },
-            data,
-            include: {
-                createdBy: { select: { id: true, fullName: true } },
-                projectTeams: {
-                    include: { team: { select: { id: true, name: true } } },
-                }, projectType: { select: { id: true, name: true, category: true } },
-                tags: true,
-                _count: { select: { tasks: { where: { isActive: true, parentTaskId: null } } } },
+        const expectedVersion = parseExpectedVersion(req.body);
+        const projectInclude = {
+            createdBy: { select: { id: true, fullName: true } },
+            projectTeams: {
+                include: { team: { select: { id: true, name: true } } },
             },
-        });
+            projectType: { select: { id: true, name: true, category: true } },
+            tags: true,
+            _count: { select: { tasks: { where: { isActive: true, parentTaskId: null } } } },
+        } as const;
+
+        const projectResult = await updateProjectOptimistic(
+            id,
+            expectedVersion,
+            data,
+            projectInclude,
+        );
+        if (!projectResult.ok) {
+            return respondVersionConflict(res, projectResult.latest);
+        }
+        const project = projectResult.record;
 
         const after = {
             title: project.title,
@@ -677,6 +692,12 @@ router.put('/:id', async (req, res) => {
                 });
             }
         }
+
+        publishProjectChanged({
+            projectId: id,
+            version: project.version,
+            actorMemberId: req.user.memberId ?? null,
+        });
 
         res.json(project);
     } catch (error) {

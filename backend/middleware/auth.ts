@@ -1,6 +1,12 @@
 import jwt from "jsonwebtoken";
 import type { NextFunction, Request, Response } from "express";
 import { prisma } from "../db";
+import {
+    canEditSiteContent,
+    canEditSupportForms,
+    isHrHeadOrVice,
+} from "../lib/supportPermissions";
+import { canViewFinance, isFrHeadOrVice } from "../lib/financePermissions";
 import type { RequestUser } from "../types/auth";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-this";
@@ -135,4 +141,66 @@ const requireAdmin = async (req: Request, res: Response, next: NextFunction): Pr
     return next();
 };
 
-export { authenticateToken, optionalAuthenticateToken, requireAdmin, JWT_SECRET, extractAuthToken };
+/** Officers, Administration, or developers may edit public site content. */
+const requireSiteContentEditor = (req: Request, res: Response, next: NextFunction): Response | void => {
+    if (req.user?.isDeveloper || req.user?.isOfficer || req.user?.isAdmin) {
+        return next();
+    }
+
+    return res.status(403).json({ error: "Site content editor access required" });
+};
+
+/** Developers, officers, or administration may edit support page header and guidance blocks. */
+const requireSupportPageEditor = (req: Request, res: Response, next: NextFunction): Response | void => {
+    if (canEditSiteContent(req.user)) {
+        return next();
+    }
+
+    return res.status(403).json({ error: "Support page editor access required" });
+};
+
+/** Developers, officers, administration, or HR head/vice may edit forms and submissions. */
+const requireSupportFormsEditor = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+): Promise<Response | void> => {
+    if (canEditSupportForms(req.user)) {
+        return next();
+    }
+
+    if (req.user?.memberId && await isHrHeadOrVice(req.user.memberId)) {
+        return next();
+    }
+
+    return res.status(403).json({ error: "Support forms editor access required" });
+};
+
+/** Developers, officers, administration, or FR head/vice may view finance dashboard. */
+const requireFinanceViewer = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+): Promise<Response | void> => {
+    if (canViewFinance(req.user)) {
+        return next();
+    }
+
+    if (req.user?.memberId && await isFrHeadOrVice(req.user.memberId)) {
+        return next();
+    }
+
+    return res.status(403).json({ error: "Finance viewer access required" });
+};
+
+export {
+    authenticateToken,
+    optionalAuthenticateToken,
+    requireAdmin,
+    requireSiteContentEditor,
+    requireSupportPageEditor,
+    requireSupportFormsEditor,
+    requireFinanceViewer,
+    JWT_SECRET,
+    extractAuthToken,
+};

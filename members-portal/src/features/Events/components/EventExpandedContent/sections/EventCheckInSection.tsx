@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { X } from 'lucide-react';
+import { YesNoField } from '@/components/YesNoField/YesNoField';
 import type { EventCustomFieldRef, Id } from '@/types/backend-contracts';
 import {
     dropdownOptions,
@@ -68,14 +69,17 @@ export default function EventCheckInPanel({
 
         if (field.type === 'checkbox') {
             return (
-                <label key={field.id} className={`event-checkin-field${errorClass}`}>
-                    <input
-                        type="checkbox"
+                <div key={field.id} className={`event-checkin-field${errorClass}`}>
+                    <YesNoField
+                        id={`checkin-field-${field.id}`}
+                        label={field.label}
+                        required={field.required}
                         checked={Boolean(value)}
-                        onChange={(event) => updatePendingField(fieldKey, event.target.checked)}
+                        onChange={(next) => updatePendingField(fieldKey, next)}
+                        error={fieldErrors[fieldKey]}
+                        variant="stacked"
                     />
-                    <span>{field.label}</span>
-                </label>
+                </div>
             );
         }
 

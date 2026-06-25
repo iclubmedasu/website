@@ -22,8 +22,6 @@ import { useAuth } from '../../../context/AuthContext';
 import { teamsAPI, teamRolesAPI, teamSubteamsAPI, teamMembersAPI, getProfilePhotoUrl } from '../../../services/api';
 import type { Id } from '../../../types/backend-contracts';
 import { buildSearchText, matchesSearchQuery } from '../../../utils/search';
-import '../../Projects/ProjectsPage.css';
-
 interface TeamItem {
     id: Id;
     name: string;

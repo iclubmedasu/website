@@ -12,6 +12,14 @@ const prismaMocks = vi.hoisted(() => ({
     eventCustomFieldFindMany: vi.fn(),
     projectFindMany: vi.fn(),
     projectFindUnique: vi.fn(),
+    sitePageFindUnique: vi.fn(),
+    aboutSectionFindMany: vi.fn(),
+    contactMethodFindMany: vi.fn(),
+    socialLinkFindMany: vi.fn(),
+    supportNoticeBlockFindMany: vi.fn(),
+    incidentReportTypeFindMany: vi.fn(),
+    incidentReportTypeFindFirst: vi.fn(),
+    incidentReportCreate: vi.fn(),
 }));
 
 const emailMocks = vi.hoisted(() => ({
@@ -38,6 +46,28 @@ vi.mock("../../db", () => ({
         project: {
             findMany: prismaMocks.projectFindMany,
             findUnique: prismaMocks.projectFindUnique,
+        },
+        sitePage: {
+            findUnique: prismaMocks.sitePageFindUnique,
+        },
+        aboutSection: {
+            findMany: prismaMocks.aboutSectionFindMany,
+        },
+        contactMethod: {
+            findMany: prismaMocks.contactMethodFindMany,
+        },
+        socialLink: {
+            findMany: prismaMocks.socialLinkFindMany,
+        },
+        supportNoticeBlock: {
+            findMany: prismaMocks.supportNoticeBlockFindMany,
+        },
+        incidentReportType: {
+            findMany: prismaMocks.incidentReportTypeFindMany,
+            findFirst: prismaMocks.incidentReportTypeFindFirst,
+        },
+        incidentReport: {
+            create: prismaMocks.incidentReportCreate,
         },
     },
 }));
@@ -80,6 +110,12 @@ describe("public routes", () => {
         prismaMocks.eventCustomFieldFindMany.mockResolvedValue([]);
         prismaMocks.projectFindMany.mockResolvedValue([]);
         prismaMocks.projectFindUnique.mockResolvedValue(null);
+        prismaMocks.sitePageFindUnique.mockResolvedValue(null);
+        prismaMocks.aboutSectionFindMany.mockResolvedValue([]);
+        prismaMocks.contactMethodFindMany.mockResolvedValue([]);
+        prismaMocks.socialLinkFindMany.mockResolvedValue([]);
+        prismaMocks.supportNoticeBlockFindMany.mockResolvedValue([]);
+        prismaMocks.incidentReportTypeFindMany.mockResolvedValue([]);
         emailMocks.sendEmail.mockResolvedValue({ id: "email-1" });
     });
 
@@ -356,5 +392,153 @@ describe("public routes", () => {
                 subject: "[iClub Contact] Partnership",
             }),
         );
+    });
+
+    it("GET /public/site/about returns about page payload", async () => {
+        prismaMocks.sitePageFindUnique.mockResolvedValue({
+            id: "about",
+            eyebrow: "About",
+            title: "iClub",
+            description: "About us",
+        });
+        prismaMocks.aboutSectionFindMany.mockResolvedValue([
+            {
+                id: 1,
+                sortOrder: 0,
+                type: "BULLET_LIST",
+                title: "What We Do",
+                leftLabel: null,
+                leftText: null,
+                rightLabel: null,
+                rightText: null,
+                bullets: ["Host events"],
+                emptyMessage: null,
+                sponsors: [],
+            },
+        ]);
+
+        const response = await request(createApp()).get("/public/site/about");
+
+        expect(response.status).toBe(200);
+        expect(response.body.header.title).toBe("iClub");
+        expect(response.body.sections[0].bullets).toEqual(["Host events"]);
+    });
+
+    it("GET /public/site/social-links returns active links", async () => {
+        prismaMocks.socialLinkFindMany.mockResolvedValue([
+            { id: 1, platform: "INSTAGRAM", url: "https://instagram.com/iclub", sortOrder: 0 },
+        ]);
+
+        const response = await request(createApp()).get("/public/site/social-links");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toHaveLength(1);
+        expect(response.body[0].platform).toBe("INSTAGRAM");
+    });
+
+    it("GET /public/site/support returns support page payload with nested forms", async () => {
+        prismaMocks.sitePageFindUnique.mockResolvedValue({
+            id: "support",
+            eyebrow: "Support",
+            title: "Help and Support",
+            description: "Submit a report",
+        });
+        prismaMocks.supportNoticeBlockFindMany.mockResolvedValue([
+            { id: 1, sortOrder: 0, locale: "EN", content: "Guidance" },
+        ]);
+        prismaMocks.incidentReportTypeFindMany.mockResolvedValue([
+            {
+                id: 1,
+                label: "General Report",
+                slug: "general",
+                sortOrder: 0,
+                isSystem: true,
+                isActive: true,
+                fields: [
+                    {
+                        id: 10,
+                        formId: 1,
+                        label: "Location",
+                        type: "text",
+                        options: null,
+                        required: false,
+                        order: 0,
+                        isActive: true,
+                    },
+                ],
+            },
+        ]);
+
+        const response = await request(createApp()).get("/public/site/support");
+
+        expect(response.status).toBe(200);
+        expect(response.body.header.title).toBe("Help and Support");
+        expect(response.body.forms).toHaveLength(1);
+        expect(response.body.forms[0].fields).toHaveLength(1);
+    });
+
+    it("GET /public/site/support excludes inactive forms", async () => {
+        prismaMocks.sitePageFindUnique.mockResolvedValue({
+            id: "support",
+            eyebrow: "Support",
+            title: "Help and Support",
+            description: "Submit a report",
+        });
+        prismaMocks.supportNoticeBlockFindMany.mockResolvedValue([]);
+        prismaMocks.incidentReportTypeFindMany.mockResolvedValue([
+            {
+                id: 1,
+                label: "General Report",
+                slug: "general",
+                sortOrder: 0,
+                isSystem: true,
+                isActive: true,
+                fields: [],
+            },
+        ]);
+
+        const response = await request(createApp()).get("/public/site/support");
+
+        expect(response.status).toBe(200);
+        expect(prismaMocks.incidentReportTypeFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { isActive: true },
+            }),
+        );
+    });
+
+    it("POST /public/support/incident-reports stores a submission", async () => {
+        prismaMocks.incidentReportTypeFindFirst.mockResolvedValue({
+            id: 1,
+            label: "General Report",
+            slug: "general",
+            sortOrder: 0,
+            isSystem: true,
+            isActive: true,
+            fields: [],
+        });
+        prismaMocks.incidentReportCreate.mockResolvedValue({
+            id: 12,
+            answers: {
+                form: { id: 1, label: "General Report", slug: "general" },
+                reporter: { name: null, email: "reporter@example.com", phone: null, team: null },
+                description: "Concern",
+                extraAnswers: [],
+            },
+            source: "PUBLIC",
+            submitterMemberId: null,
+            createdAt: new Date("2026-06-24T12:00:00.000Z"),
+        });
+
+        const response = await request(createApp())
+            .post("/public/support/incident-reports")
+            .send({
+                formId: 1,
+                email: "reporter@example.com",
+                description: "Concern",
+            });
+
+        expect(response.status).toBe(201);
+        expect(prismaMocks.incidentReportCreate).toHaveBeenCalled();
     });
 });

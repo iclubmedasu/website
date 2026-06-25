@@ -20,6 +20,7 @@ RETURNS event_trigger
 LANGUAGE plpgsql
 AS $$
 DECLARE obj record;
+DECLARE table_name text;
 BEGIN
   FOR obj IN
     SELECT *
@@ -27,9 +28,10 @@ BEGIN
     WHERE command_tag = 'CREATE TABLE'
       AND schema_name = 'public'
   LOOP
+    table_name := trim(both '"' from split_part(obj.object_identity, '.', 2));
     EXECUTE format(
       'ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',
-      split_part(obj.object_identity, '.', 2)
+      table_name
     );
   END LOOP;
 END;

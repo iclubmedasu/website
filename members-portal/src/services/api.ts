@@ -2,6 +2,7 @@ import type {
     AddDependencyPayload,
     AddTaskTagPayload,
     ApiErrorResponse,
+    ConflictErrorResponse,
     CreatePhasePayload,
     CreateEventCustomFieldPayload,
     CreateEventPayload,
@@ -71,6 +72,7 @@ import type {
     UpdateTaskPayload,
     ReorderEventCustomFieldsPayload,
 } from "../types/backend-contracts";
+import { ConflictError } from './conflictError';
 
 function isLoopbackHost(hostname: string): boolean {
     return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
@@ -115,6 +117,8 @@ export function shouldSendCredentials(): boolean {
         return false;
     }
 }
+
+export { ConflictError, isConflictError } from './conflictError';
 
 export function getNotificationsWebSocketUrl(): string {
     if (typeof window === 'undefined') {
@@ -259,7 +263,10 @@ const getAuthOnlyHeaders = (): JsonHeaders => {
 // Helper function to handle API responses
 const handleResponse = async <T = unknown>(response: Response): Promise<T> => {
     if (!response.ok) {
-        const error = (await response.json().catch(() => ({ error: 'An error occurred' }))) as ApiErrorResponse;
+        const error = (await response.json().catch(() => ({ error: 'An error occurred' }))) as ApiErrorResponse & ConflictErrorResponse;
+        if (response.status === 409 && error.code) {
+            throw new ConflictError(error);
+        }
         throw new Error(error.error || `HTTP error! status: ${response.status}`);
     }
     return (await response.json()) as T;
@@ -2153,5 +2160,498 @@ export const eventsAPI = {
         if (!response.ok) {
             await handleResponse(response);
         }
+    },
+};
+
+export const siteContentAPI = {
+    getAbout: async () => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/about`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    updateAboutHeader: async (payload: { eyebrow: string; title: string; description: string }) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/about/header`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    createAboutSection: async (payload: Record<string, unknown>) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/about/sections`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    updateAboutSection: async (sectionId: number, payload: Record<string, unknown>) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/about/sections/${sectionId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    deleteAboutSection: async (sectionId: number) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/about/sections/${sectionId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    reorderAboutSections: async (orderedIds: number[]) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/about/sections/reorder`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ orderedIds }),
+        });
+        return handleResponse(response);
+    },
+
+    createSponsor: async (sectionId: number, payload: Record<string, unknown>) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/about/sections/${sectionId}/sponsors`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    updateSponsor: async (sectionId: number, sponsorId: number, payload: Record<string, unknown>) => {
+        const response = await apiFetch(
+            `${API_BASE_URL}/site-content/about/sections/${sectionId}/sponsors/${sponsorId}`,
+            {
+                method: 'PUT',
+                headers: getAuthHeaders(),
+                body: JSON.stringify(payload),
+            },
+        );
+        return handleResponse(response);
+    },
+
+    deleteSponsor: async (sectionId: number, sponsorId: number) => {
+        const response = await apiFetch(
+            `${API_BASE_URL}/site-content/about/sections/${sectionId}/sponsors/${sponsorId}`,
+            {
+                method: 'DELETE',
+                headers: getAuthHeaders(),
+            },
+        );
+        return handleResponse(response);
+    },
+
+    getContact: async () => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/contact`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    updateContactHeader: async (payload: { eyebrow: string; title: string; description: string }) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/contact/header`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    createContactMethod: async (payload: Record<string, unknown>) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/contact/methods`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    updateContactMethod: async (methodId: number, payload: Record<string, unknown>) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/contact/methods/${methodId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    deleteContactMethod: async (methodId: number) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/contact/methods/${methodId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    reorderContactMethods: async (orderedIds: number[]) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/contact/methods/reorder`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ orderedIds }),
+        });
+        return handleResponse(response);
+    },
+
+    createSocialLink: async (payload: Record<string, unknown>) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/contact/social-links`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    updateSocialLink: async (linkId: number, payload: Record<string, unknown>) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/contact/social-links/${linkId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    deleteSocialLink: async (linkId: number) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/contact/social-links/${linkId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    reorderSocialLinks: async (orderedIds: number[]) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/contact/social-links/reorder`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ orderedIds }),
+        });
+        return handleResponse(response);
+    },
+};
+
+export const supportContentAPI = {
+    getSupport: async () => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    updateSupportHeader: async (payload: { eyebrow: string; title: string; description: string }) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/header`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    createNotice: async (payload: { locale: string; content: string }) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/notices`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    updateNotice: async (noticeId: number, payload: Record<string, unknown>) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/notices/${noticeId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    deleteNotice: async (noticeId: number) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/notices/${noticeId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    reorderNotices: async (orderedIds: number[]) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/notices/reorder`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ orderedIds }),
+        });
+        return handleResponse(response);
+    },
+
+    createForm: async (payload: { label: string }) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/forms`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    updateForm: async (formId: number, payload: Record<string, unknown>) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/forms/${formId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    deleteForm: async (formId: number) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/forms/${formId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    reorderForms: async (orderedIds: number[]) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/forms/reorder`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ orderedIds }),
+        });
+        return handleResponse(response);
+    },
+
+    createFormField: async (formId: number, payload: Record<string, unknown>) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/forms/${formId}/fields`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    updateFormField: async (formId: number, fieldId: number, payload: Record<string, unknown>) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/forms/${formId}/fields/${fieldId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    deleteFormField: async (formId: number, fieldId: number) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/forms/${formId}/fields/${fieldId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    reorderFormFields: async (formId: number, order: Array<{ id: number; order: number }>) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/forms/${formId}/fields/reorder`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ order }),
+        });
+        return handleResponse(response);
+    },
+
+    getReports: async (params?: { limit?: number; offset?: number; formId?: number }) => {
+        const search = new URLSearchParams();
+        if (params?.limit != null) search.set('limit', String(params.limit));
+        if (params?.offset != null) search.set('offset', String(params.offset));
+        if (params?.formId != null) search.set('formId', String(params.formId));
+        const query = search.toString();
+        const response = await apiFetch(
+            `${API_BASE_URL}/site-content/support/reports${query ? `?${query}` : ''}`,
+            { headers: getAuthHeaders() },
+        );
+        return handleResponse(response);
+    },
+
+    getSubmissionCounts: async () => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/reports/counts`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response) as Promise<{ counts: Record<string, number> }>;
+    },
+
+    getFormReports: async (formId: number) => {
+        const response = await apiFetch(
+            `${API_BASE_URL}/site-content/support/forms/${formId}/reports`,
+            { headers: getAuthHeaders() },
+        );
+        return handleResponse(response) as Promise<{ reports: import('@iclub/shared').IncidentReportDetail[]; total: number }>;
+    },
+
+    exportFormSubmissions: async (formId: number): Promise<void> => {
+        const response = await apiFetch(
+            `${API_BASE_URL}/site-content/support/forms/${formId}/reports/export`,
+            { headers: getAuthHeaders() },
+        );
+        if (!response.ok) {
+            await handleResponse(response);
+            return;
+        }
+        const blob = await response.blob();
+        const disposition = response.headers.get('Content-Disposition') ?? '';
+        const match = disposition.match(/filename="?([^"]+)"?/i);
+        const filename = match?.[1] ?? `form-${formId}-submissions.xlsx`;
+        const { downloadBlob } = await import('@/utils/downloadBlob');
+        downloadBlob(blob, filename);
+    },
+
+    getReport: async (reportId: number) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/reports/${reportId}`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    submitIncidentReport: async (payload: {
+        formId: number;
+        name?: string;
+        email: string;
+        phone?: string;
+        description: string;
+        team?: string;
+        fieldValues?: Record<string, unknown>;
+    }) => {
+        const response = await apiFetch(`${API_BASE_URL}/site-content/support/incident-reports`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse(response);
+    },
+
+    getPublicSupportPage: async () => {
+        const response = await apiFetch(`${API_BASE_URL}/public/site/support`);
+        return handleResponse(response);
+    },
+};
+
+export const financeAPI = {
+    getDashboard: async () => {
+        const response = await apiFetch(`${API_BASE_URL}/finance/dashboard`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<import('@iclub/shared').FinanceDashboardResponse>(response);
+    },
+
+    getAccounts: async () => {
+        const response = await apiFetch(`${API_BASE_URL}/finance/accounts`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<import('@iclub/shared').FinanceAccountSummary[]>(response);
+    },
+
+    getTransactions: async (params: import('@iclub/shared').FinanceTransactionFilters = {}) => {
+        const searchParams = new URLSearchParams();
+        if (params.accountId != null) searchParams.set('accountId', String(params.accountId));
+        if (params.type) searchParams.set('type', params.type);
+        if (params.category) searchParams.set('category', params.category);
+        if (params.search) searchParams.set('search', params.search);
+        if (params.dateFrom) searchParams.set('dateFrom', params.dateFrom);
+        if (params.dateTo) searchParams.set('dateTo', params.dateTo);
+        if (params.page != null) searchParams.set('page', String(params.page));
+        if (params.pageSize != null) searchParams.set('pageSize', String(params.pageSize));
+
+        const query = searchParams.toString();
+        const response = await apiFetch(
+            `${API_BASE_URL}/finance/transactions${query ? `?${query}` : ''}`,
+            { headers: getAuthHeaders() },
+        );
+        return handleResponse<import('@iclub/shared').FinanceTransactionListResponse>(response);
+    },
+
+    createAccount: async (payload: import('@iclub/shared').CreateFinanceAccountInput) => {
+        const response = await apiFetch(`${API_BASE_URL}/finance/accounts`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse<import('@iclub/shared').FinanceAccountSummary>(response);
+    },
+
+    updateAccount: async (id: Id, payload: import('@iclub/shared').UpdateFinanceAccountInput) => {
+        const response = await apiFetch(`${API_BASE_URL}/finance/accounts/${id}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse<import('@iclub/shared').FinanceAccountSummary>(response);
+    },
+
+    createTransaction: async (payload: import('@iclub/shared').CreateFinanceTransactionInput) => {
+        const response = await apiFetch(`${API_BASE_URL}/finance/transactions`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse<import('@iclub/shared').FinanceTransactionRow>(response);
+    },
+
+    updateTransaction: async (id: Id, payload: import('@iclub/shared').UpdateFinanceTransactionInput) => {
+        const response = await apiFetch(`${API_BASE_URL}/finance/transactions/${id}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse<import('@iclub/shared').FinanceTransactionRow>(response);
+    },
+
+    deleteTransaction: async (id: Id) => {
+        const response = await apiFetch(`${API_BASE_URL}/finance/transactions/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        if (!response.ok) {
+            const error = (await response.json().catch(() => ({ error: 'An error occurred' }))) as ApiErrorResponse;
+            throw new Error(error.error || `HTTP error! status: ${response.status}`);
+        }
+    },
+
+    createLiability: async (payload: import('@iclub/shared').CreateFinanceLiabilityInput) => {
+        const response = await apiFetch(`${API_BASE_URL}/finance/liabilities`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse<import('@iclub/shared').FinanceLiabilityRow>(response);
+    },
+
+    updateLiability: async (id: Id, payload: import('@iclub/shared').UpdateFinanceLiabilityInput) => {
+        const response = await apiFetch(`${API_BASE_URL}/finance/liabilities/${id}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse<import('@iclub/shared').FinanceLiabilityRow>(response);
+    },
+
+    createScheduledItem: async (payload: import('@iclub/shared').CreateFinanceScheduledItemInput) => {
+        const response = await apiFetch(`${API_BASE_URL}/finance/scheduled-items`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse<import('@iclub/shared').FinanceScheduledItemRow>(response);
+    },
+
+    updateScheduledItem: async (id: Id, payload: import('@iclub/shared').UpdateFinanceScheduledItemInput) => {
+        const response = await apiFetch(`${API_BASE_URL}/finance/scheduled-items/${id}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+        return handleResponse<import('@iclub/shared').FinanceScheduledItemRow>(response);
+    },
+
+    exportData: async () => {
+        const response = await apiFetch(`${API_BASE_URL}/finance/export`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<import('@iclub/shared').FinanceExportResponse>(response);
     },
 };

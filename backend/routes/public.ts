@@ -1,6 +1,10 @@
 import express, { Request, Response } from "express";
 import { prisma } from "../db";
 import { sendEmail } from "../services/emailService";
+import { buildMemberTimeline, toMemberProfileView } from "../lib/memberProfileVisibility";
+import { buildPublicMemberDirectory } from "../lib/publicMemberDirectory";
+import { getAboutPageData, getActiveSocialLinks, getContactPageData } from "../lib/siteContent";
+import { createIncidentReportSubmission, getSupportPageData } from "../lib/supportContent";
 
 const router = express.Router();
 
@@ -72,6 +76,18 @@ function parseEventId(value: string): number | null {
 
 function parseProjectId(value: string): number | null {
     return parseEventId(value);
+}
+
+function parseMemberId(value: string): number | null {
+    return parseEventId(value);
+}
+
+function isPublicEligibleMember(member: {
+    fullName: string;
+    isActive: boolean;
+    assignmentStatus: string;
+}): boolean {
+    return member.isActive && member.assignmentStatus !== "ALUMNI" && member.fullName !== "Pending";
 }
 
 function isTruthyQuery(value: unknown): boolean {
@@ -551,6 +567,154 @@ router.post("/contact", async (req: Request, res: Response) => {
 
         console.error("POST /public/contact error:", error);
         return res.status(500).json({ error: "Failed to send message" });
+    }
+});
+
+router.get("/site/about", async (_req: Request, res: Response) => {
+    try {
+        const page = await getAboutPageData();
+        if (!page) {
+            return res.status(404).json({ error: "About page not found" });
+        }
+        return res.json(page);
+    } catch (error) {
+        console.error("GET /public/site/about error:", error);
+        return res.status(500).json({ error: "Failed to fetch about page" });
+    }
+});
+
+router.get("/site/contact", async (_req: Request, res: Response) => {
+    try {
+        const page = await getContactPageData();
+        if (!page) {
+            return res.status(404).json({ error: "Contact page not found" });
+        }
+        return res.json(page);
+    } catch (error) {
+        console.error("GET /public/site/contact error:", error);
+        return res.status(500).json({ error: "Failed to fetch contact page" });
+    }
+});
+
+router.get("/site/social-links", async (_req: Request, res: Response) => {
+    try {
+        const links = await getActiveSocialLinks();
+        return res.json(links);
+    } catch (error) {
+        console.error("GET /public/site/social-links error:", error);
+        return res.status(500).json({ error: "Failed to fetch social links" });
+    }
+});
+
+router.get("/site/support", async (_req: Request, res: Response) => {
+    try {
+        const page = await getSupportPageData();
+        if (!page) {
+            return res.status(404).json({ error: "Support page not found" });
+        }
+        return res.json(page);
+    } catch (error) {
+        console.error("GET /public/site/support error:", error);
+        return res.status(500).json({ error: "Failed to fetch support page" });
+    }
+});
+
+router.post("/support/incident-reports", async (req: Request, res: Response) => {
+    try {
+        const honeypot = String(req.body?.website ?? "").trim();
+        if (honeypot) {
+            return res.json({ success: true });
+        }
+
+        const formId = parseInt(String(req.body?.formId ?? req.body?.reportTypeId ?? ""), 10);
+        if (Number.isNaN(formId)) {
+            return res.status(400).json({ error: "formId is required" });
+        }
+
+        const created = await createIncidentReportSubmission({
+            formId,
+            name: req.body?.name,
+            email: req.body?.email,
+            phone: req.body?.phone,
+            description: req.body?.description,
+            fieldValues: req.body?.fieldValues,
+            source: "PUBLIC",
+        });
+        return res.status(201).json(created);
+    } catch (error) {
+        const fieldErrors = (error as { fieldErrors?: Record<string, string> }).fieldErrors;
+        if (fieldErrors) {
+            return res.status(400).json({ error: "Validation failed", fieldErrors });
+        }
+        console.error("POST /public/support/incident-reports error:", error);
+        return res.status(500).json({ error: "Failed to submit incident report" });
+    }
+});
+
+router.get("/members/directory", async (_req: Request, res: Response) => {
+    try {
+        const directory = await buildPublicMemberDirectory();
+        return res.json(directory);
+    } catch (error) {
+        console.error("GET /public/members/directory error:", error);
+        return res.status(500).json({ error: "Failed to fetch member directory" });
+    }
+});
+
+router.get("/members/:id/profile", async (req: Request, res: Response) => {
+    try {
+        const memberId = parseMemberId(String(req.params.id));
+        if (memberId == null) {
+            return res.status(400).json({ error: "Invalid member ID" });
+        }
+
+        const member = await prisma.member.findUnique({
+            where: { id: memberId },
+            select: {
+                id: true,
+                fullName: true,
+                email: true,
+                email2: true,
+                email3: true,
+                phoneNumber: true,
+                phoneNumber2: true,
+                studentId: true,
+                profilePhotoUrl: true,
+                linkedInUrl: true,
+                joinDate: true,
+                showPhoneNumber: true,
+                showPhoneNumber2: true,
+                showEmail2: true,
+                showEmail3: true,
+                showStudentId: true,
+                isActive: true,
+                assignmentStatus: true,
+            },
+        });
+
+        if (!member || !isPublicEligibleMember(member)) {
+            return res.status(404).json({ error: "Member not found" });
+        }
+
+        const history = await prisma.memberRoleHistory.findMany({
+            where: { memberId },
+            include: {
+                team: true,
+                role: true,
+                member: true,
+                subteam: true,
+            },
+            orderBy: { startDate: "asc" },
+        });
+
+        const profile = toMemberProfileView(member);
+        return res.json({
+            ...profile,
+            roleHistory: buildMemberTimeline(history),
+        });
+    } catch (error) {
+        console.error("GET /public/members/:id/profile error:", error);
+        return res.status(500).json({ error: "Failed to fetch member profile" });
     }
 });
 

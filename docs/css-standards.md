@@ -710,8 +710,9 @@ src/
    - `.modal-header` + `.modal-body` + `.modal-footer` for layout
    - `.form-group` + `.form-label` + `.form-input` for forms
    - `.btn-primary` / `.btn-secondary` / `.btn-danger` for buttons
-4. If the modal needs a unique width: `.my-modal .modal-container { max-width: 500px; }`
-5. Do NOT redefine any base modal classes — import from `modal.css` (already in `app.css`)
+4. **Boolean on/off fields** MUST use `Toggle` from `@/components/toggle/Toggle` (`role="switch"`), never raw `<input type="checkbox">`. Use `FormToggleRow` from `@/components/toggle/FormToggleRow` for label + switch layout (`.form-toggle-row`). Import `@/components/toggle/toggle.css`.
+5. If the modal needs a unique width: `.my-modal .modal-container { max-width: 500px; }`
+6. Do NOT redefine any base modal classes — import from `modal.css` (already in `app.css`)
 
 ### 11.4 When Adding a New UI Component
 

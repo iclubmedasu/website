@@ -17,7 +17,6 @@ import EventActivityModal from './modals/EventActivityModal';
 import { parseEventTab, type EventTabKey } from './components/eventUtils';
 import type { EventDetail, EventQueryParams, EventSummary, Id, TeamRef } from '@/types/backend-contracts';
 import './EventsPage.css';
-import '../../features/Projects/ProjectsPage.css';
 
 const EVENTS_PER_PAGE = 10;
 
@@ -337,7 +336,7 @@ export default function EventsPage() {
         <main className="events-page">
             <div className="page-header">
                 <div>
-                    <h1 className="projects-title">Event Management</h1>
+                    <h1 className="events-title">Event Management</h1>
                 </div>
             </div>
 
@@ -388,7 +387,7 @@ export default function EventsPage() {
                 </div>
             ) : (
                 <>
-                    <div className="projects-grid">
+                    <div className="events-grid">
                         {paginatedEvents.map((event) => (
                             <EventCard
                                 key={event.id}
@@ -419,14 +418,14 @@ export default function EventsPage() {
                         ))}
                         {canCreateEvent && currentPage === 1 ? (
                             <div
-                                className="project-add-card"
+                                className="events-add-card"
                                 onClick={() => setShowCreateModal(true)}
                                 role="button"
                                 tabIndex={0}
                                 onKeyDown={(event) => event.key === 'Enter' && setShowCreateModal(true)}
                             >
-                                <Plus className="project-add-card-icon" />
-                                <span className="project-add-card-text">New Event</span>
+                                <Plus className="events-add-card-icon" />
+                                <span className="events-add-card-text">New Event</span>
                             </div>
                         ) : null}
                     </div>

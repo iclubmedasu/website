@@ -1,7 +1,8 @@
 'use client';
 
 import type { ComponentType } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { useResourceChannel } from '@/hooks/useResourceChannel';
 import { Layers3, ListChecks, Mail, RefreshCw, Users } from 'lucide-react';
 import type {
     EventCustomFieldRef,
@@ -91,7 +92,7 @@ export default function EventExpandedContent({
         return () => { active = false; };
     }, [eventId]);
 
-    const reloadAll = async () => {
+    const reloadAll = useCallback(async () => {
         const [tiersResult, fieldsResult, statsResult] = await Promise.all([
             eventsAPI.getTiers(eventId),
             eventsAPI.getCustomFields(eventId),
@@ -101,7 +102,13 @@ export default function EventExpandedContent({
         setFields(fieldsResult);
         setStats(statsResult);
         onReload();
-    };
+    }, [eventId, onReload]);
+
+    useResourceChannel({
+        resource: 'event',
+        resourceId: eventId,
+        onRefresh: () => { void reloadAll(); },
+    });
 
     const handleImportComplete = (result: ImportRegistrationsResult) => {
         if (result.created > 0) {
