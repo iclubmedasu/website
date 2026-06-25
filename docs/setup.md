@@ -11,11 +11,10 @@
 1. Clone the repository
 2. Navigate to the website/ folder
 3. Copy environment files:
-   - Copy .env.example to .env
-   - Copy backend/.env.example to backend/.env (if exists)
-   - Copy members-portal/.env.example to members-portal/.env.local (if exists)
-   - Copy public-website/.env.local.example to public-website/.env.local (if exists)
-4. Fill in all environment variables (see .env.example for descriptions)
+   - Copy `backend/.env.example` → `backend/.env`
+   - Copy `members-portal/.env.local.example` → `members-portal/.env.local`
+   - Copy `public-website/.env.local.example` → `public-website/.env.local`
+4. Fill in all environment variables (see each `.env.example` / `.env.local.example` for descriptions). Production URLs live in Hugging Face Space settings — see [deployment.md](deployment.md).
 5. Install all dependencies from the root:
    ```
    pnpm install

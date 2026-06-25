@@ -223,3 +223,90 @@ jobs:
           )
           print("Frontend upload complete")
           EOF
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 4 — Deploy public website to Hugging Face Space
+  #
+  # Required GitHub secrets:
+  #   HF_TOKEN           — Hugging Face User Access Token (write access)
+  #   HF_PUBLIC_SPACE    — Space path e.g. "iclubmedasu/public-website"
+  # ─────────────────────────────────────────────────────────────
+  deploy-public-website-hf:
+    name: Deploy Public Website to Hugging Face
+    runs-on: ubuntu-latest
+    needs: migrate
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Prepare public website Space files
+        run: |
+          cp public-website/Dockerfile Dockerfile
+          cp public-website/README.hf.md README.md
+
+      - name: Clean workspace before upload
+        run: |
+          # Backend and members-portal are not needed by the public website HF Space
+          rm -rf backend members-portal
+
+          # Remove all node_modules and cache folders
+          find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name ".next" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name ".cache" -exec rm -rf {} + 2>/dev/null || true
+
+          # Remove test and build output
+          find . -type d -name "coverage" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "playwright-report" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "test-results" -exec rm -rf {} + 2>/dev/null || true
+
+          echo "Workspace cleaned. Remaining files:"
+          find . -not -path "./.git/*" -type f | head -50
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install huggingface_hub with Xet support
+        run: pip install "huggingface_hub[hf_xet]"
+
+      - name: Upload to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_PUBLIC_SPACE: ${{ secrets.HF_PUBLIC_SPACE }}
+        run: |
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo_id = os.environ["HF_PUBLIC_SPACE"]
+
+          api.create_repo(
+              repo_id=repo_id,
+              repo_type="space",
+              space_sdk="docker",
+              exist_ok=True,
+          )
+
+          api.upload_folder(
+              folder_path=".",
+              repo_id=repo_id,
+              repo_type="space",
+              ignore_patterns=[
+                  ".git",
+                  ".github",
+                  ".env",
+                  ".env.*",
+                  "*.log",
+                  "*.tsbuildinfo",
+              ],
+              delete_patterns=[
+                  "backend/**",
+                  "members-portal/**",
+              ],
+              commit_message="Deploy public website from GitHub Actions",
+          )
+          print("Public website upload complete")
+          EOF

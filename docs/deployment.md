@@ -9,6 +9,7 @@ This project is deployed using GitHub Actions, with the following services:
 | Backend API       | Node.js API            | [Hugging Face Spaces](https://huggingface.co/spaces/iclubmedasu/backend) ([API](https://iclubmedasu-backend.hf.space/api), [Health](https://iclubmedasu-backend.hf.space/health)) |
 | Database          | PostgreSQL             | [Supabase](https://supabase.com/) |
 | Members Portal    | Next.js Node.js app    | [Hugging Face Spaces](https://huggingface.co/spaces/iclubmedasu/members-portal) ([Live site](https://iclubmedasu-members-portal.hf.space)) |
+| Public Website    | Next.js Node.js app    | [Hugging Face Spaces](https://huggingface.co/spaces/iclubmedasu/public-website) ([Live site](https://iclubmedasu-public-website.hf.space)) |
 
 ## Deployment Flow
 
@@ -19,6 +20,8 @@ This project is deployed using GitHub Actions, with the following services:
 3. **Database**: Managed by Supabase. Connection string is set via environment variables.
 4. **Frontend (Members Portal)**: Deployed as a Hugging Face Space (Docker container):
 	- [Live site](https://iclubmedasu-members-portal.hf.space)
+5. **Public Website**: Deployed as a Hugging Face Space (Docker container):
+	- [Live site](https://iclubmedasu-public-website.hf.space)
 
 
 ## Environment Variables
@@ -48,15 +51,23 @@ Set these in your backend Hugging Face Space → Settings → Variables and secr
 | RESEND_API_KEY            | Resend API key for ticket emails                 |
 | RESEND_FROM_EMAIL         | Verified sender in Resend (not @gmail.com); use your domain e.g. tickets@yourdomain.com |
 | RESEND_REPLY_TO           | Optional reply-to address e.g. asu.medicine.iclub@gmail.com |
+| PUBLIC_WEBSITE_URL        | Base URL for ticket email confirmation links (e.g. https://iclubmedasu-public-website.hf.space or http://localhost:3002 locally) |
 
-### Hugging Face Space Settings (Frontend)
-Set these in your frontend Hugging Face Space → Settings → **Variables** (not Secrets — build-time vars must be Variables).
+### Hugging Face Space Settings (Members Portal)
+Set these in the members portal Hugging Face Space → Settings → **Variables** (not Secrets — build-time vars must be Variables).
 
 | Variable             | Value                                              |
 |----------------------|----------------------------------------------------|
 | NEXT_PUBLIC_API_URL  | https://iclubmedasu-backend.hf.space/api           |
 
-That's genuinely the only one the frontend needs. HF passes Variables as Docker build args, which Next.js inlines at build time.
+### Hugging Face Space Settings (Public Website)
+Set these in the public website Hugging Face Space → Settings → **Variables** (not Secrets — build-time vars must be Variables).
+
+| Variable             | Value                                              |
+|----------------------|----------------------------------------------------|
+| NEXT_PUBLIC_API_URL  | https://iclubmedasu-backend.hf.space/api           |
+
+That's the only build-time variable each frontend needs. HF passes Variables as Docker build args, which Next.js inlines at build time.
 
 ### GitHub Actions Secrets (CI/CD)
 Set these in GitHub → repo Settings → Secrets and variables → Actions. These are used by your CI/CD workflow during deployment.
@@ -66,17 +77,23 @@ Set these in GitHub → repo Settings → Secrets and variables → Actions. The
 | DATABASE_URL       | Running Prisma migrations in the migrate job         |
 | HF_TOKEN           | Authenticating the push to Hugging Face               |
 | HF_SPACE           | Backend HF space path e.g. iclubmedasu/backend       |
-| HF_FRONTEND_SPACE  | Frontend HF space path e.g. iclubmedasu/members-portal |
+| HF_FRONTEND_SPACE  | Members portal HF space path e.g. iclubmedasu/members-portal |
+| HF_PUBLIC_SPACE    | Public website HF space path e.g. iclubmedasu/public-website |
 
-### Variables you can ignore or delete
+### Variables you can ignore
 
-| Variable            | Why                                                        |
-|---------------------|------------------------------------------------------------|
-| NETLIFY_AUTH_TOKEN  | No longer needed — frontend moved to Hugging Face          |
-| NETLIFY_SITE_ID     | Same reason                                                |
+| Variable              | Why                                                      |
+|-----------------------|----------------------------------------------------------|
 | SUPABASE_PROJECT_NAME | Not used in code, just for your own reference            |
 | SUPABASE_PROJECT_ID   | Same — informational only                                |
 | SUPABASE_DB_PASSWORD  | Already baked into DATABASE_URL, not needed separately   |
+
+### Legacy cleanup (Netlify)
+
+The members portal previously deployed to Netlify. If you have not already:
+
+1. Disconnect or delete the old Netlify site for the members portal.
+2. Remove any `NETLIFY_*` secrets from GitHub Actions if they are still present.
 
 #### Quick rule of thumb to remember
 
@@ -104,7 +121,7 @@ Set these in GitHub → repo Settings → Secrets and variables → Actions. The
 4. The Prisma migration set enables Row-Level Security on every app table so Supabase's public REST API cannot read or modify data directly.
 5. If you need to edit data manually as the project owner, use the Supabase SQL editor or dashboard with a privileged account rather than the public anon API.
 
-## Frontend Deployment (Hugging Face Spaces)
+## Frontend Deployment (Members Portal — Hugging Face Spaces)
 
 1. The members portal (Next.js app) is deployed as a Docker Space: [Live site](https://iclubmedasu-members-portal.hf.space)
 2. Set `NEXT_PUBLIC_API_URL` = `https://iclubmedasu-backend.hf.space/api` in the frontend Space → Settings → Variables
@@ -112,7 +129,7 @@ Set these in GitHub → repo Settings → Secrets and variables → Actions. The
 4. Next.js runs in `standalone` output mode on port 7860 (required by HF Spaces).
 5. Space config is in [`members-portal/README.hf.md`](../members-portal/README.hf.md) (copied to `README.md` during deploy).
 
-### Post-deploy static asset check
+### Post-deploy static asset check (Members Portal)
 
 Verify these return HTTP 200:
 
@@ -120,6 +137,21 @@ Verify these return HTTP 200:
 - `https://iclubmedasu-members-portal.hf.space/icons/icon-192x192.png`
 
 If users still see favicon errors after deploy, unregister the old service worker (DevTools → Application → Service Workers) and hard-refresh.
+
+## Frontend Deployment (Public Website — Hugging Face Spaces)
+
+1. The public website (Next.js app) is deployed as a Docker Space: [Live site](https://iclubmedasu-public-website.hf.space)
+2. Set `NEXT_PUBLIC_API_URL` = `https://iclubmedasu-backend.hf.space/api` in the Space → Settings → Variables
+3. The Dockerfile lives at [`public-website/Dockerfile`](../public-website/Dockerfile). CI copies it to the repo root before uploading to the Space.
+4. Next.js runs in `standalone` output mode on port 7860 (required by HF Spaces).
+5. Space config is in [`public-website/README.hf.md`](../public-website/README.hf.md) (copied to `README.md` during deploy).
+6. After first deploy, set backend `PUBLIC_WEBSITE_URL` = `https://iclubmedasu-public-website.hf.space` in the backend HF Space so ticket confirmation emails link to the live site.
+
+### Post-deploy static asset check (Public Website)
+
+Verify these return HTTP 200:
+
+- `https://iclubmedasu-public-website.hf.space/favicon.ico`
 
 ## Local Docker Testing
 
@@ -143,6 +175,11 @@ docker build -f backend/Dockerfile -t iclub-api .
 docker build -f members-portal/Dockerfile \
   --build-arg NEXT_PUBLIC_API_URL=http://localhost:3000/api \
   -t iclub-portal .
+
+# Build public website image (pass API URL at build time)
+docker build -f public-website/Dockerfile \
+  --build-arg NEXT_PUBLIC_API_URL=http://localhost:3000/api \
+  -t iclub-public .
 ```
 
 ## Post-Deployment Checklist
@@ -150,5 +187,6 @@ docker build -f members-portal/Dockerfile \
 - [ ] Database migrations ran successfully
 - [ ] Environment variables set correctly
 - [ ] API health endpoint returns 200 ([check here](https://iclubmedasu-backend.hf.space/health))
-- [ ] Frontend loads ([check here](https://iclubmedasu-members-portal.hf.space))
+- [ ] Members portal loads ([check here](https://iclubmedasu-members-portal.hf.space))
+- [ ] Public website loads ([check here](https://iclubmedasu-public-website.hf.space))
 - [ ] Login works (cookie set, API calls succeed, no CORS errors)

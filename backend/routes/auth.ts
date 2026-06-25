@@ -908,7 +908,8 @@ router.post('/login', async (req, res) => {
                         isSupportFormsEditor: true,
                         isFinanceViewer: true,
                         teamIds: []
-                    }
+                    },
+                    token,
                 });
             } else {
                 return res.status(401).json({ error: 'Invalid credentials' });

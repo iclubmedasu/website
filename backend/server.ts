@@ -62,14 +62,6 @@ function isHuggingFaceOrigin(origin: string): boolean {
     }
 }
 
-function isNetlifyOrigin(origin: string): boolean {
-    try {
-        return new URL(origin).hostname.endsWith(".netlify.app");
-    } catch {
-        return false;
-    }
-}
-
 app.use(
     cors({
         origin: (origin, callback) => {
@@ -79,11 +71,6 @@ app.use(
             }
 
             if (frontendOriginSet.has(origin)) {
-                callback(null, true);
-                return;
-            }
-
-            if (!isDevelopment && isNetlifyOrigin(origin)) {
                 callback(null, true);
                 return;
             }

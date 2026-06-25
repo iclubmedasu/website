@@ -7,9 +7,13 @@ Add the following secrets:
 - HF_TOKEN — Your Hugging Face User Access Token (write access)
 - HF_SPACE — Backend space path e.g. `iclubmedasu/backend`
 
-## Hugging Face (Frontend Deployment)
+## Hugging Face (Members Portal Deployment)
 - HF_TOKEN — Same token as above (reused)
-- HF_FRONTEND_SPACE — Frontend space path e.g. `iclubmedasu/members-portal`
+- HF_FRONTEND_SPACE — Members portal space path e.g. `iclubmedasu/members-portal`
+
+## Hugging Face (Public Website Deployment)
+- HF_TOKEN — Same token as above (reused)
+- HF_PUBLIC_SPACE — Public website space path e.g. `iclubmedasu/public-website`
 
 ## Database
 - DATABASE_URL — Supabase connection string (used by the migrate job)
@@ -18,4 +22,4 @@ Add the following secrets:
 - GITHUB_TOKEN is automatically provided by GitHub Actions — you do not need to add it
 - Only set up deployment secrets when you are ready to deploy
 - The CI pipeline (lint, typecheck, build) works without any secrets
-- Set `NEXT_PUBLIC_API_URL` in the **frontend HF Space Variables** (not GitHub secrets) — it is inlined at Docker build time
+- Set `NEXT_PUBLIC_API_URL` in each **frontend HF Space Variables** (members portal and public website — not GitHub secrets) — it is inlined at Docker build time

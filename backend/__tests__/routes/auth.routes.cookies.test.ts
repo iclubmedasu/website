@@ -63,7 +63,7 @@ describe('auth routes cookie security headers', () => {
         process.env.NODE_ENV = originalNodeEnv
     })
 
-    it('sets httpOnly strict token cookie on developer login and omits token body field', async () => {
+    it('sets httpOnly token cookie on developer login and returns token in body', async () => {
         process.env.NODE_ENV = 'test'
 
         const response = await request(buildAuthApp())
@@ -72,13 +72,14 @@ describe('auth routes cookie security headers', () => {
 
         expect(response.status).toBe(200)
         expect(response.body.user?.email).toBe('dev@iclub.com')
-        expect(response.body.token).toBeUndefined()
+        expect(typeof response.body.token).toBe('string')
+        expect(response.body.token.length).toBeGreaterThan(0)
 
         const tokenCookie = getTokenCookie(response.headers['set-cookie'])
         expect(tokenCookie).toContain('HttpOnly')
-        expect(tokenCookie).toContain('SameSite=Strict')
+        expect(tokenCookie).toContain('SameSite=None')
         expect(tokenCookie).toContain('Max-Age=604800')
-        expect(tokenCookie).not.toContain('Secure')
+        expect(tokenCookie).toContain('Secure')
     })
 
     it('sets secure token cookie in production mode', async () => {
@@ -89,14 +90,15 @@ describe('auth routes cookie security headers', () => {
             .send({ email: 'dev@iclub.com', password: 'dev123456' })
 
         expect(response.status).toBe(200)
+        expect(typeof response.body.token).toBe('string')
 
         const tokenCookie = getTokenCookie(response.headers['set-cookie'])
         expect(tokenCookie).toContain('HttpOnly')
-        expect(tokenCookie).toContain('SameSite=Strict')
+        expect(tokenCookie).toContain('SameSite=None')
         expect(tokenCookie).toContain('Secure')
     })
 
-    it('clears token cookie with strict/httpOnly attributes on logout', async () => {
+    it('clears token cookie with httpOnly attributes on logout', async () => {
         process.env.NODE_ENV = 'test'
 
         const response = await request(buildAuthApp())
@@ -108,7 +110,7 @@ describe('auth routes cookie security headers', () => {
         const tokenCookie = getTokenCookie(response.headers['set-cookie'])
         expect(tokenCookie).toContain('token=;')
         expect(tokenCookie).toContain('HttpOnly')
-        expect(tokenCookie).toContain('SameSite=Strict')
+        expect(tokenCookie).toContain('SameSite=None')
         expect(tokenCookie).toContain('Expires=Thu, 01 Jan 1970')
     })
 })
