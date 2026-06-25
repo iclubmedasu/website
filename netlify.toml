@@ -1,9 +1,0 @@
-[build]
-  command = "pnpm install && pnpm --filter members-portal build"
-  publish = "members-portal/.next"
-
-[build.environment]
-  NODE_VERSION = "20"
-
-[[plugins]]
-  package = "@netlify/plugin-nextjs"

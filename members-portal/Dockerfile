@@ -1,5 +1,6 @@
 # ============================================
 # iClub Members Portal - Dockerfile (Next.js)
+# Built for Hugging Face Spaces (port 7860)
 # ============================================
 
 FROM node:20-alpine AS base
@@ -15,32 +16,35 @@ COPY members-portal/package.json ./members-portal/
 COPY backend/package.json ./backend/
 COPY public-website/package.json ./public-website/
 COPY packages/shared/package.json ./packages/shared/
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --filter members-portal...
 
 # Build stage
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/members-portal/node_modules ./members-portal/node_modules
+COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN pnpm --filter members-portal build
 
 # Production stage
 FROM base AS runner
-WORKDIR /app/members-portal
+WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/members-portal/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/members-portal/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/members-portal/.next/static ./.next/static
+COPY --from=builder /app/members-portal/.next/standalone ./
+COPY --from=builder /app/members-portal/.next/static ./members-portal/.next/static
+COPY --from=builder /app/members-portal/public ./members-portal/public
 
 USER nextjs
-EXPOSE 3001
-ENV PORT=3001
+EXPOSE 7860
+ENV PORT=7860
 
-CMD ["node", "server.js"]
+CMD ["node", "members-portal/server.js"]

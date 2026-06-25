@@ -1,4 +1,4 @@
-name: Deploy — Supabase + Hugging Face + Netlify
+name: Deploy — Supabase + Hugging Face
 
 on:
   push:
@@ -138,49 +138,88 @@ jobs:
           EOF
 
   # ─────────────────────────────────────────────────────────────
-  # JOB 3 — Deploy frontend to Netlify
+  # JOB 3 — Deploy frontend to Hugging Face Space
   #
   # Required GitHub secrets:
-  #   NETLIFY_AUTH_TOKEN — Netlify personal access token
-  #   NETLIFY_SITE_ID    — found in Netlify site settings
-  #   HF_SPACE_URL       — iclubmedasu-backend.hf.space
+  #   HF_TOKEN           — Hugging Face User Access Token (write access)
+  #   HF_FRONTEND_SPACE  — Space path e.g. "iclubmedasu/members-portal"
   # ─────────────────────────────────────────────────────────────
-  # deploy-frontend:
-  #   name: Deploy Frontend to Netlify
-  #   runs-on: ubuntu-latest
-  #   needs: migrate
-  #
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Setup pnpm
-  #       uses: pnpm/action-setup@v3
-  #       with:
-  #         version: 10
-  #
-  #     - name: Setup Node.js
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: "20"
-  #         cache: "pnpm"
-  #
-  #     - name: Install all dependencies
-  #       run: pnpm install --frozen-lockfile
-  #
-  #
-  #     - name: Build members portal
-  #       run: pnpm --filter members-portal build
-  #       env:
-  #         NEXT_PUBLIC_API_URL: https://${{ secrets.HF_SPACE_URL }}/api
-  #
-  #     - name: Deploy to Netlify
-  #       uses: nwtgck/actions-netlify@v3
-  #       with:
-  #         publish-dir: members-portal/out
-  #         production-deploy: true
-  #         github-token: ${{ secrets.GITHUB_TOKEN }}
-  #         deploy-message: "Deploy from GitHub Actions — ${{ github.sha }}"
-  #       env:
-  #         NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-  #         NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+  deploy-frontend-hf:
+    name: Deploy Frontend to Hugging Face
+    runs-on: ubuntu-latest
+    needs: migrate
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Prepare frontend Space files
+        run: |
+          cp members-portal/Dockerfile Dockerfile
+          cp members-portal/README.hf.md README.md
+
+      - name: Clean workspace before upload
+        run: |
+          # Backend and public-website are not needed by the frontend HF Space
+          rm -rf backend public-website
+
+          # Remove all node_modules and cache folders
+          find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name ".next" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name ".cache" -exec rm -rf {} + 2>/dev/null || true
+
+          # Remove test and build output
+          find . -type d -name "coverage" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "playwright-report" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "test-results" -exec rm -rf {} + 2>/dev/null || true
+
+          echo "Workspace cleaned. Remaining files:"
+          find . -not -path "./.git/*" -type f | head -50
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install huggingface_hub with Xet support
+        run: pip install "huggingface_hub[hf_xet]"
+
+      - name: Upload to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_FRONTEND_SPACE: ${{ secrets.HF_FRONTEND_SPACE }}
+        run: |
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo_id = os.environ["HF_FRONTEND_SPACE"]
+
+          api.create_repo(
+              repo_id=repo_id,
+              repo_type="space",
+              space_sdk="docker",
+              exist_ok=True,
+          )
+
+          api.upload_folder(
+              folder_path=".",
+              repo_id=repo_id,
+              repo_type="space",
+              ignore_patterns=[
+                  ".git",
+                  ".github",
+                  ".env",
+                  ".env.*",
+                  "*.log",
+                  "*.tsbuildinfo",
+              ],
+              delete_patterns=[
+                  "backend/**",
+                  "public-website/**",
+              ],
+              commit_message="Deploy frontend from GitHub Actions",
+          )
+          print("Frontend upload complete")
+          EOF

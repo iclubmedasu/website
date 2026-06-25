@@ -6,19 +6,19 @@ This project is deployed using GitHub Actions, with the following services:
 
 | Service           | Purpose                | Provider/URL |
 |-------------------|------------------------|--------------|
-| Backend API       | Node.js API            | [Hugging Face Spaces](https://huggingface.co/spaces/iclubmedasu/backend) ([API test](https://your-hf-space-url.hf.space/api), [Health check](https://your-hf-space-url.hf.space/health)) |
+| Backend API       | Node.js API            | [Hugging Face Spaces](https://huggingface.co/spaces/iclubmedasu/backend) ([API](https://iclubmedasu-backend.hf.space/api), [Health](https://iclubmedasu-backend.hf.space/health)) |
 | Database          | PostgreSQL             | [Supabase](https://supabase.com/) |
-| Members Portal    | Next.js Node.js app    | [Netlify](https://69d96de0a0d4b29ccf1ca911--luxury-jelly-b24265.netlify.app) |
+| Members Portal    | Next.js Node.js app    | [Hugging Face Spaces](https://huggingface.co/spaces/iclubmedasu/members-portal) ([Live site](https://iclubmedasu-members-portal.hf.space)) |
 
 ## Deployment Flow
 
 1. **GitHub Actions**: CI/CD pipeline builds and deploys both backend and frontend on push to main.
 2. **Backend**: Deployed as a Hugging Face Space (Docker container). API and health endpoints:
-	- [API test](https://your-hf-space-url.hf.space/api)
-	- [Health check](https://your-hf-space-url.hf.space/health)
+	- [API](https://iclubmedasu-backend.hf.space/api)
+	- [Health check](https://iclubmedasu-backend.hf.space/health)
 3. **Database**: Managed by Supabase. Connection string is set via environment variables.
-4. **Frontend (Members Portal)**: Deployed to Netlify as a Next.js app:
-	- [Live site](https://69d96de0a0d4b29ccf1ca911--luxury-jelly-b24265.netlify.app)
+4. **Frontend (Members Portal)**: Deployed as a Hugging Face Space (Docker container):
+	- [Live site](https://iclubmedasu-members-portal.hf.space)
 
 
 ## Environment Variables
@@ -26,7 +26,7 @@ This project is deployed using GitHub Actions, with the following services:
 Here's a clear breakdown of where each variable belongs:
 
 ### Hugging Face Space Settings (Backend)
-Set these in your Hugging Face Space → Settings → Variables and secrets. These are used by your backend at runtime.
+Set these in your backend Hugging Face Space → Settings → Variables and secrets. These are used by your backend at runtime.
 
 | Variable                  | Value/Description                                 |
 |---------------------------|---------------------------------------------------|
@@ -43,45 +43,45 @@ Set these in your Hugging Face Space → Settings → Variables and secrets. The
 | GITHUB_USER_DATA_OWNER    | e.g. iclubmedasu                                 |
 | GITHUB_USER_DATA_REPO     | e.g. user-data                                   |
 | GITHUB_USER_DATA_TOKEN    | Your GitHub PAT for user data                    |
-| FRONTEND_URL              | https://your-site.netlify.app                    |
+| FRONTEND_URL              | https://iclubmedasu-members-portal.hf.space      |
 | FRONTEND_ORIGINS          | Same as above, or comma-separated list if needed |
 | RESEND_API_KEY            | Resend API key for ticket emails                 |
 | RESEND_FROM_EMAIL         | Verified sender in Resend (not @gmail.com); use your domain e.g. tickets@yourdomain.com |
 | RESEND_REPLY_TO           | Optional reply-to address e.g. asu.medicine.iclub@gmail.com |
 
-### Netlify Environment Variables (Frontend)
-Set these in Netlify → Site configuration → Environment variables. These are used by your frontend at build time.
+### Hugging Face Space Settings (Frontend)
+Set these in your frontend Hugging Face Space → Settings → **Variables** (not Secrets — build-time vars must be Variables).
 
-| Variable             | Value                                      |
-|----------------------|---------------------------------------------|
-| NEXT_PUBLIC_API_URL  | https://your-hf-space-url.hf.space/api    |
+| Variable             | Value                                              |
+|----------------------|----------------------------------------------------|
+| NEXT_PUBLIC_API_URL  | https://iclubmedasu-backend.hf.space/api           |
 
-That's genuinely the only one the frontend needs.
+That's genuinely the only one the frontend needs. HF passes Variables as Docker build args, which Next.js inlines at build time.
 
 ### GitHub Actions Secrets (CI/CD)
 Set these in GitHub → repo Settings → Secrets and variables → Actions. These are used by your CI/CD workflow during deployment.
 
-| Variable      | Used for                                             |
-|--------------|-----------------------------------------------------|
-| DATABASE_URL | Running Prisma migrations in the migrate job        |
-| HF_TOKEN     | Authenticating the push to Hugging Face             |
-| HF_SPACE     | The HF space path e.g. iclubmedasu/backend          |
+| Variable           | Used for                                             |
+|--------------------|------------------------------------------------------|
+| DATABASE_URL       | Running Prisma migrations in the migrate job         |
+| HF_TOKEN           | Authenticating the push to Hugging Face               |
+| HF_SPACE           | Backend HF space path e.g. iclubmedasu/backend       |
+| HF_FRONTEND_SPACE  | Frontend HF space path e.g. iclubmedasu/members-portal |
 
 ### Variables you can ignore or delete
 
 | Variable            | Why                                                        |
 |---------------------|------------------------------------------------------------|
-| NETLIFY_AUTH_TOKEN  | No longer needed — you deleted the deploy-frontend job      |
+| NETLIFY_AUTH_TOKEN  | No longer needed — frontend moved to Hugging Face          |
 | NETLIFY_SITE_ID     | Same reason                                                |
-| HF_SPACE_URL        | Was only used in the deploy-frontend job which is now gone |
 | SUPABASE_PROJECT_NAME | Not used in code, just for your own reference            |
 | SUPABASE_PROJECT_ID   | Same — informational only                                |
 | SUPABASE_DB_PASSWORD  | Already baked into DATABASE_URL, not needed separately   |
 
 #### Quick rule of thumb to remember
 
-> **Does the backend need it to run?** → Hugging Face Space settings  
-> **Does the frontend need it to build?** → Netlify environment variables  
+> **Does the backend need it to run?** → Backend Hugging Face Space settings  
+> **Does the frontend need it to build?** → Frontend Hugging Face Space Variables  
 > **Does the GitHub workflow need it to deploy?** → GitHub Actions secrets  
 > **Is it the same variable needed in two places?** → Set it in both (like DATABASE_URL lives in both HF and GitHub)
 
@@ -91,8 +91,8 @@ Set these in GitHub → repo Settings → Secrets and variables → Actions. The
 2. Environment variables are set in the Hugging Face Space settings.
 3. On startup, the container runs `prisma migrate deploy` before starting the API process.
 4. API endpoints:
-	- [API test](https://your-hf-space-url.hf.space/api)
-	- [Health check](https://your-hf-space-url.hf.space/health)
+	- [API](https://iclubmedasu-backend.hf.space/api)
+	- [Health check](https://iclubmedasu-backend.hf.space/health)
 5. **Keep-alive Monitoring:**
 	- The Hugging Face Space is kept alive using [UptimeRobot](https://dashboard.uptimerobot.com/monitors/802817894), which regularly pings the health endpoint to prevent the space from sleeping.
 
@@ -104,24 +104,20 @@ Set these in GitHub → repo Settings → Secrets and variables → Actions. The
 4. The Prisma migration set enables Row-Level Security on every app table so Supabase's public REST API cannot read or modify data directly.
 5. If you need to edit data manually as the project owner, use the Supabase SQL editor or dashboard with a privileged account rather than the public anon API.
 
-## Frontend Deployment (Netlify)
+## Frontend Deployment (Hugging Face Spaces)
 
-1. The members portal (Next.js app) is deployed to Netlify: [Live site](https://iclubmedasu-members-portal.netlify.app/)
-2. Environment variables are set in the Netlify dashboard. Set `NEXT_PUBLIC_API_URL` = `https://your-hf-space-url.hf.space/api`
-3. Netlify settings are defined in [`netlify.toml`](../netlify.toml) at the repo root:
-   - **Base directory:** repo root (not `members-portal`)
-   - **Build command:** `pnpm install && pnpm --filter members-portal build`
-   - **Publish directory:** `members-portal/.next`
-   - **Plugin:** `@netlify/plugin-nextjs` (required — publishes `public/` assets such as favicon and PWA icons to the CDN; publish dir alone is not sufficient)
-4. After changing static assets or PWA config, clear the Netlify build cache and redeploy
-5. Runtime: Node.js (Next.js server, not static export)
+1. The members portal (Next.js app) is deployed as a Docker Space: [Live site](https://iclubmedasu-members-portal.hf.space)
+2. Set `NEXT_PUBLIC_API_URL` = `https://iclubmedasu-backend.hf.space/api` in the frontend Space → Settings → Variables
+3. The Dockerfile lives at [`members-portal/Dockerfile`](../members-portal/Dockerfile). CI copies it to the repo root before uploading to the Space.
+4. Next.js runs in `standalone` output mode on port 7860 (required by HF Spaces).
+5. Space config is in [`members-portal/README.hf.md`](../members-portal/README.hf.md) (copied to `README.md` during deploy).
 
 ### Post-deploy static asset check
 
 Verify these return HTTP 200:
 
-- `https://iclubmedasu-members-portal.netlify.app/favicon.ico`
-- `https://iclubmedasu-members-portal.netlify.app/icons/icon-192x192.png`
+- `https://iclubmedasu-members-portal.hf.space/favicon.ico`
+- `https://iclubmedasu-members-portal.hf.space/icons/icon-192x192.png`
 
 If users still see favicon errors after deploy, unregister the old service worker (DevTools → Application → Service Workers) and hard-refresh.
 
@@ -143,13 +139,16 @@ docker-compose up portal
 # Build backend image
 docker build -f backend/Dockerfile -t iclub-api .
 
-# Build portal image
-docker build -f members-portal/Dockerfile -t iclub-portal .
+# Build portal image (pass API URL at build time)
+docker build -f members-portal/Dockerfile \
+  --build-arg NEXT_PUBLIC_API_URL=http://localhost:3000/api \
+  -t iclub-portal .
 ```
 
 ## Post-Deployment Checklist
 
 - [ ] Database migrations ran successfully
 - [ ] Environment variables set correctly
-- [ ] API health endpoint returns 200 ([check here](https://your-hf-space-url.hf.space/health))
-- [ ] Frontend loads ([check here](https://69d96de0a0d4b29ccf1ca911--luxury-jelly-b24265.netlify.app))
+- [ ] API health endpoint returns 200 ([check here](https://iclubmedasu-backend.hf.space/health))
+- [ ] Frontend loads ([check here](https://iclubmedasu-members-portal.hf.space))
+- [ ] Login works (cookie set, API calls succeed, no CORS errors)

@@ -45,8 +45,10 @@ services:
     build:
       context: .
       dockerfile: members-portal/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3000/api
     ports:
-      - '3001:3001'
+      - '7860:7860'
     depends_on:
       - api
 

@@ -29,7 +29,7 @@ const frontendOrigins = [
     "http://127.0.0.1:3001",
     "http://localhost:3002",
     "http://127.0.0.1:3002",
-    "https://iclubmedasu-members-portal.netlify.app",
+    "https://iclubmedasu-members-portal.hf.space",
     process.env.FRONTEND_URL,
     ...(process.env.FRONTEND_ORIGINS
         ? process.env.FRONTEND_ORIGINS.split(",").map((value) => value.trim())
@@ -49,6 +49,14 @@ function isPrivateNetworkOrigin(origin: string): boolean {
         if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) return true;
 
         return false;
+    } catch {
+        return false;
+    }
+}
+
+function isHuggingFaceOrigin(origin: string): boolean {
+    try {
+        return new URL(origin).hostname.endsWith(".hf.space");
     } catch {
         return false;
     }
@@ -80,6 +88,11 @@ app.use(
                 return;
             }
 
+            if (!isDevelopment && isHuggingFaceOrigin(origin)) {
+                callback(null, true);
+                return;
+            }
+
             if (isDevelopment && isPrivateNetworkOrigin(origin)) {
                 callback(null, true);
                 return;
@@ -99,7 +112,7 @@ app.get("/", (_req: Request, res: Response) => {
         service: "iClub Members Portal API",
         status: "ok",
         message: "This Hugging Face Space hosts the backend API only. Open the members portal to sign in.",
-        membersPortal: process.env.FRONTEND_URL ?? "https://iclubmedasu-members-portal.netlify.app",
+        membersPortal: process.env.FRONTEND_URL ?? "https://iclubmedasu-members-portal.hf.space",
         health: "/health",
         api: "/api",
     });
