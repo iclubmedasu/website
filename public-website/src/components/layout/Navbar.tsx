@@ -5,8 +5,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import iclubIcon from "@/assets/iclub_colored_transparent_outlined_icon.png";
 import { navLinks, siteConfig } from "@/lib/site";
+
+const ICLUB_ICON = "/images/iclub_colored_transparent_outlined_icon.png";
 
 export function Navbar() {
     const pathname = usePathname();
@@ -20,8 +21,10 @@ export function Navbar() {
             <div className="site-header-inner">
                 <Link href="/" className="flex items-center gap-3" onClick={() => setMobileOpen(false)}>
                     <Image
-                        src={iclubIcon}
+                        src={ICLUB_ICON}
                         alt={siteConfig.name}
+                        width={509}
+                        height={672}
                         className="site-header-logo"
                         priority
                     />
