@@ -28,9 +28,11 @@ COPY public-website ./public-website
 ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG SOURCE_GIT_REF=main
+ARG GITHUB_REPO=iclubmedasu/website
 
-# Fail fast if footer logos were uploaded as Xet/LFS pointer stubs instead of real PNGs.
-RUN node -e "const fs=require('fs'); for (const p of ['public-website/public/images/iclub_full_colored_transparent_outlined_logo.png','public-website/public/images/ihub_full_colored_transparent_logo_outlined.png']) { const b=fs.readFileSync(p); if (b.length<8||b[0]!==0x89||b[1]!==0x50) throw new Error(p+' is not a PNG ('+b.length+' bytes)'); }"
+# HF upload may store PNGs as Xet/LFS pointer stubs. Fetch real bytes from GitHub when needed.
+RUN SOURCE_GIT_REF="${SOURCE_GIT_REF}" GITHUB_REPO="${GITHUB_REPO}" node public-website/scripts/materialize-public-images.mjs
 
 RUN pnpm --filter @iclub/shared build
 RUN pnpm --filter public-website build
