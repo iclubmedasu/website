@@ -42,9 +42,9 @@ ENV PORT=7860
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public-website/.next/standalone ./
-COPY --from=builder /app/public-website/.next/static ./public-website/.next/static
-COPY --from=builder /app/public-website/public ./public-website/public
+COPY --from=builder --chown=nextjs:nodejs /app/public-website/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/public-website/.next/static ./public-website/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public-website/public ./public-website/public
 
 USER nextjs
 EXPOSE 7860
