@@ -1,6 +1,8 @@
 import express, { Request, Response } from "express";
 import { prisma } from "../db";
 import { sendEmail } from "../services/emailService";
+import { buildRegistrationJoinUrl } from "../services/eventTicketEmailService";
+import { generateTokensForRegistration, getSessionTokensForRegistration } from "../services/sessionTokenService";
 import { buildMemberTimeline, toMemberProfileView } from "../lib/memberProfileVisibility";
 import { buildPublicMemberDirectory } from "../lib/publicMemberDirectory";
 import { getAboutPageData, getActiveSocialLinks, getContactPageData } from "../lib/siteContent";
@@ -380,6 +382,82 @@ router.get("/events/:id/custom-fields", async (req: Request, res: Response) => {
     }
 });
 
+router.get("/events/:id/sessions", async (req: Request, res: Response) => {
+    try {
+        const eventId = parseEventId(String(req.params.id));
+        if (eventId == null) {
+            return res.status(400).json({ error: "Invalid event id" });
+        }
+
+        const event = await prisma.event.findUnique({
+            where: { id: eventId },
+            select: { id: true, isActive: true, isArchived: true, isPublished: true },
+        });
+
+        if (!event || event.isArchived || !canPublicViewEvent(event)) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+
+        const sessions = await prisma.eventSession.findMany({
+            where: { eventId, isActive: true },
+            select: {
+                id: true,
+                label: true,
+                sessionDate: true,
+                startTime: true,
+                endTime: true,
+                mode: true,
+            },
+            orderBy: [{ sessionDate: "asc" }, { order: "asc" }],
+        });
+
+        return res.json(sessions.map((session) => ({
+            ...session,
+            sessionDate: session.sessionDate.toISOString().slice(0, 10),
+        })));
+    } catch (error) {
+        console.error("GET /public/events/:id/sessions error:", error);
+        return res.status(500).json({ error: "Failed to load event sessions" });
+    }
+});
+
+router.get("/events/:id/registration-form", async (req: Request, res: Response) => {
+    try {
+        const eventId = parseEventId(String(req.params.id));
+        if (eventId == null) {
+            return res.status(400).json({ error: "Invalid event id" });
+        }
+
+        const event = await prisma.event.findUnique({
+            where: { id: eventId },
+            select: {
+                id: true,
+                isActive: true,
+                isArchived: true,
+                isPublished: true,
+                tierFieldShowOnPublic: true,
+                tierFieldRequired: true,
+                sessionFieldShowOnPublic: true,
+                sessionFieldRequired: true,
+            },
+        });
+
+        if (!event || event.isArchived || !canPublicViewEvent(event)) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+
+        return res.json({
+            tierFieldShowOnPublic: event.tierFieldShowOnPublic,
+            tierFieldRequired: event.tierFieldRequired,
+            sessionFieldShowOnPublic: event.sessionFieldShowOnPublic,
+            sessionFieldRequired: event.sessionFieldRequired,
+        });
+    } catch (error) {
+        console.error("GET /public/events/:id/registration-form error:", error);
+        return res.status(500).json({ error: "Failed to load registration form settings" });
+    }
+});
+
 router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
     try {
         const eventId = parseEventId(String(req.params.id));
@@ -398,6 +476,7 @@ router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
                 confirmationCode: { equals: confirmationCode, mode: "insensitive" },
             },
             select: {
+                id: true,
                 confirmationCode: true,
                 fullName: true,
                 email: true,
@@ -431,6 +510,40 @@ router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
             return res.status(404).json({ error: "Registration not found" });
         }
 
+        await generateTokensForRegistration(registration.id);
+
+        const eventSessions = await prisma.eventSession.findMany({
+            where: { eventId, isActive: true },
+            orderBy: [{ sessionDate: "asc" }, { order: "asc" }],
+            select: {
+                id: true,
+                label: true,
+                sessionDate: true,
+                startTime: true,
+                endTime: true,
+                mode: true,
+            },
+        });
+
+        const sessionTokens = await getSessionTokensForRegistration(registration.id);
+
+        const sessions = eventSessions.map((session) => {
+            const token = sessionTokens.get(session.id);
+            const joinUrl = session.mode === "ONLINE" && token
+                ? buildRegistrationJoinUrl(eventId, token)
+                : null;
+
+            return {
+                id: session.id,
+                label: session.label,
+                sessionDate: session.sessionDate.toISOString(),
+                startTime: session.startTime,
+                endTime: session.endTime,
+                mode: session.mode,
+                joinUrl,
+            };
+        });
+
         return res.json({
             confirmationCode: registration.confirmationCode,
             fullName: registration.fullName,
@@ -443,6 +556,7 @@ router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
                 venue: registration.event.venue,
             },
             tier: registration.tier ? { name: registration.tier.name } : null,
+            sessions,
         });
     } catch (error) {
         console.error("GET /public/events/:id/confirmation error:", error);

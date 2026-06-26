@@ -119,7 +119,7 @@ describe("public members routes", () => {
                     profilePhotoUrl: null,
                     teamMemberships: [
                         {
-                            team: { name: "Events" },
+                            team: { id: 2, name: "Events" },
                             role: { roleName: "Member" },
                         },
                     ],
@@ -139,6 +139,10 @@ describe("public members routes", () => {
             expect(response.body.members).toHaveLength(1);
             expect(response.body.members[0].fullName).toBe("Regular Member");
             expect(response.body.members[0].roleLabel).toBe("Member — Events");
+            expect(response.body.filterTeams).toEqual([
+                { id: 2, name: "Events" },
+                { id: 3, name: "Media" },
+            ]);
 
             expect(prismaMocks.memberFindMany).toHaveBeenCalledWith(
                 expect.objectContaining({

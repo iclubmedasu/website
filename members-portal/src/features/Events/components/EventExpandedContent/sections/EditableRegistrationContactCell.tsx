@@ -3,6 +3,11 @@ import { Check, Pencil, X } from 'lucide-react';
 import { eventsAPI } from '@/services/api';
 import type { EventRegistrationRef, Id } from '@/types/backend-contracts';
 import { handleRegistrationConflict } from '../registrationConflictUtils';
+import {
+    REGISTRATION_NAME_DISPLAY_LIMIT,
+    REGISTRATION_PHONE_DISPLAY_LIMIT,
+    truncateRegistrationCell,
+} from '../customFieldUtils';
 
 type ContactField = 'fullName' | 'email' | 'phoneNumber';
 
@@ -22,14 +27,13 @@ interface EditableRegistrationContactCellProps {
 }
 
 function truncateDisplay(value: string, max: number): string {
-    if (value.length <= max) return value;
-    return `${value.slice(0, max)}...`;
+    return truncateRegistrationCell(value, max);
 }
 
 const DISPLAY_LIMITS: Record<ContactField, number> = {
-    fullName: 20,
+    fullName: REGISTRATION_NAME_DISPLAY_LIMIT,
     email: 20,
-    phoneNumber: 15,
+    phoneNumber: REGISTRATION_PHONE_DISPLAY_LIMIT,
 };
 
 function readFieldValue(registration: EventRegistrationRef, field: ContactField): string {

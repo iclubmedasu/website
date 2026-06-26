@@ -2,7 +2,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2rem;
+    gap: 1.5rem;
     padding: 1rem 0 2.5rem;
 }
 
@@ -10,65 +10,136 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 1.5rem;
-    width: 100%;
-    position: relative;
-}
-
-.members-pyramid-tier--duo {
-    max-width: 42rem;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-}
-
-@media (max-width: 640px) {
-    .members-pyramid-tier--duo {
-        grid-template-columns: 1fr;
-        max-width: 18rem;
-    }
-}
-
-.members-pyramid-team-row {
-    width: 100%;
-    max-width: 48rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1rem;
-    padding: 1.25rem;
-    border: 1px solid var(--purple-300);
-    border-radius: var(--radius-md);
-    background: var(--surface-plain);
-    box-shadow: var(--shadow-sm);
-}
-
-.members-pyramid-team-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--purple-700);
-}
-
-.members-pyramid-team-pair {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
     gap: 1.25rem;
     width: 100%;
 }
 
+.members-pyramid-tier--officer {
+    max-width: 16rem;
+}
+
+.members-pyramid-tier--executive {
+    max-width: 36rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+}
+
 @media (max-width: 640px) {
-    .members-pyramid-team-pair {
+    .members-pyramid-tier--executive {
         grid-template-columns: 1fr;
+        max-width: 16rem;
     }
+}
+
+.members-pyramid-tier--teams {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+    gap: 0.875rem;
+    width: 100%;
+    max-width: 56rem;
 }
 
 .members-pyramid-connector {
     width: 2px;
-    height: 1.5rem;
+    height: 1.25rem;
     background: linear-gradient(to bottom, var(--purple-400), var(--purple-300));
     border-radius: 1px;
+}
+
+/* Compact team accord — head + vice in one card */
+.team-accord {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    padding: 0.75rem;
+    border: 1px solid var(--purple-300);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    box-shadow: var(--shadow-sm);
+    min-width: 0;
+}
+
+.team-accord-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--purple-700);
+    text-align: center;
+    padding-bottom: 0.375rem;
+    border-bottom: 1px solid var(--purple-300);
+}
+
+.team-accord-members {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.team-accord-member {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem;
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s ease;
+}
+
+.team-accord-member:hover {
+    background: var(--purple-50);
+}
+
+.team-accord-member:focus-visible {
+    outline: 2px solid var(--purple-600);
+    outline-offset: 1px;
+}
+
+.team-accord-avatar {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--purple-700), var(--purple-500));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.625rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.team-accord-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.team-accord-member-text {
+    min-width: 0;
+    text-align: left;
+}
+
+.team-accord-member-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--purple-900);
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.team-accord-member-role {
+    font-size: 0.625rem;
+    color: var(--gray-600);
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .member-card {
@@ -76,8 +147,8 @@
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 0.75rem;
-    padding: 1.25rem 1rem;
+    gap: 0.625rem;
+    padding: 1rem 0.875rem;
     border-radius: var(--radius-md);
     border: 1px solid var(--purple-300);
     background: var(--bg-card);
@@ -85,7 +156,7 @@
     transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
     text-decoration: none;
     color: inherit;
-    min-width: 10rem;
+    width: 100%;
 }
 
 .member-card:hover {
@@ -94,14 +165,60 @@
     transform: translateY(-2px);
 }
 
+.member-card:focus-visible {
+    outline: 2px solid var(--purple-600);
+    outline-offset: 2px;
+}
+
+.member-card--xl {
+    padding: 1.5rem 1.25rem;
+}
+
+.member-card--xl .member-card-avatar {
+    width: 5.5rem;
+    height: 5.5rem;
+    font-size: 1.5rem;
+}
+
+.member-card--xl .member-card-name {
+    font-size: 1.125rem;
+}
+
+.member-card--lg {
+    padding: 1.125rem 1rem;
+}
+
+.member-card--lg .member-card-avatar {
+    width: 4.25rem;
+    height: 4.25rem;
+    font-size: 1.125rem;
+}
+
+.member-card--lg .member-card-name {
+    font-size: 1rem;
+}
+
 .member-card--compact {
-    min-width: unset;
-    width: 100%;
+    padding: 0.875rem 0.75rem;
+}
+
+.member-card--compact .member-card-avatar {
+    width: 3.25rem;
+    height: 3.25rem;
+    font-size: 0.875rem;
+}
+
+.member-card--compact .member-card-name {
+    font-size: 0.875rem;
+}
+
+.member-card--compact .member-card-role {
+    font-size: 0.75rem;
 }
 
 .member-card-avatar {
-    width: 4.5rem;
-    height: 4.5rem;
+    width: 4rem;
+    height: 4rem;
     border-radius: 50%;
     overflow: hidden;
     background: linear-gradient(135deg, var(--purple-700), var(--purple-500));
@@ -109,7 +226,7 @@
     align-items: center;
     justify-content: center;
     color: #fff;
-    font-size: 1.25rem;
+    font-size: 1.125rem;
     font-weight: 600;
     flex-shrink: 0;
 }
@@ -133,10 +250,106 @@
     line-height: 1.4;
 }
 
+.member-card-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--purple-600);
+    transition: color 0.2s ease;
+}
+
+.member-card-hint-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex-shrink: 0;
+}
+
+.member-card:hover .member-card-hint {
+    color: var(--purple-800);
+}
+
 .members-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+    gap: 1rem;
+}
+
+.members-browse {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.members-browse-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.members-browse-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    min-width: 12rem;
+}
+
+.members-browse-filter-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--purple-700);
+}
+
+.members-browse-select {
+    appearance: none;
+    padding: 0.625rem 2rem 0.625rem 0.875rem;
+    border: 1px solid var(--purple-300);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card)
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a47a3' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
+        no-repeat right 0.75rem center;
+    color: var(--gray-800);
+    font-size: 0.9375rem;
+    cursor: pointer;
+}
+
+.members-browse-select:focus {
+    outline: 2px solid var(--purple-600);
+    outline-offset: 1px;
+}
+
+.members-browse-count {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.members-browse-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding-top: 0.5rem;
+}
+
+.members-browse-page-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+.members-browse-page-indicator {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--purple-900);
 }
 
 /* Profile page */

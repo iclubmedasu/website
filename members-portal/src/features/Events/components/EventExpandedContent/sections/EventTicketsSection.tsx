@@ -16,6 +16,9 @@ import {
     getSendableRegistrations,
     isImportPlaceholderEmail,
     REGISTRATION_SOURCE_GROUP_OPTIONS,
+    REGISTRATION_NAME_DISPLAY_LIMIT,
+    REGISTRATION_PHONE_DISPLAY_LIMIT,
+    truncateRegistrationCell,
 } from '../customFieldUtils';
 import { isMultiDayEvent, isWithinEventDays } from '../../eventDateUtils';
 
@@ -296,10 +299,10 @@ export default function EventTicketsSection({
                     <thead>
                         <tr>
                             <th className="event-registrations-name-cell">Name</th>
-                            <th>Email</th>
-                            <th>Phone</th>
+                            <th className="event-registrations-email-cell">Email</th>
+                            <th className="event-registrations-phone-cell">Phone</th>
                             <th>Source</th>
-                            <th>Check-in</th>
+                            <th className="event-registrations-status-cell">Check-in</th>
                             <th>Ticket</th>
                             <th>Reminder</th>
                             <th className="event-registrations-actions-col">Actions</th>
@@ -317,11 +320,21 @@ export default function EventTicketsSection({
 
                             return (
                                 <tr key={registration.id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
-                                    <td className="event-registrations-name-cell">{registration.fullName || '—'}</td>
-                                    <td className="email-cell">{registration.email || '—'}</td>
-                                    <td>{registration.phoneNumber || '—'}</td>
+                                    <td className="event-registrations-name-cell" title={registration.fullName || undefined}>
+                                        {registration.fullName
+                                            ? truncateRegistrationCell(registration.fullName, REGISTRATION_NAME_DISPLAY_LIMIT)
+                                            : '—'}
+                                    </td>
+                                    <td className="event-registrations-email-cell" title={registration.email || undefined}>
+                                        {registration.email || '—'}
+                                    </td>
+                                    <td className="event-registrations-phone-cell" title={registration.phoneNumber || undefined}>
+                                        {registration.phoneNumber
+                                            ? truncateRegistrationCell(registration.phoneNumber, REGISTRATION_PHONE_DISPLAY_LIMIT)
+                                            : '—'}
+                                    </td>
                                     <td>{formatRegistrationSource(registration)}</td>
-                                    <td>{formatRegistrationStatus(registration)}</td>
+                                    <td className="event-registrations-status-cell">{formatRegistrationStatus(registration)}</td>
                                     <td><EmailDeliveryStatusCell status={ticketStatus} /></td>
                                     <td><EmailDeliveryStatusCell status={reminderStatus} /></td>
                                     <td className="event-registrations-actions-col">

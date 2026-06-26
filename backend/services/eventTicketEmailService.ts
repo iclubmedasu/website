@@ -3,6 +3,7 @@ import path from 'path';
 import QRCode from 'qrcode';
 import { prisma } from '../db';
 import { getEventDayRange } from './eventDates';
+import { getSessionTokensForRegistration } from './sessionTokenService';
 import { sendEmail, type EmailAttachment } from './emailService';
 
 export const TICKET_QR_CONTENT_ID = 'ticket-qr-code';
@@ -43,6 +44,12 @@ export function buildRegistrationConfirmationUrl(eventId: number, confirmationCo
     const baseUrl = getPublicWebsiteUrl();
     const code = encodeURIComponent(confirmationCode.trim().toUpperCase());
     return `${baseUrl}/events/${eventId}/confirmation?code=${code}`;
+}
+
+export function buildRegistrationJoinUrl(eventId: number, onlineAccessToken: string): string {
+    const baseUrl = getPublicWebsiteUrl();
+    const token = encodeURIComponent(onlineAccessToken.trim());
+    return `${baseUrl}/events/${eventId}/join?token=${token}`;
 }
 
 function escapeHtml(value: string): string {
@@ -112,6 +119,86 @@ async function buildTicketQrAttachment(confirmationCode: string): Promise<EmailA
     };
 }
 
+function formatSessionDateForEmail(sessionDate: Date): string {
+    return new Intl.DateTimeFormat('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+    }).format(sessionDate);
+}
+
+type EmailSessionRow = {
+    id: number;
+    sessionDate: Date;
+    label: string | null;
+    startTime: string | null;
+    endTime: string | null;
+    mode: string;
+};
+
+function buildSessionsEmailSection(
+    eventId: number,
+    sessions: EmailSessionRow[],
+    sessionTokens: Map<number, string>,
+): string {
+    if (sessions.length === 0) return '';
+
+    const rows = sessions.map((session) => {
+        const dateLabel = escapeHtml(formatSessionDateForEmail(session.sessionDate));
+        const label = session.label ? escapeHtml(session.label) : '';
+        const timeRange = session.startTime && session.endTime
+            ? escapeHtml(`${session.startTime}–${session.endTime}`)
+            : null;
+        const header = [label, dateLabel, timeRange].filter(Boolean).join(' · ');
+
+        if (session.mode === 'ONSITE') {
+            return `<tr>
+  <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;">
+    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0f172a;">${header}</p>
+    <p style="margin:0;font-size:12px;color:#64748b;">Onsite attendance</p>
+  </td>
+</tr>`;
+        }
+
+        const token = sessionTokens.get(session.id);
+        if (token) {
+            const joinUrl = buildRegistrationJoinUrl(eventId, token);
+            const escapedJoinUrl = escapeHtml(joinUrl);
+            return `<tr>
+  <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;">
+    <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#0f172a;">${header}</p>
+    <a href="${escapedJoinUrl}" style="display:inline-block;padding:10px 16px;background:${PURPLE[800]};color:#ffffff;text-decoration:none;border-radius:8px;font-size:12px;font-weight:700;">Join Online Session &rarr;</a>
+    <p class="session-join-url-print" style="margin:4px 0 0;font-size:10px;color:#64748b;word-break:break-all;">${escapedJoinUrl}</p>
+  </td>
+</tr>`;
+        }
+
+        return `<tr>
+  <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;">
+    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0f172a;">${header}</p>
+    <p style="margin:0;font-size:12px;color:#64748b;">Join link will be sent when available</p>
+  </td>
+</tr>`;
+    }).join('');
+
+    return `<tr>
+  <td style="padding:0 24px 18px;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;">
+      <tr>
+        <td style="padding:14px 16px 4px;">
+          <p style="margin:0;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:#94a3b8;font-weight:700;">Your Sessions</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:0 16px 12px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">${rows}</table>
+        </td>
+      </tr>
+    </table>
+  </td>
+</tr>`;
+}
+
 function buildDetailRow(label: string, valueHtml: string, withBorder = true): string {
     const border = withBorder ? `border-bottom:1px solid #f1f5f9;` : '';
     return `<tr>
@@ -135,6 +222,7 @@ function buildRegistrationEmailHtml(input: {
     confirmationCode: string;
     confirmationUrl: string;
     variant: EventRegistrationEmailVariant;
+    sessionsSectionHtml?: string;
 }): string {
     const eventTitle = escapeHtml(input.eventTitle);
     const eventDateLabel = escapeHtml(input.eventDateLabel);
@@ -157,6 +245,7 @@ function buildRegistrationEmailHtml(input: {
     const introBlock = isReminder
         ? `<p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#64748b;text-align:center;">This is a reminder that you are registered for <strong style="color:${PURPLE[900]};">${eventTitle}</strong>. Your confirmation details are below.</p>`
         : '';
+    const sessionsSectionHtml = input.sessionsSectionHtml ?? '';
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -164,6 +253,12 @@ function buildRegistrationEmailHtml(input: {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${pageTitle}</title>
+  <style>
+    .session-join-url-print { display: none !important; mso-hide: all; }
+    @media print {
+      .session-join-url-print { display: block !important; }
+    }
+  </style>
 </head>
 <body style="margin:0;padding:0;background-color:#f0ebf5;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#0f172a;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f0ebf5;">
@@ -247,6 +342,7 @@ function buildRegistrationEmailHtml(input: {
                     <a href="${confirmationUrl}" style="display:inline-block;padding:12px 20px;background:${PURPLE[800]};color:#ffffff;text-decoration:none;border-radius:10px;font-size:12px;font-weight:700;letter-spacing:0.04em;">View registration online</a>
                   </td>
                 </tr>
+                ${sessionsSectionHtml}
                 <tr>
                   <td style="background:#f8fafc;border-top:1px solid #eef2f7;padding:16px 24px;">
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
@@ -324,6 +420,20 @@ async function sendRegistrationEmail(
         throw new Error('Registration has been cancelled');
     }
 
+    const sessions = await prisma.eventSession.findMany({
+        where: { eventId: registration.eventId, isActive: true },
+        orderBy: [{ sessionDate: 'asc' }, { order: 'asc' }],
+        select: {
+            id: true,
+            sessionDate: true,
+            label: true,
+            startTime: true,
+            endTime: true,
+            mode: true,
+        },
+    });
+
+    const sessionTokens = await getSessionTokensForRegistration(registrationId);
     const attachments = await buildTicketEmailAttachments(registration.confirmationCode);
     const html = buildRegistrationEmailHtml({
         eventTitle: registration.event.title,
@@ -334,6 +444,11 @@ async function sendRegistrationEmail(
         confirmationCode: registration.confirmationCode,
         confirmationUrl: buildRegistrationConfirmationUrl(registration.event.id, registration.confirmationCode),
         variant,
+        sessionsSectionHtml: buildSessionsEmailSection(
+            registration.event.id,
+            sessions,
+            sessionTokens,
+        ),
     });
 
     await sendEmail({

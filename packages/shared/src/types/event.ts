@@ -62,6 +62,53 @@ export interface EventAttendanceDayRef {
     checkedInAt: ISODateTime;
 }
 
+export type EventSessionMode = "ONSITE" | "ONLINE";
+
+export interface EventSessionRef {
+    id: Id;
+    eventId: Id;
+    label: string | null;
+    sessionDate: string;
+    startTime: string | null;
+    endTime: string | null;
+    mode: EventSessionMode;
+    onlineUrl: string | null;
+    order: number;
+    isActive: boolean;
+    createdAt: ISODateTime;
+    updatedAt: ISODateTime;
+    _count?: { attendances: number };
+}
+
+export interface EventSessionSelectionRef {
+    sessionId: Id;
+    label?: string | null;
+    sessionDate: string;
+    startTime?: string | null;
+    endTime?: string | null;
+    mode?: EventSessionMode | string;
+}
+
+export interface EventSessionAttendanceRef {
+    id: Id;
+    sessionId: Id;
+    registrationId: Id;
+    mode: "ONSITE" | "ONLINE";
+    joinedAt: ISODateTime;
+}
+
+export interface CreateEventSessionPayload {
+    label?: string | null;
+    sessionDate: string;
+    startTime?: string | null;
+    endTime?: string | null;
+    mode: EventSessionMode;
+    onlineUrl?: string | null;
+    order?: number;
+}
+
+export type UpdateEventSessionPayload = Partial<CreateEventSessionPayload>;
+
 export interface EventRegistrationRef {
     id: Id;
     eventId: Id;
@@ -86,6 +133,8 @@ export interface EventRegistrationRef {
     tier?: EventTierRef | null;
     member?: MemberSummary | null;
     attendanceDays?: EventAttendanceDayRef[];
+    sessionAttendances?: EventSessionAttendanceRef[];
+    sessionSelections?: EventSessionSelectionRef[];
 }
 
 export interface EventSummary {
@@ -109,6 +158,10 @@ export interface EventSummary {
     isArchived?: boolean;
     isPublished?: boolean;
     isDisclosed?: boolean;
+    tierFieldShowOnPublic?: boolean;
+    tierFieldRequired?: boolean;
+    sessionFieldShowOnPublic?: boolean;
+    sessionFieldRequired?: boolean;
     deletedAt?: ISODateTime | null;
     createdAt?: ISODateTime;
     updatedAt?: ISODateTime;
@@ -173,6 +226,13 @@ export interface EventStatistics {
         date: string;
         count: number;
     }>;
+    sessionAttendance?: Array<{
+        id: Id;
+        label: string | null;
+        sessionDate: string;
+        mode: EventSessionMode;
+        attendances: number;
+    }>;
 }
 
 export interface CreateEventPayload {
@@ -229,8 +289,16 @@ export interface ReorderEventCustomFieldsPayload {
     order: Array<{ id: Id | string; order?: number } | Id | string>;
 }
 
+export interface UpdateEventRegistrationColumnsPayload {
+    tierFieldShowOnPublic?: boolean;
+    tierFieldRequired?: boolean;
+    sessionFieldShowOnPublic?: boolean;
+    sessionFieldRequired?: boolean;
+}
+
 export interface CreateEventRegistrationPayload {
     tierId?: Id | string | null;
+    sessionIds?: Array<Id | string>;
     fullName: string;
     email: string;
     phoneNumber?: string | null;
@@ -248,6 +316,10 @@ export interface UpdateEventRegistrationPayload {
     notes?: string | null;
     customFieldValues?: Record<string, unknown> | unknown;
     version?: number;
+}
+
+export interface UpdateRegistrationSessionsPayload {
+    sessionIds: Array<Id | string>;
 }
 
 export interface WalkInRegistrationResult extends EventRegistrationRef {

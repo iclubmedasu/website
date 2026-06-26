@@ -3,9 +3,10 @@
 import type { ComponentType } from 'react';
 import { useEffect, useState, useCallback } from 'react';
 import { useResourceChannel } from '@/hooks/useResourceChannel';
-import { Layers3, ListChecks, Mail, RefreshCw, Users } from 'lucide-react';
+import { ListChecks, Mail, RefreshCw, Settings2, Users } from 'lucide-react';
 import type {
     EventCustomFieldRef,
+    EventSessionRef,
     EventStatistics,
     EventTierRef,
     Id,
@@ -17,12 +18,13 @@ import EventStatisticsSection from './sections/EventStatisticsSection';
 import EventTasksSection from './sections/EventTasksSection';
 import EventTicketsSection from './sections/EventTicketsSection';
 import EventTiersSection from './sections/EventTiersSection';
+import EventSessionsSection from './sections/EventSessionsSection';
 import type { EventTabKey } from '../eventUtils';
 import './EventExpandedContent.css';
 
 const TABS: Array<{ key: EventTabKey; label: string; icon: ComponentType<{ size?: number }> }> = [
     { key: 'statistics', label: 'Statistics', icon: RefreshCw },
-    { key: 'tiers', label: 'Tiers', icon: Layers3 },
+    { key: 'tiers', label: 'Setup', icon: Settings2 },
     { key: 'registrations', label: 'Registrations', icon: Users },
     { key: 'tickets', label: 'Tickets', icon: Mail },
     { key: 'tasks', label: 'Tasks', icon: ListChecks },
@@ -42,6 +44,10 @@ interface EventExpandedContentProps {
     canManageTiers?: boolean;
     canManageTasks?: boolean;
     canManageFields?: boolean;
+    tierFieldShowOnPublic?: boolean;
+    tierFieldRequired?: boolean;
+    sessionFieldShowOnPublic?: boolean;
+    sessionFieldRequired?: boolean;
     onReload: () => void;
 }
 
@@ -59,32 +65,56 @@ export default function EventExpandedContent({
     canManageTiers = false,
     canManageTasks = false,
     canManageFields = false,
+    tierFieldShowOnPublic: initialTierFieldShowOnPublic = true,
+    tierFieldRequired: initialTierFieldRequired = true,
+    sessionFieldShowOnPublic: initialSessionFieldShowOnPublic = false,
+    sessionFieldRequired: initialSessionFieldRequired = false,
     onReload,
 }: EventExpandedContentProps) {
     const [stats, setStats] = useState<EventStatistics | null>(null);
     const [tiers, setTiers] = useState<EventTierRef[]>([]);
     const [fields, setFields] = useState<EventCustomFieldRef[]>([]);
+    const [sessions, setSessions] = useState<EventSessionRef[]>([]);
+    const [tierFieldShowOnPublic, setTierFieldShowOnPublic] = useState(initialTierFieldShowOnPublic);
+    const [tierFieldRequired, setTierFieldRequired] = useState(initialTierFieldRequired);
+    const [sessionFieldShowOnPublic, setSessionFieldShowOnPublic] = useState(initialSessionFieldShowOnPublic);
+    const [sessionFieldRequired, setSessionFieldRequired] = useState(initialSessionFieldRequired);
     const [activeTab, setActiveTab] = useState<EventTabKey>(() => initialTab ?? 'statistics');
+
+    useEffect(() => {
+        setTierFieldShowOnPublic(initialTierFieldShowOnPublic);
+        setTierFieldRequired(initialTierFieldRequired);
+        setSessionFieldShowOnPublic(initialSessionFieldShowOnPublic);
+        setSessionFieldRequired(initialSessionFieldRequired);
+    }, [
+        initialTierFieldShowOnPublic,
+        initialTierFieldRequired,
+        initialSessionFieldShowOnPublic,
+        initialSessionFieldRequired,
+    ]);
 
     useEffect(() => {
         let active = true;
 
         const load = async () => {
             try {
-                const [tiersResult, fieldsResult, statsResult] = await Promise.all([
+                const [tiersResult, fieldsResult, statsResult, sessionsResult] = await Promise.all([
                     eventsAPI.getTiers(eventId),
                     eventsAPI.getCustomFields(eventId),
                     eventsAPI.getStatistics(eventId),
+                    eventsAPI.getSessions(eventId),
                 ]);
                 if (!active) return;
                 setTiers(tiersResult);
                 setFields(fieldsResult);
                 setStats(statsResult);
+                setSessions(sessionsResult);
             } catch {
                 if (!active) return;
                 setTiers([]);
                 setFields([]);
                 setStats(null);
+                setSessions([]);
             }
         };
 
@@ -93,14 +123,16 @@ export default function EventExpandedContent({
     }, [eventId]);
 
     const reloadAll = useCallback(async () => {
-        const [tiersResult, fieldsResult, statsResult] = await Promise.all([
+        const [tiersResult, fieldsResult, statsResult, sessionsResult] = await Promise.all([
             eventsAPI.getTiers(eventId),
             eventsAPI.getCustomFields(eventId),
             eventsAPI.getStatistics(eventId),
+            eventsAPI.getSessions(eventId),
         ]);
         setTiers(tiersResult);
         setFields(fieldsResult);
         setStats(statsResult);
+        setSessions(sessionsResult);
         onReload();
     }, [eventId, onReload]);
 
@@ -141,11 +173,16 @@ export default function EventExpandedContent({
                 </div>
             )}
             {activeTab === 'tiers' && (
-                <div className="event-expanded-tab-panel">
+                <div className="event-expanded-tab-panel event-expanded-tab-panel--setup">
                     <EventTiersSection
                         eventId={eventId}
                         tiers={tiers}
                         onTiersChange={setTiers}
+                        canManage={canManageTiers}
+                    />
+                    <hr className="event-setup-divider" />
+                    <EventSessionsSection
+                        eventId={eventId}
                         canManage={canManageTiers}
                     />
                 </div>
@@ -156,6 +193,7 @@ export default function EventExpandedContent({
                         eventId={eventId}
                         eventTitle={eventTitle}
                         tiers={tiers}
+                        sessions={sessions}
                         fields={fields}
                         onFieldsChange={setFields}
                         totalRegistered={(stats?.totalRegistered ?? 0) + (stats?.walkInCount ?? 0)}
@@ -167,6 +205,24 @@ export default function EventExpandedContent({
                         canRemoveAttendance={canRemoveAttendance}
                         onPublishedChange={onPublishedChange}
                         canManageFields={canManageFields}
+                        tierFieldShowOnPublic={tierFieldShowOnPublic}
+                        tierFieldRequired={tierFieldRequired}
+                        sessionFieldShowOnPublic={sessionFieldShowOnPublic}
+                        sessionFieldRequired={sessionFieldRequired}
+                        onRegistrationColumnsChange={(columns) => {
+                            if (columns.tierFieldShowOnPublic !== undefined) {
+                                setTierFieldShowOnPublic(columns.tierFieldShowOnPublic);
+                            }
+                            if (columns.tierFieldRequired !== undefined) {
+                                setTierFieldRequired(columns.tierFieldRequired);
+                            }
+                            if (columns.sessionFieldShowOnPublic !== undefined) {
+                                setSessionFieldShowOnPublic(columns.sessionFieldShowOnPublic);
+                            }
+                            if (columns.sessionFieldRequired !== undefined) {
+                                setSessionFieldRequired(columns.sessionFieldRequired);
+                            }
+                        }}
                         onRegistrationAdded={() => void reloadAll()}
                         onCheckIn={() => void reloadAll()}
                         onImportComplete={handleImportComplete}

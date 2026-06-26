@@ -5,6 +5,7 @@ export interface RegistrationDraft {
     email: string;
     phoneNumber: string;
     tierId: string;
+    sessionIds: string[];
     customFieldValues: Record<string, unknown>;
 }
 
@@ -13,6 +14,7 @@ export const emptyRegistrationDraft = (): RegistrationDraft => ({
     email: "",
     phoneNumber: "",
     tierId: "",
+    sessionIds: [],
     customFieldValues: {},
 });
 
@@ -60,7 +62,10 @@ export function validateRequiredCustomFields(
 export function validateRegistrationDraft(
     draft: RegistrationDraft,
     fields: PublicEventCustomField[],
-    options?: { requireTier?: boolean },
+    options?: {
+        requireTier?: boolean;
+        requireSessions?: boolean;
+    },
 ): Record<string, string> {
     const errors: Record<string, string> = {};
 
@@ -74,6 +79,9 @@ export function validateRegistrationDraft(
     }
     if (options?.requireTier && !draft.tierId) {
         errors.tierId = "Please select a tier.";
+    }
+    if (options?.requireSessions && draft.sessionIds.length === 0) {
+        errors.sessionIds = "Please select at least one session.";
     }
 
     return {

@@ -24,6 +24,23 @@
     font-size: 0.875rem;
 }
 
+.registration-session-options {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.registration-session-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    font-size: 0.9375rem;
+    color: var(--gray-700);
+}
+
+.registration-session-option input {
+    margin-top: 0.2rem;
+}
+
 .confirmation-hero {
     padding: 2rem;
     border-radius: var(--radius-xl);
@@ -201,4 +218,75 @@
     margin: 0;
     font-size: 0.875rem;
     color: var(--error-text, #b91c1c);
+}
+
+.event-ticket-sessions {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.event-ticket-sessions__title {
+    margin: 0 0 0.75rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gray-500);
+}
+
+.event-ticket-sessions__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.875rem;
+}
+
+.event-ticket-session-row {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.event-ticket-session-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.event-ticket-session-row__header {
+    margin: 0 0 0.35rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--purple-900);
+}
+
+.event-ticket-session-row__meta {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--gray-600);
+}
+
+.event-ticket-session-join-btn {
+    display: inline-block;
+    margin-top: 0.25rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: var(--radius-md);
+    background: var(--purple-800, #561789);
+    color: #ffffff;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.event-ticket-session-join-btn:hover {
+    background: var(--purple-900, #3f1166);
+    color: #ffffff;
+}
+
+.event-ticket-session-join-url {
+    margin: 0.35rem 0 0;
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    color: var(--gray-500);
+    word-break: break-all;
 }

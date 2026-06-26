@@ -1,11 +1,12 @@
 "use client";
 
-import type { PublicEventCustomField, PublicEventTier } from "@iclub/shared";
+import type { PublicEventCustomField, PublicEventRegistrationFormConfig, PublicEventSession, PublicEventTier } from "@iclub/shared";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiRequestError, publicAPI } from "@/lib/api";
 import { YesNoField } from "@/components/ui/YesNoToggle";
 import { saveRegistrationCache } from "@/lib/registrationCache";
+import { formatSessionDisplayLabel } from "@/lib/sessionUtils";
 import {
     dropdownOptions,
     emptyRegistrationDraft,
@@ -96,6 +97,13 @@ export function RegistrationForm({ eventId, eventTitle }: RegistrationFormProps)
     const router = useRouter();
     const [draft, setDraft] = useState<RegistrationDraft>(emptyRegistrationDraft);
     const [tiers, setTiers] = useState<PublicEventTier[]>([]);
+    const [sessions, setSessions] = useState<PublicEventSession[]>([]);
+    const [formConfig, setFormConfig] = useState<PublicEventRegistrationFormConfig>({
+        tierFieldShowOnPublic: true,
+        tierFieldRequired: true,
+        sessionFieldShowOnPublic: false,
+        sessionFieldRequired: false,
+    });
     const [customFields, setCustomFields] = useState<PublicEventCustomField[]>([]);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [formError, setFormError] = useState("");
@@ -108,9 +116,11 @@ export function RegistrationForm({ eventId, eventTitle }: RegistrationFormProps)
         async function loadFormData() {
             setLoading(true);
             try {
-                const [loadedTiers, loadedFields] = await Promise.all([
+                const [loadedTiers, loadedFields, loadedSessions, loadedFormConfig] = await Promise.all([
                     publicAPI.getEventTiers(eventId),
                     publicAPI.getEventCustomFields(eventId),
+                    publicAPI.getEventSessions(eventId),
+                    publicAPI.getEventRegistrationForm(eventId),
                 ]);
 
                 if (cancelled) return;
@@ -120,6 +130,8 @@ export function RegistrationForm({ eventId, eventTitle }: RegistrationFormProps)
                 );
                 setTiers(availableTiers);
                 setCustomFields(loadedFields);
+                setSessions(loadedSessions);
+                setFormConfig(loadedFormConfig);
 
                 if (availableTiers.length === 1) {
                     setDraft((current) => ({ ...current, tierId: String(availableTiers[0].id) }));
@@ -162,12 +174,26 @@ export function RegistrationForm({ eventId, eventTitle }: RegistrationFormProps)
         }));
     }
 
+    function onSessionToggle(sessionId: string, checked: boolean) {
+        clearError("sessionIds");
+        setDraft((current) => {
+            const next = new Set(current.sessionIds);
+            if (checked) {
+                next.add(sessionId);
+            } else {
+                next.delete(sessionId);
+            }
+            return { ...current, sessionIds: [...next] };
+        });
+    }
+
     async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setFormError("");
 
         const validationErrors = validateRegistrationDraft(draft, customFields, {
-            requireTier: tiers.length > 0,
+            requireTier: formConfig.tierFieldShowOnPublic && formConfig.tierFieldRequired && tiers.length > 0,
+            requireSessions: formConfig.sessionFieldShowOnPublic && formConfig.sessionFieldRequired,
         });
         if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
@@ -181,6 +207,7 @@ export function RegistrationForm({ eventId, eventTitle }: RegistrationFormProps)
                 email: draft.email.trim(),
                 phoneNumber: draft.phoneNumber.trim() || null,
                 tierId: draft.tierId ? Number(draft.tierId) : null,
+                sessionIds: draft.sessionIds.map((id) => Number(id)),
                 customFieldValues: draft.customFieldValues,
             });
 
@@ -220,10 +247,10 @@ export function RegistrationForm({ eventId, eventTitle }: RegistrationFormProps)
                 </p>
             </div>
 
-            {tiers.length > 0 ? (
+            {formConfig.tierFieldShowOnPublic && tiers.length > 0 ? (
                 <div className="form-group">
                     <label className="form-label" htmlFor="tierId">
-                        Registration tier *
+                        Registration tier{formConfig.tierFieldRequired ? " *" : ""}
                     </label>
                     <select
                         id="tierId"
@@ -250,6 +277,39 @@ export function RegistrationForm({ eventId, eventTitle }: RegistrationFormProps)
                         </p>
                     ) : null}
                     {errors.tierId ? <p className="field-error">{errors.tierId}</p> : null}
+                </div>
+            ) : null}
+
+            {formConfig.sessionFieldShowOnPublic && sessions.length > 0 ? (
+                <div className="form-group">
+                    <fieldset>
+                        <legend className="form-label">
+                            Sessions{formConfig.sessionFieldRequired ? " *" : ""}
+                        </legend>
+                        <div className="registration-session-options">
+                            {sessions.map((session) => {
+                                const sessionId = String(session.id);
+                                const checked = draft.sessionIds.includes(sessionId);
+                                return (
+                                    <label key={sessionId} className="registration-session-option">
+                                        <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={(event) => onSessionToggle(sessionId, event.target.checked)}
+                                        />
+                                        <span>{formatSessionDisplayLabel({
+                                            label: session.label,
+                                            sessionDate: session.sessionDate,
+                                            startTime: session.startTime,
+                                            endTime: session.endTime,
+                                            mode: session.mode,
+                                        })}</span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    </fieldset>
+                    {errors.sessionIds ? <p className="field-error">{errors.sessionIds}</p> : null}
                 </div>
             ) : null}
 

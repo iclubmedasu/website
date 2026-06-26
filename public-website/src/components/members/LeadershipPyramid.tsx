@@ -1,5 +1,6 @@
 import type { PublicMemberDirectory } from "@iclub/shared";
 import { PublicMemberCard } from "./PublicMemberCard";
+import { TeamLeadershipAccord } from "./TeamLeadershipAccord";
 
 interface LeadershipPyramidProps {
     directory: PublicMemberDirectory;
@@ -25,8 +26,8 @@ export function LeadershipPyramid({ directory }: LeadershipPyramidProps) {
         <div className="members-pyramid">
             {officer ? (
                 <>
-                    <div className="members-pyramid-tier">
-                        <PublicMemberCard member={officer} />
+                    <div className="members-pyramid-tier members-pyramid-tier--officer">
+                        <PublicMemberCard member={officer} size="xl" />
                     </div>
                     {(president || vicePresident || hasTeams) && <div className="members-pyramid-connector" />}
                 </>
@@ -34,23 +35,26 @@ export function LeadershipPyramid({ directory }: LeadershipPyramidProps) {
 
             {president || vicePresident ? (
                 <>
-                    <div className="members-pyramid-tier members-pyramid-tier--duo">
-                        {president ? <PublicMemberCard member={president} /> : <div />}
-                        {vicePresident ? <PublicMemberCard member={vicePresident} /> : <div />}
+                    <div className="members-pyramid-tier members-pyramid-tier--executive">
+                        {president ? <PublicMemberCard member={president} size="lg" /> : null}
+                        {vicePresident ? <PublicMemberCard member={vicePresident} size="lg" /> : null}
                     </div>
                     {hasTeams && <div className="members-pyramid-connector" />}
                 </>
             ) : null}
 
-            {teamLeadership.map((row) => (
-                <div key={row.teamId} className="members-pyramid-team-row">
-                    <p className="members-pyramid-team-label">{row.teamName}</p>
-                    <div className="members-pyramid-team-pair">
-                        {row.head ? <PublicMemberCard member={row.head} compact /> : <div />}
-                        {row.vice ? <PublicMemberCard member={row.vice} compact /> : <div />}
-                    </div>
+            {hasTeams ? (
+                <div className="members-pyramid-tier members-pyramid-tier--teams">
+                    {teamLeadership.map((row) => (
+                        <TeamLeadershipAccord
+                            key={row.teamId}
+                            teamName={row.teamName}
+                            head={row.head}
+                            vice={row.vice}
+                        />
+                    ))}
                 </div>
-            ))}
+            ) : null}
         </div>
     );
 }

@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { CalendarDays, MapPin, Users } from "lucide-react";
 import { notFound } from "next/navigation";
 import { EventDetailActions } from "@/components/events/EventDetailActions";
+import { EventDetailHeader } from "@/components/events/EventDetailHeader";
 import { BackLink } from "@/components/navigation/BackLink";
-import { PageContainer, Badge } from "@/components/ui";
+import { PageContainer } from "@/components/ui";
 import { publicAPI } from "@/lib/api";
 import {
     formatCapacityLabel,
@@ -48,16 +49,12 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
         <PageContainer className="space-y-10 py-10 sm:py-14">
             <BackLink href="/events" label="Back to Events" />
             <section className="max-w-3xl space-y-4">
-                <div className="flex flex-wrap items-center gap-3">
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-purple-700">Event</p>
-                    {event.projectType?.name ? (
-                        <Badge variant="purple">{event.projectType.name}</Badge>
-                    ) : null}
-                </div>
-                <h1 className="text-4xl font-bold text-purple-900">{event.title}</h1>
-                {event.description ? (
-                    <p className="text-lg leading-8 text-slate-600">{event.description}</p>
-                ) : null}
+                <EventDetailHeader
+                    eventId={event.id}
+                    eventTitle={event.title}
+                    projectTypeName={event.projectType?.name}
+                    description={event.description}
+                />
                 <div className="flex flex-col gap-3 text-sm text-slate-600">
                     <p className="inline-flex items-start gap-2">
                         <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-purple-700" />

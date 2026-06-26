@@ -49,6 +49,32 @@ export interface PublicEventCustomField {
     order?: number;
 }
 
+export interface PublicEventSession {
+    id: Id;
+    label?: string | null;
+    sessionDate: string;
+    startTime?: string | null;
+    endTime?: string | null;
+    mode: string;
+}
+
+export interface PublicEventRegistrationFormConfig {
+    tierFieldShowOnPublic: boolean;
+    tierFieldRequired: boolean;
+    sessionFieldShowOnPublic: boolean;
+    sessionFieldRequired: boolean;
+}
+
+export interface PublicConfirmationSession {
+    id: Id;
+    label: string | null;
+    sessionDate: string;
+    startTime?: string | null;
+    endTime?: string | null;
+    mode: string;
+    joinUrl?: string | null;
+}
+
 export interface PublicRegistrationConfirmation {
     confirmationCode: string;
     fullName: string;
@@ -61,6 +87,7 @@ export interface PublicRegistrationConfirmation {
         venue?: string | null;
     };
     tier: { name: string } | null;
+    sessions: PublicConfirmationSession[];
 }
 
 export interface PublicProjectTag {
@@ -99,8 +126,14 @@ export interface PublicMemberCard {
     id: Id;
     fullName: string;
     roleLabel: string;
+    teamId?: Id | null;
     teamName?: string | null;
     profilePhotoUrl?: string | null;
+}
+
+export interface PublicMemberFilterTeam {
+    id: Id;
+    name: string;
 }
 
 export interface PublicTeamLeadershipRow {
@@ -115,6 +148,7 @@ export interface PublicMemberDirectory {
     president: PublicMemberCard | null;
     vicePresident: PublicMemberCard | null;
     teamLeadership: PublicTeamLeadershipRow[];
+    filterTeams: PublicMemberFilterTeam[];
     members: PublicMemberCard[];
 }
 

@@ -6,6 +6,7 @@ export interface PublicMemberCardData {
     id: number;
     fullName: string;
     roleLabel: string;
+    teamId?: number | null;
     teamName?: string | null;
     profilePhotoUrl?: string | null;
 }
@@ -17,11 +18,17 @@ export interface PublicTeamLeadershipRowData {
     vice: PublicMemberCardData | null;
 }
 
+export interface PublicMemberFilterTeamData {
+    id: number;
+    name: string;
+}
+
 export interface PublicMemberDirectoryData {
     officer: PublicMemberCardData | null;
     president: PublicMemberCardData | null;
     vicePresident: PublicMemberCardData | null;
     teamLeadership: PublicTeamLeadershipRowData[];
+    filterTeams: PublicMemberFilterTeamData[];
     members: PublicMemberCardData[];
 }
 
@@ -39,14 +46,25 @@ function toCard(
     member: MemberPick,
     roleLabel: string,
     teamName?: string | null,
+    teamId?: number | null,
 ): PublicMemberCardData {
     return {
         id: member.id,
         fullName: member.fullName,
         roleLabel,
+        teamId: teamId ?? null,
         teamName: teamName ?? null,
         profilePhotoUrl: member.profilePhotoUrl ? "/profile-photo" : null,
     };
+}
+
+function shuffleMembers<T>(items: T[]): T[] {
+    const result = [...items];
+    for (let i = result.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
 }
 
 function findAdminRole(
@@ -55,12 +73,13 @@ function findAdminRole(
         role: { roleName: string };
     }>,
     roleName: string,
+    adminTeamId: number | null,
 ): PublicMemberCardData | null {
     const row = members.find(
         (tm) => tm.role.roleName === roleName && isEligibleMember(tm.member),
     );
     if (!row) return null;
-    return toCard(row.member, roleName, ADMINISTRATION_TEAM_NAME);
+    return toCard(row.member, roleName, ADMINISTRATION_TEAM_NAME, adminTeamId);
 }
 
 export async function buildPublicMemberDirectory(): Promise<PublicMemberDirectoryData> {
@@ -86,9 +105,10 @@ export async function buildPublicMemberDirectory(): Promise<PublicMemberDirector
     });
 
     const adminMembers = adminTeam?.members ?? [];
-    const officer = findAdminRole(adminMembers, "Officer");
-    const president = findAdminRole(adminMembers, "President");
-    const vicePresident = findAdminRole(adminMembers, "Vice President");
+    const adminTeamId = adminTeam?.id ?? null;
+    const officer = findAdminRole(adminMembers, "Officer", adminTeamId);
+    const president = findAdminRole(adminMembers, "President", adminTeamId);
+    const vicePresident = findAdminRole(adminMembers, "Vice President", adminTeamId);
 
     const pyramidMemberIds = new Set<number>();
     for (const card of [officer, president, vicePresident]) {
@@ -131,10 +151,10 @@ export async function buildPublicMemberDirectory(): Promise<PublicMemberDirector
 
             const roleKey = tm.role.systemRoleKey;
             if (roleKey === 1) {
-                head = toCard(tm.member, "Head of Team", team.name);
+                head = toCard(tm.member, "Head of Team", team.name, team.id);
                 pyramidMemberIds.add(tm.member.id);
             } else if (roleKey === 2) {
-                vice = toCard(tm.member, "Vice Head of Team", team.name);
+                vice = toCard(tm.member, "Vice Head of Team", team.name, team.id);
                 pyramidMemberIds.add(tm.member.id);
             }
         }
@@ -163,14 +183,19 @@ export async function buildPublicMemberDirectory(): Promise<PublicMemberDirector
             teamMemberships: {
                 where: { isActive: true },
                 include: {
-                    team: { select: { name: true } },
+                    team: { select: { id: true, name: true } },
                     role: { select: { roleName: true } },
                 },
                 orderBy: { joinedDate: "asc" },
             },
         },
-        orderBy: { fullName: "asc" },
+        orderBy: { id: "asc" },
     });
+
+    const filterTeams: PublicMemberFilterTeamData[] = teams.map((team) => ({
+        id: team.id,
+        name: team.name,
+    }));
 
     const members: PublicMemberCardData[] = eligibleMembers.map((member) => {
         const primary = member.teamMemberships?.[0];
@@ -178,11 +203,13 @@ export async function buildPublicMemberDirectory(): Promise<PublicMemberDirector
             ? `${primary.role.roleName} — ${primary.team.name}`
             : "Member";
         const teamName = primary?.team.name ?? null;
+        const teamId = primary?.team.id ?? null;
 
         return toCard(
             { id: member.id, fullName: member.fullName, profilePhotoUrl: member.profilePhotoUrl },
             roleLabel,
             teamName,
+            teamId,
         );
     });
 
@@ -191,6 +218,7 @@ export async function buildPublicMemberDirectory(): Promise<PublicMemberDirector
         president,
         vicePresident,
         teamLeadership,
-        members,
+        filterTeams,
+        members: shuffleMembers(members),
     };
 }

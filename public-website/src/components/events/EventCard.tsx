@@ -2,6 +2,7 @@ import type { PublicEventListItem } from "@iclub/shared";
 import { CalendarDays, MapPin, Users } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui";
+import { EventShareMenu } from "@/components/events/EventShareMenu";
 import {
     formatCapacityLabel,
     formatEventDateRange,
@@ -13,7 +14,7 @@ interface EventCardProps {
     variant?: "default" | "past";
 }
 
-function EventCardContent({
+function EventCardBody({
     event,
     variant,
 }: {
@@ -26,17 +27,6 @@ function EventCardContent({
 
     return (
         <>
-            <div className="flex items-start justify-between gap-3">
-                <h3 className="event-card-title">{event.title}</h3>
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                    {event.projectType?.name ? (
-                        <Badge variant="purple" className="shrink-0">
-                            {event.projectType.name}
-                        </Badge>
-                    ) : null}
-                    {isPast ? <Badge variant="neutral">Completed</Badge> : null}
-                </div>
-            </div>
             {event.description ? (
                 <p className="event-card-description line-clamp-3">{event.description}</p>
             ) : (
@@ -69,18 +59,62 @@ function EventCardContent({
     );
 }
 
+function EventCardHeader({
+    event,
+    variant,
+    showShare = false,
+}: {
+    event: PublicEventListItem;
+    variant: "default" | "past";
+    showShare?: boolean;
+}) {
+    const isPast = variant === "past";
+    const eventHref = `/events/${event.id}`;
+
+    return (
+        <div className="event-card-header">
+            {showShare ? (
+                <Link href={eventHref} className="event-card-title-link">
+                    <h3 className="event-card-title">{event.title}</h3>
+                </Link>
+            ) : (
+                <h3 className="event-card-title">{event.title}</h3>
+            )}
+            <div className="event-card-header-type">
+                {event.projectType?.name ? (
+                    <Badge variant="purple" className="shrink-0">
+                        {event.projectType.name}
+                    </Badge>
+                ) : null}
+                {isPast ? <Badge variant="neutral">Completed</Badge> : null}
+            </div>
+            {showShare ? (
+                <EventShareMenu eventId={event.id} eventTitle={event.title} />
+            ) : (
+                <span className="event-card-header-spacer" aria-hidden="true" />
+            )}
+        </div>
+    );
+}
+
 export function EventCard({ event, variant = "default" }: EventCardProps) {
+    const eventHref = `/events/${event.id}`;
+
     if (variant === "past") {
         return (
             <article className="event-card event-card--past">
-                <EventCardContent event={event} variant="past" />
+                <EventCardHeader event={event} variant="past" />
+                <EventCardBody event={event} variant="past" />
             </article>
         );
     }
 
     return (
-        <Link href={`/events/${event.id}`} className="event-card">
-            <EventCardContent event={event} variant="default" />
-        </Link>
+        <article className="event-card">
+            <EventCardHeader event={event} variant="default" showShare />
+            <Link href={eventHref} className="event-card-body">
+                <EventCardBody event={event} variant="default" />
+            </Link>
+        </article>
     );
 }

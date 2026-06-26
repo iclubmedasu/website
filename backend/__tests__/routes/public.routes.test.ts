@@ -8,6 +8,7 @@ const prismaMocks = vi.hoisted(() => ({
     eventRegistrationCount: vi.fn(),
     eventRegistrationGroupBy: vi.fn(),
     eventRegistrationFindFirst: vi.fn(),
+    eventSessionFindMany: vi.fn(),
     eventTierFindMany: vi.fn(),
     eventCustomFieldFindMany: vi.fn(),
     projectFindMany: vi.fn(),
@@ -20,6 +21,11 @@ const prismaMocks = vi.hoisted(() => ({
     incidentReportTypeFindMany: vi.fn(),
     incidentReportTypeFindFirst: vi.fn(),
     incidentReportCreate: vi.fn(),
+}));
+
+const sessionTokenMocks = vi.hoisted(() => ({
+    generateTokensForRegistration: vi.fn(),
+    getSessionTokensForRegistration: vi.fn(),
 }));
 
 const emailMocks = vi.hoisted(() => ({
@@ -36,6 +42,9 @@ vi.mock("../../db", () => ({
             count: prismaMocks.eventRegistrationCount,
             groupBy: prismaMocks.eventRegistrationGroupBy,
             findFirst: prismaMocks.eventRegistrationFindFirst,
+        },
+        eventSession: {
+            findMany: prismaMocks.eventSessionFindMany,
         },
         eventTier: {
             findMany: prismaMocks.eventTierFindMany,
@@ -73,6 +82,13 @@ vi.mock("../../db", () => ({
 }));
 
 vi.mock("../../services/emailService", () => emailMocks);
+
+vi.mock("../../services/sessionTokenService", () => sessionTokenMocks);
+
+vi.mock("../../services/eventTicketEmailService", () => ({
+    buildRegistrationJoinUrl: (eventId: number, token: string) =>
+        `https://public.example/events/${eventId}/join?token=${token}`,
+}));
 
 import publicRouter from "../../routes/public";
 
@@ -247,6 +263,7 @@ describe("public routes", () => {
 
     it("GET /public/events/:id/confirmation returns registration summary", async () => {
         prismaMocks.eventRegistrationFindFirst.mockResolvedValue({
+            id: 42,
             confirmationCode: "ABC123",
             fullName: "Ada Lovelace",
             email: "ada@example.com",
@@ -263,6 +280,26 @@ describe("public routes", () => {
             },
             tier: { name: "General" },
         });
+        sessionTokenMocks.generateTokensForRegistration.mockResolvedValue(1);
+        sessionTokenMocks.getSessionTokensForRegistration.mockResolvedValue(new Map([[7, "tok-online-1"]]));
+        prismaMocks.eventSessionFindMany.mockResolvedValue([
+            {
+                id: 6,
+                label: "Morning onsite",
+                sessionDate: new Date("2026-07-01T10:00:00.000Z"),
+                startTime: "10:00",
+                endTime: "12:00",
+                mode: "ONSITE",
+            },
+            {
+                id: 7,
+                label: "Afternoon online",
+                sessionDate: new Date("2026-07-01T14:00:00.000Z"),
+                startTime: "14:00",
+                endTime: "16:00",
+                mode: "ONLINE",
+            },
+        ]);
 
         const response = await request(createApp()).get("/public/events/1/confirmation?code=abc123");
 
@@ -271,6 +308,20 @@ describe("public routes", () => {
             confirmationCode: "ABC123",
             fullName: "Ada Lovelace",
             tier: { name: "General" },
+        });
+        expect(sessionTokenMocks.generateTokensForRegistration).toHaveBeenCalledWith(42);
+        expect(response.body.sessions).toHaveLength(2);
+        expect(response.body.sessions[0]).toMatchObject({
+            id: 6,
+            label: "Morning onsite",
+            mode: "ONSITE",
+            joinUrl: null,
+        });
+        expect(response.body.sessions[1]).toMatchObject({
+            id: 7,
+            label: "Afternoon online",
+            mode: "ONLINE",
+            joinUrl: "https://public.example/events/1/join?token=tok-online-1",
         });
     });
 

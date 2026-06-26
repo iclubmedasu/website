@@ -7,6 +7,7 @@
 @import "../components/navigation/back-link.css";
 @import "../components/ui/ui.css";
 @import "../components/members/members.css";
+@import "../components/events/event-share.css";
 @import "../components/home/rubiks-cube.css";
 
 @theme {

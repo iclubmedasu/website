@@ -1,5 +1,5 @@
 import { fmtDate } from '@/components/cards/LifecycleCardView/LifecycleCardView';
-import type { EventCustomFieldRef, EventRegistrationRef } from '@/types/backend-contracts';
+import type { EventCustomFieldRef, EventRegistrationRef, EventSessionRef } from '@/types/backend-contracts';
 import {
     formatCustomFieldValue,
     formatRegistrationSource,
@@ -119,14 +119,42 @@ function withFrozenPaneInWorksheetXml(
 export interface ExportEventRegistrationsExcelOptions {
     registrations: EventRegistrationRef[];
     fields: EventCustomFieldRef[];
+    sessions?: EventSessionRef[];
     multiDayEvent: boolean;
     fileName: string;
+}
+
+function formatSessionSelectionsExport(registration: EventRegistrationRef): string {
+    return (registration.sessionSelections ?? [])
+        .map((selection) => selection.label?.trim() || formatAttendanceDayLabel(selection.sessionDate))
+        .filter(Boolean)
+        .join(', ');
+}
+
+function formatAttendanceExport(
+    registration: EventRegistrationRef,
+    sessionDateById: Map<string, string>,
+): string {
+    const chips: string[] = [];
+
+    registration.attendanceDays?.forEach((day) => {
+        chips.push(`Onsite · ${formatAttendanceDayLabel(day.eventDay)}`);
+    });
+
+    registration.sessionAttendances?.forEach((attendance) => {
+        const sessionDate = sessionDateById.get(String(attendance.sessionId));
+        const dayLabel = sessionDate ? formatAttendanceDayLabel(sessionDate) : 'Session';
+        chips.push(`Online · ${dayLabel}`);
+    });
+
+    return chips.join(', ');
 }
 
 function buildRegistrationMatrix(
     registrations: EventRegistrationRef[],
     fields: EventCustomFieldRef[],
     multiDayEvent: boolean,
+    sessionDateById: Map<string, string>,
 ): string[][] {
     const sortedFields = [...fields].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     const headers = [
@@ -134,6 +162,7 @@ function buildRegistrationMatrix(
         'Email',
         'Phone',
         ...sortedFields.map((field) => field.label),
+        'Sessions',
         'Tier',
         'Code',
         ...(multiDayEvent ? ['Attendance'] : []),
@@ -151,15 +180,13 @@ function buildRegistrationMatrix(
                 const value = formatCustomFieldValue(field, getCustomFieldValue(registration, field));
                 return value === '—' ? '' : value;
             }),
+            formatSessionSelectionsExport(registration),
             registration.tier?.name || '',
             registration.confirmationCode,
         ];
 
         if (multiDayEvent) {
-            const attendance = registration.attendanceDays?.length
-                ? registration.attendanceDays.map((day) => formatAttendanceDayLabel(day.eventDay)).join(', ')
-                : '';
-            row.push(attendance);
+            row.push(formatAttendanceExport(registration, sessionDateById));
         }
 
         row.push(
@@ -237,12 +264,16 @@ function styleRegistrationSheet(XLSX: any, matrix: string[][]) {
 export async function exportEventRegistrationsExcel({
     registrations,
     fields,
+    sessions = [],
     multiDayEvent,
     fileName,
 }: ExportEventRegistrationsExcelOptions): Promise<void> {
     const xlsxModule = await import('xlsx-js-style');
     const XLSX = xlsxModule.default || xlsxModule;
-    const matrix = buildRegistrationMatrix(registrations, fields, multiDayEvent);
+    const sessionDateById = new Map(
+        sessions.map((session) => [String(session.id), session.sessionDate.slice(0, 10)]),
+    );
+    const matrix = buildRegistrationMatrix(registrations, fields, multiDayEvent, sessionDateById);
     const sheet = styleRegistrationSheet(XLSX, matrix);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, 'Registrations');

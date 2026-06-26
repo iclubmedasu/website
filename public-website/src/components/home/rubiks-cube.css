@@ -42,7 +42,6 @@
 }
 
 .rubiks-cube-wrap {
-    /* --cube must equal 3 * SPACING in RubiksCube.tsx (SPACING = --cubie) */
     --cubie: 56px;
     --cube: 168px;
     position: relative;
@@ -69,11 +68,19 @@
 
 .rubiks-sticker {
     position: absolute;
+    /* flush to the cubie — no inset gap, no floating, no spaces */
     inset: 0;
-    border-radius: 2px;
-    border: 1px solid #160c2b;
+    /* small radius on every sticker; at this size it's barely visible on interior
+       stickers but reads as a soft bevel on the 12 outer edges of the whole cube
+       because that's where no adjacent sticker covers the corner */
+    border-radius: 6px;
+    /* thin dark seam between cubies — gives the grid lines */
+    border: 2px solid #160c2b;
     backface-visibility: hidden;
-    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.08);
+    /* subtle matte depth: light from top-left, shadow bottom-right — no glow */
+    box-shadow:
+        inset 0 1px 3px rgba(255, 255, 255, 0.22),
+        inset 0 -1px 3px rgba(0, 0, 0, 0.28);
 }
 
 .rubiks-sticker--front {
@@ -100,26 +107,28 @@
     transform: rotateX(-90deg) translateZ(calc(var(--cubie) / 2));
 }
 
+/* Vivid purples — rich and bright, not desaturated */
 .rubiks-cell--purple900 {
-    background: #561789;
+    background: #4a0f8a;
 }
 
 .rubiks-cell--purple800 {
-    background: #662f91;
+    background: #5e1fa8;
 }
 
 .rubiks-cell--purple700 {
-    background: #7a47a3;
+    background: #7b3dbf;
 }
 
 .rubiks-cell--purple600 {
-    background: #9063b3;
+    background: #9c63d4;
 }
 
 .rubiks-cell--purple500 {
-    background: #af8fc8;
+    background: #c09ee8;
 }
 
+/* Clean white with just a hint of purple warmth */
 .rubiks-cell--white {
-    background: #f4f0fa;
+    background: #f0ecfa;
 }

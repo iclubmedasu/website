@@ -153,6 +153,14 @@ export function formatRegistrationStatus(registration: EventRegistrationRef): st
     return 'Registered';
 }
 
+export const REGISTRATION_NAME_DISPLAY_LIMIT = 20;
+export const REGISTRATION_PHONE_DISPLAY_LIMIT = 15;
+
+export function truncateRegistrationCell(value: string, maxLength: number): string {
+    if (value.length <= maxLength) return value;
+    return `${value.slice(0, maxLength)}......`;
+}
+
 export function parseCustomFieldInputValue(
     field: EventCustomFieldRef,
     raw: string,

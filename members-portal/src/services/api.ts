@@ -8,6 +8,7 @@ import type {
     CreateEventPayload,
     CreateEventRegistrationPayload,
     CreateEventTierPayload,
+    CreateEventSessionPayload,
     CreateEventTaskPayload,
     CheckInRegistrationPayload,
     RemoveRegistrationAttendancePayload,
@@ -35,6 +36,7 @@ import type {
     EventSummary,
     EventActivityEntry,
     EventTierRef,
+    EventSessionRef,
     EventTaskRef,
     MemberSummary,
     NotificationMarkAllReadResponse,
@@ -63,9 +65,12 @@ import type {
     TaskSummary,
     UpdatePhasePayload,
     UpdateEventCustomFieldPayload,
+    UpdateEventRegistrationColumnsPayload,
     UpdateEventPayload,
     UpdateEventRegistrationPayload,
+    UpdateRegistrationSessionsPayload,
     UpdateEventTierPayload,
+    UpdateEventSessionPayload,
     UpdateEventTaskPayload,
     UpdateProjectPayload,
     UpdateScheduleSlotPayload,
@@ -1883,6 +1888,72 @@ export const eventsAPI = {
         }
     },
 
+    getSessions: async (eventId: Id | string): Promise<EventSessionRef[]> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/sessions`, {
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<EventSessionRef[]>(response);
+    },
+
+    createSession: async (eventId: Id | string, data: CreateEventSessionPayload): Promise<EventSessionRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/sessions`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        return handleResponse<EventSessionRef>(response);
+    },
+
+    updateSession: async (
+        eventId: Id | string,
+        sessionId: Id | string,
+        data: UpdateEventSessionPayload,
+    ): Promise<EventSessionRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/sessions/${sessionId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        return handleResponse<EventSessionRef>(response);
+    },
+
+    removeSession: async (eventId: Id | string, sessionId: Id | string): Promise<void> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/sessions/${sessionId}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+
+        if (!response.ok) {
+            await handleResponse(response);
+        }
+    },
+
+    generateOnlineTokens: async (eventId: Id | string): Promise<{ generated: number }> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/sessions/generate-tokens`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({}),
+        });
+
+        return handleResponse<{ generated: number }>(response);
+    },
+
+    updateRegistrationColumns: async (
+        eventId: Id | string,
+        data: UpdateEventRegistrationColumnsPayload,
+    ): Promise<UpdateEventRegistrationColumnsPayload & { id: Id }> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registration-columns`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        return handleResponse<UpdateEventRegistrationColumnsPayload & { id: Id }>(response);
+    },
+
     getCustomFields: async (eventId: Id | string): Promise<EventCustomFieldRef[]> => {
         const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/custom-fields`, {
             headers: getAuthHeaders(),
@@ -2045,6 +2116,36 @@ export const eventsAPI = {
     ): Promise<EventRegistrationRef> => {
         const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${registrationId}/attendance`, {
             method: 'DELETE',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+
+        return handleResponse<EventRegistrationRef>(response);
+    },
+
+    removeSessionAttendance: async (
+        eventId: Id | string,
+        registrationId: Id | string,
+        sessionAttendanceId: Id | string,
+    ): Promise<EventRegistrationRef> => {
+        const response = await apiFetch(
+            `${API_BASE_URL}/events/${eventId}/registrations/${registrationId}/session-attendance/${sessionAttendanceId}`,
+            {
+                method: 'DELETE',
+                headers: getAuthHeaders(),
+            },
+        );
+
+        return handleResponse<EventRegistrationRef>(response);
+    },
+
+    updateRegistrationSessions: async (
+        eventId: Id | string,
+        registrationId: Id | string,
+        payload: UpdateRegistrationSessionsPayload,
+    ): Promise<EventRegistrationRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${registrationId}/sessions`, {
+            method: 'PATCH',
             headers: getAuthHeaders(),
             body: JSON.stringify(payload),
         });

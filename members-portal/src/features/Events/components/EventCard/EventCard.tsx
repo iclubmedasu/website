@@ -263,6 +263,10 @@ export default function EventCard({
                             canManageTiers={canManageTiers}
                             canManageTasks={canManageTasks}
                             canManageFields={canManageFields}
+                            tierFieldShowOnPublic={fullDetail.tierFieldShowOnPublic ?? true}
+                            tierFieldRequired={fullDetail.tierFieldRequired ?? true}
+                            sessionFieldShowOnPublic={fullDetail.sessionFieldShowOnPublic ?? false}
+                            sessionFieldRequired={fullDetail.sessionFieldRequired ?? false}
                             onReload={() => onReloadDetail?.()}
                         />
                     </div>

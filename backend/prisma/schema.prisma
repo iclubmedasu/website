@@ -361,6 +361,10 @@ model Event {
   isArchived          Boolean   @default(false)
   isPublished         Boolean   @default(false)
   isDisclosed         Boolean   @default(false)
+  tierFieldShowOnPublic   Boolean   @default(true)
+  tierFieldRequired       Boolean   @default(true)
+  sessionFieldShowOnPublic Boolean  @default(false)
+  sessionFieldRequired    Boolean   @default(false)
   deletedAt           DateTime?
   version             Int       @default(0)
   createdAt           DateTime  @default(now())
@@ -378,6 +382,7 @@ model Event {
   files               EventFile[]
   folders             EventFolder[]
   activityLog         EventActivityLog[]
+  sessions            EventSession[]
 
   @@index([projectId])
   @@index([projectTypeId])
@@ -456,6 +461,7 @@ model EventRegistration {
   customFieldValues  Json?
   ticketEmailSentAt  DateTime?
   reminderEmailSentAt DateTime?
+  onlineAccessToken  String?   @unique
   version            Int       @default(0)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
@@ -464,6 +470,9 @@ model EventRegistration {
   tier               EventTier? @relation(fields: [tierId], references: [id], onDelete: SetNull)
   member             Member?    @relation(fields: [memberId], references: [id], onDelete: SetNull)
   attendanceDays     EventRegistrationDay[]
+  sessionAttendances EventSessionAttendance[]
+  sessionSelections  EventRegistrationSession[]
+  sessionTokens      EventSessionToken[]
 
   @@index([eventId])
   @@index([tierId])
@@ -483,6 +492,73 @@ model EventRegistrationDay {
   @@unique([registrationId, eventDay])
   @@index([registrationId])
   @@index([eventDay])
+}
+
+model EventSession {
+  id            Int       @id @default(autoincrement())
+  eventId       Int
+  label         String?
+  sessionDate   DateTime  @db.Date
+  startTime     String?
+  endTime       String?
+  mode          String    @default("ONSITE")
+  onlineUrl     String?
+  order         Int       @default(0)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  event         Event                    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  attendances   EventSessionAttendance[]
+  tokens        EventSessionToken[]
+  registrations EventRegistrationSession[]
+
+  @@index([eventId])
+  @@index([eventId, sessionDate])
+}
+
+model EventSessionAttendance {
+  id             Int          @id @default(autoincrement())
+  sessionId      Int
+  registrationId Int
+  mode           String       @default("ONSITE")
+  joinedAt       DateTime     @default(now())
+
+  session        EventSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  registration   EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, registrationId, mode])
+  @@index([sessionId])
+  @@index([registrationId])
+}
+
+model EventSessionToken {
+  id             Int               @id @default(autoincrement())
+  sessionId      Int
+  registrationId Int
+  token          String            @unique
+  createdAt      DateTime          @default(now())
+
+  session        EventSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  registration   EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, registrationId])
+  @@index([sessionId])
+  @@index([registrationId])
+}
+
+model EventRegistrationSession {
+  id             Int               @id @default(autoincrement())
+  registrationId Int
+  sessionId      Int
+  createdAt      DateTime          @default(now())
+
+  registration   EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  session        EventSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([registrationId, sessionId])
+  @@index([registrationId])
+  @@index([sessionId])
 }
 
 // ============================================

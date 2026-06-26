@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { BackLink } from "@/components/navigation/BackLink";
 import { LeadershipPyramid } from "@/components/members/LeadershipPyramid";
-import { MembersGrid } from "@/components/members/MembersGrid";
+import { MembersBrowse } from "@/components/members/MembersBrowse";
 import { PageHeader, Section, SectionHeading } from "@/components/ui";
 import { publicAPI } from "@/lib/api";
 import { siteConfig } from "@/lib/site";
@@ -28,7 +28,7 @@ export default async function MembersPage() {
             <Section variant="plain">
                 <SectionHeading
                     title="Leadership"
-                    description="Club officer, executive board, and team leads."
+                    description="Club officer, executive board, and team leads. Click a member to view their profile and role history."
                 />
                 <LeadershipPyramid directory={directory} />
             </Section>
@@ -36,9 +36,9 @@ export default async function MembersPage() {
             <Section variant="subtle">
                 <SectionHeading
                     title="All members"
-                    description="Everyone actively contributing to the club."
+                    description="Browse by team or explore the full roster — ten members per page."
                 />
-                <MembersGrid members={directory.members} />
+                <MembersBrowse members={directory.members} filterTeams={directory.filterTeams} />
             </Section>
         </>
     );

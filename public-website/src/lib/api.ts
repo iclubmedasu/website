@@ -7,6 +7,8 @@ import type {
     PublicEventCustomField,
     PublicEventDetail,
     PublicEventListItem,
+    PublicEventRegistrationFormConfig,
+    PublicEventSession,
     PublicEventTier,
     PublicMemberDirectory,
     PublicMemberProfile,
@@ -152,6 +154,20 @@ export const publicAPI = {
         return fetchPublic<PublicEventCustomField[]>(`/public/events/${id}/custom-fields`, []);
     },
 
+    async getEventSessions(id: number): Promise<PublicEventSession[]> {
+        return fetchPublic<PublicEventSession[]>(`/public/events/${id}/sessions`, []);
+    },
+
+    async getEventRegistrationForm(id: number): Promise<PublicEventRegistrationFormConfig> {
+        const result = await fetchPublicOrThrow<PublicEventRegistrationFormConfig>(`/public/events/${id}/registration-form`);
+        return result ?? {
+            tierFieldShowOnPublic: true,
+            tierFieldRequired: true,
+            sessionFieldShowOnPublic: false,
+            sessionFieldRequired: false,
+        };
+    },
+
     async getRegistrationConfirmation(
         eventId: number,
         code: string,
@@ -175,6 +191,7 @@ export const publicAPI = {
             president: null,
             vicePresident: null,
             teamLeadership: [],
+            filterTeams: [],
             members: [],
         });
     },

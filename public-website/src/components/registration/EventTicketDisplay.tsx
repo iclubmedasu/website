@@ -1,14 +1,13 @@
 "use client";
 
-import type { PublicRegistrationConfirmation } from "@iclub/shared";
+import type { PublicConfirmationSession, PublicRegistrationConfirmation } from "@iclub/shared";
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { Button } from "@/components/ui";
 import { formatEventDateRange } from "@/lib/customFieldUtils";
 import {
-    downloadDataUrlAsPng,
     downloadTicketAsPdf,
-    downloadTicketAsPng,
+    // downloadTicketAsPng,
 } from "@/lib/ticketDownload";
 
 interface EventTicketDisplayProps {
@@ -24,11 +23,25 @@ function buildTicketFilename(confirmation: PublicRegistrationConfirmation, exten
     return `${slug}-ticket.${extension}`;
 }
 
+function formatSessionHeader(session: PublicConfirmationSession): string {
+    const title = session.label?.trim();
+    const parsed = new Date(session.sessionDate);
+    const dateLabel = Number.isNaN(parsed.getTime())
+        ? session.sessionDate
+        : parsed.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    const timeRange = session.startTime && session.endTime
+        ? `${session.startTime}–${session.endTime}`
+        : null;
+    return [title, dateLabel, timeRange].filter(Boolean).join(" · ");
+}
+
 export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {
     const ticketRef = useRef<HTMLElement>(null);
     const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-    const [exporting, setExporting] = useState<"png" | "pdf" | null>(null);
+    const [exporting, setExporting] = useState<"pdf" | null>(null);
     const [exportError, setExportError] = useState("");
+
+    const sessions = confirmation.sessions ?? [];
 
     useEffect(() => {
         let cancelled = false;
@@ -54,31 +67,6 @@ export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {
             cancelled = true;
         };
     }, [confirmation.confirmationCode]);
-
-    async function handleDownloadPng() {
-        setExportError("");
-        setExporting("png");
-        try {
-            const filename = buildTicketFilename(confirmation, "png");
-            if (ticketRef.current) {
-                await downloadTicketAsPng(ticketRef.current, filename);
-                return;
-            }
-            if (qrDataUrl) {
-                downloadDataUrlAsPng(qrDataUrl, filename);
-                return;
-            }
-            setExportError("Ticket is not ready to download yet.");
-        } catch {
-            if (qrDataUrl) {
-                downloadDataUrlAsPng(qrDataUrl, buildTicketFilename(confirmation, "png"));
-            } else {
-                setExportError("Failed to save ticket as image.");
-            }
-        } finally {
-            setExporting(null);
-        }
-    }
 
     async function handleDownloadPdf() {
         setExportError("");
@@ -149,6 +137,36 @@ export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {
                     </div>
                 </div>
 
+                {sessions.length > 0 ? (
+                    <div className="event-ticket-sessions">
+                        <p className="event-ticket-sessions__title">Your Sessions</p>
+                        <ul className="event-ticket-sessions__list">
+                            {sessions.map((session) => (
+                                <li key={String(session.id)} className="event-ticket-session-row">
+                                    <p className="event-ticket-session-row__header">{formatSessionHeader(session)}</p>
+                                    {session.mode === "ONSITE" ? (
+                                        <p className="event-ticket-session-row__meta">Onsite attendance</p>
+                                    ) : session.joinUrl ? (
+                                        <>
+                                            <a
+                                                href={session.joinUrl}
+                                                className="event-ticket-session-join-btn"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                Join Online Session →
+                                            </a>
+                                            <p className="event-ticket-session-join-url">{session.joinUrl}</p>
+                                        </>
+                                    ) : (
+                                        <p className="event-ticket-session-row__meta">Join link will be sent when available</p>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ) : null}
+
                 <p className="event-ticket-card-note">
                     Present this QR code or confirmation code at check-in. A copy has also been emailed to{" "}
                     <strong>{confirmation.email}</strong>.
@@ -156,14 +174,6 @@ export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {
             </section>
 
             <div className="event-ticket-download-actions">
-                <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={downloadsDisabled}
-                    onClick={() => void handleDownloadPng()}
-                >
-                    {exporting === "png" ? "Saving…" : "Save as image"}
-                </Button>
                 <Button
                     type="button"
                     variant="secondary"

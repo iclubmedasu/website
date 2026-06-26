@@ -12,11 +12,13 @@ import type {
     EventCustomFieldRef,
     EventRegistrationRef,
     EventRegistrationSourceGroup,
+    EventSessionRef,
     EventTierRef,
     Id,
     ImportRegistrationsResult,
     ReorderEventCustomFieldsPayload,
     UpdateEventCustomFieldPayload,
+    UpdateEventRegistrationColumnsPayload,
 } from '@/types/backend-contracts';
 import {
     emptyAttendeeDraft,
@@ -27,17 +29,22 @@ import {
     type AttendeeDraft,
 } from '../customFieldUtils';
 import CustomFieldColumnMenu from './CustomFieldColumnMenu';
+import SpecialColumnMenu from './SpecialColumnMenu';
+import CopyPublicEventLinkButton from '../../CopyPublicEventLinkButton';
 import EditableCustomFieldCell from './EditableCustomFieldCell';
 import EditableRegistrationContactCell from './EditableRegistrationContactCell';
 import EditableRegistrationTierCell from './EditableRegistrationTierCell';
+import EditableRegistrationSessionCell from './EditableRegistrationSessionCell';
+import CollapsibleAttendanceChips, { type AttendanceRemovalTarget } from './CollapsibleAttendanceChips';
 import EventCheckInPanel from './EventCheckInSection';
 import WalkInDraftFields from './WalkInDraftFields';
-import { formatEventDuration, formatAttendanceDayLabel, isMultiDayEvent, isWithinEventDays } from '../../eventDateUtils';
+import { formatEventDuration, isMultiDayEvent, isWithinEventDays } from '../../eventDateUtils';
 
 interface EventRegistrationsSectionProps {
     eventId: Id | string;
     eventTitle?: string;
     tiers: EventTierRef[];
+    sessions?: EventSessionRef[];
     fields: EventCustomFieldRef[];
     onFieldsChange: (fields: EventCustomFieldRef[]) => void;
     totalRegistered?: number;
@@ -49,6 +56,11 @@ interface EventRegistrationsSectionProps {
     canRemoveAttendance?: boolean;
     onPublishedChange?: (eventId: Id, published: boolean) => Promise<void>;
     canManageFields?: boolean;
+    tierFieldShowOnPublic?: boolean;
+    tierFieldRequired?: boolean;
+    sessionFieldShowOnPublic?: boolean;
+    sessionFieldRequired?: boolean;
+    onRegistrationColumnsChange?: (columns: UpdateEventRegistrationColumnsPayload) => void;
     onRegistrationAdded?: () => void;
     onCheckIn?: () => void;
     onImportComplete?: (result: ImportRegistrationsResult) => void;
@@ -58,6 +70,7 @@ export default function EventRegistrationsSection({
     eventId,
     eventTitle,
     tiers,
+    sessions = [],
     fields,
     onFieldsChange,
     totalRegistered = 0,
@@ -69,6 +82,11 @@ export default function EventRegistrationsSection({
     canRemoveAttendance = false,
     onPublishedChange,
     canManageFields = false,
+    tierFieldShowOnPublic = true,
+    tierFieldRequired = true,
+    sessionFieldShowOnPublic = false,
+    sessionFieldRequired = false,
+    onRegistrationColumnsChange,
     onRegistrationAdded,
     onCheckIn,
     onImportComplete,
@@ -86,11 +104,7 @@ export default function EventRegistrationsSection({
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [exporting, setExporting] = useState(false);
     const [publishing, setPublishing] = useState(false);
-    const [attendanceRemovalTarget, setAttendanceRemovalTarget] = useState<{
-        registration: EventRegistrationRef;
-        eventDay: string;
-        dayLabel: string;
-    } | null>(null);
+    const [attendanceRemovalTarget, setAttendanceRemovalTarget] = useState<AttendanceRemovalTarget | null>(null);
     const [removingAttendance, setRemovingAttendance] = useState(false);
     const [editingField, setEditingField] = useState<EventCustomFieldRef | null>(null);
     const dragFieldId = useRef<number | null>(null);
@@ -103,6 +117,9 @@ export default function EventRegistrationsSection({
     const canEditCustomFieldValues = withinEventDays;
     const eventDurationLabel = formatEventDuration(eventDate, eventEndDate ?? eventDate);
     const multiDayEvent = isMultiDayEvent(eventDate, eventEndDate);
+    const sessionDateById = new Map(
+        sessions.map((session) => [String(session.id), session.sessionDate.slice(0, 10)]),
+    );
 
     const loadRegistrations = useCallback(async () => {
         try {
@@ -161,6 +178,16 @@ export default function EventRegistrationsSection({
     const handleUpdateField = async (field: EventCustomFieldRef, patch: UpdateEventCustomFieldPayload) => {
         const updated = await eventsAPI.updateCustomField(eventId, field.id, patch);
         onFieldsChange(fields.map((item) => (item.id === updated.id ? updated : item)));
+    };
+
+    const handleRegistrationColumnsChange = async (patch: UpdateEventRegistrationColumnsPayload) => {
+        const updated = await eventsAPI.updateRegistrationColumns(eventId, patch);
+        onRegistrationColumnsChange?.({
+            tierFieldShowOnPublic: updated.tierFieldShowOnPublic,
+            tierFieldRequired: updated.tierFieldRequired,
+            sessionFieldShowOnPublic: updated.sessionFieldShowOnPublic,
+            sessionFieldRequired: updated.sessionFieldRequired,
+        });
     };
 
     const handleRemoveField = async (fieldId: number) => {
@@ -279,13 +306,20 @@ export default function EventRegistrationsSection({
         if (!attendanceRemovalTarget || removingAttendance) return;
         setRemovingAttendance(true);
         try {
-            const updated = await eventsAPI.removeRegistrationAttendance(
-                eventId,
-                attendanceRemovalTarget.registration.id,
-                { eventDay: attendanceRemovalTarget.eventDay },
-            );
+            const updated = attendanceRemovalTarget.kind === 'onsite'
+                ? await eventsAPI.removeRegistrationAttendance(
+                    eventId,
+                    attendanceRemovalTarget.registration.id,
+                    { eventDay: attendanceRemovalTarget.eventDay },
+                )
+                : await eventsAPI.removeSessionAttendance(
+                    eventId,
+                    attendanceRemovalTarget.registration.id,
+                    attendanceRemovalTarget.sessionAttendanceId,
+                );
             handleRegistrationUpdated(updated);
             onCheckIn?.();
+            setAttendanceRemovalTarget(null);
         } finally {
             setRemovingAttendance(false);
         }
@@ -323,6 +357,7 @@ export default function EventRegistrationsSection({
             await exportEventRegistrationsExcel({
                 registrations: allRegistrations,
                 fields,
+                sessions,
                 multiDayEvent,
                 fileName: eventTitle?.trim() || `event-${eventId}`,
             });
@@ -347,18 +382,22 @@ export default function EventRegistrationsSection({
         <section className="event-expanded-panel">
             <div className="event-expanded-header event-expanded-header--compact">
                 <h2 className="expanded-section-title">Registrations</h2>
-                {canPublishEvent ? (
-                    <div className="event-expanded-publish-toggle">
-                        <span className="event-expanded-publish-toggle-label">Accept registrations (publish to public website)</span>
-                        <Toggle
-                            color="purple"
-                            checked={isPublished}
-                            disabled={publishing}
-                            onChange={(next) => void handlePublishToggle(next)}
-                            aria-label="Accept registrations on public website"
-                        />
-                    </div>
-                ) : null}
+                <div className="event-expanded-header-actions">
+                    {canPublishEvent ? (
+                        <div className="event-expanded-publish-toggle">
+                            <span className="event-expanded-publish-toggle-label">Accept registrations (publish to public website)</span>
+                            <Toggle
+                                color="purple"
+                                checked={isPublished}
+                                disabled={publishing}
+                                onChange={(next) => void handlePublishToggle(next)}
+                                aria-label="Accept registrations on public website"
+                            />
+                        </div>
+                    ) : null}
+                    {canPublishEvent ? <span className="event-expanded-header-divider" aria-hidden="true" /> : null}
+                    <CopyPublicEventLinkButton eventId={eventId} isPublished={isPublished} />
+                </div>
             </div>
             <div className="event-expanded-form-grid">
                 <input value={registrationSearch} onChange={(e) => setRegistrationSearch(e.target.value)} placeholder="Search by name, email, phone, or code" className="form-input" />
@@ -420,10 +459,39 @@ export default function EventRegistrationsSection({
                                                 ) : field.label}
                                             </th>
                                         ))}
-                                        <th>Tier</th>
+                                        <th className="event-registrations-col-th">
+                                            {canManageFields ? (
+                                                <SpecialColumnMenu
+                                                    label="Sessions"
+                                                    required={sessionFieldRequired}
+                                                    showOnPublic={sessionFieldShowOnPublic}
+                                                    onToggleRequired={() => void handleRegistrationColumnsChange({
+                                                        sessionFieldRequired: !sessionFieldRequired,
+                                                    })}
+                                                    onToggleShowOnPublic={() => void handleRegistrationColumnsChange({
+                                                        sessionFieldShowOnPublic: !sessionFieldShowOnPublic,
+                                                    })}
+                                                />
+                                            ) : 'Sessions'}
+                                        </th>
+                                        <th className="event-registrations-col-th">
+                                            {canManageFields ? (
+                                                <SpecialColumnMenu
+                                                    label="Tier"
+                                                    required={tierFieldRequired}
+                                                    showOnPublic={tierFieldShowOnPublic}
+                                                    onToggleRequired={() => void handleRegistrationColumnsChange({
+                                                        tierFieldRequired: !tierFieldRequired,
+                                                    })}
+                                                    onToggleShowOnPublic={() => void handleRegistrationColumnsChange({
+                                                        tierFieldShowOnPublic: !tierFieldShowOnPublic,
+                                                    })}
+                                                />
+                                            ) : 'Tier'}
+                                        </th>
                                         <th>Code</th>
                                         {multiDayEvent ? <th>Attendance</th> : null}
-                                        <th>Status</th>
+                                        <th className="event-registrations-status-cell">Status</th>
                                         <th>Source</th>
                                         <th>Registered</th>
                                         <th className="event-registrations-add-field-col">
@@ -457,7 +525,7 @@ export default function EventRegistrationsSection({
                                                 registration={registration}
                                                 field="email"
                                                 editable={canEditCustomFieldValues}
-                                                className="email-cell"
+                                                className="event-registrations-email-cell"
                                                 onUpdated={handleRegistrationUpdated}
                                             />
                                             <EditableRegistrationContactCell
@@ -465,6 +533,7 @@ export default function EventRegistrationsSection({
                                                 registration={registration}
                                                 field="phoneNumber"
                                                 editable={canEditCustomFieldValues}
+                                                className="event-registrations-phone-cell"
                                                 onUpdated={handleRegistrationUpdated}
                                             />
                                             {sortedFields.map((field) => (
@@ -477,6 +546,13 @@ export default function EventRegistrationsSection({
                                                     onUpdated={handleRegistrationUpdated}
                                                 />
                                             ))}
+                                            <EditableRegistrationSessionCell
+                                                eventId={eventId}
+                                                registration={registration}
+                                                sessions={sessions}
+                                                editable={canEditCustomFieldValues}
+                                                onUpdated={handleRegistrationUpdated}
+                                            />
                                             <EditableRegistrationTierCell
                                                 eventId={eventId}
                                                 registration={registration}
@@ -487,39 +563,16 @@ export default function EventRegistrationsSection({
                                             <td><code>{registration.confirmationCode}</code></td>
                                             {multiDayEvent ? (
                                                 <td>
-                                                    {registration.attendanceDays && registration.attendanceDays.length > 0 ? (
-                                                        <span className="event-attendance-days">
-                                                            {registration.attendanceDays.map((day) => {
-                                                                const dayLabel = formatAttendanceDayLabel(day.eventDay);
-                                                                if (canRemoveAttendance) {
-                                                                    return (
-                                                                        <button
-                                                                            key={day.eventDay}
-                                                                            type="button"
-                                                                            className="event-attendance-day-chip event-attendance-day-chip--removable"
-                                                                            title={`Remove check-in for ${dayLabel}`}
-                                                                            onClick={() => setAttendanceRemovalTarget({
-                                                                                registration,
-                                                                                eventDay: day.eventDay,
-                                                                                dayLabel,
-                                                                            })}
-                                                                        >
-                                                                            {dayLabel}
-                                                                            <span className="event-attendance-day-chip__remove" aria-hidden="true">×</span>
-                                                                        </button>
-                                                                    );
-                                                                }
-                                                                return (
-                                                                    <span key={day.eventDay} className="event-attendance-day-chip">
-                                                                        {dayLabel}
-                                                                    </span>
-                                                                );
-                                                            })}
-                                                        </span>
-                                                    ) : '—'}
+                                                    <CollapsibleAttendanceChips
+                                                        registration={registration}
+                                                        sessionDateById={sessionDateById}
+                                                        canRemoveAttendance={canRemoveAttendance}
+                                                        collapsible={multiDayEvent}
+                                                        onRequestRemoval={setAttendanceRemovalTarget}
+                                                    />
                                                 </td>
                                             ) : null}
-                                            <td>{formatRegistrationStatus(registration)}</td>
+                                            <td className="event-registrations-status-cell">{formatRegistrationStatus(registration)}</td>
                                             <td>{formatRegistrationSource(registration)}</td>
                                             <td>{fmtDate(registration.createdAt) || '—'}</td>
                                             <td className="event-registrations-add-field-col" aria-hidden="true" />

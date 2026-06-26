@@ -13,6 +13,9 @@ const prismaMocks = vi.hoisted(() => ({
     eventRegistrationDayCreate: vi.fn(),
     memberFindFirst: vi.fn(),
     eventTierFindFirst: vi.fn(),
+    eventTierFindMany: vi.fn(),
+    eventSessionFindMany: vi.fn(),
+    eventRegistrationSessionCreateMany: vi.fn(),
     transaction: vi.fn(),
 }));
 
@@ -38,6 +41,15 @@ const ticketEmailMocks = vi.hoisted(() => ({
     sendEventReminderEmail: vi.fn(),
 }));
 
+const sessionTokenMocks = vi.hoisted(() => ({
+    generateOnlineAccessToken: vi.fn(() => 'a'.repeat(48)),
+    generateTokensForAllEventRegistrations: vi.fn(),
+    generateTokensForSession: vi.fn().mockResolvedValue(0),
+    generateTokensForRegistration: vi.fn().mockResolvedValue(0),
+    ensureSessionToken: vi.fn(),
+    getSessionTokensForRegistration: vi.fn().mockResolvedValue(new Map()),
+}));
+
 vi.mock('../../db', () => ({
     prisma: {
         event: {
@@ -60,6 +72,13 @@ vi.mock('../../db', () => ({
         },
         eventTier: {
             findFirst: prismaMocks.eventTierFindFirst,
+            findMany: prismaMocks.eventTierFindMany,
+        },
+        eventSession: {
+            findMany: prismaMocks.eventSessionFindMany,
+        },
+        eventRegistrationSession: {
+            createMany: prismaMocks.eventRegistrationSessionCreateMany,
         },
         $transaction: prismaMocks.transaction,
     },
@@ -68,6 +87,7 @@ vi.mock('../../db', () => ({
 vi.mock('../../services/eventCode', () => eventCodeMocks);
 vi.mock('../../services/activityLogService', () => activityMocks);
 vi.mock('../../services/eventTicketEmailService', () => ticketEmailMocks);
+vi.mock('../../services/sessionTokenService', () => sessionTokenMocks);
 vi.mock('../../services/eventDates', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../../services/eventDates')>();
     return {
@@ -103,11 +123,17 @@ const publishedEvent = {
     title: 'Summit',
     status: 'PUBLISHED',
     isActive: true,
+    isPublished: true,
+    isArchived: false,
     allowWalkIns: true,
     eventDate: new Date('2026-06-20T10:00:00.000Z'),
     eventEndDate: new Date('2026-06-24T18:00:00.000Z'),
     registrationDeadline: null,
     capacity: null,
+    tierFieldShowOnPublic: true,
+    tierFieldRequired: false,
+    sessionFieldShowOnPublic: false,
+    sessionFieldRequired: false,
 };
 
 describe('event ticket email routes', () => {
@@ -116,10 +142,24 @@ describe('event ticket email routes', () => {
         prismaMocks.memberFindFirst.mockResolvedValue(null);
         prismaMocks.eventRegistrationCount.mockResolvedValue(0);
         prismaMocks.eventTierFindFirst.mockResolvedValue(null);
+        prismaMocks.eventTierFindMany.mockResolvedValue([]);
+        prismaMocks.eventSessionFindMany.mockResolvedValue([]);
+        prismaMocks.eventRegistrationSessionCreateMany.mockResolvedValue({ count: 0 });
         eventCodeMocks.generateUniqueConfirmationCode.mockResolvedValue('ABC123');
         activityMocks.logEventActivity.mockResolvedValue(undefined);
         ticketEmailMocks.sendEventTicketEmail.mockResolvedValue(undefined);
         eventDatesMocks.shouldSendWalkInTicket.mockReturnValue(true);
+        prismaMocks.transaction.mockImplementation(async (fn: (tx: {
+            eventRegistration: {
+                create: typeof prismaMocks.eventRegistrationCreate
+                count: typeof prismaMocks.eventRegistrationCount
+            }
+        }) => Promise<unknown>) => fn({
+            eventRegistration: {
+                create: prismaMocks.eventRegistrationCreate,
+                count: prismaMocks.eventRegistrationCount,
+            },
+        }));
     });
 
     afterEach(() => {

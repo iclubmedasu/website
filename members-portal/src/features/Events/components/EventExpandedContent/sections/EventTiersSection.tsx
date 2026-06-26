@@ -29,24 +29,37 @@ export default function EventTiersSection({ eventId, tiers, onTiersChange, canMa
     const [editCapacity, setEditCapacity] = useState('');
     const [editPrice, setEditPrice] = useState('');
     const [editCurrency, setEditCurrency] = useState<EventTierCurrency>(DEFAULT_TIER_CURRENCY);
+    const [formError, setFormError] = useState('');
 
     const isEditing = editingTierId != null;
 
     const handleCreateTier = async () => {
+        const trimmedName = tierName.trim();
+        if (!trimmedName) {
+            setFormError('Tier name is required.');
+            return;
+        }
+
+        setFormError('');
         const payload: CreateEventTierPayload = {
-            name: tierName.trim(),
+            name: trimmedName,
             description: tierDescription.trim() || null,
             maxCapacity: tierCapacity ? Number.parseInt(tierCapacity, 10) : null,
             price: parseTierPrice(tierPrice),
             currency: tierCurrency,
         };
-        const created = await eventsAPI.createTier(eventId, payload);
-        onTiersChange([...tiers, created]);
-        setTierName('');
-        setTierDescription('');
-        setTierCapacity('');
-        setTierPrice('');
-        setTierCurrency(DEFAULT_TIER_CURRENCY);
+
+        try {
+            const created = await eventsAPI.createTier(eventId, payload);
+            onTiersChange([...tiers, created]);
+            setTierName('');
+            setTierDescription('');
+            setTierCapacity('');
+            setTierPrice('');
+            setTierCurrency(DEFAULT_TIER_CURRENCY);
+        } catch (err) {
+            setFormError(err instanceof Error ? err.message : 'Failed to create tier.');
+        }
     };
 
     const handleUpdateTier = async (tier: EventTierRef, patch: UpdateEventTierPayload) => {
@@ -81,22 +94,44 @@ export default function EventTiersSection({ eventId, tiers, onTiersChange, canMa
     };
 
     const saveEdit = async (tier: EventTierRef) => {
-        await handleUpdateTier(tier, {
-            name: editName.trim(),
-            description: editDescription.trim() || null,
-            maxCapacity: editCapacity ? Number.parseInt(editCapacity, 10) : null,
-            price: parseTierPrice(editPrice),
-            currency: editCurrency,
-        });
-        cancelEdit();
+        const trimmedName = editName.trim();
+        if (!trimmedName) {
+            setFormError('Tier name is required.');
+            return;
+        }
+
+        setFormError('');
+        try {
+            await handleUpdateTier(tier, {
+                name: trimmedName,
+                description: editDescription.trim() || null,
+                maxCapacity: editCapacity ? Number.parseInt(editCapacity, 10) : null,
+                price: parseTierPrice(editPrice),
+                currency: editCurrency,
+            });
+            cancelEdit();
+        } catch (err) {
+            setFormError(err instanceof Error ? err.message : 'Failed to update tier.');
+        }
     };
 
     return (
         <section className="event-expanded-panel">
             <h2 className="expanded-section-title">Tiers</h2>
+            {formError ? <p className="error-message">{formError}</p> : null}
             {canManage ? (
             <div className="event-expanded-form-grid">
-                <input value={tierName} onChange={(e) => setTierName(e.target.value)} placeholder="Tier name" className="form-input" disabled={isEditing} />
+                <input
+                    value={tierName}
+                    onChange={(e) => {
+                        setTierName(e.target.value);
+                        if (formError) setFormError('');
+                    }}
+                    placeholder="Tier name"
+                    className="form-input"
+                    disabled={isEditing}
+                    aria-label="Tier name"
+                />
                 <input value={tierDescription} onChange={(e) => setTierDescription(e.target.value)} placeholder="Description" className="form-input" disabled={isEditing} />
                 <input value={tierCapacity} onChange={(e) => setTierCapacity(e.target.value)} placeholder="Max capacity" type="number" min="0" className="form-input" disabled={isEditing} />
                 <TierPriceFields
@@ -107,7 +142,14 @@ export default function EventTiersSection({ eventId, tiers, onTiersChange, canMa
                     onCurrencyChange={setTierCurrency}
                     disabled={isEditing}
                 />
-                <button type="button" onClick={() => void handleCreateTier()} className="btn btn-primary" disabled={isEditing}>Add tier</button>
+                <button
+                    type="button"
+                    onClick={() => void handleCreateTier()}
+                    className="btn btn-primary"
+                    disabled={isEditing}
+                >
+                    Add tier
+                </button>
             </div>
             ) : null}
             <div className="event-expanded-tiers-list">
