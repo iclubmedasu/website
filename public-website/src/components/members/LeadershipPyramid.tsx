@@ -7,7 +7,8 @@ interface LeadershipPyramidProps {
 }
 
 export function LeadershipPyramid({ directory }: LeadershipPyramidProps) {
-    const { officer, president, vicePresident, teamLeadership } = directory;
+    const { officer, president, vicePresident } = directory;
+    const teamLeadership = directory.teamLeadership ?? [];
     const hasAdmin = officer || president || vicePresident;
     const hasTeams = teamLeadership.length > 0;
 

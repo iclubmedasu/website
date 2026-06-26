@@ -42,6 +42,7 @@ interface EventExpandedContentProps {
     canRemoveAttendance?: boolean;
     onPublishedChange?: (eventId: Id, published: boolean) => Promise<void>;
     canManageTiers?: boolean;
+    canManageSessions?: boolean;
     canManageTasks?: boolean;
     canManageFields?: boolean;
     tierFieldShowOnPublic?: boolean;
@@ -63,6 +64,7 @@ export default function EventExpandedContent({
     canRemoveAttendance = false,
     onPublishedChange,
     canManageTiers = false,
+    canManageSessions = false,
     canManageTasks = false,
     canManageFields = false,
     tierFieldShowOnPublic: initialTierFieldShowOnPublic = true,
@@ -183,7 +185,7 @@ export default function EventExpandedContent({
                     <hr className="event-setup-divider" />
                     <EventSessionsSection
                         eventId={eventId}
-                        canManage={canManageTiers}
+                        canManage={canManageSessions}
                     />
                 </div>
             )}

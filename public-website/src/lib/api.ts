@@ -186,14 +186,23 @@ export const publicAPI = {
     },
 
     async getMembersDirectory(): Promise<PublicMemberDirectory> {
-        return fetchPublic<PublicMemberDirectory>("/public/members/directory", {
+        const fallback: PublicMemberDirectory = {
             officer: null,
             president: null,
             vicePresident: null,
             teamLeadership: [],
             filterTeams: [],
             members: [],
-        });
+        };
+        const data = await fetchPublic<Partial<PublicMemberDirectory>>("/public/members/directory", fallback);
+        return {
+            officer: data.officer ?? null,
+            president: data.president ?? null,
+            vicePresident: data.vicePresident ?? null,
+            teamLeadership: data.teamLeadership ?? [],
+            filterTeams: data.filterTeams ?? [],
+            members: data.members ?? [],
+        };
     },
 
     async getMemberProfile(id: number): Promise<PublicMemberProfile | null> {

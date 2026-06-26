@@ -39,6 +39,7 @@ export interface EventCardProps {
     archivedView?: boolean;
     canUpload?: boolean;
     canManageTiers?: boolean;
+    canManageSessions?: boolean;
     canManageTasks?: boolean;
     canManageFields?: boolean;
     canPublishEvent?: boolean;
@@ -67,6 +68,7 @@ export default function EventCard({
     archivedView = false,
     canUpload = false,
     canManageTiers = false,
+    canManageSessions = false,
     canManageTasks = false,
     canManageFields = false,
     canPublishEvent = false,
@@ -261,6 +263,7 @@ export default function EventCard({
                             canRemoveAttendance={canRemoveAttendance}
                             onPublishedChange={onPublishedChange}
                             canManageTiers={canManageTiers}
+                            canManageSessions={canManageSessions}
                             canManageTasks={canManageTasks}
                             canManageFields={canManageFields}
                             tierFieldShowOnPublic={fullDetail.tierFieldShowOnPublic ?? true}

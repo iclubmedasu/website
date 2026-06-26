@@ -1591,13 +1591,9 @@ router.get('/:id/sessions', optionalAuthenticateToken, async (req, res) => {
 
 router.post('/:id/sessions', authenticateToken, async (req, res) => {
     try {
-        if (!canUserManageEventTiers(req.user)) return res.status(403).json({ error: 'Access denied' });
-
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
-
-        const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true } });
-        if (!event) return res.status(404).json({ error: 'Event not found' });
+        if (!await ensureEventOperationsAccess(res, req, eventId)) return;
 
         const sessionDate = parseSessionDate(req.body?.sessionDate);
         if (!sessionDate) return res.status(400).json({ error: 'Valid sessionDate is required (YYYY-MM-DD)' });
@@ -1692,11 +1688,10 @@ router.patch('/:id/sessions/generate-tokens', authenticateToken, async (req, res
 
 router.put('/:id/sessions/:sessionId', authenticateToken, async (req, res) => {
     try {
-        if (!canUserManageEventTiers(req.user)) return res.status(403).json({ error: 'Access denied' });
-
         const eventId = parseId(req.params.id);
         const sessionId = parseId(req.params.sessionId);
         if (!eventId || !sessionId) return res.status(400).json({ error: 'Invalid event or session ID' });
+        if (!await ensureEventOperationsAccess(res, req, eventId)) return;
 
         const existing = await prisma.eventSession.findFirst({ where: { id: sessionId, eventId } });
         if (!existing) return res.status(404).json({ error: 'Session not found' });
@@ -1806,11 +1801,10 @@ router.put('/:id/sessions/:sessionId', authenticateToken, async (req, res) => {
 
 router.delete('/:id/sessions/:sessionId', authenticateToken, async (req, res) => {
     try {
-        if (!canUserManageEventTiers(req.user)) return res.status(403).json({ error: 'Access denied' });
-
         const eventId = parseId(req.params.id);
         const sessionId = parseId(req.params.sessionId);
         if (!eventId || !sessionId) return res.status(400).json({ error: 'Invalid event or session ID' });
+        if (!await ensureEventOperationsAccess(res, req, eventId)) return;
 
         const session = await prisma.eventSession.findFirst({
             where: { id: sessionId, eventId },

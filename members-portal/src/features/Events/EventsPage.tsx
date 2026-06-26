@@ -103,6 +103,7 @@ export default function EventsPage() {
             ),
             canManageEvent: () => isLifecycleRole,
             canManageTiers: isElevatedWorkItemRole,
+            canManageSessions: true,
             canManageTasks: isElevatedWorkItemRole,
             canManageFields: true,
             canManageRegistrations: true,
@@ -400,6 +401,7 @@ export default function EventsPage() {
                                 canManage={eventPermissions.canManageEvent()}
                                 canUpload={eventPermissions.canUploadToEvent()}
                                 canManageTiers={eventPermissions.canManageTiers}
+                                canManageSessions={eventPermissions.canManageSessions}
                                 canManageTasks={eventPermissions.canManageTasks}
                                 canManageFields={eventPermissions.canManageFields}
                                 canPublishEvent={eventPermissions.canPublishEvent}
@@ -485,6 +487,7 @@ export default function EventsPage() {
                     canManage={eventPermissions.canManageEvent()}
                     canUpload={eventPermissions.canUploadToEvent()}
                     canManageTiers={eventPermissions.canManageTiers}
+                    canManageSessions={eventPermissions.canManageSessions}
                     canManageTasks={eventPermissions.canManageTasks}
                     canManageFields={eventPermissions.canManageFields}
                     canPublishEvent={eventPermissions.canPublishEvent}

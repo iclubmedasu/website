@@ -65,6 +65,7 @@ export default function PastEventsPage() {
             isElevatedWorkItemRole,
             canManageLifecycle: isLifecycleRole,
             canManageTiers: isElevatedWorkItemRole,
+            canManageSessions: true,
             canManageTasks: isElevatedWorkItemRole,
             canManageFields: true,
             canUploadToEvent: () => !!user?.id,
@@ -257,6 +258,7 @@ export default function PastEventsPage() {
                                 canManage={canManageLifecycle}
                                 canUpload={eventPermissions.canUploadToEvent()}
                                 canManageTiers={eventPermissions.canManageTiers}
+                                canManageSessions={eventPermissions.canManageSessions}
                                 canManageTasks={eventPermissions.canManageTasks}
                                 canManageFields={eventPermissions.canManageFields}
                                 archivedView

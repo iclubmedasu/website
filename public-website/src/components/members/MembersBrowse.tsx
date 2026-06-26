@@ -15,17 +15,19 @@ interface MembersBrowseProps {
 }
 
 export function MembersBrowse({ members, filterTeams }: MembersBrowseProps) {
+    const roster = members ?? [];
+    const teams = filterTeams ?? [];
     const [teamFilter, setTeamFilter] = useState<string>(ALL_TEAMS);
     const [page, setPage] = useState(1);
 
     const filteredMembers = useMemo(() => {
-        if (teamFilter === ALL_TEAMS) return members;
+        if (teamFilter === ALL_TEAMS) return roster;
         if (teamFilter === UNASSIGNED) {
-            return members.filter((member) => member.teamId == null);
+            return roster.filter((member) => member.teamId == null);
         }
         const teamId = Number(teamFilter);
-        return members.filter((member) => member.teamId === teamId);
-    }, [members, teamFilter]);
+        return roster.filter((member) => member.teamId === teamId);
+    }, [roster, teamFilter]);
 
     const totalPages = Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE));
     const currentPage = Math.min(page, totalPages);
@@ -43,7 +45,7 @@ export function MembersBrowse({ members, filterTeams }: MembersBrowseProps) {
         setPage(1);
     }
 
-    if (members.length === 0) {
+    if (roster.length === 0) {
         return (
             <div className="member-profile-empty">
                 <p className="member-profile-empty-title">No members to display</p>
@@ -63,7 +65,7 @@ export function MembersBrowse({ members, filterTeams }: MembersBrowseProps) {
                         onChange={(event) => handleTeamChange(event.target.value)}
                     >
                         <option value={ALL_TEAMS}>All teams</option>
-                        {filterTeams.map((team) => (
+                        {teams.map((team) => (
                             <option key={team.id} value={String(team.id)}>
                                 {team.name}
                             </option>
