@@ -56,3 +56,36 @@ export function formatAttendanceDayLabel(eventDay: string): string {
     if (Number.isNaN(parsed.getTime())) return eventDay;
     return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
+
+function toLocalTimeString(date: Date): string {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+}
+
+interface SessionTimeWindowLike {
+    sessionDate: string;
+    startTime?: string | null;
+    endTime?: string | null;
+    isActive?: boolean;
+}
+
+export function isSessionActiveNow(
+    session: SessionTimeWindowLike,
+    referenceDate: Date = new Date(),
+): boolean {
+    if (session.isActive === false) return false;
+    if (!session.startTime || !session.endTime) return false;
+    const sessionDay = session.sessionDate.slice(0, 10);
+    const today = toLocalDayString(referenceDate);
+    if (sessionDay !== today) return false;
+    const hhmm = toLocalTimeString(referenceDate);
+    return session.startTime <= hhmm && hhmm < session.endTime;
+}
+
+export function getActiveSessionsNow<T extends SessionTimeWindowLike>(
+    sessions: T[],
+    referenceDate: Date = new Date(),
+): T[] {
+    return sessions.filter((session) => isSessionActiveNow(session, referenceDate));
+}

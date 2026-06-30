@@ -64,11 +64,9 @@ export function useResourceChannel({
             }
         };
 
-        window.addEventListener('focus', scheduleRefresh);
         document.addEventListener('visibilitychange', handleVisibility);
 
         return () => {
-            window.removeEventListener('focus', scheduleRefresh);
             document.removeEventListener('visibilitychange', handleVisibility);
             if (debounceTimerRef.current) {
                 clearTimeout(debounceTimerRef.current);

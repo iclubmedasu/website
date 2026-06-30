@@ -1408,9 +1408,9 @@
     font-size: 0.9rem;
 }
 
-.event-checkin-required-modal .modal-body {
-    max-height: min(60vh, 420px);
-    overflow-y: auto;
+/* event staff modals: base structure from modal.css; portal via EventStaffModal */
+.event-staff-action-modal {
+    max-width: 32rem;
 }
 
 @media (max-width: 900px) {
@@ -1596,32 +1596,6 @@
 
 .event-expanded-panel .event-expanded-header .expanded-section-title {
     margin-bottom: 0.35rem;
-}
-
-.event-checkin-required-panel {
-    display: grid;
-    gap: 0.75rem;
-}
-
-.event-checkin-required-fields {
-    display: grid;
-    gap: 0.75rem;
-}
-
-.event-checkin-field {
-    display: grid;
-    gap: 0.35rem;
-}
-
-.event-checkin-field--error .form-input {
-    border-color: var(--error-text);
-    box-shadow: var(--shadow-focus-error);
-}
-
-.event-checkin-required-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
 }
 
 /* check-in feedback: .error-message and .success-message from errormsg.css / modal.css */

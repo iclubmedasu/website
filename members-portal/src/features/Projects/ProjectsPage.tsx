@@ -291,8 +291,11 @@ export default function ProjectsPage() {
     }, []);
 
     // ── Load projects ──
-    const loadProjects = useCallback(async () => {
-        setLoading(true); setError('');
+    const loadProjects = useCallback(async (options?: { silent?: boolean }) => {
+        if (!options?.silent) {
+            setLoading(true);
+            setError('');
+        }
         try {
             const [activeData, inactiveData] = await Promise.all([
                 projectsAPI.getAll({
@@ -326,9 +329,13 @@ export default function ProjectsPage() {
             });
             setProjects(filtered);
         } catch (err: any) {
-            setError(err.message || 'Failed to load projects');
+            if (!options?.silent) {
+                setError(err.message || 'Failed to load projects');
+            }
         } finally {
-            setLoading(false);
+            if (!options?.silent) {
+                setLoading(false);
+            }
         }
     }, [filterTeam, filterCategory, filterPriority, filterStatus]);
 
@@ -442,7 +449,7 @@ export default function ProjectsPage() {
     const handleRemoteProjectRefresh = useCallback(() => {
         if (!expandedProjectId) return;
         void handleRefreshDetail(expandedProjectId);
-        void loadProjects();
+        void loadProjects({ silent: true });
     }, [expandedProjectId, loadProjects]);
 
     useResourceChannel({

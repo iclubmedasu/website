@@ -7,6 +7,7 @@ import {
     getCustomFieldValue,
 } from './EventExpandedContent/customFieldUtils';
 import { formatAttendanceDayLabel } from './eventDateUtils';
+import { formatSessionDisplayLabel } from './eventUtils';
 
 const HEADER_FILL = '#561789';
 const ZEBRA_FILL = '#F9FAFB';
@@ -144,19 +145,46 @@ function formatAttendanceExport(
     registration.sessionAttendances?.forEach((attendance) => {
         const sessionDate = sessionDateById.get(String(attendance.sessionId));
         const dayLabel = sessionDate ? formatAttendanceDayLabel(sessionDate) : 'Session';
-        chips.push(`Online · ${dayLabel}`);
+        const modeLabel = attendance.mode === 'ONLINE' ? 'Online' : 'Onsite';
+        chips.push(`${modeLabel} · ${dayLabel}`);
     });
 
     return chips.join(', ');
 }
 
+function getSortedActiveSessions(sessions: EventSessionRef[]): EventSessionRef[] {
+    return [...sessions]
+        .filter((session) => session.isActive !== false)
+        .sort((a, b) => {
+            const dateCompare = a.sessionDate.localeCompare(b.sessionDate);
+            if (dateCompare !== 0) return dateCompare;
+            return (a.order ?? 0) - (b.order ?? 0);
+        });
+}
+
+function formatSessionColumnHeader(session: EventSessionRef): string {
+    return `Session: ${formatSessionDisplayLabel(session)}`;
+}
+
+function formatSessionAttendanceExport(
+    registration: EventRegistrationRef,
+    session: EventSessionRef,
+): string {
+    const attended = (registration.sessionAttendances ?? []).some(
+        (attendance) => String(attendance.sessionId) === String(session.id),
+    );
+    return attended ? 'Attended' : 'Missed';
+}
+
 function buildRegistrationMatrix(
     registrations: EventRegistrationRef[],
     fields: EventCustomFieldRef[],
+    sessions: EventSessionRef[],
     multiDayEvent: boolean,
     sessionDateById: Map<string, string>,
 ): string[][] {
     const sortedFields = [...fields].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const sortedActiveSessions = getSortedActiveSessions(sessions);
     const headers = [
         'Name',
         'Email',
@@ -166,6 +194,7 @@ function buildRegistrationMatrix(
         'Tier',
         'Code',
         ...(multiDayEvent ? ['Attendance'] : []),
+        ...sortedActiveSessions.map(formatSessionColumnHeader),
         'Status',
         'Source',
         'Registered',
@@ -188,6 +217,8 @@ function buildRegistrationMatrix(
         if (multiDayEvent) {
             row.push(formatAttendanceExport(registration, sessionDateById));
         }
+
+        row.push(...sortedActiveSessions.map((session) => formatSessionAttendanceExport(registration, session)));
 
         row.push(
             formatRegistrationStatus(registration),
@@ -273,7 +304,7 @@ export async function exportEventRegistrationsExcel({
     const sessionDateById = new Map(
         sessions.map((session) => [String(session.id), session.sessionDate.slice(0, 10)]),
     );
-    const matrix = buildRegistrationMatrix(registrations, fields, multiDayEvent, sessionDateById);
+    const matrix = buildRegistrationMatrix(registrations, fields, sessions, multiDayEvent, sessionDateById);
     const sheet = styleRegistrationSheet(XLSX, matrix);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, 'Registrations');

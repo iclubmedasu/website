@@ -1,6 +1,12 @@
 import { useCallback, useRef, useState } from 'react';
 import { eventsAPI } from '@/services/api';
-import type { EventCustomFieldRef, EventRegistrationRef, Id } from '@/types/backend-contracts';
+import type {
+    EventCustomFieldRef,
+    EventRegistrationRef,
+    EventSessionRef,
+    EventTierRef,
+    Id,
+} from '@/types/backend-contracts';
 import { isCustomFieldValueEmpty, mergeCustomFieldValues } from './customFieldUtils';
 import { parseScannedPayload } from './checkInScanUtils';
 
@@ -19,9 +25,20 @@ const SOURCE_LABEL: Record<CheckInSource, string> = {
 interface UseCheckInFlowOptions {
     eventId: Id | string;
     onCheckIn: () => void;
+    tiers?: EventTierRef[];
+    sessions?: EventSessionRef[];
+    tierFieldRequired?: boolean;
+    sessionFieldRequired?: boolean;
 }
 
-export function useCheckInFlow({ eventId, onCheckIn }: UseCheckInFlowOptions) {
+export function useCheckInFlow({
+    eventId,
+    onCheckIn,
+    tiers = [],
+    sessions = [],
+    tierFieldRequired = false,
+    sessionFieldRequired = false,
+}: UseCheckInFlowOptions) {
     const [manualCode, setManualCode] = useState('');
     const [result, setResult] = useState<CheckInResultState>(null);
     const [registration, setRegistration] = useState<EventRegistrationRef | null>(null);
@@ -31,9 +48,21 @@ export function useCheckInFlow({ eventId, onCheckIn }: UseCheckInFlowOptions) {
     const [loading, setLoading] = useState(false);
     const [requiredFieldsModalOpen, setRequiredFieldsModalOpen] = useState(false);
     const [lastSource, setLastSource] = useState<CheckInSource | null>(null);
+    const [activeSessionsNow, setActiveSessionsNow] = useState<EventSessionRef[]>([]);
+    const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+    const [alreadyHasDayAttendance, setAlreadyHasDayAttendance] = useState(false);
+    const [needsTier, setNeedsTier] = useState(false);
+    const [needsSessions, setNeedsSessions] = useState(false);
+    const [selectedTierId, setSelectedTierId] = useState('');
+    const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
 
     const activeCodeRef = useRef('');
     const lastProcessedRef = useRef<{ code: string; at: number } | null>(null);
+
+    const showCombinedModal = requiredFieldsModalOpen
+        || activeSessionsNow.length > 0
+        || needsTier
+        || needsSessions;
 
     const resetFlow = useCallback(() => {
         setRegistration(null);
@@ -41,6 +70,13 @@ export function useCheckInFlow({ eventId, onCheckIn }: UseCheckInFlowOptions) {
         setPendingCustomValues({});
         setFieldErrors({});
         setRequiredFieldsModalOpen(false);
+        setActiveSessionsNow([]);
+        setSelectedSessionId(null);
+        setAlreadyHasDayAttendance(false);
+        setNeedsTier(false);
+        setNeedsSessions(false);
+        setSelectedTierId('');
+        setSelectedSessionIds([]);
         activeCodeRef.current = '';
     }, []);
 
@@ -54,11 +90,20 @@ export function useCheckInFlow({ eventId, onCheckIn }: UseCheckInFlowOptions) {
         return false;
     };
 
-    const completeCheckIn = useCallback(async (customFieldValues?: Record<string, unknown>, source?: CheckInSource) => {
+    const completeCheckIn = useCallback(async (
+        customFieldValues?: Record<string, unknown>,
+        source?: CheckInSource,
+        sessionId?: string | null,
+        tierId?: string | null,
+        sessionIds?: string[],
+    ) => {
         const confirmationCode = activeCodeRef.current;
         const checkedIn = await eventsAPI.checkInRegistration(eventId, 'code', {
             confirmationCode,
             ...(customFieldValues ? { customFieldValues } : {}),
+            ...(sessionId ? { sessionId } : {}),
+            ...(tierId ? { tierId } : {}),
+            ...(sessionIds && sessionIds.length > 0 ? { sessionIds } : {}),
         });
         const priorDays = checkedIn.attendanceDays?.length ?? 0;
         const via = source ? SOURCE_LABEL[source] : 'scan';
@@ -103,8 +148,16 @@ export function useCheckInFlow({ eventId, onCheckIn }: UseCheckInFlowOptions) {
 
         try {
             const lookup = await eventsAPI.lookupRegistrationByCode(eventId, parsed);
+            const activeNow = lookup.activeSessionsNow ?? [];
+            const alreadyCheckedIn = lookup.alreadyCheckedInToday ?? lookup.checkedInToday;
+            const registrationNeedsTier = tierFieldRequired && !lookup.registration.tier;
+            const registrationNeedsSessions = sessionFieldRequired
+                && (lookup.registration.sessionSelections?.length ?? 0) === 0;
+            const existingSelectionIds = (lookup.registration.sessionSelections ?? [])
+                .map((selection) => String(selection.sessionId));
 
-            if (lookup.checkedInToday) {
+            if (alreadyCheckedIn && activeNow.length === 0 && !registrationNeedsTier && !registrationNeedsSessions
+                && lookup.missingRequiredFields.length === 0) {
                 setResult({
                     type: 'error',
                     message: `${lookup.registration.fullName} is already checked in today.`,
@@ -115,21 +168,47 @@ export function useCheckInFlow({ eventId, onCheckIn }: UseCheckInFlowOptions) {
 
             setRegistration(lookup.registration);
             setMissingFields(lookup.missingRequiredFields);
+            setActiveSessionsNow(activeNow);
+            setNeedsTier(registrationNeedsTier);
+            setNeedsSessions(registrationNeedsSessions);
+            setSelectedTierId('');
+            setSelectedSessionIds(existingSelectionIds);
 
-            if (lookup.missingRequiredFields.length === 0) {
+            if (alreadyCheckedIn && activeNow.length > 0) {
+                setAlreadyHasDayAttendance(true);
+                setSelectedSessionId(String(activeNow[0].id));
+                if (lookup.missingRequiredFields.length > 0) {
+                    setPendingCustomValues({});
+                    setRequiredFieldsModalOpen(true);
+                }
+                return;
+            }
+
+            if (activeNow.length > 0) {
+                setSelectedSessionId(null);
+            }
+
+            const canAutoCheckIn = lookup.missingRequiredFields.length === 0
+                && activeNow.length === 0
+                && !registrationNeedsTier
+                && !registrationNeedsSessions;
+
+            if (canAutoCheckIn) {
                 await completeCheckIn(undefined, source);
                 return;
             }
 
             setPendingCustomValues({});
-            setRequiredFieldsModalOpen(true);
+            if (lookup.missingRequiredFields.length > 0) {
+                setRequiredFieldsModalOpen(true);
+            }
         } catch (error) {
             setResult({ type: 'error', message: error instanceof Error ? error.message : 'Lookup failed' });
             resetFlow();
         } finally {
             setLoading(false);
         }
-    }, [completeCheckIn, eventId, resetFlow]);
+    }, [completeCheckIn, eventId, resetFlow, sessionFieldRequired, tierFieldRequired]);
 
     const handleCompleteCheckIn = useCallback(async () => {
         if (!registration) return;
@@ -143,6 +222,13 @@ export function useCheckInFlow({ eventId, onCheckIn }: UseCheckInFlowOptions) {
             }
         }
 
+        if (needsTier && !selectedTierId) {
+            errors._tier = 'A registration tier is required.';
+        }
+        if (needsSessions && selectedSessionIds.length === 0) {
+            errors._sessions = 'At least one session must be selected.';
+        }
+
         if (Object.keys(errors).length > 0) {
             setFieldErrors(errors);
             return;
@@ -152,17 +238,36 @@ export function useCheckInFlow({ eventId, onCheckIn }: UseCheckInFlowOptions) {
         setFieldErrors({});
 
         try {
-            const merged = mergeCustomFieldValues(
-                registration.customFieldValues as Record<string, unknown> | null | undefined,
-                pendingCustomValues,
+            const merged = missingFields.length > 0
+                ? mergeCustomFieldValues(
+                    registration.customFieldValues as Record<string, unknown> | null | undefined,
+                    pendingCustomValues,
+                )
+                : undefined;
+            await completeCheckIn(
+                merged,
+                lastSource ?? 'manual',
+                selectedSessionId,
+                needsTier ? selectedTierId : undefined,
+                needsSessions ? selectedSessionIds : undefined,
             );
-            await completeCheckIn(merged, lastSource ?? 'manual');
         } catch (error) {
             setResult({ type: 'error', message: error instanceof Error ? error.message : 'Check-in failed' });
         } finally {
             setLoading(false);
         }
-    }, [completeCheckIn, lastSource, missingFields, pendingCustomValues, registration]);
+    }, [
+        completeCheckIn,
+        lastSource,
+        missingFields,
+        needsSessions,
+        needsTier,
+        pendingCustomValues,
+        registration,
+        selectedSessionId,
+        selectedSessionIds,
+        selectedTierId,
+    ]);
 
     const handleCancelRequiredFields = useCallback(() => {
         resetFlow();
@@ -179,9 +284,40 @@ export function useCheckInFlow({ eventId, onCheckIn }: UseCheckInFlowOptions) {
         });
     }, []);
 
+    const toggleSessionSelection = useCallback((sessionId: string) => {
+        setSelectedSessionIds((current) => (
+            current.includes(sessionId)
+                ? current.filter((id) => id !== sessionId)
+                : [...current, sessionId]
+        ));
+        setFieldErrors((current) => {
+            if (!current._sessions) return current;
+            const next = { ...current };
+            delete next._sessions;
+            return next;
+        });
+    }, []);
+
+    const clearFieldError = useCallback((key: string) => {
+        setFieldErrors((current) => {
+            if (!current[key]) return current;
+            const next = { ...current };
+            delete next[key];
+            return next;
+        });
+    }, []);
+
     const handleManualLookup = useCallback(() => {
         void processConfirmationCode(manualCode, 'manual');
     }, [manualCode, processConfirmationCode]);
+
+    const sortedActiveSessions = [...sessions]
+        .filter((session) => session.isActive !== false)
+        .sort((a, b) => {
+            const dateCompare = a.sessionDate.localeCompare(b.sessionDate);
+            if (dateCompare !== 0) return dateCompare;
+            return (a.order ?? 0) - (b.order ?? 0);
+        });
 
     return {
         manualCode,
@@ -193,6 +329,20 @@ export function useCheckInFlow({ eventId, onCheckIn }: UseCheckInFlowOptions) {
         fieldErrors,
         loading,
         requiredFieldsModalOpen,
+        showCombinedModal,
+        activeSessionsNow,
+        selectedSessionId,
+        setSelectedSessionId,
+        alreadyHasDayAttendance,
+        needsTier,
+        needsSessions,
+        selectedTierId,
+        setSelectedTierId,
+        selectedSessionIds,
+        toggleSessionSelection,
+        clearFieldError,
+        tiers,
+        sortedActiveSessions,
         lastSource,
         processConfirmationCode,
         handleCompleteCheckIn,

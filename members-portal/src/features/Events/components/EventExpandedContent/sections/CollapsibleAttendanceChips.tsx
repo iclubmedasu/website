@@ -57,11 +57,12 @@ function buildAttendanceChips(
     registration.sessionAttendances?.forEach((attendance) => {
         const sessionDate = sessionDateById.get(String(attendance.sessionId));
         const dayLabel = sessionDate ? formatAttendanceDayLabel(sessionDate) : 'Session';
-        const chipLabel = `Online · ${dayLabel}`;
+        const isOnline = attendance.mode === 'ONLINE';
+        const chipLabel = `${isOnline ? 'Online' : 'Onsite'} · ${dayLabel}`;
         const className = [
             'event-attendance-day-chip',
             canRemoveAttendance ? 'event-attendance-day-chip--removable' : '',
-            'event-attendance-day-chip--online',
+            isOnline ? 'event-attendance-day-chip--online' : '',
         ].filter(Boolean).join(' ');
         chips.push({
             key: `online-${attendance.id}`,

@@ -38,7 +38,9 @@ import EditableRegistrationSessionCell from './EditableRegistrationSessionCell';
 import CollapsibleAttendanceChips, { type AttendanceRemovalTarget } from './CollapsibleAttendanceChips';
 import EventCheckInPanel from './EventCheckInSection';
 import WalkInDraftFields from './WalkInDraftFields';
-import { formatEventDuration, isMultiDayEvent, isWithinEventDays } from '../../eventDateUtils';
+import SessionAttendanceOptions from './SessionAttendanceOptions';
+import EventStaffModal from '@/features/Events/components/EventStaffModal';
+import { formatEventDuration, getActiveSessionsNow, isMultiDayEvent, isWithinEventDays } from '../../eventDateUtils';
 
 interface EventRegistrationsSectionProps {
     eventId: Id | string;
@@ -106,6 +108,8 @@ export default function EventRegistrationsSection({
     const [publishing, setPublishing] = useState(false);
     const [attendanceRemovalTarget, setAttendanceRemovalTarget] = useState<AttendanceRemovalTarget | null>(null);
     const [removingAttendance, setRemovingAttendance] = useState(false);
+    const [walkInAttendanceOpen, setWalkInAttendanceOpen] = useState(false);
+    const [walkInAttendanceSessionId, setWalkInAttendanceSessionId] = useState<string | null>(null);
     const [editingField, setEditingField] = useState<EventCustomFieldRef | null>(null);
     const dragFieldId = useRef<number | null>(null);
     const tableScrollRef = useRef<HTMLDivElement>(null);
@@ -117,6 +121,7 @@ export default function EventRegistrationsSection({
     const canEditCustomFieldValues = withinEventDays;
     const eventDurationLabel = formatEventDuration(eventDate, eventEndDate ?? eventDate);
     const multiDayEvent = isMultiDayEvent(eventDate, eventEndDate);
+    const activeSessionsNow = getActiveSessionsNow(sessions);
     const sessionDateById = new Map(
         sessions.map((session) => [String(session.id), session.sessionDate.slice(0, 10)]),
     );
@@ -235,6 +240,49 @@ export default function EventRegistrationsSection({
         setIsAddingAttendee(false);
         setDraft(emptyAttendeeDraft());
         setDraftErrors({});
+        setWalkInAttendanceOpen(false);
+        setWalkInAttendanceSessionId(null);
+    };
+
+    const buildWalkInPayload = (attendanceSessionId?: string | null) => {
+        const customFieldValues = Object.fromEntries(
+            sortedFields.map((field) => [String(field.id), draft.customFieldValues[String(field.id)] ?? null]),
+        );
+        return {
+            fullName: draft.fullName.trim(),
+            email: draft.email.trim(),
+            phoneNumber: draft.phoneNumber.trim() || null,
+            tierId: draft.tierId || null,
+            sessionIds: draft.sessionIds,
+            ...(attendanceSessionId ? { sessionId: attendanceSessionId } : {}),
+            isWalkIn: true,
+            customFieldValues,
+        };
+    };
+
+    const executeWalkInSave = async (attendanceSessionId?: string | null) => {
+        setSaving(true);
+        try {
+            const saved = await eventsAPI.createWalkInRegistration(eventId, buildWalkInPayload(attendanceSessionId));
+            setRegistrations((current) => {
+                const existingIndex = current.findIndex((item) => item.id === saved.id);
+                if (existingIndex >= 0) {
+                    const next = [...current];
+                    next[existingIndex] = saved;
+                    return next;
+                }
+                return [saved, ...current];
+            });
+            closeDraft();
+            onRegistrationAdded?.();
+        } catch (error) {
+            setWalkInAttendanceOpen(false);
+            setDraftErrors({
+                _form: error instanceof Error ? error.message : 'Failed to save attendee.',
+            });
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleDraftChange = (patch: Partial<AttendeeDraft>) => {
@@ -259,43 +307,31 @@ export default function EventRegistrationsSection({
     };
 
     const handleSaveAttendee = async () => {
-        const errors = validateAttendeeDraft(draft, sortedFields);
+        const errors = validateAttendeeDraft(draft, sortedFields, {
+            tierFieldRequired,
+            sessionFieldRequired,
+        });
         if (Object.keys(errors).length > 0) {
             setDraftErrors(errors);
             return;
         }
 
-        setSaving(true);
-        try {
-            const customFieldValues = Object.fromEntries(
-                sortedFields.map((field) => [String(field.id), draft.customFieldValues[String(field.id)] ?? null]),
-            );
-            const saved = await eventsAPI.createWalkInRegistration(eventId, {
-                fullName: draft.fullName.trim(),
-                email: draft.email.trim(),
-                phoneNumber: draft.phoneNumber.trim() || null,
-                tierId: draft.tierId || null,
-                isWalkIn: true,
-                customFieldValues,
-            });
-            setRegistrations((current) => {
-                const existingIndex = current.findIndex((item) => item.id === saved.id);
-                if (existingIndex >= 0) {
-                    const next = [...current];
-                    next[existingIndex] = saved;
-                    return next;
-                }
-                return [saved, ...current];
-            });
-            closeDraft();
-            onRegistrationAdded?.();
-        } catch (error) {
-            setDraftErrors({
-                _form: error instanceof Error ? error.message : 'Failed to save attendee.',
-            });
-        } finally {
-            setSaving(false);
+        if (activeSessionsNow.length > 0) {
+            setWalkInAttendanceSessionId(null);
+            setWalkInAttendanceOpen(true);
+            return;
         }
+
+        await executeWalkInSave();
+    };
+
+    const handleConfirmWalkInAttendance = async () => {
+        await executeWalkInSave(walkInAttendanceSessionId);
+    };
+
+    const handleCancelWalkInAttendance = () => {
+        setWalkInAttendanceOpen(false);
+        setWalkInAttendanceSessionId(null);
     };
 
     const handleRegistrationUpdated = (updated: EventRegistrationRef) => {
@@ -373,6 +409,10 @@ export default function EventRegistrationsSection({
         draftErrors,
         sortedFields,
         tiers,
+        sessions,
+        tierFieldRequired,
+        sessionFieldRequired,
+        multiDayEvent,
         onDraftChange: handleDraftChange,
         onClearError: clearDraftError,
         onCustomFieldChange: updateDraftCustomField,
@@ -641,10 +681,50 @@ export default function EventRegistrationsSection({
                     <EventCheckInPanel
                         eventId={eventId}
                         onCheckIn={handleCheckInSuccess}
-                        suspended={fieldModalOpen || importModalOpen || isAddingAttendee}
+                        suspended={fieldModalOpen || importModalOpen || isAddingAttendee || walkInAttendanceOpen}
+                        tiers={tiers}
+                        sessions={sessions}
+                        tierFieldRequired={tierFieldRequired}
+                        sessionFieldRequired={sessionFieldRequired}
                     />
                 </aside>
             </div>
+
+            <EventStaffModal
+                open={walkInAttendanceOpen}
+                title="Session attendance"
+                subtitle={`${draft.fullName.trim() || 'Walk-in attendee'} — choose how to record attendance for this check-in.`}
+                titleId="walkin-attendance-title"
+                onClose={handleCancelWalkInAttendance}
+                closeDisabled={saving}
+                footer={(
+                    <>
+                        <button
+                            type="button"
+                            onClick={handleCancelWalkInAttendance}
+                            className="btn btn-secondary"
+                            disabled={saving}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => void handleConfirmWalkInAttendance()}
+                            className="btn btn-primary"
+                            disabled={saving}
+                        >
+                            {saving ? 'Saving…' : 'Save walk-in'}
+                        </button>
+                    </>
+                )}
+            >
+                <SessionAttendanceOptions
+                    activeSessionsNow={activeSessionsNow}
+                    selectedSessionId={walkInAttendanceSessionId}
+                    onSelectSessionId={setWalkInAttendanceSessionId}
+                    radioName="walkin-session"
+                />
+            </EventStaffModal>
 
             {importModalOpen ? (
                 <ImportRegistrationsModal

@@ -299,6 +299,7 @@ export interface UpdateEventRegistrationColumnsPayload {
 export interface CreateEventRegistrationPayload {
     tierId?: Id | string | null;
     sessionIds?: Array<Id | string>;
+    sessionId?: Id | string | null;
     fullName: string;
     email: string;
     phoneNumber?: string | null;
@@ -404,6 +405,9 @@ export interface CheckInRegistrationPayload {
     confirmationCode?: string;
     eventDay?: string;
     customFieldValues?: Record<string, unknown> | unknown;
+    sessionId?: Id | string | null;
+    tierId?: Id | string | null;
+    sessionIds?: Array<Id | string>;
 }
 
 export interface RemoveRegistrationAttendancePayload {
@@ -415,6 +419,9 @@ export interface EventRegistrationLookupResult {
     missingRequiredFields: EventCustomFieldRef[];
     eventDay: string;
     checkedInToday: boolean;
+    alreadyCheckedInToday: boolean;
+    activeSessionsNow: EventSessionRef[];
+    existingSessionAttendances: EventSessionAttendanceRef[];
 }
 
 export interface EventTaskAssignmentRef {

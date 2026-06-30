@@ -123,7 +123,12 @@ export default function FileUploadZone({ entityId, filesAPI, memberId, onFileUpl
             done: true,
             fileObj: null,
         }));
-        setUploadingFiles(existing);
+        setUploadingFiles((prev) => {
+            const inProgress = prev.filter((f) => !f.done);
+            const existingIds = new Set(existing.map((f) => String(f.id)));
+            const keptInProgress = inProgress.filter((f) => !existingIds.has(String(f.id)));
+            return [...keptInProgress, ...existing];
+        });
     }, [existingFiles]);
 
     useEffect(() => {

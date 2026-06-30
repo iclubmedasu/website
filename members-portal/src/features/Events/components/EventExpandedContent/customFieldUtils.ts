@@ -5,6 +5,7 @@ export interface AttendeeDraft {
     email: string;
     phoneNumber: string;
     tierId: string;
+    sessionIds: string[];
     customFieldValues: Record<string, unknown>;
 }
 
@@ -13,6 +14,7 @@ export const emptyAttendeeDraft = (): AttendeeDraft => ({
     email: '',
     phoneNumber: '',
     tierId: '',
+    sessionIds: [],
     customFieldValues: {},
 });
 
@@ -87,6 +89,7 @@ export function validateRequiredCustomFields(
 export function validateAttendeeDraft(
     draft: AttendeeDraft,
     fields: EventCustomFieldRef[],
+    options?: { tierFieldRequired?: boolean; sessionFieldRequired?: boolean },
 ): Record<string, string> {
     const errors: Record<string, string> = {};
 
@@ -95,6 +98,13 @@ export function validateAttendeeDraft(
     }
     if (!draft.email.trim()) {
         errors.email = 'Email is required.';
+    }
+
+    if (options?.tierFieldRequired && !draft.tierId) {
+        errors.tierId = 'Tier is required.';
+    }
+    if (options?.sessionFieldRequired && draft.sessionIds.length === 0) {
+        errors.sessionIds = 'At least one session must be selected.';
     }
 
     const customErrors = validateRequiredCustomFields(draft.customFieldValues, fields);

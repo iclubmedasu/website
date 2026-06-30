@@ -1052,11 +1052,12 @@
 }
 
 .radio-option-card {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
     padding: 1rem 1.25rem;
-    border: 2px solid var(--gray-200);
+    border: 2px solid var(--gray-80);
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: all 0.2s;

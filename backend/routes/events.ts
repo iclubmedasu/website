@@ -420,6 +420,58 @@ function parseSessionIds(value: unknown): number[] {
     return [...new Set(ids)];
 }
 
+type SessionTimeWindow = { sessionDate: Date; startTime: string | null; endTime: string | null };
+
+function toLocalDayString(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function toLocalTimeString(date: Date): string {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+}
+
+function doSessionsOverlap(a: SessionTimeWindow, b: SessionTimeWindow): boolean {
+    if (!a.startTime || !a.endTime || !b.startTime || !b.endTime) return false;
+    if (formatEventDay(a.sessionDate) !== formatEventDay(b.sessionDate)) return false;
+    return a.startTime < b.endTime && b.startTime < a.endTime;
+}
+
+async function getActiveSessionsAtTime(eventId: number, referenceDate: Date) {
+    const day = toLocalDayString(referenceDate);
+    const hhmm = toLocalTimeString(referenceDate);
+    const sessions = await prisma.eventSession.findMany({
+        where: {
+            eventId,
+            isActive: true,
+            sessionDate: eventDayStringToDate(day),
+            startTime: { not: null },
+            endTime: { not: null },
+        },
+        orderBy: [{ startTime: 'asc' }, { order: 'asc' }],
+    });
+    return sessions.filter((session) => session.startTime! <= hhmm && hhmm < session.endTime!);
+}
+
+async function findOverlappingSessionAttendance(
+    registrationId: number,
+    target: SessionTimeWindow,
+) {
+    const attendances = await prisma.eventSessionAttendance.findMany({
+        where: { registrationId, mode: 'ONSITE' },
+        include: {
+            session: {
+                select: { label: true, sessionDate: true, startTime: true, endTime: true },
+            },
+        },
+    });
+    return attendances.find((attendance) => attendance.session && doSessionsOverlap(attendance.session, target)) ?? null;
+}
+
 async function validateSessionIdsForEvent(
     eventId: number,
     sessionIds: number[],
@@ -1861,6 +1913,9 @@ router.get('/:id/join', async (req, res) => {
                         id: true,
                         onlineUrl: true,
                         mode: true,
+                        sessionDate: true,
+                        startTime: true,
+                        endTime: true,
                     },
                 },
                 registration: {
@@ -1880,6 +1935,15 @@ router.get('/:id/join', async (req, res) => {
         const { session } = sessionToken;
         if (session.mode === 'ONSITE' || !session.onlineUrl) {
             return res.status(409).json({ error: 'This session is not available for online join' });
+        }
+
+        if (session.startTime && session.endTime) {
+            const activeNow = await getActiveSessionsAtTime(eventId, new Date());
+            if (!activeNow.some((active) => active.id === session.id)) {
+                return res.status(409).json({
+                    error: 'This session is not currently active. Online join is only available during the session time.',
+                });
+            }
         }
 
         await prisma.eventSessionAttendance.upsert({
@@ -2252,12 +2316,16 @@ router.get('/:id/registrations/lookup', authenticateToken, async (req, res) => {
         const checkedInToday = resolved
             ? hasAttendanceOnDay(registration.attendanceDays ?? [], resolved.eventDay)
             : false;
+        const activeSessionsNow = await getActiveSessionsAtTime(eventId, new Date());
 
         return res.json({
             registration: serializeRegistration(registration),
             missingRequiredFields,
             eventDay,
             checkedInToday,
+            alreadyCheckedInToday: checkedInToday,
+            activeSessionsNow,
+            existingSessionAttendances: registration.sessionAttendances ?? [],
         });
     } catch (error) {
         console.error(`GET /events/${req.params.id}/registrations/lookup error:`, error);
@@ -2499,14 +2567,45 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
             return res.status(409).json({ error: 'Walk-ins are only available on event days' });
         }
 
+        const sessionId = parseId(req.body?.sessionId);
+        const requestedSessionIds = parseSessionIds(req.body?.sessionIds);
+        const sessionValidation = await validateSessionIdsForEvent(eventId, requestedSessionIds);
+        if (!sessionValidation.ok) {
+            return res.status(400).json({ error: sessionValidation.error });
+        }
+        const walkInTierId = parseId(req.body?.tierId);
+
+        let targetSession: (SessionTimeWindow & { id: number; label: string | null }) | null = null;
+        if (sessionId) {
+            const session = await prisma.eventSession.findFirst({
+                where: { id: sessionId, eventId, isActive: true },
+                select: { id: true, label: true, sessionDate: true, startTime: true, endTime: true },
+            });
+            if (!session) {
+                return res.status(400).json({ error: 'Invalid or inactive session for this event' });
+            }
+            targetSession = session;
+        }
+
         const existingRegistration = await findActiveEventRegistration(eventId, {
             email,
             memberId: resolvedMemberId,
         });
 
         if (existingRegistration) {
-            if (hasAttendanceOnDay(existingRegistration.attendanceDays ?? [], resolvedDay.eventDay)) {
+            const alreadyCheckedInForDay = hasAttendanceOnDay(existingRegistration.attendanceDays ?? [], resolvedDay.eventDay);
+            if (!sessionId && alreadyCheckedInForDay) {
                 return res.status(409).json({ error: 'This person is already checked in today' });
+            }
+
+            if (sessionId && targetSession) {
+                const conflict = await findOverlappingSessionAttendance(existingRegistration.id, targetSession);
+                if (conflict) {
+                    const sessionLabel = conflict.session?.label ?? 'session';
+                    return res.status(409).json({
+                        error: `Already checked into an overlapping session (${sessionLabel})`,
+                    });
+                }
             }
 
             const mergedCustomFieldValues = mergeCustomFieldValues(
@@ -2518,14 +2617,48 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
                 return res.status(400).json({ error: 'Required custom fields are missing', fieldErrors: mergedFieldErrors });
             }
 
-            const updated = await prisma.$transaction(async (tx) => {
-                await tx.eventRegistrationDay.create({
-                    data: {
-                        registrationId: existingRegistration.id,
-                        eventDay: resolvedDay.eventDayDate,
-                        checkedInAt: walkInCheckedInAt,
-                    },
+            const finalTierId = walkInTierId ?? existingRegistration.tierId ?? null;
+            const existingSelectionIds = (existingRegistration.sessionSelections ?? []).map((s) => s.sessionId);
+            const finalSessionIds = sessionValidation.ids.length > 0
+                ? sessionValidation.ids
+                : existingSelectionIds;
+
+            if (event.tierFieldRequired && !finalTierId) {
+                return res.status(400).json({ error: 'A registration tier is required' });
+            }
+            if (event.sessionFieldRequired && finalSessionIds.length === 0) {
+                return res.status(400).json({ error: 'At least one session must be selected' });
+            }
+
+            if (walkInTierId) {
+                const tier = await prisma.eventTier.findFirst({
+                    where: { id: walkInTierId, eventId, isActive: true },
+                    select: { id: true },
                 });
+                if (!tier) return res.status(400).json({ error: 'Invalid tier for this event' });
+            }
+
+            const updated = await prisma.$transaction(async (tx) => {
+                if (!alreadyCheckedInForDay) {
+                    await tx.eventRegistrationDay.create({
+                        data: {
+                            registrationId: existingRegistration.id,
+                            eventDay: resolvedDay.eventDayDate,
+                            checkedInAt: walkInCheckedInAt,
+                        },
+                    });
+                }
+
+                if (sessionId && targetSession) {
+                    await tx.eventSessionAttendance.create({
+                        data: {
+                            sessionId,
+                            registrationId: existingRegistration.id,
+                            mode: 'ONSITE',
+                            joinedAt: walkInCheckedInAt,
+                        },
+                    });
+                }
 
                 await mergeRegistrationCustomFieldValues(
                     existingRegistration.id,
@@ -2533,12 +2666,23 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
                     { tx, incrementVersion: false },
                 );
 
+                if (sessionValidation.ids.length > 0) {
+                    await tx.eventRegistrationSession.createMany({
+                        data: sessionValidation.ids.map((sid) => ({
+                            registrationId: existingRegistration.id,
+                            sessionId: sid,
+                        })),
+                        skipDuplicates: true,
+                    });
+                }
+
                 return tx.eventRegistration.update({
                     where: { id: existingRegistration.id },
                     data: {
                         status: 'CHECKED_IN',
                         ...(existingRegistration.status !== 'CHECKED_IN' ? { checkedInAt: walkInCheckedInAt } : {}),
                         ...(resolvedMemberId && !existingRegistration.memberId ? { memberId: resolvedMemberId } : {}),
+                        ...(walkInTierId !== null ? { tierId: walkInTierId } : {}),
                         version: { increment: 1 },
                     },
                     include: registrationInclude,
@@ -2572,11 +2716,26 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
             });
         }
 
+        if (event.tierFieldRequired && !walkInTierId) {
+            return res.status(400).json({ error: 'A registration tier is required' });
+        }
+        if (event.sessionFieldRequired && sessionValidation.ids.length === 0) {
+            return res.status(400).json({ error: 'At least one session must be selected' });
+        }
+
+        if (walkInTierId) {
+            const tier = await prisma.eventTier.findFirst({
+                where: { id: walkInTierId, eventId, isActive: true },
+                select: { id: true },
+            });
+            if (!tier) return res.status(400).json({ error: 'Invalid tier for this event' });
+        }
+
         const confirmationCode = await createRegistrationCodeWithRetry();
         const registration = await prisma.eventRegistration.create({
             data: {
                 eventId,
-                tierId: parseId(req.body?.tierId),
+                tierId: walkInTierId,
                 memberId: resolvedMemberId,
                 fullName,
                 email,
@@ -2594,6 +2753,20 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
                         checkedInAt: walkInCheckedInAt,
                     },
                 },
+                ...(sessionValidation.ids.length > 0 ? {
+                    sessionSelections: {
+                        create: sessionValidation.ids.map((sid) => ({ sessionId: sid })),
+                    },
+                } : {}),
+                ...(sessionId ? {
+                    sessionAttendances: {
+                        create: {
+                            sessionId,
+                            mode: 'ONSITE',
+                            joinedAt: walkInCheckedInAt,
+                        },
+                    },
+                } : {}),
             },
             include: registrationInclude,
         });
@@ -2891,7 +3064,7 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
-            select: { eventDate: true, eventEndDate: true },
+            select: { eventDate: true, eventEndDate: true, tierFieldRequired: true, sessionFieldRequired: true },
         });
         if (!event) return res.status(404).json({ error: 'Event not found' });
 
@@ -2920,8 +3093,31 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
             return res.status(409).json({ error: 'Check-in is only available on event days' });
         }
 
-        if (hasAttendanceOnDay(activeRegistration.attendanceDays ?? [], resolvedDay.eventDay)) {
+        const sessionId = parseId(req.body?.sessionId);
+        const alreadyCheckedInForDay = hasAttendanceOnDay(activeRegistration.attendanceDays ?? [], resolvedDay.eventDay);
+
+        if (!sessionId && alreadyCheckedInForDay) {
             return res.status(409).json({ error: 'Already checked in for this day' });
+        }
+
+        let targetSession: SessionTimeWindow | null = null;
+        if (sessionId) {
+            const session = await prisma.eventSession.findFirst({
+                where: { id: sessionId, eventId, isActive: true },
+                select: { id: true, label: true, sessionDate: true, startTime: true, endTime: true },
+            });
+            if (!session) {
+                return res.status(400).json({ error: 'Invalid or inactive session for this event' });
+            }
+            targetSession = session;
+
+            const conflict = await findOverlappingSessionAttendance(activeRegistration.id, session);
+            if (conflict) {
+                const sessionLabel = conflict.session?.label ?? 'session';
+                return res.status(409).json({
+                    error: `Already checked into an overlapping session (${sessionLabel})`,
+                });
+            }
         }
 
         const customFieldPatch = req.body?.customFieldValues;
@@ -2938,15 +3134,59 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
             });
         }
 
+        const tierIdFromBody = req.body?.tierId !== undefined ? parseId(req.body.tierId) : undefined;
+        const requestedSessionIds = req.body?.sessionIds !== undefined ? parseSessionIds(req.body.sessionIds) : undefined;
+
+        if (tierIdFromBody) {
+            const tier = await prisma.eventTier.findFirst({
+                where: { id: tierIdFromBody, eventId, isActive: true },
+                select: { id: true },
+            });
+            if (!tier) return res.status(400).json({ error: 'Invalid tier for this event' });
+        }
+
+        let validatedSessionIds: number[] | undefined;
+        if (requestedSessionIds !== undefined) {
+            const sessionValidation = await validateSessionIdsForEvent(eventId, requestedSessionIds);
+            if (!sessionValidation.ok) {
+                return res.status(400).json({ error: sessionValidation.error });
+            }
+            validatedSessionIds = sessionValidation.ids;
+        }
+
+        const finalTierId = tierIdFromBody ?? activeRegistration.tierId ?? null;
+        const existingSelectionIds = (activeRegistration.sessionSelections ?? []).map((s) => s.sessionId);
+        const finalSessionIds = validatedSessionIds ?? existingSelectionIds;
+
+        if (event.tierFieldRequired && !finalTierId) {
+            return res.status(409).json({ error: 'A registration tier is required', missingTier: true });
+        }
+        if (event.sessionFieldRequired && finalSessionIds.length === 0) {
+            return res.status(409).json({ error: 'At least one session must be selected', missingSessions: true });
+        }
+
         const checkedInAt = new Date();
         const updated = await prisma.$transaction(async (tx) => {
-            await tx.eventRegistrationDay.create({
-                data: {
-                    registrationId: activeRegistration.id,
-                    eventDay: resolvedDay.eventDayDate,
-                    checkedInAt,
-                },
-            });
+            if (!alreadyCheckedInForDay) {
+                await tx.eventRegistrationDay.create({
+                    data: {
+                        registrationId: activeRegistration.id,
+                        eventDay: resolvedDay.eventDayDate,
+                        checkedInAt,
+                    },
+                });
+            }
+
+            if (sessionId && targetSession) {
+                await tx.eventSessionAttendance.create({
+                    data: {
+                        sessionId,
+                        registrationId: activeRegistration.id,
+                        mode: 'ONSITE',
+                        joinedAt: checkedInAt,
+                    },
+                });
+            }
 
             if (customFieldPatch !== undefined) {
                 await mergeRegistrationCustomFieldValues(activeRegistration.id, customFieldPatch, {
@@ -2955,11 +3195,22 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
                 });
             }
 
+            if (validatedSessionIds !== undefined && validatedSessionIds.length > 0) {
+                await tx.eventRegistrationSession.createMany({
+                    data: validatedSessionIds.map((sid) => ({
+                        registrationId: activeRegistration.id,
+                        sessionId: sid,
+                    })),
+                    skipDuplicates: true,
+                });
+            }
+
             return tx.eventRegistration.update({
                 where: { id: activeRegistration.id },
                 data: {
                     status: 'CHECKED_IN',
                     ...(activeRegistration.status !== 'CHECKED_IN' ? { checkedInAt } : {}),
+                    ...(tierIdFromBody !== undefined ? { tierId: tierIdFromBody } : {}),
                     version: { increment: 1 },
                 },
                 include: registrationInclude,
@@ -3455,9 +3706,7 @@ router.patch('/:id/registrations/:registrationId', authenticateToken, async (req
                 email: req.body?.email !== undefined ? String(req.body.email).trim().toLowerCase() : existing.email,
                 phoneNumber: req.body?.phoneNumber !== undefined ? String(req.body.phoneNumber).trim() || null : existing.phoneNumber,
                 notes: req.body?.notes !== undefined ? String(req.body.notes).trim() || null : existing.notes,
-                ...(req.body?.tierId !== undefined
-                    ? { tier: nextTierId ? { connect: { id: nextTierId } } : { disconnect: true } }
-                    : {}),
+                ...(req.body?.tierId !== undefined ? { tierId: nextTierId } : {}),
             };
 
             const scalarResult = await updateEventRegistrationOptimistic(
