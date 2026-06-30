@@ -1403,7 +1403,7 @@ export const projectFilesAPI = {
             if (token) {
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`);
             }
-            xhr.withCredentials = true;
+            xhr.withCredentials = shouldSendCredentials();
             xhr.send(formData);
         });
     },
@@ -1613,7 +1613,7 @@ export const eventFilesAPI = {
             if (token) {
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`);
             }
-            xhr.withCredentials = true;
+            xhr.withCredentials = shouldSendCredentials();
             xhr.send(formData);
         });
     },
