@@ -79,6 +79,17 @@
     }
 }
 
+/* Reclaim screen real estate on landscape mobile */
+@media (max-height: 500px) {
+    .project-card--expanded {
+        top: 0.35rem;
+        left: 0.35rem;
+        right: 0.35rem;
+        bottom: 0.35rem;
+        padding: 0.65rem 0.9rem;
+    }
+}
+
 /* Hide collapsed content when expanded */
 .project-card--expanded .project-card-collapsed-content {
     display: none;

@@ -181,26 +181,28 @@ export default function EventCheckInPanel({
                 <hr className="event-checkin-divider" />
                 <div className="event-registrations-checkin-manual">
                     <h3 className="expanded-section-title expanded-section-title--sm">Manual entry</h3>
-                    <input
-                        ref={manualInputRef}
-                        value={manualCode}
-                        onChange={(e) => setManualCode(e.target.value)}
-                        placeholder="6-character code"
-                        className="form-input"
-                        disabled={loading || showCombinedModal || suspended}
-                        onKeyDown={(event) => {
-                            manualInputHandlers.onKeyDown(event);
-                            if (event.key === 'Enter') void handleManualLookup();
-                        }}
-                    />
-                    <button
-                        type="button"
-                        onClick={() => void handleManualLookup()}
-                        className="btn btn-primary event-expanded-btn-block"
-                        disabled={loading || showCombinedModal || suspended}
-                    >
-                        {loading ? 'Looking up…' : 'Check in'}
-                    </button>
+                    <div className="event-registrations-checkin-manual-row">
+                        <input
+                            ref={manualInputRef}
+                            value={manualCode}
+                            onChange={(e) => setManualCode(e.target.value)}
+                            placeholder="6-character code"
+                            className="form-input"
+                            disabled={loading || showCombinedModal || suspended}
+                            onKeyDown={(event) => {
+                                manualInputHandlers.onKeyDown(event);
+                                if (event.key === 'Enter') void handleManualLookup();
+                            }}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => void handleManualLookup()}
+                            className="btn btn-primary"
+                            disabled={loading || showCombinedModal || suspended}
+                        >
+                            {loading ? 'Looking up…' : 'Check in'}
+                        </button>
+                    </div>
                 </div>
                 {result ? (
                     <div className={result.type === 'error' ? 'error-message' : 'success-message'}>
