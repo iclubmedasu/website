@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { X, Loader, Trash2 } from 'lucide-react';
+import { fromDateTimeLocalValue } from '@/utils/datetimeLocal';
 import { scheduleSlotsAPI } from '../../../services/api';
 import ScheduleTimetable from '../components/ScheduleTimetable/ScheduleTimetable';
 import type { Id, MemberSummary, ScheduleSlot, TaskSummary } from '../../../types/backend-contracts';
@@ -125,6 +126,13 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], currentM
             return;
         }
 
+        const startDateTimeIso = fromDateTimeLocalValue(form.startDateTime);
+        const endDateTimeIso = fromDateTimeLocalValue(form.endDateTime);
+        if (!startDateTimeIso || !endDateTimeIso) {
+            setError('Please enter valid start and end times');
+            return;
+        }
+
         try {
             setSaving(true);
             setError('');
@@ -134,8 +142,8 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], currentM
                 memberId: selectedMemberId,
                 title: form.title.trim() || null,
                 notes: form.notes.trim() || null,
-                startDateTime: form.startDateTime,
-                endDateTime: form.endDateTime,
+                startDateTime: startDateTimeIso,
+                endDateTime: endDateTimeIso,
             });
             setForm((current) => ({
                 ...current,

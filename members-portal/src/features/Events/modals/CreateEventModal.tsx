@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { Checkbox } from '@/components/checkbox';
 import { eventsAPI, projectsAPI, projectTypesAPI } from '@/services/api';
+import { fromDateTimeLocalValue, toDateTimeLocalValue } from '@/utils/datetimeLocal';
 import { toTitleCase } from '@/utils/titleCase';
 import type {
     CreateEventPayload,
@@ -55,13 +56,6 @@ interface CreateEventModalProps {
     onSaved?: (saved: EventDetail) => void;
 }
 
-function toDateInput(value: string): string {
-    if (!value) return '';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '';
-    return date.toISOString().slice(0, 16);
-}
-
 export default function CreateEventModal({
     mode = 'create',
     initial = null,
@@ -105,11 +99,11 @@ export default function CreateEventModal({
         priority: (initial?.priority as LegacyPriority | undefined) ?? 'MEDIUM',
         status: (initial?.status as ProjectStatus | undefined) ?? 'NOT_STARTED',
         venue: initial?.venue ?? '',
-        eventDate: initial?.eventDate ? toDateInput(initial.eventDate) : '',
+        eventDate: initial?.eventDate ? toDateTimeLocalValue(initial.eventDate) : '',
         eventEndDate: initial?.eventEndDate
-            ? toDateInput(initial.eventEndDate)
-            : (initial?.eventDate ? toDateInput(initial.eventDate) : ''),
-        registrationDeadline: initial?.registrationDeadline ? toDateInput(initial.registrationDeadline) : '',
+            ? toDateTimeLocalValue(initial.eventEndDate)
+            : (initial?.eventDate ? toDateTimeLocalValue(initial.eventDate) : ''),
+        registrationDeadline: initial?.registrationDeadline ? toDateTimeLocalValue(initial.registrationDeadline) : '',
         capacity: initial?.capacity != null ? String(initial.capacity) : '',
         projectId: initial?.projectId != null ? String(initial.projectId) : '',
         allowWalkIns: initial?.allowWalkIns ?? false,
@@ -221,6 +215,17 @@ export default function CreateEventModal({
             return;
         }
 
+        const eventDateIso = fromDateTimeLocalValue(form.eventDate);
+        const eventEndDateIso = fromDateTimeLocalValue(endDateValue);
+        const registrationDeadlineIso = form.registrationDeadline
+            ? fromDateTimeLocalValue(form.registrationDeadline)
+            : null;
+
+        if (!eventDateIso || !eventEndDateIso) {
+            setError('Please enter valid event dates');
+            return;
+        }
+
         setSaving(true);
         try {
             const normalizedPriority: Priority = form.priority === 'URGENT' ? 'CRITICAL' : form.priority;
@@ -229,9 +234,9 @@ export default function CreateEventModal({
                 title: toTitleCase(form.title.trim()),
                 description: form.description.trim() || null,
                 venue: form.venue.trim() || null,
-                eventDate: form.eventDate,
-                eventEndDate: endDateValue,
-                registrationDeadline: form.registrationDeadline || null,
+                eventDate: eventDateIso,
+                eventEndDate: eventEndDateIso,
+                registrationDeadline: registrationDeadlineIso,
                 capacity: form.capacity ? Number.parseInt(form.capacity, 10) : null,
                 projectId: form.projectId ? Number.parseInt(form.projectId, 10) : null,
                 projectTypeId: Number.parseInt(form.projectTypeId, 10),
@@ -375,7 +380,7 @@ export default function CreateEventModal({
                                         id="event-start-date"
                                         type="datetime-local"
                                         className="form-input"
-                                        value={toDateInput(form.eventDate)}
+                                        value={form.eventDate}
                                         onChange={handleChange('eventDate')}
                                     />
                                 </div>
@@ -386,7 +391,7 @@ export default function CreateEventModal({
                                         id="event-end-date"
                                         type="datetime-local"
                                         className="form-input"
-                                        value={toDateInput(form.eventEndDate || form.eventDate)}
+                                        value={form.eventEndDate || form.eventDate}
                                         onChange={handleChange('eventEndDate')}
                                     />
                                 </div>
@@ -410,7 +415,7 @@ export default function CreateEventModal({
                                         id="event-deadline"
                                         type="datetime-local"
                                         className="form-input"
-                                        value={toDateInput(form.registrationDeadline)}
+                                        value={form.registrationDeadline}
                                         onChange={handleChange('registrationDeadline')}
                                     />
                                 </div>
