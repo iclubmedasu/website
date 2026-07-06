@@ -1,23 +1,14 @@
 import type { PublicProjectSummary } from "@iclub/shared";
 import { CalendarDays, Tag } from "lucide-react";
 import Link from "next/link";
+import { ClientFormattedDate } from "@/components/datetime/ClientDateTime";
 import { Badge } from "@/components/ui";
-
-function formatCompletedDate(value?: string | null): string | null {
-    if (!value) return null;
-    return new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        year: "numeric",
-    }).format(new Date(value));
-}
 
 interface ProjectCardProps {
     project: PublicProjectSummary;
 }
 
 function ProjectCardContent({ project }: ProjectCardProps) {
-    const completedLabel = formatCompletedDate(project.completedDate);
-
     return (
         <>
             <div className="flex items-start justify-between gap-3">
@@ -34,10 +25,10 @@ function ProjectCardContent({ project }: ProjectCardProps) {
                 <div className="flex-1" />
             )}
             <div className="project-card-footer">
-                {completedLabel ? (
+                {project.completedDate ? (
                     <span className="project-card-meta">
                         <CalendarDays className="h-4 w-4 shrink-0 text-purple-700" />
-                        Completed {completedLabel}
+                        Completed <ClientFormattedDate value={project.completedDate} />
                     </span>
                 ) : null}
                 {project.tags?.slice(0, 3).map((tag) => (

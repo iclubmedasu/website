@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import type {
+import {
     FinanceAccountSummary,
     FinanceScheduledItemRow,
     FinanceScheduledItemType,
     FinanceScheduledRecurrence,
 } from '@iclub/shared';
+import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
 import { financeAPI } from '@/services/api';
 import { FormToggleRow } from '@/components/toggle/FormToggleRow';
 import { FinanceModal } from '../components/FinanceModal';
@@ -32,7 +33,9 @@ export function ScheduledItemFormModal({ item, accounts, onClose, onSaved }: Sch
     const [title, setTitle] = useState(item?.title ?? '');
     const [type, setType] = useState<FinanceScheduledItemType>(item?.type ?? 'EXPENSE');
     const [amount, setAmount] = useState(item ? String(item.amount) : '');
-    const [dueDate, setDueDate] = useState(item?.dueDate ?? new Date().toISOString().slice(0, 10));
+    const [dueDate, setDueDate] = useState(
+        item?.dueDate ? toDateInputValue(item.dueDate) : toDateInputValue(new Date()),
+    );
     const [accountId, setAccountId] = useState(
         String(item?.accountId ?? activeAccounts[0]?.id ?? ''),
     );
@@ -65,7 +68,7 @@ export function ScheduledItemFormModal({ item, accounts, onClose, onSaved }: Sch
                 title: title.trim(),
                 type,
                 amount: parsedAmount,
-                dueDate,
+                dueDate: fromDateInputValue(dueDate) ?? dueDate,
                 accountId: Number(accountId),
                 recurrence: recurrence || null,
                 notes: notes.trim() || null,

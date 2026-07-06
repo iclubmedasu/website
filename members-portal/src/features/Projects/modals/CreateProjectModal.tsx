@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { X } from 'lucide-react';
+import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
 import { projectsAPI, projectTypesAPI } from '../../../services/api';
 import { toTitleCase } from '../../../utils/titleCase';
 import type {
@@ -107,8 +108,8 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
         projectTypeId: initial?.projectTypeId != null ? String(initial.projectTypeId) : '',
         priority: (initial?.priority as LegacyPriority | undefined) ?? 'MEDIUM',
         status: initial?.status ?? 'NOT_STARTED',
-        startDate: initial?.startDate ? initial.startDate.split('T')[0] : '',
-        dueDate: initial?.dueDate ? initial.dueDate.split('T')[0] : '',
+        startDate: initial?.startDate ? toDateInputValue(initial.startDate) : '',
+        dueDate: initial?.dueDate ? toDateInputValue(initial.dueDate) : '',
         teamIds: buildInitialTeamIds(),
     });
     const [loading, setLoading] = useState(false);
@@ -202,8 +203,8 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                 projectTypeId: parseInt(form.projectTypeId, 10),
                 priority: normalizedPriority,
                 status: form.status,
-                startDate: form.startDate || null,
-                dueDate: form.dueDate || null,
+                startDate: form.startDate ? fromDateInputValue(form.startDate) : null,
+                dueDate: form.dueDate ? fromDateInputValue(form.dueDate) : null,
                 teamIds: form.teamIds,
             };
 

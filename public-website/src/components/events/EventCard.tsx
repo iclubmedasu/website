@@ -1,13 +1,10 @@
 import type { PublicEventListItem } from "@iclub/shared";
 import { CalendarDays, MapPin, Users } from "lucide-react";
 import Link from "next/link";
+import { ClientEventDateRange, ClientRegistrationDeadline } from "@/components/datetime/ClientDateTime";
 import { Badge } from "@/components/ui";
 import { EventShareMenu } from "@/components/events/EventShareMenu";
-import {
-    formatCapacityLabel,
-    formatEventDateRange,
-    formatRegistrationDeadline,
-} from "@/lib/customFieldUtils";
+import { formatCapacityLabel } from "@/lib/customFieldUtils";
 
 interface EventCardProps {
     event: PublicEventListItem;
@@ -21,7 +18,6 @@ function EventCardBody({
     event: PublicEventListItem;
     variant: "default" | "past";
 }) {
-    const deadlineLabel = formatRegistrationDeadline(event.registrationDeadline);
     const capacityLabel = formatCapacityLabel(event.spotsRemaining, event.capacity);
     const isPast = variant === "past";
 
@@ -35,7 +31,10 @@ function EventCardBody({
             <div className="event-card-meta">
                 <p className="event-card-meta-item">
                     <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-purple-700" />
-                    {formatEventDateRange(event.eventDate, event.eventEndDate)}
+                    <ClientEventDateRange
+                        eventDate={event.eventDate}
+                        eventEndDate={event.eventEndDate}
+                    />
                 </p>
                 {event.venue ? (
                     <p className="event-card-meta-item">
@@ -43,9 +42,14 @@ function EventCardBody({
                         {event.venue}
                     </p>
                 ) : null}
-                {!isPast && deadlineLabel ? (
+                {!isPast && event.registrationDeadline ? (
                     <p className="event-card-meta-item">
-                        <span className="font-medium text-purple-800">Register by:</span> {deadlineLabel}
+                        <span className="font-medium text-purple-800">Register by:</span>{" "}
+                        <ClientRegistrationDeadline
+                            value={event.registrationDeadline}
+                            prefix=""
+                            inline
+                        />
                     </p>
                 ) : null}
             </div>

@@ -52,6 +52,8 @@ export interface PublicEventCustomField {
 export interface PublicEventSession {
     id: Id;
     label?: string | null;
+    startDateTime?: string | null;
+    endDateTime?: string | null;
     sessionDate: string;
     startTime?: string | null;
     endTime?: string | null;
@@ -68,6 +70,8 @@ export interface PublicEventRegistrationFormConfig {
 export interface PublicConfirmationSession {
     id: Id;
     label: string | null;
+    startDateTime?: string | null;
+    endDateTime?: string | null;
     sessionDate: string;
     startTime?: string | null;
     endTime?: string | null;

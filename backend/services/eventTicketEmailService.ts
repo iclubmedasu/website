@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import QRCode from 'qrcode';
+import { formatEventDateRangeInClubTimezone, formatSessionRangeInClubTimezone } from '@iclub/shared/utils';
 import { prisma } from '../db';
-import { getEventDayRange } from './eventDates';
 import { getSessionTokensForRegistration } from './sessionTokenService';
 import { sendEmail, type EmailAttachment } from './emailService';
 
@@ -62,26 +62,7 @@ function escapeHtml(value: string): string {
 }
 
 function formatEventDateLabel(eventDate: Date, eventEndDate: Date): string {
-    const dateFormatter = new Intl.DateTimeFormat('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-    });
-    const timeFormatter = new Intl.DateTimeFormat('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-    });
-
-    const range = getEventDayRange(eventDate, eventEndDate);
-    const startLabel = dateFormatter.format(eventDate);
-
-    if (!range || range.startDay === range.endDay) {
-        return `${startLabel} · ${timeFormatter.format(eventDate)}`;
-    }
-
-    const endLabel = dateFormatter.format(eventEndDate);
-    return `${startLabel} – ${endLabel}`;
+    return formatEventDateRangeInClubTimezone(eventDate.toISOString(), eventEndDate.toISOString());
 }
 
 function loadEmailAsset(filename: string, contentId: string): EmailAttachment {
@@ -119,17 +100,11 @@ async function buildTicketQrAttachment(confirmationCode: string): Promise<EmailA
     };
 }
 
-function formatSessionDateForEmail(sessionDate: Date): string {
-    return new Intl.DateTimeFormat('en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-    }).format(sessionDate);
-}
-
 type EmailSessionRow = {
     id: number;
     sessionDate: Date;
+    startDateTime: Date | null;
+    endDateTime: Date | null;
     label: string | null;
     startTime: string | null;
     endTime: string | null;
@@ -144,12 +119,11 @@ function buildSessionsEmailSection(
     if (sessions.length === 0) return '';
 
     const rows = sessions.map((session) => {
-        const dateLabel = escapeHtml(formatSessionDateForEmail(session.sessionDate));
-        const label = session.label ? escapeHtml(session.label) : '';
-        const timeRange = session.startTime && session.endTime
-            ? escapeHtml(`${session.startTime}–${session.endTime}`)
+        const scheduleLabel = session.startDateTime && session.endDateTime
+            ? formatSessionRangeInClubTimezone(session.startDateTime, session.endDateTime)
             : null;
-        const header = [label, dateLabel, timeRange].filter(Boolean).join(' · ');
+        const label = session.label ? escapeHtml(session.label) : '';
+        const header = [label, scheduleLabel ? escapeHtml(scheduleLabel) : null].filter(Boolean).join(' · ');
 
         if (session.mode === 'ONSITE') {
             return `<tr>
@@ -422,10 +396,12 @@ async function sendRegistrationEmail(
 
     const sessions = await prisma.eventSession.findMany({
         where: { eventId: registration.eventId, isActive: true },
-        orderBy: [{ sessionDate: 'asc' }, { order: 'asc' }],
+        orderBy: [{ startDateTime: 'asc' }, { sessionDate: 'asc' }, { order: 'asc' }],
         select: {
             id: true,
             sessionDate: true,
+            startDateTime: true,
+            endDateTime: true,
             label: true,
             startTime: true,
             endTime: true,

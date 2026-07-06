@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { X, Loader, Trash2 } from 'lucide-react';
-import { fromDateTimeLocalValue } from '@/utils/datetimeLocal';
+import { fromDateTimeLocalValue, formatDateTime } from '@iclub/shared/utils';
 import { scheduleSlotsAPI } from '../../../services/api';
 import ScheduleTimetable from '../components/ScheduleTimetable/ScheduleTimetable';
 import type { Id, MemberSummary, ScheduleSlot, TaskSummary } from '../../../types/backend-contracts';
@@ -44,12 +44,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
     return fallback;
 }
 
-function formatDateTime(value: string | Date | null | undefined): string {
-    if (!value) return '—';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '—';
-    return date.toLocaleString();
-}
 
 export default function TaskScheduleSlotsModal({ task, allMembers = [], currentMemberId = null, onClose }: TaskScheduleSlotsModalProps) {
     const [slots, setSlots] = useState<ScheduleSlotView[]>([]);

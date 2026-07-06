@@ -1,3 +1,5 @@
+import { CLUB_TIMEZONE, formatDateRange } from '@iclub/shared/utils';
+
 export type AssignmentActivityInput = {
     memberId: number;
     startDateTime: Date;
@@ -11,18 +13,7 @@ export function getAssignmentMemberName(assignment: AssignmentActivityInput): st
 }
 
 export function formatAssignmentSlot(startDateTime: Date, endDateTime: Date): string {
-    const dateOptions: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
-    const timeOptions: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
-    const startDate = startDateTime.toLocaleDateString([], dateOptions);
-    const endDate = endDateTime.toLocaleDateString([], dateOptions);
-    const startTime = startDateTime.toLocaleTimeString([], timeOptions);
-    const endTime = endDateTime.toLocaleTimeString([], timeOptions);
-
-    if (startDate === endDate) {
-        return `${startDate}, ${startTime} – ${endTime}`;
-    }
-
-    return `${startDate}, ${startTime} – ${endDate}, ${endTime}`;
+    return formatDateRange(startDateTime, endDateTime, { timeZone: CLUB_TIMEZONE });
 }
 
 export function buildAssignmentActivityValue(assignment: AssignmentActivityInput) {

@@ -1,10 +1,7 @@
-import { fmtDate } from '@/components/cards/LifecycleCardView/LifecycleCardView';
+import { formatDate, formatEventDateRange, toDateInputValue } from '@iclub/shared/utils';
 
 function toLocalDayString(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return toDateInputValue(date);
 }
 
 function toDayString(value: string): string | null {
@@ -17,10 +14,8 @@ function toDayString(value: string): string | null {
 
 export function formatEventDuration(start?: string | null, end?: string | null): string {
     if (!start) return '—';
-    const startDay = start.slice(0, 10);
-    const endDay = end?.slice(0, 10);
-    if (!end || !endDay || startDay === endDay) return fmtDate(start) || '—';
-    return `${fmtDate(start) || '—'} – ${fmtDate(end) || '—'}`;
+    const endValue = end ?? start;
+    return formatEventDateRange(start, endValue);
 }
 
 export function getEventDayRange(
@@ -52,19 +47,15 @@ export function isMultiDayEvent(start?: string | null, end?: string | null): boo
 }
 
 export function formatAttendanceDayLabel(eventDay: string): string {
-    const parsed = new Date(`${eventDay}T12:00:00`);
+    const parsed = new Date(`${eventDay.slice(0, 10)}T12:00:00`);
     if (Number.isNaN(parsed.getTime())) return eventDay;
-    return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-function toLocalTimeString(date: Date): string {
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${hours}:${minutes}`;
+    return formatDate(parsed);
 }
 
 interface SessionTimeWindowLike {
-    sessionDate: string;
+    startDateTime?: string | null;
+    endDateTime?: string | null;
+    sessionDate?: string;
     startTime?: string | null;
     endTime?: string | null;
     isActive?: boolean;
@@ -75,11 +66,18 @@ export function isSessionActiveNow(
     referenceDate: Date = new Date(),
 ): boolean {
     if (session.isActive === false) return false;
-    if (!session.startTime || !session.endTime) return false;
+    if (session.startDateTime && session.endDateTime) {
+        const start = new Date(session.startDateTime);
+        const end = new Date(session.endDateTime);
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
+        const now = referenceDate.getTime();
+        return start.getTime() <= now && now < end.getTime();
+    }
+    if (!session.startTime || !session.endTime || !session.sessionDate) return false;
     const sessionDay = session.sessionDate.slice(0, 10);
     const today = toLocalDayString(referenceDate);
     if (sessionDay !== today) return false;
-    const hhmm = toLocalTimeString(referenceDate);
+    const hhmm = `${String(referenceDate.getHours()).padStart(2, '0')}:${String(referenceDate.getMinutes()).padStart(2, '0')}`;
     return session.startTime <= hhmm && hhmm < session.endTime;
 }
 

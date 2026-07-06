@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, type CSSProperties } from 'react';
+import { formatDateTime } from '@iclub/shared/utils';
 import { getProfilePhotoUrl } from '../../../../services/api';
 import './ScheduleTimetable.css';
 import type { Id, MemberSummary, ScheduleSlot } from '../../../../types/backend-contracts';
@@ -115,7 +116,7 @@ function formatDateTimeRange(start: string | Date | null | undefined, end: strin
     const startDate = getDateOrNull(start);
     const endDate = getDateOrNull(end);
     if (!startDate || !endDate) return '—';
-    return `${startDate.toLocaleString()} → ${endDate.toLocaleString()}`;
+    return `${formatDateTime(startDate)} → ${formatDateTime(endDate)}`;
 }
 
 function groupSlotsByMember(slots: ScheduleTimetableSlot[] = []): GroupedScheduleSlots[] {

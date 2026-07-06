@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { FinanceAccountSummary, FinanceTransactionRow } from '@iclub/shared';
+import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
 import { financeAPI } from '@/services/api';
 import { FinanceModal } from '../components/FinanceModal';
 
@@ -29,7 +30,9 @@ export function TransactionFormModal({
     const [amount, setAmount] = useState(transaction ? String(transaction.amount) : '');
     const [category, setCategory] = useState(transaction?.category ?? '');
     const [transactionDate, setTransactionDate] = useState(
-        transaction?.transactionDate ?? new Date().toISOString().slice(0, 10),
+        transaction?.transactionDate
+            ? toDateInputValue(transaction.transactionDate)
+            : toDateInputValue(new Date()),
     );
     const [description, setDescription] = useState(transaction?.description ?? '');
     const [reference, setReference] = useState(transaction?.reference ?? '');
@@ -67,7 +70,7 @@ export function TransactionFormModal({
                 type,
                 amount: parsedAmount,
                 category: category.trim(),
-                transactionDate,
+                transactionDate: fromDateInputValue(transactionDate) ?? transactionDate,
                 description: description.trim() || null,
                 reference: reference.trim() || null,
             };

@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import {
+    formatSessionRange,
+    fromDateTimeLocalValue,
+    toDateTimeLocalValue,
+} from '@iclub/shared/utils';
 import { eventsAPI } from '@/services/api';
 import type {
     CreateEventSessionPayload,
@@ -11,12 +16,6 @@ import type {
 interface EventSessionsSectionProps {
     eventId: Id | string;
     canManage?: boolean;
-}
-
-function formatSessionDateLabel(sessionDate: string): string {
-    const parsed = new Date(`${sessionDate.slice(0, 10)}T12:00:00`);
-    if (Number.isNaN(parsed.getTime())) return sessionDate;
-    return parsed.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 function formatModeLabel(mode: EventSessionMode | string): string {
@@ -35,17 +34,54 @@ function truncateUrl(url: string, maxLength = 48): string {
 
 function validateSessionInput(
     label: string,
-    sessionDate: string,
+    startDateTime: string,
+    endDateTime: string,
     mode: EventSessionMode,
     onlineUrl: string,
 ): string | null {
     if (!label.trim()) return 'Session title is required.';
-    if (!sessionDate.trim()) return 'Session date is required.';
+    if (!startDateTime.trim() || !endDateTime.trim()) return 'Session start and end are required.';
+    if (new Date(endDateTime).getTime() < new Date(startDateTime).getTime()) {
+        return 'Session end must be on or after the start.';
+    }
     if (!mode) return 'Session type is required.';
     if (requiresOnlineUrl(mode) && !onlineUrl.trim()) {
         return 'Meeting link is required for online sessions.';
     }
     return null;
+}
+
+function buildSessionPayload(
+    label: string,
+    startDateTime: string,
+    endDateTime: string,
+    mode: EventSessionMode,
+    onlineUrl: string,
+): CreateEventSessionPayload | null {
+    const startIso = fromDateTimeLocalValue(startDateTime);
+    const endIso = fromDateTimeLocalValue(endDateTime);
+    if (!startIso || !endIso) return null;
+    return {
+        label: label.trim(),
+        startDateTime: startIso,
+        endDateTime: endIso,
+        mode,
+        onlineUrl: requiresOnlineUrl(mode) ? onlineUrl.trim() : null,
+    };
+}
+
+function hydrateSessionTimes(session: EventSessionRef): { start: string; end: string } {
+    if (session.startDateTime && session.endDateTime) {
+        return {
+            start: toDateTimeLocalValue(session.startDateTime),
+            end: toDateTimeLocalValue(session.endDateTime),
+        };
+    }
+    const day = session.sessionDate.slice(0, 10);
+    return {
+        start: session.startTime ? `${day}T${session.startTime}` : '',
+        end: session.endTime ? `${day}T${session.endTime}` : '',
+    };
 }
 
 export default function EventSessionsSection({ eventId, canManage = false }: EventSessionsSectionProps) {
@@ -56,16 +92,14 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
     const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
 
     const [label, setLabel] = useState('');
-    const [sessionDate, setSessionDate] = useState('');
-    const [startTime, setStartTime] = useState('');
-    const [endTime, setEndTime] = useState('');
+    const [startDateTime, setStartDateTime] = useState('');
+    const [endDateTime, setEndDateTime] = useState('');
     const [mode, setMode] = useState<EventSessionMode>('ONSITE');
     const [onlineUrl, setOnlineUrl] = useState('');
 
     const [editLabel, setEditLabel] = useState('');
-    const [editSessionDate, setEditSessionDate] = useState('');
-    const [editStartTime, setEditStartTime] = useState('');
-    const [editEndTime, setEditEndTime] = useState('');
+    const [editStartDateTime, setEditStartDateTime] = useState('');
+    const [editEndDateTime, setEditEndDateTime] = useState('');
     const [editMode, setEditMode] = useState<EventSessionMode>('ONSITE');
     const [editOnlineUrl, setEditOnlineUrl] = useState('');
 
@@ -91,30 +125,26 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
 
     const resetCreateForm = () => {
         setLabel('');
-        setSessionDate('');
-        setStartTime('');
-        setEndTime('');
+        setStartDateTime('');
+        setEndDateTime('');
         setMode('ONSITE');
         setOnlineUrl('');
     };
 
     const handleCreateSession = async () => {
-        const validationError = validateSessionInput(label, sessionDate, mode, onlineUrl);
+        const validationError = validateSessionInput(label, startDateTime, endDateTime, mode, onlineUrl);
         if (validationError) {
             setFormError(validationError);
             return;
         }
 
-        setFormError('');
-        const payload: CreateEventSessionPayload = {
-            label: label.trim(),
-            sessionDate: sessionDate.trim(),
-            startTime: startTime.trim() || null,
-            endTime: endTime.trim() || null,
-            mode,
-            onlineUrl: requiresOnlineUrl(mode) ? onlineUrl.trim() : null,
-        };
+        const payload = buildSessionPayload(label, startDateTime, endDateTime, mode, onlineUrl);
+        if (!payload) {
+            setFormError('Please enter valid session start and end times.');
+            return;
+        }
 
+        setFormError('');
         try {
             const created = await eventsAPI.createSession(eventId, payload);
             setSessions((current) => [...current, created]);
@@ -125,11 +155,11 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
     };
 
     const startEdit = (session: EventSessionRef) => {
+        const times = hydrateSessionTimes(session);
         setEditingSessionId(Number(session.id));
         setEditLabel(session.label ?? '');
-        setEditSessionDate(session.sessionDate.slice(0, 10));
-        setEditStartTime(session.startTime ?? '');
-        setEditEndTime(session.endTime ?? '');
+        setEditStartDateTime(times.start);
+        setEditEndDateTime(times.end);
         setEditMode(session.mode === 'ONSITE' ? 'ONSITE' : 'ONLINE');
         setEditOnlineUrl(session.onlineUrl ?? '');
         setFormError('');
@@ -138,30 +168,38 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
     const cancelEdit = () => {
         setEditingSessionId(null);
         setEditLabel('');
-        setEditSessionDate('');
-        setEditStartTime('');
-        setEditEndTime('');
+        setEditStartDateTime('');
+        setEditEndDateTime('');
         setEditMode('ONSITE');
         setEditOnlineUrl('');
     };
 
     const saveEdit = async (session: EventSessionRef) => {
-        const validationError = validateSessionInput(editLabel, editSessionDate, editMode, editOnlineUrl);
+        const validationError = validateSessionInput(
+            editLabel,
+            editStartDateTime,
+            editEndDateTime,
+            editMode,
+            editOnlineUrl,
+        );
         if (validationError) {
             setFormError(validationError);
             return;
         }
 
-        setFormError('');
-        const payload: UpdateEventSessionPayload = {
-            label: editLabel.trim(),
-            sessionDate: editSessionDate.trim(),
-            startTime: editStartTime.trim() || null,
-            endTime: editEndTime.trim() || null,
-            mode: editMode,
-            onlineUrl: requiresOnlineUrl(editMode) ? editOnlineUrl.trim() : null,
-        };
+        const payload = buildSessionPayload(
+            editLabel,
+            editStartDateTime,
+            editEndDateTime,
+            editMode,
+            editOnlineUrl,
+        ) as UpdateEventSessionPayload | null;
+        if (!payload) {
+            setFormError('Please enter valid session start and end times.');
+            return;
+        }
 
+        setFormError('');
         try {
             const updated = await eventsAPI.updateSession(eventId, session.id, payload);
             setSessions((current) => current.map((item) => (item.id === updated.id ? updated : item)));
@@ -186,17 +224,15 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
     const renderSessionFormFields = (
         values: {
             label: string;
-            sessionDate: string;
-            startTime: string;
-            endTime: string;
+            startDateTime: string;
+            endDateTime: string;
             mode: EventSessionMode;
             onlineUrl: string;
         },
         setters: {
             setLabel: (value: string) => void;
-            setSessionDate: (value: string) => void;
-            setStartTime: (value: string) => void;
-            setEndTime: (value: string) => void;
+            setStartDateTime: (value: string) => void;
+            setEndDateTime: (value: string) => void;
             setMode: (value: EventSessionMode) => void;
             setOnlineUrl: (value: string) => void;
         },
@@ -212,31 +248,21 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
                 aria-label="Session title"
             />
             <input
-                type="date"
-                value={values.sessionDate}
-                onChange={(e) => setters.setSessionDate(e.target.value)}
-                className="form-input event-session-date-input"
+                type="datetime-local"
+                value={values.startDateTime}
+                onChange={(e) => setters.setStartDateTime(e.target.value)}
+                className="form-input"
                 disabled={options?.disabled}
-                aria-label="Session date"
+                aria-label="Session start"
             />
-            <div className="event-session-time-range">
-                <input
-                    type="time"
-                    value={values.startTime}
-                    onChange={(e) => setters.setStartTime(e.target.value)}
-                    className="form-input"
-                    disabled={options?.disabled}
-                    aria-label="Start time"
-                />
-                <input
-                    type="time"
-                    value={values.endTime}
-                    onChange={(e) => setters.setEndTime(e.target.value)}
-                    className="form-input"
-                    disabled={options?.disabled}
-                    aria-label="End time"
-                />
-            </div>
+            <input
+                type="datetime-local"
+                value={values.endDateTime}
+                onChange={(e) => setters.setEndDateTime(e.target.value)}
+                className="form-input"
+                disabled={options?.disabled}
+                aria-label="Session end"
+            />
             <select
                 aria-label="Session type"
                 value={values.mode}
@@ -276,8 +302,8 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
             {canManage ? (
                 <div className="event-expanded-form-grid event-expanded-session-form-grid">
                     {renderSessionFormFields(
-                        { label, sessionDate, startTime, endTime, mode, onlineUrl },
-                        { setLabel, setSessionDate, setStartTime, setEndTime, setMode, setOnlineUrl },
+                        { label, startDateTime, endDateTime, mode, onlineUrl },
+                        { setLabel, setStartDateTime, setEndDateTime, setMode, setOnlineUrl },
                         {
                             disabled: isEditing,
                             actions: (
@@ -301,8 +327,8 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
                 {sessions.map((session) => {
                     const sessionIsEditing = editingSessionId === Number(session.id);
                     const actionsDisabled = isEditing && !sessionIsEditing;
-                    const timeRange = session.startTime && session.endTime
-                        ? `${session.startTime} – ${session.endTime}`
+                    const timeRange = session.startDateTime && session.endDateTime
+                        ? formatSessionRange(session.startDateTime, session.endDateTime)
                         : null;
                     const attendanceCount = session._count?.attendances ?? 0;
 
@@ -313,17 +339,15 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
                                     {renderSessionFormFields(
                                         {
                                             label: editLabel,
-                                            sessionDate: editSessionDate,
-                                            startTime: editStartTime,
-                                            endTime: editEndTime,
+                                            startDateTime: editStartDateTime,
+                                            endDateTime: editEndDateTime,
                                             mode: editMode,
                                             onlineUrl: editOnlineUrl,
                                         },
                                         {
                                             setLabel: setEditLabel,
-                                            setSessionDate: setEditSessionDate,
-                                            setStartTime: setEditStartTime,
-                                            setEndTime: setEditEndTime,
+                                            setStartDateTime: setEditStartDateTime,
+                                            setEndDateTime: setEditEndDateTime,
                                             setMode: setEditMode,
                                             setOnlineUrl: setEditOnlineUrl,
                                         },
@@ -350,16 +374,12 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
                             <div>
                                 <strong>{session.label || 'Untitled session'}</strong>
                                 {' '}
-                                <span className="event-expanded-muted">
-                                    {formatSessionDateLabel(session.sessionDate)}
-                                </span>
-                                {' '}
                                 <span className={`event-session-mode-badge event-session-mode-badge--${session.mode.toLowerCase()}`}>
                                     {formatModeLabel(session.mode)}
                                 </span>
                                 <p className="event-expanded-muted">
-                                    {timeRange ? `${timeRange} · ` : ''}
-                                    {attendanceCount} attended
+                                    {timeRange || 'No schedule set'}
+                                    {attendanceCount > 0 ? ` · ${attendanceCount} attended` : ''}
                                 </p>
                                 {requiresOnlineUrl(session.mode) && session.onlineUrl ? (
                                     <p className="event-expanded-muted">

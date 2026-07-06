@@ -26,6 +26,7 @@ import {
     Calendar,
 } from 'lucide-react';
 import { tasksAPI, phasesAPI, getProfilePhotoUrl } from '../../../../services/api';
+import { toLocalDayKey } from '@iclub/shared/utils';
 import DeletePhaseTaskModal from '../../modals/DeletePhaseTaskModal';
 import ScheduleTimetable from '../ScheduleTimetable/ScheduleTimetable';
 import {
@@ -918,7 +919,7 @@ function buildExportTimeline(rangeStart: any, rangeEnd: any) {
             (day) => day.toLocaleDateString('en-GB', { month: 'short' }),
         ),
         weekBands: buildBands(
-            (day) => getWeekStartDate(day).toISOString().split('T')[0],
+            (day) => toLocalDayKey(getWeekStartDate(day)),
             (day) => formatExportShortDate(getWeekStartDate(day)),
         ),
     };
@@ -986,7 +987,7 @@ function generateTimeline(rangeStart: any, rangeEnd: any, scale: ScaleKey) {
             topH[topH.length - 1].colSpan++;
             const next = addDays(cur, 1);
             cols.push({
-                key: cur.toISOString().split('T')[0],
+                key: toLocalDayKey(cur),
                 label: String(cur.getDate()),
                 date: new Date(cur),
                 endDate: new Date(next),
@@ -1013,7 +1014,7 @@ function generateTimeline(rangeStart: any, rangeEnd: any, scale: ScaleKey) {
             topH[topH.length - 1].colSpan++;
             const weekEnd = addDays(cur, 7);
             cols.push({
-                key: `w-${cur.toISOString().split('T')[0]}`,
+                key: `w-${toLocalDayKey(cur)}`,
                 label: String(cur.getDate()),
                 date: new Date(cur),
                 endDate: new Date(weekEnd),
@@ -2649,10 +2650,10 @@ export default function GanttChart({
                 const rowStart = row.start || row.end;
                 const rowEnd = row.end || row.start;
                 if (rowStart && rowEnd) {
-                    const startKey = startOfDay(rowStart).toISOString().split('T')[0];
-                    const endKey = startOfDay(rowEnd).toISOString().split('T')[0];
+                    const startKey = toLocalDayKey(startOfDay(rowStart));
+                    const endKey = toLocalDayKey(startOfDay(rowEnd));
                     for (let i = 0; i < timeline.days.length; i++) {
-                        const dayKey = timeline.days[i].toISOString().split('T')[0];
+                        const dayKey = toLocalDayKey(timeline.days[i]);
                         if (dayKey >= startKey && dayKey <= endKey) {
                             matrix[sheetRow][dateColumnStart + i] = '';
                         }
@@ -2781,11 +2782,11 @@ export default function GanttChart({
                 const rowStart = row.start || row.end;
                 const rowEnd = row.end || row.start;
                 if (rowStart && rowEnd) {
-                    const startKey = startOfDay(rowStart).toISOString().split('T')[0];
-                    const endKey = startOfDay(rowEnd).toISOString().split('T')[0];
+                    const startKey = toLocalDayKey(startOfDay(rowStart));
+                    const endKey = toLocalDayKey(startOfDay(rowEnd));
                     for (let index = 0; index < timeline.days.length; index++) {
                         const day = timeline.days[index];
-                        const dayKey = day.toISOString().split('T')[0];
+                        const dayKey = toLocalDayKey(day);
                         const inRange = dayKey >= startKey && dayKey <= endKey;
                         const weekendFill = day.getDay() === 0 || day.getDay() === 6 ? '#f8fafc' : '#ffffff';
 

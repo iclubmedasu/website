@@ -501,6 +501,8 @@ model EventSession {
   sessionDate   DateTime  @db.Date
   startTime     String?
   endTime       String?
+  startDateTime DateTime?
+  endDateTime   DateTime?
   mode          String    @default("ONSITE")
   onlineUrl     String?
   order         Int       @default(0)
@@ -515,6 +517,7 @@ model EventSession {
 
   @@index([eventId])
   @@index([eventId, sessionDate])
+  @@index([startDateTime])
 }
 
 model EventSessionAttendance {

@@ -1,3 +1,5 @@
+import { formatSessionRange } from '@iclub/shared/utils';
+
 export type EventTabKey = 'tiers' | 'registrations' | 'tickets' | 'statistics' | 'tasks';
 
 export const EVENT_TABS = [
@@ -26,17 +28,32 @@ export function parseEventTab(value: string | null): EventTabKey | null {
 
 export function formatSessionDisplayLabel(input: {
     label?: string | null;
-    sessionDate: string;
+    startDateTime?: string | null;
+    endDateTime?: string | null;
+    sessionDate?: string;
     startTime?: string | null;
     endTime?: string | null;
     mode?: string | null;
 }): string {
     const title = input.label?.trim();
-    const parsed = new Date(`${input.sessionDate.slice(0, 10)}T12:00:00`);
-    const dateLabel = Number.isNaN(parsed.getTime())
-        ? input.sessionDate
-        : parsed.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-    const timeRange = input.startTime && input.endTime ? `${input.startTime}–${input.endTime}` : null;
+    const scheduleLabel = input.startDateTime && input.endDateTime
+        ? formatSessionRange(input.startDateTime, input.endDateTime)
+        : null;
     const modeLabel = input.mode === 'ONSITE' ? 'Onsite' : input.mode === 'ONLINE' ? 'Online' : null;
-    return [title, dateLabel, timeRange, modeLabel].filter(Boolean).join(' · ');
+    return [title, scheduleLabel, modeLabel].filter(Boolean).join(' · ');
+}
+
+export function compareSessionsBySchedule<T extends {
+    startDateTime?: string | null;
+    sessionDate?: string;
+    order?: number | null;
+}>(a: T, b: T): number {
+    if (a.startDateTime && b.startDateTime) {
+        const instantCompare = a.startDateTime.localeCompare(b.startDateTime);
+        if (instantCompare !== 0) return instantCompare;
+    } else if (a.sessionDate && b.sessionDate) {
+        const dateCompare = a.sessionDate.localeCompare(b.sessionDate);
+        if (dateCompare !== 0) return dateCompare;
+    }
+    return (a.order ?? 0) - (b.order ?? 0);
 }

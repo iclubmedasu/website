@@ -1,4 +1,5 @@
 import type { EventSessionRef } from '@/types/backend-contracts';
+import { formatSessionRange } from '@iclub/shared/utils';
 
 function getSessionTitle(session: EventSessionRef): string {
     return session.label?.trim() || 'Untitled session';
@@ -51,8 +52,8 @@ export default function SessionAttendanceOptions({
                 ) : null}
                 {activeSessionsNow.map((session) => {
                     const sessionId = String(session.id);
-                    const timeRange = session.startTime && session.endTime
-                        ? `${session.startTime}–${session.endTime}`
+                    const timeRange = session.startDateTime && session.endDateTime
+                        ? formatSessionRange(session.startDateTime, session.endDateTime)
                         : null;
                     const isSelected = sessionSelectorValue === sessionId;
                     const modeLabel = formatSessionMode(session.mode);

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { eventsAPI } from '@/services/api';
 import type { EventRegistrationRef, EventSessionRef, Id } from '@/types/backend-contracts';
 import { truncateRegistrationCell } from '../customFieldUtils';
+import { compareSessionsBySchedule } from '../../eventUtils';
 
 interface EditableRegistrationSessionCellProps {
     eventId: Id | string;
@@ -76,11 +77,7 @@ export default function EditableRegistrationSessionCell({
 
     const activeSessions = [...sessions]
         .filter((session) => session.isActive !== false)
-        .sort((a, b) => {
-            const dateCompare = a.sessionDate.localeCompare(b.sessionDate);
-            if (dateCompare !== 0) return dateCompare;
-            return (a.order ?? 0) - (b.order ?? 0);
-        });
+        .sort(compareSessionsBySchedule);
 
     const selectedSelections = localSessionIds
         .map((sessionId) => {

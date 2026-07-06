@@ -5,13 +5,9 @@ import { EventDetailActions } from "@/components/events/EventDetailActions";
 import { EventDetailHeader } from "@/components/events/EventDetailHeader";
 import { BackLink } from "@/components/navigation/BackLink";
 import { PageContainer } from "@/components/ui";
+import { ClientEventDateRange, ClientRegistrationDeadline } from "@/components/datetime/ClientDateTime";
 import { publicAPI } from "@/lib/api";
-import {
-    formatCapacityLabel,
-    formatEventDateRange,
-    formatRegistrationDeadline,
-    formatTierPrice,
-} from "@/lib/customFieldUtils";
+import { formatCapacityLabel, formatTierPrice } from "@/lib/customFieldUtils";
 
 interface EventDetailPageProps {
     params: Promise<{ id: string }>;
@@ -42,7 +38,6 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
         notFound();
     }
 
-    const deadlineLabel = formatRegistrationDeadline(event.registrationDeadline);
     const capacityLabel = formatCapacityLabel(event.spotsRemaining, event.capacity);
 
     return (
@@ -58,7 +53,10 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                 <div className="flex flex-col gap-3 text-sm text-slate-600">
                     <p className="inline-flex items-start gap-2">
                         <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-purple-700" />
-                        {formatEventDateRange(event.eventDate, event.eventEndDate)}
+                        <ClientEventDateRange
+                            eventDate={event.eventDate}
+                            eventEndDate={event.eventEndDate}
+                        />
                     </p>
                     {event.venue ? (
                         <p className="inline-flex items-start gap-2">
@@ -70,7 +68,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                         <Users className="h-4 w-4 shrink-0 text-purple-700" />
                         {capacityLabel}
                     </p>
-                    {deadlineLabel ? <p>Registration deadline: {deadlineLabel}</p> : null}
+                    <ClientRegistrationDeadline value={event.registrationDeadline} />
                 </div>
                 <div className="pt-2">
                     <EventDetailActions eventId={event.id} registrationOpen={event.registrationOpen} />

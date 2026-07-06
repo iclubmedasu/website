@@ -1,20 +1,23 @@
-function toLocalDayString(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+import { toClubDayString } from '@iclub/shared/utils';
+
+function clubDayFromInstant(value: Date | string): string | null {
+    return toClubDayString(value);
+}
+
+function clubDayFromDateOnly(date: Date): string {
+    return toClubDayString(date) ?? date.toISOString().slice(0, 10);
 }
 
 function toDayString(value: Date | string): string | null {
     if (value instanceof Date) {
         if (Number.isNaN(value.getTime())) return null;
-        return toLocalDayString(value);
+        return clubDayFromDateOnly(value);
     }
     const trimmed = String(value).trim();
     if (!trimmed) return null;
     const parsed = new Date(trimmed);
     if (Number.isNaN(parsed.getTime())) return null;
-    return toLocalDayString(parsed);
+    return clubDayFromInstant(parsed);
 }
 
 export function getEventDayRange(
@@ -35,12 +38,13 @@ export function isWithinEventDays(
 ): boolean {
     const range = getEventDayRange(start, end);
     if (!range) return false;
-    const today = toLocalDayString(referenceDate);
+    const today = clubDayFromInstant(referenceDate);
+    if (!today) return false;
     return today >= range.startDay && today <= range.endDay;
 }
 
 export function formatEventDay(date: Date): string {
-    return date.toISOString().slice(0, 10);
+    return clubDayFromDateOnly(date);
 }
 
 export function parseEventDayString(value: unknown): string | null {
@@ -74,8 +78,8 @@ export function resolveCheckInEventDay(
     const explicit = options?.eventDay != null && String(options.eventDay).trim() !== ''
         ? parseEventDayString(options.eventDay)
         : null;
-    const eventDay = explicit ?? toLocalDayString(referenceDate);
-    if (!isEventDayInRange(eventDay, start, end)) return null;
+    const eventDay = explicit ?? clubDayFromInstant(referenceDate);
+    if (!eventDay || !isEventDayInRange(eventDay, start, end)) return null;
     return { eventDay, eventDayDate: eventDayStringToDate(eventDay) };
 }
 
@@ -89,7 +93,8 @@ export function shouldSendWalkInTicket(
     if (!range) return false;
     if (range.startDay === range.endDay) return false;
 
-    const today = toLocalDayString(referenceDate);
+    const today = clubDayFromInstant(referenceDate);
+    if (!today) return false;
     if (today < range.startDay || today > range.endDay) return false;
     return today < range.endDay;
 }

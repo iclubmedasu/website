@@ -4,7 +4,7 @@ import type { PublicConfirmationSession, PublicRegistrationConfirmation } from "
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { Button } from "@/components/ui";
-import { formatEventDateRange } from "@/lib/customFieldUtils";
+import { formatEventDateRange, formatSessionRange } from "@iclub/shared/utils";
 import {
     downloadTicketAsPdf,
     // downloadTicketAsPng,
@@ -25,14 +25,10 @@ function buildTicketFilename(confirmation: PublicRegistrationConfirmation, exten
 
 function formatSessionHeader(session: PublicConfirmationSession): string {
     const title = session.label?.trim();
-    const parsed = new Date(session.sessionDate);
-    const dateLabel = Number.isNaN(parsed.getTime())
-        ? session.sessionDate
-        : parsed.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-    const timeRange = session.startTime && session.endTime
-        ? `${session.startTime}–${session.endTime}`
+    const scheduleLabel = session.startDateTime && session.endDateTime
+        ? formatSessionRange(session.startDateTime, session.endDateTime)
         : null;
-    return [title, dateLabel, timeRange].filter(Boolean).join(" · ");
+    return [title, scheduleLabel].filter(Boolean).join(" · ");
 }
 
 export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {

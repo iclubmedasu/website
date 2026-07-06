@@ -7,6 +7,7 @@ import type {
     EventTierRef,
     Id,
 } from '@/types/backend-contracts';
+import { compareSessionsBySchedule } from '../eventUtils';
 import { isCustomFieldValueEmpty, mergeCustomFieldValues } from './customFieldUtils';
 import { parseScannedPayload } from './checkInScanUtils';
 
@@ -313,11 +314,7 @@ export function useCheckInFlow({
 
     const sortedActiveSessions = [...sessions]
         .filter((session) => session.isActive !== false)
-        .sort((a, b) => {
-            const dateCompare = a.sessionDate.localeCompare(b.sessionDate);
-            if (dateCompare !== 0) return dateCompare;
-            return (a.order ?? 0) - (b.order ?? 0);
-        });
+        .sort(compareSessionsBySchedule);
 
     return {
         manualCode,

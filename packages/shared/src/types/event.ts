@@ -68,8 +68,13 @@ export interface EventSessionRef {
     id: Id;
     eventId: Id;
     label: string | null;
+    startDateTime: string | null;
+    endDateTime: string | null;
+    /** @deprecated Derived legacy field; prefer startDateTime/endDateTime */
     sessionDate: string;
+    /** @deprecated Derived legacy field; prefer startDateTime/endDateTime */
     startTime: string | null;
+    /** @deprecated Derived legacy field; prefer startDateTime/endDateTime */
     endTime: string | null;
     mode: EventSessionMode;
     onlineUrl: string | null;
@@ -83,6 +88,8 @@ export interface EventSessionRef {
 export interface EventSessionSelectionRef {
     sessionId: Id;
     label?: string | null;
+    startDateTime?: string | null;
+    endDateTime?: string | null;
     sessionDate: string;
     startTime?: string | null;
     endTime?: string | null;
@@ -99,8 +106,13 @@ export interface EventSessionAttendanceRef {
 
 export interface CreateEventSessionPayload {
     label?: string | null;
-    sessionDate: string;
+    startDateTime: string;
+    endDateTime: string;
+    /** @deprecated Legacy fallback for older clients */
+    sessionDate?: string;
+    /** @deprecated Legacy fallback for older clients */
     startTime?: string | null;
+    /** @deprecated Legacy fallback for older clients */
     endTime?: string | null;
     mode: EventSessionMode;
     onlineUrl?: string | null;

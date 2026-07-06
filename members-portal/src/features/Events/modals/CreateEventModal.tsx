@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { Checkbox } from '@/components/checkbox';
 import { eventsAPI, projectsAPI, projectTypesAPI } from '@/services/api';
-import { fromDateTimeLocalValue, toDateTimeLocalValue } from '@/utils/datetimeLocal';
+import { fromDateTimeLocalValue, toDateTimeLocalValue } from '@iclub/shared/utils';
 import { toTitleCase } from '@/utils/titleCase';
 import type {
     CreateEventPayload,

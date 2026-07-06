@@ -8,6 +8,12 @@ import {
     validateRequiredCustomFieldValues,
 } from '../lib/customFields';
 import { prisma } from '../db';
+import {
+    doSessionInstantsOverlap,
+    isSessionActiveAt,
+    parseEventSessionTimes,
+    serializeEventSession,
+} from '../lib/eventSessionTime';
 import express, { Request, Response } from 'express';
 import { authenticateToken, optionalAuthenticateToken } from '../middleware/auth';
 import { generateUniqueConfirmationCode } from '../services/eventCode';
@@ -121,6 +127,8 @@ const registrationInclude = {
                 select: {
                     id: true,
                     label: true,
+                    startDateTime: true,
+                    endDateTime: true,
                     sessionDate: true,
                     startTime: true,
                     endTime: true,
@@ -147,6 +155,8 @@ function serializeRegistration(registration: RegistrationWithDays | (Omit<Regist
         sessionId: number;
         session?: {
             label: string | null;
+            startDateTime: Date | null;
+            endDateTime: Date | null;
             sessionDate: Date;
             startTime: string | null;
             endTime: string | null;
@@ -159,12 +169,19 @@ function serializeRegistration(registration: RegistrationWithDays | (Omit<Regist
         .map((selection) => ({
             sessionId: selection.sessionId,
             label: selection.session?.label ?? null,
+            startDateTime: selection.session?.startDateTime?.toISOString() ?? null,
+            endDateTime: selection.session?.endDateTime?.toISOString() ?? null,
             sessionDate: selection.session ? formatEventDay(selection.session.sessionDate) : '',
             startTime: selection.session?.startTime ?? null,
             endTime: selection.session?.endTime ?? null,
             mode: selection.session?.mode ?? 'ONSITE',
         }))
-        .sort((a, b) => a.sessionDate.localeCompare(b.sessionDate));
+        .sort((a, b) => {
+            if (a.startDateTime && b.startDateTime) {
+                return a.startDateTime.localeCompare(b.startDateTime);
+            }
+            return a.sessionDate.localeCompare(b.sessionDate);
+        });
 
     return {
         ...rest,
@@ -388,21 +405,6 @@ function canPublicView(event: { isPublished: boolean; isActive: boolean; isArchi
     return event.isActive && !event.isArchived && event.isPublished;
 }
 
-function parseSessionTime(value: unknown): string | null {
-    const trimmed = String(value ?? '').trim();
-    if (!trimmed) return null;
-    if (!/^\d{2}:\d{2}$/.test(trimmed)) return null;
-    const [hours, minutes] = trimmed.split(':').map(Number);
-    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
-    return trimmed;
-}
-
-function parseSessionDate(value: unknown): Date | null {
-    const day = parseEventDayString(value);
-    if (!day) return null;
-    return eventDayStringToDate(day);
-}
-
 function normalizeSessionMode(value: unknown): string | null {
     const mode = String(value || '').trim().toUpperCase();
     return VALID_SESSION_MODES.has(mode) ? mode : null;
@@ -420,41 +422,34 @@ function parseSessionIds(value: unknown): number[] {
     return [...new Set(ids)];
 }
 
-type SessionTimeWindow = { sessionDate: Date; startTime: string | null; endTime: string | null };
-
-function toLocalDayString(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-function toLocalTimeString(date: Date): string {
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${hours}:${minutes}`;
-}
+type SessionTimeWindow = {
+    sessionDate: Date;
+    startTime: string | null;
+    endTime: string | null;
+    startDateTime: Date | null;
+    endDateTime: Date | null;
+};
 
 function doSessionsOverlap(a: SessionTimeWindow, b: SessionTimeWindow): boolean {
+    if (a.startDateTime && a.endDateTime && b.startDateTime && b.endDateTime) {
+        return doSessionInstantsOverlap(a, b);
+    }
     if (!a.startTime || !a.endTime || !b.startTime || !b.endTime) return false;
     if (formatEventDay(a.sessionDate) !== formatEventDay(b.sessionDate)) return false;
     return a.startTime < b.endTime && b.startTime < a.endTime;
 }
 
 async function getActiveSessionsAtTime(eventId: number, referenceDate: Date) {
-    const day = toLocalDayString(referenceDate);
-    const hhmm = toLocalTimeString(referenceDate);
     const sessions = await prisma.eventSession.findMany({
         where: {
             eventId,
             isActive: true,
-            sessionDate: eventDayStringToDate(day),
-            startTime: { not: null },
-            endTime: { not: null },
+            startDateTime: { not: null },
+            endDateTime: { not: null },
         },
-        orderBy: [{ startTime: 'asc' }, { order: 'asc' }],
+        orderBy: [{ startDateTime: 'asc' }, { order: 'asc' }],
     });
-    return sessions.filter((session) => session.startTime! <= hhmm && hhmm < session.endTime!);
+    return sessions.filter((session) => isSessionActiveAt(session, referenceDate));
 }
 
 async function findOverlappingSessionAttendance(
@@ -465,7 +460,14 @@ async function findOverlappingSessionAttendance(
         where: { registrationId, mode: 'ONSITE' },
         include: {
             session: {
-                select: { label: true, sessionDate: true, startTime: true, endTime: true },
+                select: {
+                    label: true,
+                    sessionDate: true,
+                    startTime: true,
+                    endTime: true,
+                    startDateTime: true,
+                    endDateTime: true,
+                },
             },
         },
     });
@@ -1630,11 +1632,11 @@ router.get('/:id/sessions', optionalAuthenticateToken, async (req, res) => {
 
         const sessions = await prisma.eventSession.findMany({
             where: { eventId, isActive: true },
-            orderBy: [{ sessionDate: 'asc' }, { order: 'asc' }],
+            orderBy: [{ startDateTime: 'asc' }, { sessionDate: 'asc' }, { order: 'asc' }],
             include: { _count: { select: { attendances: true } } },
         });
 
-        return res.json(sessions);
+        return res.json(sessions.map((session) => serializeEventSession(session)));
     } catch (error) {
         console.error(`GET /events/${req.params.id}/sessions error:`, error);
         return res.status(500).json({ error: 'Failed to fetch sessions' });
@@ -1647,8 +1649,10 @@ router.post('/:id/sessions', authenticateToken, async (req, res) => {
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
         if (!await ensureEventOperationsAccess(res, req, eventId)) return;
 
-        const sessionDate = parseSessionDate(req.body?.sessionDate);
-        if (!sessionDate) return res.status(400).json({ error: 'Valid sessionDate is required (YYYY-MM-DD)' });
+        const parsedTimes = parseEventSessionTimes(req.body ?? {});
+        if (!parsedTimes) {
+            return res.status(400).json({ error: 'Valid startDateTime and endDateTime are required' });
+        }
 
         const mode = normalizeSessionMode(req.body?.mode);
         if (!mode) return res.status(400).json({ error: 'Valid mode is required (ONSITE or ONLINE)' });
@@ -1663,23 +1667,15 @@ router.post('/:id/sessions', authenticateToken, async (req, res) => {
         const label = String(req.body?.label ?? '').trim();
         if (!label) return res.status(400).json({ error: 'Session title is required' });
 
-        const startTime = req.body?.startTime !== undefined ? parseSessionTime(req.body.startTime) : null;
-        if (req.body?.startTime !== undefined && req.body?.startTime !== null && String(req.body.startTime).trim() && !startTime) {
-            return res.status(400).json({ error: 'startTime must be in HH:MM format' });
-        }
-
-        const endTime = req.body?.endTime !== undefined ? parseSessionTime(req.body.endTime) : null;
-        if (req.body?.endTime !== undefined && req.body?.endTime !== null && String(req.body.endTime).trim() && !endTime) {
-            return res.status(400).json({ error: 'endTime must be in HH:MM format' });
-        }
-
         const created = await prisma.eventSession.create({
             data: {
                 eventId,
                 label,
-                sessionDate,
-                startTime,
-                endTime,
+                sessionDate: parsedTimes.sessionDate,
+                startTime: parsedTimes.startTime,
+                endTime: parsedTimes.endTime,
+                startDateTime: parsedTimes.startDateTime,
+                endDateTime: parsedTimes.endDateTime,
                 mode,
                 onlineUrl,
                 order: Number.isInteger(Number(req.body?.order)) ? Number(req.body.order) : 0,
@@ -1707,7 +1703,7 @@ router.post('/:id/sessions', authenticateToken, async (req, res) => {
             queueSessionTokenGeneration(created.id, 'session-create');
         }
 
-        return res.status(201).json(created);
+        return res.status(201).json(serializeEventSession(created));
     } catch (error) {
         console.error(`POST /events/${req.params.id}/sessions error:`, error);
         return res.status(500).json({ error: 'Failed to create session' });
@@ -1748,11 +1744,15 @@ router.put('/:id/sessions/:sessionId', authenticateToken, async (req, res) => {
         const existing = await prisma.eventSession.findFirst({ where: { id: sessionId, eventId } });
         if (!existing) return res.status(404).json({ error: 'Session not found' });
 
-        const sessionDate = req.body?.sessionDate !== undefined
-            ? parseSessionDate(req.body.sessionDate)
-            : existing.sessionDate;
-        if (req.body?.sessionDate !== undefined && !sessionDate) {
-            return res.status(400).json({ error: 'Valid sessionDate is required (YYYY-MM-DD)' });
+        const parsedTimes = parseEventSessionTimes({
+            startDateTime: req.body?.startDateTime ?? existing.startDateTime?.toISOString(),
+            endDateTime: req.body?.endDateTime ?? existing.endDateTime?.toISOString(),
+            sessionDate: req.body?.sessionDate ?? formatEventDay(existing.sessionDate),
+            startTime: req.body?.startTime ?? existing.startTime,
+            endTime: req.body?.endTime ?? existing.endTime,
+        });
+        if (!parsedTimes) {
+            return res.status(400).json({ error: 'Valid startDateTime and endDateTime are required' });
         }
 
         const mode = req.body?.mode !== undefined
@@ -1777,35 +1777,15 @@ router.put('/:id/sessions/:sessionId', authenticateToken, async (req, res) => {
             : existing.label;
         if (!nextLabel) return res.status(400).json({ error: 'Session title is required' });
 
-        let startTime = existing.startTime;
-        if (req.body?.startTime !== undefined) {
-            if (req.body.startTime === null || String(req.body.startTime).trim() === '') {
-                startTime = null;
-            } else {
-                const parsed = parseSessionTime(req.body.startTime);
-                if (!parsed) return res.status(400).json({ error: 'startTime must be in HH:MM format' });
-                startTime = parsed;
-            }
-        }
-
-        let endTime = existing.endTime;
-        if (req.body?.endTime !== undefined) {
-            if (req.body.endTime === null || String(req.body.endTime).trim() === '') {
-                endTime = null;
-            } else {
-                const parsed = parseSessionTime(req.body.endTime);
-                if (!parsed) return res.status(400).json({ error: 'endTime must be in HH:MM format' });
-                endTime = parsed;
-            }
-        }
-
         const updated = await prisma.eventSession.update({
             where: { id: sessionId },
             data: {
                 label: nextLabel,
-                sessionDate: sessionDate ?? existing.sessionDate,
-                startTime,
-                endTime,
+                sessionDate: parsedTimes.sessionDate,
+                startTime: parsedTimes.startTime,
+                endTime: parsedTimes.endTime,
+                startDateTime: parsedTimes.startDateTime,
+                endDateTime: parsedTimes.endDateTime,
                 mode: mode ?? existing.mode,
                 onlineUrl,
                 order: req.body?.order !== undefined && Number.isInteger(Number(req.body.order))
@@ -1844,7 +1824,7 @@ router.put('/:id/sessions/:sessionId', authenticateToken, async (req, res) => {
             queueSessionTokenGeneration(updated.id, 'session-update');
         }
 
-        return res.json(updated);
+        return res.json(serializeEventSession(updated));
     } catch (error) {
         console.error(`PUT /events/${req.params.id}/sessions/${req.params.sessionId} error:`, error);
         return res.status(500).json({ error: 'Failed to update session' });
@@ -2579,7 +2559,15 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
         if (sessionId) {
             const session = await prisma.eventSession.findFirst({
                 where: { id: sessionId, eventId, isActive: true },
-                select: { id: true, label: true, sessionDate: true, startTime: true, endTime: true },
+                select: {
+                    id: true,
+                    label: true,
+                    sessionDate: true,
+                    startTime: true,
+                    endTime: true,
+                    startDateTime: true,
+                    endDateTime: true,
+                },
             });
             if (!session) {
                 return res.status(400).json({ error: 'Invalid or inactive session for this event' });
@@ -3104,7 +3092,15 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
         if (sessionId) {
             const session = await prisma.eventSession.findFirst({
                 where: { id: sessionId, eventId, isActive: true },
-                select: { id: true, label: true, sessionDate: true, startTime: true, endTime: true },
+                select: {
+                    id: true,
+                    label: true,
+                    sessionDate: true,
+                    startTime: true,
+                    endTime: true,
+                    startDateTime: true,
+                    endDateTime: true,
+                },
             });
             if (!session) {
                 return res.status(400).json({ error: 'Invalid or inactive session for this event' });

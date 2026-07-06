@@ -158,6 +158,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     setIsAlumni(false);
                     setUser(null);
                 }
+            } else if (response.status === 401) {
+                clearTokenUtil();
+                setIsAlumni(false);
+                setUser(null);
             } else {
                 setIsAlumni(false);
                 setUser(null);

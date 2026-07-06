@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express";
 import { prisma } from "../db";
+import { serializeEventSession } from "../lib/eventSessionTime";
 import { sendEmail } from "../services/emailService";
 import { buildRegistrationJoinUrl } from "../services/eventTicketEmailService";
 import { generateTokensForRegistration, getSessionTokensForRegistration } from "../services/sessionTokenService";
@@ -400,21 +401,10 @@ router.get("/events/:id/sessions", async (req: Request, res: Response) => {
 
         const sessions = await prisma.eventSession.findMany({
             where: { eventId, isActive: true },
-            select: {
-                id: true,
-                label: true,
-                sessionDate: true,
-                startTime: true,
-                endTime: true,
-                mode: true,
-            },
-            orderBy: [{ sessionDate: "asc" }, { order: "asc" }],
+            orderBy: [{ startDateTime: "asc" }, { sessionDate: "asc" }, { order: "asc" }],
         });
 
-        return res.json(sessions.map((session) => ({
-            ...session,
-            sessionDate: session.sessionDate.toISOString().slice(0, 10),
-        })));
+        return res.json(sessions.map((session) => serializeEventSession(session)));
     } catch (error) {
         console.error("GET /public/events/:id/sessions error:", error);
         return res.status(500).json({ error: "Failed to load event sessions" });
@@ -514,32 +504,20 @@ router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
 
         const eventSessions = await prisma.eventSession.findMany({
             where: { eventId, isActive: true },
-            orderBy: [{ sessionDate: "asc" }, { order: "asc" }],
-            select: {
-                id: true,
-                label: true,
-                sessionDate: true,
-                startTime: true,
-                endTime: true,
-                mode: true,
-            },
+            orderBy: [{ startDateTime: "asc" }, { sessionDate: "asc" }, { order: "asc" }],
         });
 
         const sessionTokens = await getSessionTokensForRegistration(registration.id);
 
         const sessions = eventSessions.map((session) => {
+            const serialized = serializeEventSession(session);
             const token = sessionTokens.get(session.id);
             const joinUrl = session.mode === "ONLINE" && token
                 ? buildRegistrationJoinUrl(eventId, token)
                 : null;
 
             return {
-                id: session.id,
-                label: session.label,
-                sessionDate: session.sessionDate.toISOString(),
-                startTime: session.startTime,
-                endTime: session.endTime,
-                mode: session.mode,
+                ...serialized,
                 joinUrl,
             };
         });

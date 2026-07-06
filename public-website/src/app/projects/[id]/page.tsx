@@ -2,20 +2,12 @@ import type { Metadata } from "next";
 import { CalendarDays, Tag } from "lucide-react";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/navigation/BackLink";
+import { ClientFormattedDate } from "@/components/datetime/ClientDateTime";
 import { Badge, PageContainer } from "@/components/ui";
 import { publicAPI } from "@/lib/api";
 
 interface ProjectDetailPageProps {
     params: Promise<{ id: string }>;
-}
-
-function formatCompletedDate(value?: string | null): string | null {
-    if (!value) return null;
-    return new Intl.DateTimeFormat("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-    }).format(new Date(value));
 }
 
 export async function generateMetadata({ params }: ProjectDetailPageProps): Promise<Metadata> {
@@ -39,8 +31,6 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
         notFound();
     }
 
-    const completedLabel = formatCompletedDate(project.completedDate);
-
     return (
         <PageContainer className="space-y-8 py-10 sm:py-14">
             <BackLink href="/projects" label="Back to Projects" />
@@ -55,10 +45,10 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
                 {project.description ? (
                     <p className="text-lg leading-8 text-slate-600">{project.description}</p>
                 ) : null}
-                {completedLabel ? (
+                {project.completedDate ? (
                     <p className="inline-flex items-center gap-2 text-sm text-slate-600">
                         <CalendarDays className="h-4 w-4 shrink-0 text-purple-700" />
-                        Completed {completedLabel}
+                        Completed <ClientFormattedDate value={project.completedDate} />
                     </p>
                 ) : null}
                 {project.tags && project.tags.length > 0 ? (

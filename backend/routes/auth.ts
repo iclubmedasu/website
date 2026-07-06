@@ -1096,6 +1096,12 @@ router.get('/me', async (req, res) => {
         };
         res.json({ user: userPayload });
     } catch (error) {
+        if (error instanceof jwt.TokenExpiredError) {
+            return res.status(401).json({ error: 'Token expired', code: 'TOKEN_EXPIRED' });
+        }
+        if (error instanceof jwt.JsonWebTokenError) {
+            return res.status(401).json({ error: 'Invalid token', code: 'INVALID_TOKEN' });
+        }
         console.error('Get user error:', error);
         res.status(401).json({ error: 'Invalid token' });
     }

@@ -141,7 +141,7 @@ export async function ensureRegistrationHasToken(
             isActive: true,
             mode: { not: 'ONSITE' },
         },
-        orderBy: [{ sessionDate: 'asc' }, { order: 'asc' }],
+        orderBy: [{ startDateTime: 'asc' }, { sessionDate: 'asc' }, { order: 'asc' }],
         take: 1,
         select: { id: true },
     });

@@ -6,6 +6,7 @@ import {
     parseCustomFieldInputValue,
     type AttendeeDraft,
 } from '../customFieldUtils';
+import { compareSessionsBySchedule } from '../../eventUtils';
 
 interface WalkInDraftFieldsProps {
     variant: 'table' | 'stack';
@@ -33,11 +34,7 @@ function cellErrorClass(draftErrors: Record<string, string>, key: string) {
 function getSortedActiveSessions(sessions: EventSessionRef[]): EventSessionRef[] {
     return [...sessions]
         .filter((session) => session.isActive !== false)
-        .sort((a, b) => {
-            const dateCompare = a.sessionDate.localeCompare(b.sessionDate);
-            if (dateCompare !== 0) return dateCompare;
-            return (a.order ?? 0) - (b.order ?? 0);
-        });
+        .sort(compareSessionsBySchedule);
 }
 
 function getSessionSelectionLabel(sessionIds: string[], activeSessions: EventSessionRef[]): string {

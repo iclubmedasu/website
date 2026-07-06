@@ -113,39 +113,7 @@ export function formatCapacityLabel(spotsRemaining: number | null | undefined, c
     return `${spotsRemaining} spot${spotsRemaining === 1 ? "" : "s"} remaining`;
 }
 
-export function formatEventDateRange(eventDate: string, eventEndDate: string): string {
-    const start = new Date(eventDate);
-    const end = new Date(eventEndDate);
-    const sameDay = start.toDateString() === end.toDateString();
-
-    const dateFormatter = new Intl.DateTimeFormat("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-    });
-    const timeFormatter = new Intl.DateTimeFormat("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-    });
-
-    if (sameDay) {
-        return `${dateFormatter.format(start)} · ${timeFormatter.format(start)} – ${timeFormatter.format(end)}`;
-    }
-
-    return `${dateFormatter.format(start)} – ${dateFormatter.format(end)}`;
-}
-
-export function formatRegistrationDeadline(value?: string | null): string | null {
-    if (!value) return null;
-    return new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-    }).format(new Date(value));
-}
+export { formatEventDateRange, formatRegistrationDeadline } from "@iclub/shared/utils";
 
 export function formatTierPrice(price: number | null | undefined, currency: string | null | undefined): string {
     if (price == null) return "Free";

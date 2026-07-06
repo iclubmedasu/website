@@ -299,6 +299,8 @@ export function RegistrationForm({ eventId, eventTitle }: RegistrationFormProps)
                                         />
                                         <span>{formatSessionDisplayLabel({
                                             label: session.label,
+                                            startDateTime: session.startDateTime,
+                                            endDateTime: session.endDateTime,
                                             sessionDate: session.sessionDate,
                                             startTime: session.startTime,
                                             endTime: session.endTime,
