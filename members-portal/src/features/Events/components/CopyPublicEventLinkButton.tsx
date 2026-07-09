@@ -53,7 +53,7 @@ export default function CopyPublicEventLinkButton({
     const handleCopy = useCallback(async () => {
         if (!isPublished) return;
 
-        const url = buildPublicEventUrl(eventId);
+        const url = await buildPublicEventUrl(eventId);
         const ok = await copyTextToClipboard(url);
         if (!ok) {
             window.alert('Failed to copy link.');

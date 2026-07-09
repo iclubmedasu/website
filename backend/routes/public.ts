@@ -6,6 +6,7 @@ import { buildRegistrationJoinUrl } from "../services/eventTicketEmailService";
 import { generateTokensForRegistration, getSessionTokensForRegistration } from "../services/sessionTokenService";
 import { buildMemberTimeline, toMemberProfileView } from "../lib/memberProfileVisibility";
 import { buildPublicMemberDirectory } from "../lib/publicMemberDirectory";
+import { getPublicWebsiteUrl } from "../lib/publicWebsiteUrl";
 import { getAboutPageData, getActiveSocialLinks, getContactPageData } from "../lib/siteContent";
 import { createIncidentReportSubmission, getSupportPageData } from "../lib/supportContent";
 
@@ -660,6 +661,10 @@ router.post("/contact", async (req: Request, res: Response) => {
         console.error("POST /public/contact error:", error);
         return res.status(500).json({ error: "Failed to send message" });
     }
+});
+
+router.get("/site-config", (_req: Request, res: Response) => {
+    return res.json({ publicWebsiteUrl: getPublicWebsiteUrl() });
 });
 
 router.get("/site/about", async (_req: Request, res: Response) => {

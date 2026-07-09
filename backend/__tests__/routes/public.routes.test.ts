@@ -445,6 +445,16 @@ describe("public routes", () => {
         );
     });
 
+    it("GET /public/site-config returns public website URL", async () => {
+        const response = await request(createApp()).get("/public/site-config");
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(
+            expect.objectContaining({
+                publicWebsiteUrl: expect.any(String),
+            }),
+        );
+    });
+
     it("GET /public/site/about returns about page payload", async () => {
         prismaMocks.sitePageFindUnique.mockResolvedValue({
             id: "about",

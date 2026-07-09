@@ -60,6 +60,53 @@ export function resolveApiBaseUrl(): string {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+if (process.env.NODE_ENV === "production") {
+    console.info(`[public-website] API_BASE_URL=${API_BASE_URL}`);
+}
+
+export type PublicFetchStatus = "ok" | "not_found" | "unavailable";
+
+export type PublicFetchResult<T> =
+    | { status: "ok"; data: T }
+    | { status: "not_found" }
+    | { status: "unavailable" };
+
+const RETRY_DELAYS_MS = [2000, 4000];
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+}
+
+async function fetchWithRetry(
+    url: string,
+    init?: RequestInit & { next?: { revalidate?: number } },
+): Promise<Response> {
+    let lastError: unknown;
+    const attempts = RETRY_DELAYS_MS.length + 1;
+
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+        try {
+            const response = await fetch(url, init);
+            if (response.status === 503 && attempt < attempts - 1) {
+                await sleep(RETRY_DELAYS_MS[attempt]);
+                continue;
+            }
+            return response;
+        } catch (error) {
+            lastError = error;
+            if (attempt < attempts - 1) {
+                await sleep(RETRY_DELAYS_MS[attempt]);
+                continue;
+            }
+            throw error;
+        }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error("Fetch failed after retries");
+}
+
 export function getPublicProfilePhotoUrl(memberId: number | string | null | undefined): string | null {
     if (!memberId) return null;
     return `${API_BASE_URL}/members/${memberId}/profile-photo`;
@@ -89,7 +136,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 async function fetchPublic<T>(path: string, fallback: T): Promise<T> {
     try {
-        const response = await fetch(`${API_BASE_URL}${path}`, {
+        const response = await fetchWithRetry(`${API_BASE_URL}${path}`, {
             next: { revalidate: 60 },
         });
         return await handleResponse<T>(response);
@@ -100,17 +147,30 @@ async function fetchPublic<T>(path: string, fallback: T): Promise<T> {
 }
 
 async function fetchPublicOrThrow<T>(path: string): Promise<T | null> {
+    const result = await fetchPublicDetail<T>(path);
+    if (result.status === "ok") {
+        return result.data;
+    }
+    return null;
+}
+
+async function fetchPublicDetail<T>(path: string): Promise<PublicFetchResult<T>> {
     try {
-        const response = await fetch(`${API_BASE_URL}${path}`, {
+        const response = await fetchWithRetry(`${API_BASE_URL}${path}`, {
             next: { revalidate: 60 },
         });
         if (response.status === 404) {
-            return null;
+            return { status: "not_found" };
         }
-        return await handleResponse<T>(response);
+        if (response.status === 503) {
+            console.error(`Failed to fetch ${path}: backend unavailable (503 after retries)`);
+            return { status: "unavailable" };
+        }
+        const data = await handleResponse<T>(response);
+        return { status: "ok", data };
     } catch (error) {
         console.error(`Failed to fetch ${path}:`, error);
-        return null;
+        return { status: "unavailable" };
     }
 }
 
@@ -159,7 +219,12 @@ export const publicAPI = {
     },
 
     async getEvent(id: number): Promise<PublicEventDetail | null> {
-        return fetchPublicOrThrow<PublicEventDetail>(`/public/events/${id}`);
+        const result = await this.getEventWithStatus(id);
+        return result.status === "ok" ? result.data : null;
+    },
+
+    async getEventWithStatus(id: number): Promise<PublicFetchResult<PublicEventDetail>> {
+        return fetchPublicDetail<PublicEventDetail>(`/public/events/${id}`);
     },
 
     async getEventTiers(id: number): Promise<PublicEventTier[]> {

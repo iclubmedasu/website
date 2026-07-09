@@ -185,6 +185,18 @@ The public website SSR calls the backend API at `NEXT_PUBLIC_API_URL`. A **503 f
 
 If `NEXT_PUBLIC_API_URL` is missing at build time, server-side fetches fall back to `localhost:3000` and pages render empty; production logs will show a clear error about the missing variable.
 
+The public website now **retries** API calls on 503 (cold-start) and shows “Service temporarily unavailable” on event detail pages instead of a false 404 when the backend is down.
+
+### Copy link from members portal shows `localhost:3002`
+
+The copy-link button uses the backend’s existing `PUBLIC_WEBSITE_URL` (via `GET /api/public/site-config`), or derives `iclubmedasu-public-website.hf.space` from the members-portal HF hostname. **No separate members-portal variable is required** if backend `PUBLIC_WEBSITE_URL` is set.
+
+Optional override for local dev: `NEXT_PUBLIC_PUBLIC_WEBSITE_URL` in members-portal `.env.local`.
+
+### Event URL returns 404 on the live public site
+
+If the event is published and the [public API](https://iclubmedasu-backend.hf.space/api/public/events/1) returns data, but the page shows 404, the public website likely could not reach the API (503) during server-side render. Check backend `/health` and refresh after the backend is warm.
+
 ## Local Docker Testing
 
 You can still use Docker Compose for local development:

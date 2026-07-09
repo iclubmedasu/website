@@ -8,6 +8,7 @@ import { PageContainer } from "@/components/ui";
 import { ClientEventDateRange, ClientRegistrationDeadline } from "@/components/datetime/ClientDateTime";
 import { publicAPI } from "@/lib/api";
 import { formatCapacityLabel, formatTierPrice } from "@/lib/customFieldUtils";
+import { ServiceUnavailableMessage } from "@/components/ui/ServiceUnavailableMessage";
 
 interface EventDetailPageProps {
     params: Promise<{ id: string }>;
@@ -29,10 +30,16 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
         notFound();
     }
 
-    const [event, tiers] = await Promise.all([
-        publicAPI.getEvent(eventId),
+    const [eventResult, tiers] = await Promise.all([
+        publicAPI.getEventWithStatus(eventId),
         publicAPI.getEventTiers(eventId),
     ]);
+
+    if (eventResult.status === "unavailable") {
+        return <ServiceUnavailableMessage backHref="/events" backLabel="Back to Events" />;
+    }
+
+    const event = eventResult.status === "ok" ? eventResult.data : null;
 
     if (!event) {
         notFound();

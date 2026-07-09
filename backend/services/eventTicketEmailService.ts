@@ -30,15 +30,7 @@ const PURPLE = {
 
 export type EventRegistrationEmailVariant = 'ticket' | 'reminder';
 
-const DEFAULT_PUBLIC_WEBSITE_URL = 'http://localhost:3002';
-
-function getPublicWebsiteUrl(): string {
-    const configured = process.env.PUBLIC_WEBSITE_URL?.trim();
-    if (!configured) {
-        return DEFAULT_PUBLIC_WEBSITE_URL;
-    }
-    return configured.replace(/\/$/, '');
-}
+import { getPublicWebsiteUrl } from '../lib/publicWebsiteUrl';
 
 export function buildRegistrationConfirmationUrl(eventId: number, confirmationCode: string): string {
     const baseUrl = getPublicWebsiteUrl();
