@@ -35,6 +35,7 @@ interface EventExpandedContentProps {
     eventTitle?: string;
     initialTab?: EventTabKey | null;
     allowWalkIns?: boolean;
+    allowDirectCheckIn?: boolean;
     eventDate?: string | null;
     eventEndDate?: string | null;
     isPublished?: boolean;
@@ -57,6 +58,7 @@ export default function EventExpandedContent({
     eventTitle,
     initialTab,
     allowWalkIns = false,
+    allowDirectCheckIn = false,
     eventDate,
     eventEndDate,
     isPublished = false,
@@ -200,6 +202,7 @@ export default function EventExpandedContent({
                         onFieldsChange={setFields}
                         totalRegistered={(stats?.totalRegistered ?? 0) + (stats?.walkInCount ?? 0)}
                         allowWalkIns={allowWalkIns}
+                        allowDirectCheckIn={allowDirectCheckIn}
                         eventDate={eventDate}
                         eventEndDate={eventEndDate}
                         isPublished={isPublished}

@@ -123,6 +123,7 @@ const registrationInclude = {
     sessionSelections: {
         select: {
             sessionId: true,
+            createdAt: true,
             session: {
                 select: {
                     id: true,
@@ -153,6 +154,7 @@ function serializeAttendanceDays(
 function serializeRegistration(registration: RegistrationWithDays | (Omit<RegistrationWithDays, 'sessionSelections'> & {
     sessionSelections?: Array<{
         sessionId: number;
+        createdAt?: Date | null;
         session?: {
             label: string | null;
             startDateTime: Date | null;
@@ -168,6 +170,7 @@ function serializeRegistration(registration: RegistrationWithDays | (Omit<Regist
     const selections = (sessionSelections ?? [])
         .map((selection) => ({
             sessionId: selection.sessionId,
+            createdAt: selection.createdAt?.toISOString() ?? null,
             label: selection.session?.label ?? null,
             startDateTime: selection.session?.startDateTime?.toISOString() ?? null,
             endDateTime: selection.session?.endDateTime?.toISOString() ?? null,
@@ -575,6 +578,7 @@ function eventActivitySnapshot(event: {
     registrationDeadline?: Date | null;
     capacity?: number | null;
     allowWalkIns: boolean;
+    allowDirectCheckIn: boolean;
     isCertifiable: boolean;
     projectId?: number | null;
     projectTypeId?: number | null;
@@ -592,6 +596,7 @@ function eventActivitySnapshot(event: {
         registrationDeadline: event.registrationDeadline,
         capacity: event.capacity,
         allowWalkIns: event.allowWalkIns,
+        allowDirectCheckIn: event.allowDirectCheckIn,
         isCertifiable: event.isCertifiable,
         projectId: event.projectId,
         projectTypeId: event.projectTypeId,
@@ -611,6 +616,7 @@ const EVENT_FIELD_LABELS: Record<string, string> = {
     registrationDeadline: 'registration deadline',
     capacity: 'capacity',
     allowWalkIns: 'allow walk-ins',
+    allowDirectCheckIn: 'allow direct check-in',
     isCertifiable: 'certifiable',
     projectId: 'project',
     projectTypeId: 'project type',
@@ -840,6 +846,7 @@ router.post('/', authenticateToken, async (req, res) => {
                 registrationDeadline: registrationDeadline && !Number.isNaN(registrationDeadline.getTime()) ? registrationDeadline : null,
                 capacity,
                 allowWalkIns: Boolean(req.body?.allowWalkIns),
+                allowDirectCheckIn: Boolean(req.body?.allowDirectCheckIn),
                 isCertifiable: Boolean(req.body?.isCertifiable),
                 projectId,
                 projectTypeId,
@@ -937,6 +944,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
                     : existing.registrationDeadline,
             capacity: req.body?.capacity !== undefined ? capacity : existing.capacity,
             allowWalkIns: req.body?.allowWalkIns !== undefined ? Boolean(req.body.allowWalkIns) : existing.allowWalkIns,
+            allowDirectCheckIn: req.body?.allowDirectCheckIn !== undefined ? Boolean(req.body.allowDirectCheckIn) : existing.allowDirectCheckIn,
             isCertifiable: req.body?.isCertifiable !== undefined ? Boolean(req.body.isCertifiable) : existing.isCertifiable,
             projectId: req.body?.projectId !== undefined ? projectId : existing.projectId,
         };

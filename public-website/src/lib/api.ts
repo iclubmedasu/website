@@ -117,6 +117,14 @@ function buildQuery(params: Record<string, string | number | boolean | undefined
 }
 
 export const publicAPI = {
+    async getPublishedEvents(options?: { limit?: number }): Promise<PublicEventListItem[]> {
+        const query = buildQuery({
+            limit: options?.limit ?? 50,
+            upcoming: false,
+        });
+        return fetchPublic<PublicEventListItem[]>(`/public/events${query}`, []);
+    },
+
     async getEvents(options?: { limit?: number; upcoming?: boolean }): Promise<PublicEventListItem[]> {
         const query = buildQuery({
             limit: options?.limit,
@@ -136,7 +144,7 @@ export const publicAPI = {
 
     async getPastEvents(options?: { limit?: number }): Promise<PublicEventListItem[]> {
         const query = buildQuery({
-            limit: options?.limit,
+            limit: options?.limit ?? 50,
             past: true,
         });
         return fetchPublic<PublicEventListItem[]>(`/public/events${query}`, []);
@@ -174,6 +182,11 @@ export const publicAPI = {
     ): Promise<PublicRegistrationConfirmation | null> {
         const query = buildQuery({ code });
         return fetchPublicOrThrow<PublicRegistrationConfirmation>(`/public/events/${eventId}/confirmation${query}`);
+    },
+
+    async getPublishedProjects(options?: { limit?: number }): Promise<PublicProjectSummary[]> {
+        const query = buildQuery({ limit: options?.limit ?? 50 });
+        return fetchPublic<PublicProjectSummary[]>(`/public/projects${query}`, []);
     },
 
     async getProjects(options?: { limit?: number }): Promise<PublicProjectSummary[]> {

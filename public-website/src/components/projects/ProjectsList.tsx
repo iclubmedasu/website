@@ -1,4 +1,5 @@
 import type { PublicProjectSummary } from "@iclub/shared";
+import { CardScrollItem, CardScrollList } from "@/components/ui/CardScrollList";
 import { ProjectCard } from "./ProjectCard";
 import { EmptyState } from "@/components/ui";
 
@@ -18,10 +19,12 @@ export function ProjectsList({
     }
 
     return (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <CardScrollList>
             {projects.map((project) => (
-                <ProjectCard key={project.id} project={project} />
+                <CardScrollItem key={project.id}>
+                    <ProjectCard project={project} />
+                </CardScrollItem>
             ))}
-        </div>
+        </CardScrollList>
     );
 }

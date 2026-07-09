@@ -9,8 +9,8 @@ export function UpcomingEventsPreview({ events }: UpcomingEventsPreviewProps) {
     return (
         <Section variant="subtle">
             <SectionHeading
-                title="Upcoming Events"
-                description="Join our latest workshops, community events, and student-led activities."
+                title="Events"
+                description="Browse our published workshops, community events, and student-led activities — scroll sideways to see more."
                 action={{ label: "View all events", href: "/events" }}
             />
             <EventsList events={events} />

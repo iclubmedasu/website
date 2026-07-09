@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ProjectsPage() {
-    const projects = await publicAPI.getProjects({ limit: 50 });
+    const projects = await publicAPI.getPublishedProjects();
 
     return (
         <>
@@ -20,7 +20,7 @@ export default async function ProjectsPage() {
                 <PageHeader
                     eyebrow="Projects"
                     title="Student-led initiatives"
-                    description={`Discover projects completed and led by ${siteConfig.shortName} members — from research to community impact.`}
+                    description={`Discover projects completed and led by ${siteConfig.shortName} members — scroll sideways to see more.`}
                 />
             </Section>
             <Section variant="plain">

@@ -107,6 +107,7 @@ export default function CreateEventModal({
         capacity: initial?.capacity != null ? String(initial.capacity) : '',
         projectId: initial?.projectId != null ? String(initial.projectId) : '',
         allowWalkIns: initial?.allowWalkIns ?? false,
+        allowDirectCheckIn: initial?.allowDirectCheckIn ?? false,
         isCertifiable: initial?.isCertifiable ?? false,
         teamIds: buildInitialTeamIds(),
     });
@@ -244,6 +245,7 @@ export default function CreateEventModal({
                 status: form.status,
                 teamIds: form.teamIds,
                 allowWalkIns: form.allowWalkIns,
+                allowDirectCheckIn: form.allowDirectCheckIn,
                 isCertifiable: form.isCertifiable,
             };
 
@@ -470,6 +472,14 @@ export default function CreateEventModal({
                                     <span>
                                         <strong>Certifiable event</strong>
                                         <small>Mark attendance for certificate or recognition tracking.</small>
+                                    </span>
+                                </label>
+
+                                <label className="toggle-field">
+                                    <Checkbox checked={form.allowDirectCheckIn} onChange={handleChange('allowDirectCheckIn')} />
+                                    <span>
+                                        <strong>Allow direct check-in</strong>
+                                        <small>Show a check-in button on each registration row during event days.</small>
                                     </span>
                                 </label>
                             </div>

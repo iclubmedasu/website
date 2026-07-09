@@ -256,6 +256,7 @@ export default function EventCard({
                             eventTitle={fullDetail.title}
                             initialTab={initialTab}
                             allowWalkIns={fullDetail.allowWalkIns ?? false}
+                            allowDirectCheckIn={fullDetail.allowDirectCheckIn ?? false}
                             eventDate={fullDetail.eventDate}
                             eventEndDate={fullDetail.eventEndDate}
                             isPublished={fullDetail.isPublished ?? false}

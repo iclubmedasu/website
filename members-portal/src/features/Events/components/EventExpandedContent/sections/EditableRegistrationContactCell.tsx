@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, Pencil, X } from 'lucide-react';
+import { Check, LogIn, Pencil, X } from 'lucide-react';
 import { eventsAPI } from '@/services/api';
 import type { EventRegistrationRef, Id } from '@/types/backend-contracts';
 import { handleRegistrationConflict } from '../registrationConflictUtils';
@@ -24,6 +24,9 @@ interface EditableRegistrationContactCellProps {
     editable?: boolean;
     className?: string;
     onUpdated: (updated: EventRegistrationRef) => void;
+    onCheckIn?: () => void;
+    checkInDisabled?: boolean;
+    checkInTitle?: string;
 }
 
 function truncateDisplay(value: string, max: number): string {
@@ -58,6 +61,9 @@ export default function EditableRegistrationContactCell({
     editable = true,
     className,
     onUpdated,
+    onCheckIn,
+    checkInDisabled = false,
+    checkInTitle = 'Check in',
 }: EditableRegistrationContactCellProps) {
     const storedValue = readFieldValue(registration, field);
     const [editing, setEditing] = useState(false);
@@ -186,14 +192,28 @@ export default function EditableRegistrationContactCell({
         <td className={cellClass} title={storedValue || undefined}>
             <div className="event-registrations-contact-cell">
                 <span className="event-registrations-contact-cell__value">{displayValue}</span>
-                <button
-                    type="button"
-                    className="table-action-btn edit-btn event-registrations-contact-cell__edit"
-                    onClick={startEdit}
-                    aria-label={`Edit ${label}`}
-                >
-                    <Pencil size={12} />
-                </button>
+                <div className="event-registrations-contact-cell__actions">
+                    {onCheckIn ? (
+                        <button
+                            type="button"
+                            className="table-action-btn event-registrations-contact-cell__checkin"
+                            onClick={onCheckIn}
+                            disabled={checkInDisabled}
+                            aria-label={checkInTitle}
+                            title={checkInTitle}
+                        >
+                            <LogIn size={12} />
+                        </button>
+                    ) : null}
+                    <button
+                        type="button"
+                        className="table-action-btn edit-btn event-registrations-contact-cell__edit"
+                        onClick={startEdit}
+                        aria-label={`Edit ${label}`}
+                    >
+                        <Pencil size={12} />
+                    </button>
+                </div>
             </div>
         </td>
     );

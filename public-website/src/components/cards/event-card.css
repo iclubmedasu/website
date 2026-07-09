@@ -125,6 +125,33 @@
     flex-shrink: 0;
 }
 
+.events-scroll,
+.card-scroll {
+    display: flex;
+    gap: 1.5rem;
+    overflow-x: auto;
+    overflow-y: visible;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.25rem 0.25rem 1rem;
+    margin: 0 -0.25rem;
+}
+
+.events-scroll-item,
+.card-scroll-item {
+    flex: 0 0 min(100%, 22rem);
+    width: min(100%, 22rem);
+    scroll-snap-align: start;
+}
+
+@media (min-width: 640px) {
+    .events-scroll-item,
+    .card-scroll-item {
+        flex-basis: 22rem;
+        width: 22rem;
+    }
+}
+
 .project-card {
     display: flex;
     flex-direction: column;

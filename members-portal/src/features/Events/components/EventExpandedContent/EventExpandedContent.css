@@ -976,16 +976,33 @@
     height: 0.75rem;
 }
 
-.event-registrations-contact-cell__edit {
+.event-registrations-contact-cell__edit,
+.event-registrations-contact-cell__checkin {
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
 }
 
 .event-registrations-table tbody tr:hover .event-registrations-contact-cell__edit,
-.event-registrations-table tbody tr:focus-within .event-registrations-contact-cell__edit {
+.event-registrations-table tbody tr:hover .event-registrations-contact-cell__checkin,
+.event-registrations-table tbody tr:focus-within .event-registrations-contact-cell__edit,
+.event-registrations-table tbody tr:focus-within .event-registrations-contact-cell__checkin {
     opacity: 1;
     pointer-events: auto;
+}
+
+.event-registrations-contact-cell__checkin {
+    color: var(--purple-700);
+}
+
+.event-registrations-contact-cell__checkin:hover:not(:disabled) {
+    background: var(--purple-700);
+    color: white;
+}
+
+.event-registrations-contact-cell__checkin:disabled {
+    opacity: 0.35;
+    pointer-events: none;
 }
 
 .event-registrations-contact-cell__save {
@@ -1420,6 +1437,59 @@
     font-size: 0.9rem;
 }
 
+.event-checkin-toolbar {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.event-checkin-toolbar__title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+.event-checkin-toolbar__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.event-registrations-checkin-panel--maximized {
+    position: fixed;
+    inset: 0;
+    z-index: 1150;
+    border-radius: 0;
+    max-height: none;
+    padding:
+        max(0.65rem, env(safe-area-inset-top))
+        max(0.75rem, env(safe-area-inset-right))
+        max(0.65rem, env(safe-area-inset-bottom))
+        max(0.75rem, env(safe-area-inset-left));
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    gap: 0.5rem;
+    overflow: hidden;
+}
+
+.event-registrations-checkin-panel--maximized .event-qr-scanner,
+.event-registrations-checkin-panel--maximized .event-qr-scanner__viewport {
+    min-height: 0;
+}
+
+@media (min-width: 901px) {
+    .event-checkin-toolbar--mobile-only {
+        display: none;
+    }
+}
+
 /* event staff modals: base structure from modal.css; portal via EventStaffModal */
 .event-staff-action-modal {
     max-width: 32rem;
@@ -1454,11 +1524,15 @@
 
     .event-registrations-checkin-panel {
         display: grid;
-        grid-template-rows: minmax(4.5rem, 1fr) auto auto;
+        grid-template-rows: auto minmax(4.5rem, 1fr) auto auto;
         gap: 0.5rem;
         flex: 1;
         min-height: 0;
         overflow: hidden;
+    }
+
+    .event-checkin-toolbar--mobile-only {
+        display: flex;
     }
 
     /* Mobile check-in: reserve space for scan + manual (no overlap) */
@@ -1501,7 +1575,7 @@
 
     .event-registrations-checkin-panel > .error-message,
     .event-registrations-checkin-panel > .success-message {
-        grid-row: 4;
+        grid-row: 5;
     }
 
     .event-registrations-row--draft {

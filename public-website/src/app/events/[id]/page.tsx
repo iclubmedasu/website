@@ -75,8 +75,8 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                 </div>
             </section>
 
-            {tiers.length > 0 ? (
-                <section className="space-y-4">
+         {/*   {tiers.length > 0 ? (
+                 <section className="space-y-4">
                     <h2 className="text-2xl font-semibold text-purple-900">Registration Tiers</h2>
                     <div className="grid gap-4 md:grid-cols-2">
                         {tiers.map((tier) => {
@@ -96,8 +96,8 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                             );
                         })}
                     </div>
-                </section>
-            ) : null}
+                </section> 
+            ) : null} */}
         </PageContainer>
     );
 }

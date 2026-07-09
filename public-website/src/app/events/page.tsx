@@ -7,13 +7,13 @@ import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
     title: "Events",
-    description: `Events open for registration at ${siteConfig.name}.`,
+    description: `Published events from ${siteConfig.name}.`,
 };
 
 export default async function EventsPage() {
     const [events, pastEvents] = await Promise.all([
-        publicAPI.getRegisterableEvents({ limit: 50 }),
-        publicAPI.getPastEvents({ limit: 50 }),
+        publicAPI.getPublishedEvents(),
+        publicAPI.getPastEvents(),
     ]);
 
     return (
@@ -22,21 +22,21 @@ export default async function EventsPage() {
                 <BackLink href="/" label="Back to Home" />
                 <PageHeader
                     eyebrow="Events"
-                    title="Events open for registration"
-                    description={`Browse published ${siteConfig.shortName} events with registration still open.`}
+                    title="Published events"
+                    description={`Browse all published ${siteConfig.shortName} events — scroll sideways to see more.`}
                 />
             </Section>
             <Section variant="plain">
                 <EventsList
                     events={events}
-                    emptyTitle="No events open for registration"
-                    emptyDescription="New events will appear here when registration opens."
+                    emptyTitle="No published events"
+                    emptyDescription="New events will appear here once they are published."
                 />
             </Section>
             <Section variant="subtle">
                 <SectionHeading
                     title="Past Events"
-                    description="Events the club has already run and disclosed publicly."
+                    description="Events the club has already run and disclosed publicly — scroll sideways to see more."
                 />
                 <EventsList
                     events={pastEvents}

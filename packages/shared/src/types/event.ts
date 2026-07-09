@@ -87,6 +87,7 @@ export interface EventSessionRef {
 
 export interface EventSessionSelectionRef {
     sessionId: Id;
+    createdAt?: ISODateTime | null;
     label?: string | null;
     startDateTime?: string | null;
     endDateTime?: string | null;
@@ -159,6 +160,7 @@ export interface EventSummary {
     registrationDeadline?: ISODateTime | null;
     capacity?: number | null;
     allowWalkIns?: boolean;
+    allowDirectCheckIn?: boolean;
     isCertifiable?: boolean;
     status: EventStatus;
     priority?: Priority | string;
@@ -261,6 +263,7 @@ export interface CreateEventPayload {
     progressStatus?: ProjectStatus | string;
     teamIds?: Array<{ teamId: Id | string; canEdit?: boolean; isOwner?: boolean }>;
     allowWalkIns?: boolean;
+    allowDirectCheckIn?: boolean;
     isCertifiable?: boolean;
     status?: EventStatus;
 }

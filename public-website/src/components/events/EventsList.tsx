@@ -1,6 +1,6 @@
 import type { PublicEventListItem } from "@iclub/shared";
+import { CardScrollItem, CardScrollList } from "@/components/ui/CardScrollList";
 import { EventCard } from "./EventCard";
-
 interface EventsListProps {
     events: PublicEventListItem[];
     variant?: "default" | "past";
@@ -24,10 +24,11 @@ export function EventsList({
     }
 
     return (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <CardScrollList>
             {events.map((event) => (
-                <EventCard key={event.id} event={event} variant={variant} />
+                <CardScrollItem key={event.id}>
+                    <EventCard event={event} variant={variant} />
+                </CardScrollItem>
             ))}
-        </div>
-    );
-}
+        </CardScrollList>
+    );}

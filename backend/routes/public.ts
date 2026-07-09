@@ -195,7 +195,7 @@ function serializePublicEventListItem(
 
 router.get("/events", async (req: Request, res: Response) => {
     try {
-        const limit = parseLimit(req.query.limit, 3);
+        const limit = parseLimit(req.query.limit, 50);
         const past = isTruthyQuery(req.query.past);
         const upcoming = isUpcomingQuery(req.query.upcoming);
         const registerable = isTruthyQuery(req.query.registerable);
@@ -544,7 +544,7 @@ router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
 
 router.get("/projects", async (req: Request, res: Response) => {
     try {
-        const limit = parseLimit(req.query.limit, 3);
+        const limit = parseLimit(req.query.limit, 50);
 
         const projects = await prisma.project.findMany({
             where: {

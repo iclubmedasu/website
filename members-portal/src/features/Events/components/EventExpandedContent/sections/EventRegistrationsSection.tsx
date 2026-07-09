@@ -40,6 +40,7 @@ import EventCheckInPanel from './EventCheckInSection';
 import WalkInDraftFields from './WalkInDraftFields';
 import SessionAttendanceOptions from './SessionAttendanceOptions';
 import EventStaffModal from '@/features/Events/components/EventStaffModal';
+import { useCheckInFlow } from '../useCheckInFlow';
 import { formatEventDuration, getActiveSessionsNow, isMultiDayEvent, isWithinEventDays } from '../../eventDateUtils';
 
 interface EventRegistrationsSectionProps {
@@ -51,6 +52,7 @@ interface EventRegistrationsSectionProps {
     onFieldsChange: (fields: EventCustomFieldRef[]) => void;
     totalRegistered?: number;
     allowWalkIns?: boolean;
+    allowDirectCheckIn?: boolean;
     eventDate?: string | null;
     eventEndDate?: string | null;
     isPublished?: boolean;
@@ -77,6 +79,7 @@ export default function EventRegistrationsSection({
     onFieldsChange,
     totalRegistered = 0,
     allowWalkIns = false,
+    allowDirectCheckIn = false,
     eventDate,
     eventEndDate,
     isPublished = false,
@@ -118,6 +121,7 @@ export default function EventRegistrationsSection({
     const sortedFields = [...fields].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     const withinEventDays = isWithinEventDays(eventDate, eventEndDate);
     const walkInsEnabled = allowWalkIns && withinEventDays;
+    const directCheckInEnabled = allowDirectCheckIn && withinEventDays;
     const canEditCustomFieldValues = withinEventDays;
     const eventDurationLabel = formatEventDuration(eventDate, eventEndDate ?? eventDate);
     const multiDayEvent = isMultiDayEvent(eventDate, eventEndDate);
@@ -167,6 +171,15 @@ export default function EventRegistrationsSection({
         void loadRegistrations();
         onCheckIn?.();
     };
+
+    const checkInFlow = useCheckInFlow({
+        eventId,
+        onCheckIn: handleCheckInSuccess,
+        tiers,
+        sessions,
+        tierFieldRequired,
+        sessionFieldRequired,
+    });
 
     const handlePublishToggle = async (nextPublished: boolean) => {
         if (!onPublishedChange || publishing) return;
@@ -559,6 +572,11 @@ export default function EventRegistrationsSection({
                                                 editable={canEditCustomFieldValues}
                                                 className="event-registrations-name-cell"
                                                 onUpdated={handleRegistrationUpdated}
+                                                onCheckIn={directCheckInEnabled
+                                                    ? () => void checkInFlow.processConfirmationCode(registration.confirmationCode, 'table')
+                                                    : undefined}
+                                                checkInDisabled={registration.status === 'CANCELLED' || checkInFlow.loading}
+                                                checkInTitle="Check in attendee"
                                             />
                                             <EditableRegistrationContactCell
                                                 eventId={eventId}
@@ -679,13 +697,9 @@ export default function EventRegistrationsSection({
                 </div>
                 <aside className="event-registrations-checkin-column">
                     <EventCheckInPanel
-                        eventId={eventId}
-                        onCheckIn={handleCheckInSuccess}
-                        suspended={fieldModalOpen || importModalOpen || isAddingAttendee || walkInAttendanceOpen}
+                        checkInFlow={checkInFlow}
+                        suspended={fieldModalOpen || importModalOpen || isAddingAttendee || walkInAttendanceOpen || checkInFlow.showCombinedModal}
                         tiers={tiers}
-                        sessions={sessions}
-                        tierFieldRequired={tierFieldRequired}
-                        sessionFieldRequired={sessionFieldRequired}
                     />
                 </aside>
             </div>

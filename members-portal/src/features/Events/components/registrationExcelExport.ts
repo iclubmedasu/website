@@ -1,4 +1,3 @@
-import { fmtDate } from '@/components/cards/LifecycleCardView/LifecycleCardView';
 import type { EventCustomFieldRef, EventRegistrationRef, EventSessionRef } from '@/types/backend-contracts';
 import {
     formatCustomFieldValue,
@@ -26,6 +25,18 @@ interface SheetCellStyleOptions {
     fillPattern?: string;
 }
 
+interface AttendanceLogRow {
+    name: string;
+    email: string;
+    code: string;
+    type: string;
+    detail: string;
+    mode: string;
+    timestamp: string;
+    sortName: string;
+    sortTime: number;
+}
+
 function downloadBlob(blob: Blob, filename: string) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -46,6 +57,25 @@ function hexToArgb(hex: string): string {
     const normalized = hex.replace('#', '');
     if (normalized.length === 6) return `FF${normalized.toUpperCase()}`;
     return normalized.toUpperCase();
+}
+
+function fmtDateTime(value: string | Date | null | undefined): string {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+function formatAttendanceMode(mode: string | null | undefined): string {
+    if (mode === 'ONLINE') return 'Online';
+    if (mode === 'ONSITE') return 'Onsite';
+    return mode || '';
 }
 
 function applySheetCellStyle(cell: Record<string, unknown>, {
@@ -139,14 +169,17 @@ function formatAttendanceExport(
     const chips: string[] = [];
 
     registration.attendanceDays?.forEach((day) => {
-        chips.push(`Onsite · ${formatAttendanceDayLabel(day.eventDay)}`);
+        const timeLabel = fmtDateTime(day.checkedInAt);
+        const dayLabel = formatAttendanceDayLabel(day.eventDay);
+        chips.push(timeLabel ? `Onsite · ${dayLabel} · ${timeLabel}` : `Onsite · ${dayLabel}`);
     });
 
     registration.sessionAttendances?.forEach((attendance) => {
         const sessionDate = sessionDateById.get(String(attendance.sessionId));
         const dayLabel = sessionDate ? formatAttendanceDayLabel(sessionDate) : 'Session';
         const modeLabel = attendance.mode === 'ONLINE' ? 'Online' : 'Onsite';
-        chips.push(`${modeLabel} · ${dayLabel}`);
+        const timeLabel = fmtDateTime(attendance.joinedAt);
+        chips.push(timeLabel ? `${modeLabel} · ${dayLabel} · ${timeLabel}` : `${modeLabel} · ${dayLabel}`);
     });
 
     return chips.join(', ');
@@ -170,21 +203,125 @@ function formatSessionAttendanceExport(
     registration: EventRegistrationRef,
     session: EventSessionRef,
 ): string {
-    const attended = (registration.sessionAttendances ?? []).some(
-        (attendance) => String(attendance.sessionId) === String(session.id),
+    const attendance = (registration.sessionAttendances ?? []).find(
+        (entry) => String(entry.sessionId) === String(session.id),
     );
-    return attended ? 'Attended' : 'Missed';
+    if (!attendance) return 'Missed';
+    return fmtDateTime(attendance.joinedAt) || 'Attended';
+}
+
+function buildSessionLabelById(sessions: EventSessionRef[]): Map<string, string> {
+    return new Map(
+        sessions.map((session) => [String(session.id), formatSessionDisplayLabel(session)]),
+    );
+}
+
+function pushAttendanceLogRow(
+    rows: AttendanceLogRow[],
+    registration: EventRegistrationRef,
+    type: string,
+    detail: string,
+    mode: string,
+    timestamp: string | Date | null | undefined,
+) {
+    if (!timestamp) return;
+    const parsed = new Date(timestamp);
+    if (Number.isNaN(parsed.getTime())) return;
+
+    rows.push({
+        name: registration.fullName,
+        email: registration.email,
+        code: registration.confirmationCode,
+        type,
+        detail,
+        mode,
+        timestamp: fmtDateTime(timestamp),
+        sortName: registration.fullName.toLowerCase(),
+        sortTime: parsed.getTime(),
+    });
+}
+
+function buildAttendanceLogMatrix(
+    registrations: EventRegistrationRef[],
+    sessionLabelById: Map<string, string>,
+): string[][] {
+    const headers = ['Name', 'Email', 'Code', 'Type', 'Detail', 'Mode', 'Timestamp'];
+    const rows: AttendanceLogRow[] = [];
+
+    registrations.forEach((registration) => {
+        (registration.attendanceDays ?? []).forEach((day) => {
+            pushAttendanceLogRow(
+                rows,
+                registration,
+                'Day check-in',
+                formatAttendanceDayLabel(day.eventDay),
+                'Onsite',
+                day.checkedInAt,
+            );
+        });
+
+        (registration.sessionAttendances ?? []).forEach((attendance) => {
+            const detail = sessionLabelById.get(String(attendance.sessionId)) || 'Session';
+            pushAttendanceLogRow(
+                rows,
+                registration,
+                'Session attendance',
+                detail,
+                formatAttendanceMode(attendance.mode),
+                attendance.joinedAt,
+            );
+        });
+    });
+
+    rows.sort((a, b) => {
+        const nameCompare = a.sortName.localeCompare(b.sortName);
+        if (nameCompare !== 0) return nameCompare;
+        return a.sortTime - b.sortTime;
+    });
+
+    return [
+        headers,
+        ...rows.map((row) => [
+            row.name,
+            row.email,
+            row.code,
+            row.type,
+            row.detail,
+            row.mode,
+            row.timestamp,
+        ]),
+    ];
+}
+
+function buildSessionAttendanceMatrix(
+    registrations: EventRegistrationRef[],
+    sessions: EventSessionRef[],
+): string[][] {
+    const sortedActiveSessions = getSortedActiveSessions(sessions);
+    const headers = [
+        'Name',
+        'Email',
+        'Code',
+        ...sortedActiveSessions.map(formatSessionColumnHeader),
+    ];
+
+    const rows = registrations.map((registration) => [
+        registration.fullName,
+        registration.email,
+        registration.confirmationCode,
+        ...sortedActiveSessions.map((session) => formatSessionAttendanceExport(registration, session)),
+    ]);
+
+    return [headers, ...rows];
 }
 
 function buildRegistrationMatrix(
     registrations: EventRegistrationRef[],
     fields: EventCustomFieldRef[],
-    sessions: EventSessionRef[],
     multiDayEvent: boolean,
     sessionDateById: Map<string, string>,
 ): string[][] {
     const sortedFields = [...fields].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    const sortedActiveSessions = getSortedActiveSessions(sessions);
     const headers = [
         'Name',
         'Email',
@@ -194,9 +331,9 @@ function buildRegistrationMatrix(
         'Tier',
         'Code',
         ...(multiDayEvent ? ['Attendance'] : []),
-        ...sortedActiveSessions.map(formatSessionColumnHeader),
         'Status',
         'Source',
+        'Cancelled',
         'Registered',
     ];
 
@@ -218,12 +355,11 @@ function buildRegistrationMatrix(
             row.push(formatAttendanceExport(registration, sessionDateById));
         }
 
-        row.push(...sortedActiveSessions.map((session) => formatSessionAttendanceExport(registration, session)));
-
         row.push(
             formatRegistrationStatus(registration),
             formatRegistrationSource(registration),
-            fmtDate(registration.createdAt) || '',
+            fmtDateTime(registration.cancelledAt),
+            fmtDateTime(registration.createdAt),
         );
 
         return row;
@@ -247,7 +383,7 @@ function computeColumnWidths(matrix: string[][]): Array<{ wch: number }> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function styleRegistrationSheet(XLSX: any, matrix: string[][]) {
+function styleSheet(XLSX: any, matrix: string[][]) {
     const sheet = XLSX.utils.aoa_to_sheet(matrix);
     const cellBorder = {
         top: { style: 'thin', color: { rgb: hexToArgb(BORDER_COLOR) } },
@@ -292,6 +428,24 @@ function styleRegistrationSheet(XLSX: any, matrix: string[][]) {
     return sheet;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function applyFrozenTopRowToAllSheets(workbookZip: any) {
+    const sheetPaths = Object.keys(workbookZip.files ?? {})
+        .filter((path) => /^xl\/worksheets\/sheet\d+\.xml$/.test(path));
+
+    await Promise.all(sheetPaths.map(async (sheetPath: string) => {
+        const sheetFile = workbookZip.file(sheetPath);
+        if (!sheetFile) return;
+        let sheetXml = await sheetFile.async('string');
+        sheetXml = withFrozenPaneInWorksheetXml(sheetXml, {
+            xSplit: 0,
+            ySplit: 1,
+            topLeftCell: 'A2',
+        });
+        workbookZip.file(sheetPath, sheetXml);
+    }));
+}
+
 export async function exportEventRegistrationsExcel({
     registrations,
     fields,
@@ -304,10 +458,22 @@ export async function exportEventRegistrationsExcel({
     const sessionDateById = new Map(
         sessions.map((session) => [String(session.id), session.sessionDate.slice(0, 10)]),
     );
-    const matrix = buildRegistrationMatrix(registrations, fields, sessions, multiDayEvent, sessionDateById);
-    const sheet = styleRegistrationSheet(XLSX, matrix);
+    const sessionLabelById = buildSessionLabelById(sessions);
+    const registrationMatrix = buildRegistrationMatrix(
+        registrations,
+        fields,
+        multiDayEvent,
+        sessionDateById,
+    );
+    const sessionAttendanceMatrix = buildSessionAttendanceMatrix(registrations, sessions);
+    const attendanceLogMatrix = buildAttendanceLogMatrix(registrations, sessionLabelById);
+    const registrationSheet = styleSheet(XLSX, registrationMatrix);
+    const sessionAttendanceSheet = styleSheet(XLSX, sessionAttendanceMatrix);
+    const attendanceLogSheet = styleSheet(XLSX, attendanceLogMatrix);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, sheet, 'Registrations');
+    XLSX.utils.book_append_sheet(workbook, registrationSheet, 'Registrations');
+    XLSX.utils.book_append_sheet(workbook, sessionAttendanceSheet, 'Session Attendance');
+    XLSX.utils.book_append_sheet(workbook, attendanceLogSheet, 'Attendance Log');
 
     const workbookBytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array', cellStyles: true }) as ArrayBuffer;
 
@@ -315,17 +481,7 @@ export async function exportEventRegistrationsExcel({
     const JSZip = jszipModule.default;
     const workbookZip = await JSZip.loadAsync(workbookBytes);
 
-    const sheetPath = 'xl/worksheets/sheet1.xml';
-    const sheetFile = workbookZip.file(sheetPath);
-    if (sheetFile) {
-        let sheetXml = await sheetFile.async('string');
-        sheetXml = withFrozenPaneInWorksheetXml(sheetXml, {
-            xSplit: 0,
-            ySplit: 1,
-            topLeftCell: 'A2',
-        });
-        workbookZip.file(sheetPath, sheetXml);
-    }
+    await applyFrozenTopRowToAllSheets(workbookZip);
 
     const workbookBlob = await workbookZip.generateAsync({ type: 'blob' });
     downloadBlob(workbookBlob, `${sanitizeFileName(fileName)}-registrations.xlsx`);

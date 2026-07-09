@@ -10,8 +10,9 @@ import type {
 import { compareSessionsBySchedule } from '../eventUtils';
 import { isCustomFieldValueEmpty, mergeCustomFieldValues } from './customFieldUtils';
 import { parseScannedPayload } from './checkInScanUtils';
+import { playCheckInDetectBeep, playCheckInSuccessBeep } from './checkInSounds';
 
-export type CheckInSource = 'camera' | 'scanner' | 'manual';
+export type CheckInSource = 'camera' | 'scanner' | 'manual' | 'table';
 
 export type CheckInResultState = { type: 'success' | 'error'; message: string } | null;
 
@@ -21,6 +22,7 @@ const SOURCE_LABEL: Record<CheckInSource, string> = {
     camera: 'camera',
     scanner: 'scanner',
     manual: 'manual entry',
+    table: 'table',
 };
 
 interface UseCheckInFlowOptions {
@@ -115,13 +117,14 @@ export function useCheckInFlow({
             type: 'success',
             message: `Checked in ${checkedIn.fullName} (${checkedIn.confirmationCode}) via ${via}${dayNote}`,
         });
+        playCheckInSuccessBeep();
         setManualCode('');
         resetFlow();
         onCheckIn();
     }, [eventId, onCheckIn, resetFlow]);
 
     const processConfirmationCode = useCallback(async (rawInput: string, source: CheckInSource) => {
-        const parsed = source === 'manual'
+        const parsed = source === 'manual' || source === 'table'
             ? rawInput.trim().toUpperCase()
             : parseScannedPayload(rawInput);
 
@@ -135,6 +138,10 @@ export function useCheckInFlow({
 
         if (shouldDedup(parsed)) {
             return;
+        }
+
+        if (source === 'camera' || source === 'scanner') {
+            playCheckInDetectBeep();
         }
 
         activeCodeRef.current = parsed;
@@ -348,3 +355,5 @@ export function useCheckInFlow({
         handleManualLookup,
     };
 }
+
+export type UseCheckInFlowReturn = ReturnType<typeof useCheckInFlow>;

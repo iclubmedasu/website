@@ -11,7 +11,7 @@ export function PastEventsPreview({ events }: PastEventsPreviewProps) {
         <Section variant="plain">
             <SectionHeading
                 title="Past Events"
-                description="Events the club has already run and disclosed publicly."
+                description="Events the club has already run and disclosed publicly — scroll sideways to see more."
                 action={{ label: "View all events", href: "/events" }}
             />
             <EventsList events={events} variant="past" />

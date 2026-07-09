@@ -352,6 +352,7 @@ model Event {
   registrationDeadline DateTime?
   capacity            Int?
   allowWalkIns        Boolean   @default(false)
+  allowDirectCheckIn  Boolean   @default(false)
   isCertifiable       Boolean   @default(false)
   status              String    @default("DRAFT") // DRAFT, PUBLISHED, COMPLETED, CANCELLED
   priority            String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT

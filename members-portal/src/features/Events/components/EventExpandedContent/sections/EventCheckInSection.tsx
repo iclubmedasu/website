@@ -1,10 +1,10 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { YesNoField } from '@/components/YesNoField/YesNoField';
 import type {
     EventCustomFieldRef,
     EventSessionRef,
     EventTierRef,
-    Id,
 } from '@/types/backend-contracts';
 import EventStaffModal from '@/features/Events/components/EventStaffModal';
 import {
@@ -12,18 +12,15 @@ import {
     getCustomFieldValueFromRecord,
 } from '../customFieldUtils';
 import EventQrScanner from '../EventQrScanner';
-import { useCheckInFlow } from '../useCheckInFlow';
+import { unlockCheckInAudio } from '../checkInSounds';
+import type { UseCheckInFlowReturn } from '../useCheckInFlow';
 import { useHardwareScannerCapture } from '../useHardwareScannerCapture';
 import SessionAttendanceOptions from './SessionAttendanceOptions';
 
 interface EventCheckInPanelProps {
-    eventId: Id | string;
-    onCheckIn: () => void;
+    checkInFlow: UseCheckInFlowReturn;
     suspended?: boolean;
     tiers?: EventTierRef[];
-    sessions?: EventSessionRef[];
-    tierFieldRequired?: boolean;
-    sessionFieldRequired?: boolean;
 }
 
 function getSessionTitle(session: EventSessionRef): string {
@@ -31,15 +28,12 @@ function getSessionTitle(session: EventSessionRef): string {
 }
 
 export default function EventCheckInPanel({
-    eventId,
-    onCheckIn,
+    checkInFlow,
     suspended = false,
     tiers = [],
-    sessions = [],
-    tierFieldRequired = false,
-    sessionFieldRequired = false,
 }: EventCheckInPanelProps) {
     const manualInputRef = useRef<HTMLInputElement>(null);
+    const [isMaximized, setIsMaximized] = useState(false);
 
     const {
         manualCode,
@@ -68,14 +62,7 @@ export default function EventCheckInPanel({
         updatePendingField,
         handleManualLookup,
         pendingCustomValues,
-    } = useCheckInFlow({
-        eventId,
-        onCheckIn,
-        tiers,
-        sessions,
-        tierFieldRequired,
-        sessionFieldRequired,
-    });
+    } = checkInFlow;
 
     const handleScannerCode = useCallback((raw: string) => {
         void processConfirmationCode(raw, 'scanner');
@@ -97,6 +84,35 @@ export default function EventCheckInPanel({
         manualInputRef,
         onScan: handleScannerCode,
     });
+
+    useEffect(() => {
+        if (!isMaximized) return undefined;
+
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setIsMaximized(false);
+            }
+        };
+        window.addEventListener('keydown', handleEscape);
+
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            window.removeEventListener('keydown', handleEscape);
+        };
+    }, [isMaximized]);
+
+    const toggleMaximize = useCallback(() => {
+        unlockCheckInAudio();
+        setIsMaximized((prev) => !prev);
+    }, []);
+
+    const handlePanelClick = useCallback((event: MouseEvent<HTMLElement>) => {
+        unlockCheckInAudio();
+        panelClickHandler(event);
+    }, [panelClickHandler]);
 
     const renderMissingFieldInput = (field: EventCustomFieldRef) => {
         const fieldKey = String(field.id);
@@ -168,9 +184,24 @@ export default function EventCheckInPanel({
         <>
             <input ref={captureInputRef} {...captureInputProps} />
             <div
-                className="event-registrations-checkin-panel"
-                onClick={panelClickHandler}
+                className={`event-registrations-checkin-panel${isMaximized ? ' event-registrations-checkin-panel--maximized' : ''}`}
+                onClick={handlePanelClick}
             >
+                <div className="event-checkin-toolbar event-checkin-toolbar--mobile-only">
+                    <h3 className="event-checkin-toolbar__title">Check-in</h3>
+                    <button
+                        type="button"
+                        className="btn btn-secondary event-checkin-toolbar__btn"
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            toggleMaximize();
+                        }}
+                        title={isMaximized ? 'Minimize check-in' : 'Maximize check-in'}
+                    >
+                        {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                        <span>{isMaximized ? 'Minimize' : 'Maximize'}</span>
+                    </button>
+                </div>
                 <div className="event-registrations-checkin-scan">
                     <h3 className="expanded-section-title expanded-section-title--sm">Scan</h3>
                     <EventQrScanner
