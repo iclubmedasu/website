@@ -112,14 +112,7 @@ jobs:
           api = HfApi(token=os.environ["HF_TOKEN"])
           repo_id = os.environ["HF_SPACE"]
 
-          # Ensure the Space exists (no-op if it already does)
-          api.create_repo(
-              repo_id=repo_id,
-              repo_type="space",
-              space_sdk="docker",
-              exist_ok=True,
-          )
-
+          # Spaces are created manually on HF (Docker Spaces require PRO to create via API).
           api.upload_folder(
               folder_path=".",
               repo_id=repo_id,
@@ -141,6 +134,22 @@ jobs:
           )
           print("Upload complete")
           EOF
+
+      - name: Verify backend health endpoint
+        run: |
+          echo "Waiting for Hugging Face Space to rebuild..."
+          sleep 90
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS "https://iclubmedasu-backend.hf.space/health"; then
+              echo ""
+              echo "Backend health check passed"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 30s..."
+            sleep 30
+          done
+          echo "Backend health check failed after deploy — check HF Space logs"
+          exit 1
 
   # ─────────────────────────────────────────────────────────────
   # JOB 3 — Deploy frontend to Hugging Face Space
@@ -200,13 +209,6 @@ jobs:
 
           api = HfApi(token=os.environ["HF_TOKEN"])
           repo_id = os.environ["HF_FRONTEND_SPACE"]
-
-          api.create_repo(
-              repo_id=repo_id,
-              repo_type="space",
-              space_sdk="docker",
-              exist_ok=True,
-          )
 
           api.upload_folder(
               folder_path=".",
@@ -288,13 +290,6 @@ jobs:
 
           api = HfApi(token=os.environ["HF_TOKEN"])
           repo_id = os.environ["HF_PUBLIC_SPACE"]
-
-          api.create_repo(
-              repo_id=repo_id,
-              repo_type="space",
-              space_sdk="docker",
-              exist_ok=True,
-          )
 
           api.upload_folder(
               folder_path=".",

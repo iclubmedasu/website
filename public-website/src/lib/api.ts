@@ -43,6 +43,14 @@ export function resolveApiBaseUrl(): string {
         return configuredApiUrl;
     }
 
+    if (process.env.NODE_ENV === "production") {
+        console.error(
+            "NEXT_PUBLIC_API_URL is not set. Public pages will fail to load data. "
+            + "Set it in the Hugging Face Space → Settings → Variables "
+            + "(e.g. https://iclubmedasu-backend.hf.space/api) and rebuild the Space.",
+        );
+    }
+
     if (typeof window !== "undefined") {
         return `${window.location.protocol}//${window.location.hostname}:3000/api`;
     }

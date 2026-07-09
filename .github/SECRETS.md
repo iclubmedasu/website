@@ -22,4 +22,5 @@ Add the following secrets:
 - GITHUB_TOKEN is automatically provided by GitHub Actions — you do not need to add it
 - Only set up deployment secrets when you are ready to deploy
 - The CI pipeline (lint, typecheck, build) works without any secrets
+- Docker Spaces must exist on HF before first deploy (create manually in HF UI). CI uploads only — it does not call `create_repo` (avoids HF 402 without PRO).
 - Set `NEXT_PUBLIC_API_URL` in each **frontend HF Space Variables** (members portal and public website — not GitHub secrets) — it is inlined at Docker build time

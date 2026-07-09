@@ -23,6 +23,19 @@ This project is deployed using GitHub Actions, with the following services:
 5. **Public Website**: Deployed as a Hugging Face Space (Docker container):
 	- [Live site](https://iclubmedasu-public-website.hf.space)
 
+### Hugging Face Spaces — CI upload only (no `create_repo`)
+
+Docker Spaces must be **created once manually** on Hugging Face (Settings → New Space → Docker SDK). The deploy workflow only **uploads** files via `huggingface_hub`; it does **not** call `create_repo`.
+
+**Why:** Hugging Face returns `402 Payment Required` when creating Docker Spaces via API without a [PRO subscription](https://huggingface.co/pro). Static Spaces are free; Docker/Gradio Spaces on `cpu-basic` require PRO to create through the API. Uploading to an **existing** Space does not require PRO.
+
+**First-time setup:**
+
+1. Create three Docker Spaces on HF: `backend`, `members-portal`, `public-website` (under your org e.g. `iclubmedasu/`).
+2. Set GitHub secrets `HF_SPACE`, `HF_FRONTEND_SPACE`, `HF_PUBLIC_SPACE` to those paths.
+3. Push to `main` — CI uploads code and HF rebuilds each Space.
+
+**If deploy fails with 402:** Your Spaces already exist; ensure the workflow does not call `create_repo` (upload-only). If you need a **new** Docker Space, create it in the HF web UI or subscribe to PRO.
 
 ## Environment Variables
 
@@ -157,6 +170,21 @@ Verify these return HTTP 200 with real PNG bytes (Content-Length well over 1 KB,
 - `https://iclubmedasu-public-website.hf.space/images/iclub_full_colored_transparent_outlined_logo.png`
 - `https://iclubmedasu-public-website.hf.space/images/ihub_full_colored_transparent_logo_outlined.png`
 
+## Troubleshooting
+
+### Public website logs show `503` on `/public/*` fetches
+
+The public website SSR calls the backend API at `NEXT_PUBLIC_API_URL`. A **503 from `*.hf.space`** means the **backend Space is unavailable**, not a frontend bug.
+
+1. Open [backend health](https://iclubmedasu-backend.hf.space/health) — expect HTTP 200 and `"status":"ok"`.
+2. Open [public events API](https://iclubmedasu-backend.hf.space/api/public/events?limit=5&upcoming=false) — expect a JSON array.
+3. If health returns 503: open the [backend Space](https://huggingface.co/spaces/iclubmedasu/backend) → **Logs** — check for missing `DATABASE_URL`, Prisma errors, or crash on startup.
+4. Wake a sleeping Space by visiting `/health`; confirm [UptimeRobot](https://dashboard.uptimerobot.com/monitors/802817894) pings `/health` regularly.
+5. On the **public-website** Space → Settings → **Variables**, set `NEXT_PUBLIC_API_URL` = `https://iclubmedasu-backend.hf.space/api` (must be **Variables**, not Secrets — it is baked in at Docker build time). **Rebuild** the Space after changing it.
+6. After backend is healthy, redeploy so the public site picks up the latest build.
+
+If `NEXT_PUBLIC_API_URL` is missing at build time, server-side fetches fall back to `localhost:3000` and pages render empty; production logs will show a clear error about the missing variable.
+
 ## Local Docker Testing
 
 You can still use Docker Compose for local development:
@@ -194,4 +222,6 @@ docker build -f public-website/Dockerfile \
 - [ ] Members portal loads ([check here](https://iclubmedasu-members-portal.hf.space))
 - [ ] Public website loads ([check here](https://iclubmedasu-public-website.hf.space))
 - [ ] Backend `PUBLIC_WEBSITE_URL` set to `https://iclubmedasu-public-website.hf.space` on the backend HF Space
+- [ ] Public website `NEXT_PUBLIC_API_URL` = `https://iclubmedasu-backend.hf.space/api` in HF Space **Variables** (rebuild after change)
+- [ ] Public API smoke test: `https://iclubmedasu-backend.hf.space/api/public/events?limit=5&upcoming=false` returns JSON
 - [ ] Login works (cookie set, API calls succeed, no CORS errors)
