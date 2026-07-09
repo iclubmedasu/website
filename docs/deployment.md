@@ -160,7 +160,7 @@ If users still see favicon errors after deploy, unregister the old service worke
 4. Next.js runs in `standalone` output mode on port 7860 (required by HF Spaces). Production builds use `next build --webpack` (Turbopack rejects some PNG assets on HF).
 5. Space config is in [`public-website/README.hf.md`](../public-website/README.hf.md) (copied to `README.md` during deploy).
 6. Set backend `PUBLIC_WEBSITE_URL` = `https://iclubmedasu-public-website.hf.space` in the backend HF Space so ticket confirmation emails link to the live site.
-7. Binary assets (PNG, etc.) are stored via Xet — see root [`.gitattributes`](../.gitattributes) (`filter=xet`). CI uses `huggingface_hub[hf_xet]` when uploading to Spaces. HF may store uploaded PNGs as pointer stubs; the public-website Dockerfile runs [`materialize-public-images.mjs`](../public-website/scripts/materialize-public-images.mjs) during the Space build to fetch real PNG bytes from GitHub (`raw.githubusercontent.com`) when local files are not valid images. CI writes `public-website/SOURCE_GIT_REF` with the deploy commit SHA before upload.
+7. Binary assets (PNG, etc.) are stored via Xet — see root [`.gitattributes`](../.gitattributes) (`filter=xet`). CI uses `huggingface_hub[hf_xet]` when uploading to Spaces. HF may store uploaded PNGs as pointer stubs; CI runs [`materialize-public-images.mjs`](../public-website/scripts/materialize-public-images.mjs) **before upload** (using `GITHUB_TOKEN` + retries) so real PNG bytes are in the Space. The Dockerfile runs the same script as a safety net during the Space build.
 
 ### Post-deploy static asset check (Public Website)
 
@@ -171,6 +171,14 @@ Verify these return HTTP 200 with real PNG bytes (Content-Length well over 1 KB,
 - `https://iclubmedasu-public-website.hf.space/images/ihub_full_colored_transparent_logo_outlined.png`
 
 ## Troubleshooting
+
+### Public website Docker build fails with `HTTP 429` on `raw.githubusercontent.com`
+
+HF may receive Xet pointer stubs instead of real PNG bytes. The materialize script fetches real images from GitHub; **429** means GitHub rate-limited the request.
+
+1. **Redeploy via GitHub Actions** — CI now materializes images before upload (authenticated `GITHUB_TOKEN`) so the Space should already contain real PNGs.
+2. If the Space build still retries fetches, wait a few minutes and **Rebuild** the Space (the script backs off on 429).
+3. Confirm post-deploy asset URLs return real PNG sizes (see [Post-deploy static asset check](#post-deploy-static-asset-check-public-website)).
 
 ### Public website shows empty pages or old `503` errors in logs
 

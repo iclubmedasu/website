@@ -253,6 +253,12 @@ jobs:
           cp public-website/README.hf.md README.md
           echo "${GITHUB_SHA}" > public-website/SOURCE_GIT_REF
 
+      - name: Materialize public website images
+        env:
+          SOURCE_GIT_REF: ${{ github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node public-website/scripts/materialize-public-images.mjs
+
       - name: Clean workspace before upload
         run: |
           # Backend and members-portal are not needed by the public website HF Space
