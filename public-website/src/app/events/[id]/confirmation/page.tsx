@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ConfirmationFromCache } from "@/components/registration/ConfirmationFromCache";
-import { RegistrationConfirmation } from "@/components/registration/RegistrationConfirmation";
+import { ConfirmationPageContent } from "@/components/public-data/ConfirmationPageContent";
 import { BackLink } from "@/components/navigation/BackLink";
 import { PageContainer } from "@/components/ui";
-import { publicAPI } from "@/lib/api";
 
 interface ConfirmationPageProps {
     params: Promise<{ id: string }>;
@@ -33,15 +32,5 @@ export default async function ConfirmationPage({ params, searchParams }: Confirm
         );
     }
 
-    const confirmation = await publicAPI.getRegistrationConfirmation(eventId, code);
-    if (!confirmation) {
-        notFound();
-    }
-
-    return (
-        <PageContainer className="max-w-3xl py-10 sm:py-14">
-            <BackLink href={`/events/${eventId}`} label="Back to event" />
-            <RegistrationConfirmation confirmation={confirmation} />
-        </PageContainer>
-    );
+    return <ConfirmationPageContent eventId={eventId} code={code.trim()} />;
 }

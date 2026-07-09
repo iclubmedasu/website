@@ -24,8 +24,9 @@ function isLoopbackHost(hostname: string): boolean {
     return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
 }
 
-export function resolveApiBaseUrl(): string {
-    const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL;
+/** Resolve API base URL at call time (browser-safe; trims HF variable whitespace). */
+export function getApiBaseUrl(): string {
+    const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
 
     if (configuredApiUrl) {
         if (typeof window !== "undefined") {
@@ -43,14 +44,6 @@ export function resolveApiBaseUrl(): string {
         return configuredApiUrl;
     }
 
-    if (process.env.NODE_ENV === "production") {
-        console.error(
-            "NEXT_PUBLIC_API_URL is not set. Public pages will fail to load data. "
-            + "Set it in the Hugging Face Space → Settings → Variables "
-            + "(e.g. https://iclubmedasu-backend.hf.space/api) and rebuild the Space.",
-        );
-    }
-
     if (typeof window !== "undefined") {
         return `${window.location.protocol}//${window.location.hostname}:3000/api`;
     }
@@ -58,58 +51,12 @@ export function resolveApiBaseUrl(): string {
     return "http://localhost:3000/api";
 }
 
-const API_BASE_URL = resolveApiBaseUrl();
-
-if (process.env.NODE_ENV === "production") {
-    console.info(`[public-website] API_BASE_URL=${API_BASE_URL}`);
-}
-
-export type PublicFetchStatus = "ok" | "not_found" | "unavailable";
-
-export type PublicFetchResult<T> =
-    | { status: "ok"; data: T }
-    | { status: "not_found" }
-    | { status: "unavailable" };
-
-const RETRY_DELAYS_MS = [2000, 4000];
-
-function sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => {
-        setTimeout(resolve, ms);
-    });
-}
-
-async function fetchWithRetry(
-    url: string,
-    init?: RequestInit & { next?: { revalidate?: number } },
-): Promise<Response> {
-    let lastError: unknown;
-    const attempts = RETRY_DELAYS_MS.length + 1;
-
-    for (let attempt = 0; attempt < attempts; attempt += 1) {
-        try {
-            const response = await fetch(url, init);
-            if (response.status === 503 && attempt < attempts - 1) {
-                await sleep(RETRY_DELAYS_MS[attempt]);
-                continue;
-            }
-            return response;
-        } catch (error) {
-            lastError = error;
-            if (attempt < attempts - 1) {
-                await sleep(RETRY_DELAYS_MS[attempt]);
-                continue;
-            }
-            throw error;
-        }
-    }
-
-    throw lastError instanceof Error ? lastError : new Error("Fetch failed after retries");
-}
+/** @deprecated Use getApiBaseUrl — kept for existing imports */
+export const resolveApiBaseUrl = getApiBaseUrl;
 
 export function getPublicProfilePhotoUrl(memberId: number | string | null | undefined): string | null {
     if (!memberId) return null;
-    return `${API_BASE_URL}/members/${memberId}/profile-photo`;
+    return `${getApiBaseUrl()}/members/${memberId}/profile-photo`;
 }
 
 export class ApiRequestError extends Error {
@@ -134,11 +81,16 @@ async function handleResponse<T>(response: Response): Promise<T> {
     return (await response.json()) as T;
 }
 
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+    return fetch(`${getApiBaseUrl()}${path}`, {
+        cache: "no-store",
+        ...init,
+    });
+}
+
 async function fetchPublic<T>(path: string, fallback: T): Promise<T> {
     try {
-        const response = await fetchWithRetry(`${API_BASE_URL}${path}`, {
-            next: { revalidate: 60 },
-        });
+        const response = await apiFetch(path);
         return await handleResponse<T>(response);
     } catch (error) {
         console.error(`Failed to fetch ${path}:`, error);
@@ -147,30 +99,15 @@ async function fetchPublic<T>(path: string, fallback: T): Promise<T> {
 }
 
 async function fetchPublicOrThrow<T>(path: string): Promise<T | null> {
-    const result = await fetchPublicDetail<T>(path);
-    if (result.status === "ok") {
-        return result.data;
-    }
-    return null;
-}
-
-async function fetchPublicDetail<T>(path: string): Promise<PublicFetchResult<T>> {
     try {
-        const response = await fetchWithRetry(`${API_BASE_URL}${path}`, {
-            next: { revalidate: 60 },
-        });
+        const response = await apiFetch(path);
         if (response.status === 404) {
-            return { status: "not_found" };
+            return null;
         }
-        if (response.status === 503) {
-            console.error(`Failed to fetch ${path}: backend unavailable (503 after retries)`);
-            return { status: "unavailable" };
-        }
-        const data = await handleResponse<T>(response);
-        return { status: "ok", data };
+        return await handleResponse<T>(response);
     } catch (error) {
         console.error(`Failed to fetch ${path}:`, error);
-        return { status: "unavailable" };
+        return null;
     }
 }
 
@@ -219,12 +156,7 @@ export const publicAPI = {
     },
 
     async getEvent(id: number): Promise<PublicEventDetail | null> {
-        const result = await this.getEventWithStatus(id);
-        return result.status === "ok" ? result.data : null;
-    },
-
-    async getEventWithStatus(id: number): Promise<PublicFetchResult<PublicEventDetail>> {
-        return fetchPublicDetail<PublicEventDetail>(`/public/events/${id}`);
+        return fetchPublicOrThrow<PublicEventDetail>(`/public/events/${id}`);
     },
 
     async getEventTiers(id: number): Promise<PublicEventTier[]> {
@@ -312,7 +244,7 @@ export const publicAPI = {
     },
 
     async submitIncidentReport(payload: SubmitIncidentReportPayload): Promise<{ id: number }> {
-        const response = await fetch(`${API_BASE_URL}/public/support/incident-reports`, {
+        const response = await apiFetch("/public/support/incident-reports", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
@@ -321,7 +253,7 @@ export const publicAPI = {
     },
 
     async sendContact(payload: PublicContactRequest): Promise<PublicContactResponse> {
-        const response = await fetch(`${API_BASE_URL}/public/contact`, {
+        const response = await apiFetch("/public/contact", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
@@ -333,12 +265,11 @@ export const publicAPI = {
         eventId: number,
         payload: CreateEventRegistrationPayload,
     ): Promise<{ confirmationCode: string }> {
-        const response = await fetch(`${API_BASE_URL}/events/${eventId}/registrations`, {
+        const response = await apiFetch(`/events/${eventId}/registrations`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
         });
-        const data = await handleResponse<{ confirmationCode: string }>(response);
-        return data;
+        return handleResponse<{ confirmationCode: string }>(response);
     },
 };

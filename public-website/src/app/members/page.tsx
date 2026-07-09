@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { BackLink } from "@/components/navigation/BackLink";
-import { LeadershipPyramid } from "@/components/members/LeadershipPyramid";
-import { MembersBrowse } from "@/components/members/MembersBrowse";
-import { PageHeader, Section, SectionHeading } from "@/components/ui";
-import { publicAPI } from "@/lib/api";
+import { MembersPageContent } from "@/components/public-data/MembersPageContent";
+import { PageHeader, Section } from "@/components/ui";
 import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -11,9 +9,7 @@ export const metadata: Metadata = {
     description: `Meet the leadership and members of ${siteConfig.name}.`,
 };
 
-export default async function MembersPage() {
-    const directory = await publicAPI.getMembersDirectory();
-
+export default function MembersPage() {
     return (
         <>
             <Section variant="subtle" tight>
@@ -24,22 +20,7 @@ export default async function MembersPage() {
                     description={`The people behind ${siteConfig.shortName} — from club leadership to every contributing member.`}
                 />
             </Section>
-
-            <Section variant="plain">
-                <SectionHeading
-                    title="Leadership"
-                    description="Club officer, executive board, and team leads. Click a member to view their profile and role history."
-                />
-                <LeadershipPyramid directory={directory} />
-            </Section>
-
-            <Section variant="subtle">
-                <SectionHeading
-                    title="All members"
-                    description="Browse by team or explore the full roster — ten members per page."
-                />
-                <MembersBrowse members={directory.members} filterTeams={directory.filterTeams} />
-            </Section>
+            <MembersPageContent />
         </>
     );
 }

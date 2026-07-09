@@ -172,20 +172,17 @@ Verify these return HTTP 200 with real PNG bytes (Content-Length well over 1 KB,
 
 ## Troubleshooting
 
-### Public website logs show `503` on `/public/*` fetches
+### Public website shows empty pages or old `503` errors in logs
 
-The public website SSR calls the backend API at `NEXT_PUBLIC_API_URL`. A **503 from `*.hf.space`** means the **backend Space is unavailable**, not a frontend bug.
+The public website loads data in the **browser** (same pattern as the members portal), not during Next.js server-side render. Server-to-server calls between Hugging Face Spaces often return **503** even when the same API URL works from a user's browser.
 
 1. Open [backend health](https://iclubmedasu-backend.hf.space/health) — expect HTTP 200 and `"status":"ok"`.
-2. Open [public events API](https://iclubmedasu-backend.hf.space/api/public/events?limit=5&upcoming=false) — expect a JSON array.
+2. Open [public events API](https://iclubmedasu-backend.hf.space/api/public/events?limit=5&upcoming=false) in your browser — expect a JSON array.
 3. If health returns 503: open the [backend Space](https://huggingface.co/spaces/iclubmedasu/backend) → **Logs** — check for missing `DATABASE_URL`, Prisma errors, or crash on startup.
 4. Wake a sleeping Space by visiting `/health`; confirm [UptimeRobot](https://dashboard.uptimerobot.com/monitors/802817894) pings `/health` regularly.
-5. On the **public-website** Space → Settings → **Variables**, set `NEXT_PUBLIC_API_URL` = `https://iclubmedasu-backend.hf.space/api` (must be **Variables**, not Secrets — it is baked in at Docker build time). **Rebuild** the Space after changing it.
-6. After backend is healthy, redeploy so the public site picks up the latest build.
+5. On the **public-website** Space → Settings → **Variables**, set `NEXT_PUBLIC_API_URL` to exactly `https://iclubmedasu-backend.hf.space/api` with **no leading or trailing spaces** (must be **Variables**, not Secrets — it is baked in at Docker build time). **Rebuild** the Space after changing it.
 
-If `NEXT_PUBLIC_API_URL` is missing at build time, server-side fetches fall back to `localhost:3000` and pages render empty; production logs will show a clear error about the missing variable.
-
-The public website now **retries** API calls on 503 (cold-start) and shows “Service temporarily unavailable” on event detail pages instead of a false 404 when the backend is down.
+If `NEXT_PUBLIC_API_URL` is missing at build time, browser fetches fall back to `localhost:3000` on the client and pages stay empty on the live site.
 
 ### Copy link from members portal shows `localhost:3002`
 
@@ -195,7 +192,7 @@ Optional override for local dev: `NEXT_PUBLIC_PUBLIC_WEBSITE_URL` in members-por
 
 ### Event URL returns 404 on the live public site
 
-If the event is published and the [public API](https://iclubmedasu-backend.hf.space/api/public/events/1) returns data, but the page shows 404, the public website likely could not reach the API (503) during server-side render. Check backend `/health` and refresh after the backend is warm.
+If the event is published and the [public API](https://iclubmedasu-backend.hf.space/api/public/events/1) returns data in your browser, but the page shows “Event not found”, check that `NEXT_PUBLIC_API_URL` is set correctly on the public-website Space (no spaces) and rebuild. Open the browser network tab — `/api/public/events/1` should return 200 from the user's browser.
 
 ## Local Docker Testing
 

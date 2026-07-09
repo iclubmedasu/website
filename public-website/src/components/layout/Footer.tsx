@@ -1,13 +1,10 @@
-import { Mail } from "lucide-react";
 import { BrandLogos } from "@/components/layout/BrandLogos";
-import { SocialLinks } from "@/components/layout/SocialLinks";
-import { publicAPI } from "@/lib/api";
+import { FooterContactClient } from "@/components/public-data/FooterContactClient";
 import { fallbackContactPage } from "@/lib/siteContentFallback";
 import { siteConfig } from "@/lib/site";
 
-export async function Footer() {
-    const contactPage = await publicAPI.getContactPage();
-    const contact = contactPage ?? fallbackContactPage;
+export function Footer() {
+    const contact = fallbackContactPage;
     const emailMethod = contact.methods.find((method) => method.type === "EMAIL") ?? contact.methods[0];
     const contactEmail = emailMethod?.value ?? siteConfig.contactEmail;
 
@@ -17,13 +14,10 @@ export async function Footer() {
                 <div className="site-footer-contact-block">
                     <p className="site-footer-heading">Contact</p>
                     <p className="site-footer-tagline">{siteConfig.tagline}</p>
-                    <div className="site-footer-contact">
-                        <a href={`mailto:${contactEmail}`} className="site-footer-link inline-flex items-center gap-2">
-                            <Mail className="h-4 w-4 shrink-0" />
-                            {contactEmail}
-                        </a>
-                        <SocialLinks links={contact.socialLinks} />
-                    </div>
+                    <FooterContactClient
+                        fallbackEmail={contactEmail}
+                        fallbackLinks={contact.socialLinks}
+                    />
                 </div>
             </div>
 
