@@ -150,6 +150,27 @@ export default function EditableRegistrationSessionCell({
         void persistSelection(next);
     };
 
+    const selectableSessionIds = activeSessions
+        .filter((session) => !session.isFull || localSessionIds.includes(String(session.id)))
+        .map((session) => String(session.id));
+    const allSelected = selectableSessionIds.length > 0
+        && selectableSessionIds.every((sessionId) => localSessionIds.includes(sessionId));
+
+    const toggleSelectAll = () => {
+        if (allSelected) {
+            void persistSelection([]);
+            return;
+        }
+        const next = new Set(localSessionIds);
+        for (const session of activeSessions) {
+            const sessionId = String(session.id);
+            if (!session.isFull || localSessionIds.includes(sessionId)) {
+                next.add(sessionId);
+            }
+        }
+        void persistSelection([...next]);
+    };
+
     const closedLabel = getClosedLabel(localSessionIds, activeSessions);
     const cellClass = [
         error ? 'event-registrations-cell--error' : '',
@@ -177,18 +198,31 @@ export default function EditableRegistrationSessionCell({
                 </button>
                 {open && activeSessions.length > 0 ? (
                     <div className="event-registration-sessions-cell__menu" role="listbox" aria-multiselectable="true">
+                        <label className="event-registration-sessions-cell__option event-registration-sessions-cell__option--select-all">
+                            <input
+                                type="checkbox"
+                                checked={allSelected}
+                                disabled={saving}
+                                onChange={toggleSelectAll}
+                            />
+                            <span>Select all</span>
+                        </label>
                         {activeSessions.map((session) => {
                             const sessionId = String(session.id);
                             const checked = localSessionIds.includes(sessionId);
+                            const fullAndUnselected = Boolean(session.isFull) && !checked;
                             return (
                                 <label key={sessionId} className="event-registration-sessions-cell__option">
                                     <input
                                         type="checkbox"
                                         checked={checked}
-                                        disabled={saving}
+                                        disabled={saving || fullAndUnselected}
                                         onChange={() => toggleSession(sessionId)}
                                     />
-                                    <span>{getSessionTitle(session)}</span>
+                                    <span>
+                                        {getSessionTitle(session)}
+                                        {fullAndUnselected ? ' (Full)' : ''}
+                                    </span>
                                 </label>
                             );
                         })}

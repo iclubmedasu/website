@@ -3,6 +3,8 @@ import { CalendarDays, Tag } from "lucide-react";
 import Link from "next/link";
 import { ClientFormattedDate } from "@/components/datetime/ClientDateTime";
 import { Badge } from "@/components/ui";
+import { ProjectShareMenu } from "./ProjectShareMenu";
+import { publicProjectPath } from "@/lib/publicSlug";
 
 interface ProjectCardProps {
     project: PublicProjectSummary;
@@ -11,14 +13,6 @@ interface ProjectCardProps {
 function ProjectCardContent({ project }: ProjectCardProps) {
     return (
         <>
-            <div className="flex items-start justify-between gap-3">
-                <h3 className="project-card-title">{project.title}</h3>
-                {project.projectType?.name ? (
-                    <Badge variant="purple" className="shrink-0">
-                        {project.projectType.name}
-                    </Badge>
-                ) : null}
-            </div>
             {project.description ? (
                 <p className="project-card-description">{project.description}</p>
             ) : (
@@ -43,9 +37,26 @@ function ProjectCardContent({ project }: ProjectCardProps) {
 }
 
 export function ProjectCard({ project }: ProjectCardProps) {
+    const href = publicProjectPath(project.slug);
+
     return (
-        <Link href={`/projects/${project.id}`} className="project-card">
-            <ProjectCardContent project={project} />
-        </Link>
+        <article className="project-card">
+            <div className="event-card-header">
+                <Link href={href} className="event-card-title-link">
+                    <h3 className="project-card-title">{project.title}</h3>
+                </Link>
+                <div className="event-card-header-type">
+                    {project.projectType?.name ? (
+                        <Badge variant="purple" className="shrink-0">
+                            {project.projectType.name}
+                        </Badge>
+                    ) : null}
+                </div>
+                <ProjectShareMenu projectSlug={project.slug} projectTitle={project.title} />
+            </div>
+            <Link href={href} className="event-card-body">
+                <ProjectCardContent project={project} />
+            </Link>
+        </article>
     );
 }

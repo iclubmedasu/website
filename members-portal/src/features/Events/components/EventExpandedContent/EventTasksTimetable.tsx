@@ -25,6 +25,8 @@ import {
     type DaySection,
     type TimetableBar,
 } from '@/features/Events/components/eventTaskTimetableModel';
+import type { EventTasksSelection } from '@/features/Events/components/eventTaskClipboard';
+import { getLocalDateKey } from '@/features/Events/components/eventTaskClipboard';
 import EventTaskBarPreview from './EventTaskBarPreview';
 import BarMemberNames from './BarMemberNames';
 import './EventTasksTimetable.css';
@@ -51,9 +53,12 @@ interface BarPreviewState {
 interface EventTasksTimetableProps {
     days: Date[];
     tasks: EventTaskRef[];
+    selection: EventTasksSelection;
+    onSelectionChange: (selection: EventTasksSelection) => void;
     onAddTask: (day: Date) => void;
     onEditTask: (task: EventTaskRef) => void;
     onRemoveAssignment: (target: RemoveAssignmentTarget) => void;
+    onDeleteTask: (task: EventTaskRef) => void;
     canManage: boolean;
 }
 
@@ -64,9 +69,13 @@ interface DayBlockProps {
     visibleHourCount: number;
     dayTrackWidth: number;
     minuteWidth: number;
+    selectedTaskId: number | null;
+    selectedDayKey: string | null;
+    onSelectDay: (day: Date) => void;
     onAddTask: (day: Date) => void;
     onEditTask: (task: EventTaskRef) => void;
     onRemoveAssignment: (target: RemoveAssignmentTarget) => void;
+    onDeleteTask: (task: EventTaskRef) => void;
     onBarMouseEnter: (bar: TimetableBar, event: MouseEvent<HTMLDivElement>) => void;
     onBarMouseLeave: (bar: TimetableBar) => void;
     onBarClick: (bar: TimetableBar, event: MouseEvent<HTMLDivElement>) => void;
@@ -81,9 +90,13 @@ function DayBlock({
     visibleHourCount,
     dayTrackWidth,
     minuteWidth,
+    selectedTaskId,
+    selectedDayKey,
+    onSelectDay,
     onAddTask,
     onEditTask,
     onRemoveAssignment,
+    onDeleteTask,
     onBarMouseEnter,
     onBarMouseLeave,
     onBarClick,
@@ -92,9 +105,10 @@ function DayBlock({
 }: DayBlockProps) {
     const tableWidth = DATE_COL_WIDTH + LOCATION_COL_WIDTH + dayTrackWidth;
     const dateRowSpan = section.rows.length + 1;
+    const isDaySelected = selectedDayKey === section.key;
 
     return (
-        <div className="ett-day-block">
+        <div className={`ett-day-block${isDaySelected ? ' ett-day-block--selected' : ''}`}>
             <div className="ett-day-scroll">
                 <table className="ett-table" style={{ minWidth: `${tableWidth}px` }}>
                     <thead>
@@ -115,14 +129,28 @@ function DayBlock({
                         {section.rows.map((row, index) => (
                             <tr key={`${section.key}-${row.location}-${index}`} className={row.isPlaceholder ? 'ett-row--empty' : undefined}>
                                 {index === 0 && (
-                                    <td className="ett-date-cell ett-sticky-left" rowSpan={dateRowSpan}>
+                                    <td
+                                        className={`ett-date-cell ett-sticky-left${isDaySelected ? ' ett-date-cell--selected' : ''}`}
+                                        rowSpan={dateRowSpan}
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            onSelectDay(section.date);
+                                        }}
+                                    >
                                         <span className="ett-cell-label">{section.label}</span>
                                     </td>
                                 )}
                                 <td className="ett-location-cell ett-sticky-left-2" title={row.location}>
                                     <span className="ett-cell-label">{row.location}</span>
                                 </td>
-                                <td colSpan={visibleHourCount} className="ett-day-track-cell">
+                                <td
+                                    colSpan={visibleHourCount}
+                                    className="ett-day-track-cell"
+                                    onClick={(event) => {
+                                        if ((event.target as HTMLElement).closest('.ett-bar')) return;
+                                        onSelectDay(section.date);
+                                    }}
+                                >
                                     <div
                                         className="ett-day-track"
                                         style={{ minHeight: `${row.laneCount * LANE_HEIGHT + 10}px` }}
@@ -136,12 +164,18 @@ function DayBlock({
                                             const isMerged = bar.members.length > 1;
                                             const hasLeader = bar.members.some((member) => member.isLeader);
                                             const singleMember = bar.members.length === 1 ? bar.members[0] : null;
+                                            const isSelected = selectedTaskId === bar.taskId;
 
                                             return (
                                                 <div
                                                     key={bar.key}
                                                     ref={setBarRef(bar.key)}
-                                                    className={`ett-bar${hasLeader ? ' ett-bar--leader' : ''}${isMerged ? ' ett-bar--merged' : ''}`}
+                                                    className={[
+                                                        'ett-bar',
+                                                        hasLeader ? 'ett-bar--leader' : '',
+                                                        isMerged ? 'ett-bar--merged' : '',
+                                                        isSelected ? 'ett-bar--selected' : '',
+                                                    ].filter(Boolean).join(' ')}
                                                     style={{
                                                         left: `${geometry.left}px`,
                                                         width: `${geometry.width}px`,
@@ -168,7 +202,19 @@ function DayBlock({
                                                             >
                                                                 <Pencil size={11} />
                                                             </button>
-                                                            {!isMerged && singleMember && (
+                                                            {isMerged ? (
+                                                                <button
+                                                                    type="button"
+                                                                    className="ett-bar-action"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        onDeleteTask(task);
+                                                                    }}
+                                                                    aria-label={`Delete task ${bar.title}`}
+                                                                >
+                                                                    <Trash2 size={11} />
+                                                                </button>
+                                                            ) : singleMember ? (
                                                                 <button
                                                                     type="button"
                                                                     className="ett-bar-action"
@@ -185,7 +231,7 @@ function DayBlock({
                                                                 >
                                                                     <Trash2 size={11} />
                                                                 </button>
-                                                            )}
+                                                            ) : null}
                                                         </div>
                                                     )}
                                                 </div>
@@ -219,9 +265,12 @@ function DayBlock({
 export default function EventTasksTimetable({
     days,
     tasks,
+    selection,
+    onSelectionChange,
     onAddTask,
     onEditTask,
     onRemoveAssignment,
+    onDeleteTask,
     canManage,
 }: EventTasksTimetableProps) {
     const minuteWidth = getDefaultMinuteWidth();
@@ -262,6 +311,8 @@ export default function EventTasksTimetable({
 
     const previewBar = preview ? barsByKey.get(preview.barKey) ?? null : null;
     const previewTask = previewBar ? tasksById.get(previewBar.taskId) ?? null : null;
+    const selectedTaskId = selection?.type === 'task' ? selection.taskId : null;
+    const selectedDayKey = selection?.type === 'day' ? selection.dateKey : null;
 
     const setBarRef = useCallback((barKey: string) => (node: HTMLDivElement | null) => {
         if (node) {
@@ -315,21 +366,34 @@ export default function EventTasksTimetable({
         });
     }, [clearPreviewHoverTimer]);
 
+    const handleSelectDay = useCallback((day: Date) => {
+        onSelectionChange({ type: 'day', dateKey: getLocalDateKey(day), day });
+    }, [onSelectionChange]);
+
     const handleBarClick = useCallback((bar: TimetableBar, event: MouseEvent<HTMLDivElement>) => {
         event.stopPropagation();
         clearPreviewHoverTimer();
+        const task = tasksById.get(bar.taskId);
+        if (task) {
+            onSelectionChange({ type: 'task', taskId: bar.taskId, task });
+        }
         const element = event.currentTarget;
         const position = getBarPreviewPosition(element.getBoundingClientRect());
         setPreview((current) => {
             if (current?.barKey === bar.key && current.pinned) return null;
             return { barKey: bar.key, pinned: true, position };
         });
-    }, [clearPreviewHoverTimer]);
+    }, [clearPreviewHoverTimer, onSelectionChange, tasksById]);
 
     const handleRemoveAssignment = useCallback((target: RemoveAssignmentTarget) => {
         setPreview(null);
         onRemoveAssignment(target);
     }, [onRemoveAssignment]);
+
+    const handleDeleteTask = useCallback((task: EventTaskRef) => {
+        setPreview(null);
+        onDeleteTask(task);
+    }, [onDeleteTask]);
 
     useEffect(() => {
         if (!preview?.barKey) return undefined;
@@ -349,6 +413,8 @@ export default function EventTasksTimetable({
             if (!(target instanceof Element)) return;
             if (previewPopoverRef.current?.contains(target)) return;
             if (target.closest('.ett-bar')) return;
+            if (target.closest('.ett-date-cell')) return;
+            if (target.closest('.event-tasks-toolbar')) return;
             setPreview(null);
         };
 
@@ -389,9 +455,13 @@ export default function EventTasksTimetable({
                             visibleHourCount={visibleHourCount}
                             dayTrackWidth={dayTrackWidth}
                             minuteWidth={minuteWidth}
+                            selectedTaskId={selectedTaskId}
+                            selectedDayKey={selectedDayKey}
+                            onSelectDay={handleSelectDay}
                             onAddTask={onAddTask}
                             onEditTask={onEditTask}
                             onRemoveAssignment={handleRemoveAssignment}
+                            onDeleteTask={handleDeleteTask}
                             onBarMouseEnter={handleBarMouseEnter}
                             onBarMouseLeave={handleBarMouseLeave}
                             onBarClick={handleBarClick}

@@ -116,14 +116,20 @@ function SessionSelectionsPicker({
                         <div className="event-registration-sessions-cell__menu" role="listbox" aria-multiselectable="true">
                             {activeSessions.map((session) => {
                                 const sessionId = String(session.id);
+                                const checked = draft.sessionIds.includes(sessionId);
+                                const fullAndUnselected = Boolean(session.isFull) && !checked;
                                 return (
                                     <label key={sessionId} className="event-registration-sessions-cell__option">
                                         <input
                                             type="checkbox"
-                                            checked={draft.sessionIds.includes(sessionId)}
+                                            checked={checked}
+                                            disabled={fullAndUnselected}
                                             onChange={() => toggleSession(sessionId)}
                                         />
-                                        <span>{getSessionTitle(session)}</span>
+                                        <span>
+                                            {getSessionTitle(session)}
+                                            {fullAndUnselected ? ' (Full)' : ''}
+                                        </span>
                                     </label>
                                 );
                             })}
@@ -160,14 +166,20 @@ function SessionSelectionsPicker({
                     <div className="event-registration-sessions-cell__menu" role="listbox" aria-multiselectable="true">
                         {activeSessions.map((session) => {
                             const sessionId = String(session.id);
+                            const checked = draft.sessionIds.includes(sessionId);
+                            const fullAndUnselected = Boolean(session.isFull) && !checked;
                             return (
                                 <label key={sessionId} className="event-registration-sessions-cell__option">
                                     <input
                                         type="checkbox"
-                                        checked={draft.sessionIds.includes(sessionId)}
+                                        checked={checked}
+                                        disabled={fullAndUnselected}
                                         onChange={() => toggleSession(sessionId)}
                                     />
-                                    <span>{getSessionTitle(session)}</span>
+                                    <span>
+                                        {getSessionTitle(session)}
+                                        {fullAndUnselected ? ' (Full)' : ''}
+                                    </span>
                                 </label>
                             );
                         })}

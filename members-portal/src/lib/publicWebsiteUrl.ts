@@ -118,7 +118,12 @@ export async function resolvePublicWebsiteOrigin(): Promise<string> {
     return resolvePromise;
 }
 
-export async function buildPublicEventUrl(eventId: number | string): Promise<string> {
+export async function buildPublicEventUrl(eventSlugOrId: number | string): Promise<string> {
     const origin = await resolvePublicWebsiteOrigin();
-    return `${origin}/events/${eventId}`;
+    return `${origin}/events/${eventSlugOrId}`;
+}
+
+export async function buildPublicProjectUrl(projectSlugOrId: number | string): Promise<string> {
+    const origin = await resolvePublicWebsiteOrigin();
+    return `${origin}/projects/${projectSlugOrId}`;
 }

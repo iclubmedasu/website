@@ -14,6 +14,7 @@ import type {
     PublicMemberProfile,
     PublicProjectSummary,
     PublicProjectDetail,
+    PublicEventJoinResponse,
     PublicRegistrationConfirmation,
     PublicSocialLink,
     PublicSupportPage,
@@ -155,24 +156,24 @@ export const publicAPI = {
         return fetchPublic<PublicEventListItem[]>(`/public/events${query}`, []);
     },
 
-    async getEvent(id: number): Promise<PublicEventDetail | null> {
-        return fetchPublicOrThrow<PublicEventDetail>(`/public/events/${id}`);
+    async getEvent(idOrSlug: number | string): Promise<PublicEventDetail | null> {
+        return fetchPublicOrThrow<PublicEventDetail>(`/public/events/${idOrSlug}`);
     },
 
-    async getEventTiers(id: number): Promise<PublicEventTier[]> {
-        return fetchPublic<PublicEventTier[]>(`/public/events/${id}/tiers`, []);
+    async getEventTiers(idOrSlug: number | string): Promise<PublicEventTier[]> {
+        return fetchPublic<PublicEventTier[]>(`/public/events/${idOrSlug}/tiers`, []);
     },
 
-    async getEventCustomFields(id: number): Promise<PublicEventCustomField[]> {
-        return fetchPublic<PublicEventCustomField[]>(`/public/events/${id}/custom-fields`, []);
+    async getEventCustomFields(idOrSlug: number | string): Promise<PublicEventCustomField[]> {
+        return fetchPublic<PublicEventCustomField[]>(`/public/events/${idOrSlug}/custom-fields`, []);
     },
 
-    async getEventSessions(id: number): Promise<PublicEventSession[]> {
-        return fetchPublic<PublicEventSession[]>(`/public/events/${id}/sessions`, []);
+    async getEventSessions(idOrSlug: number | string): Promise<PublicEventSession[]> {
+        return fetchPublic<PublicEventSession[]>(`/public/events/${idOrSlug}/sessions`, []);
     },
 
-    async getEventRegistrationForm(id: number): Promise<PublicEventRegistrationFormConfig> {
-        const result = await fetchPublicOrThrow<PublicEventRegistrationFormConfig>(`/public/events/${id}/registration-form`);
+    async getEventRegistrationForm(idOrSlug: number | string): Promise<PublicEventRegistrationFormConfig> {
+        const result = await fetchPublicOrThrow<PublicEventRegistrationFormConfig>(`/public/events/${idOrSlug}/registration-form`);
         return result ?? {
             tierFieldShowOnPublic: true,
             tierFieldRequired: true,
@@ -182,11 +183,34 @@ export const publicAPI = {
     },
 
     async getRegistrationConfirmation(
-        eventId: number,
+        eventIdOrSlug: number | string,
         code: string,
     ): Promise<PublicRegistrationConfirmation | null> {
         const query = buildQuery({ code });
-        return fetchPublicOrThrow<PublicRegistrationConfirmation>(`/public/events/${eventId}/confirmation${query}`);
+        return fetchPublicOrThrow<PublicRegistrationConfirmation>(`/public/events/${eventIdOrSlug}/confirmation${query}`);
+    },
+
+    async joinEventSession(eventIdOrSlug: number | string, token: string): Promise<PublicEventJoinResponse> {
+        try {
+            const query = buildQuery({ token });
+            const response = await apiFetch(`/events/${eventIdOrSlug}/join${query}`, {
+                headers: { Accept: "application/json" },
+            });
+            const body = (await response.json().catch(() => null)) as PublicEventJoinResponse | null;
+            if (body && typeof body.status === "string") {
+                return body;
+            }
+            return {
+                status: "error",
+                message: "Something went wrong while opening this session. Please try again.",
+            };
+        } catch (error) {
+            console.error(`Failed to join event ${eventIdOrSlug}:`, error);
+            return {
+                status: "error",
+                message: "Something went wrong while opening this session. Please try again.",
+            };
+        }
     },
 
     async getPublishedProjects(options?: { limit?: number }): Promise<PublicProjectSummary[]> {
@@ -199,8 +223,8 @@ export const publicAPI = {
         return fetchPublic<PublicProjectSummary[]>(`/public/projects${query}`, []);
     },
 
-    async getProject(id: number): Promise<PublicProjectDetail | null> {
-        return fetchPublicOrThrow<PublicProjectDetail>(`/public/projects/${id}`);
+    async getProject(idOrSlug: number | string): Promise<PublicProjectDetail | null> {
+        return fetchPublicOrThrow<PublicProjectDetail>(`/public/projects/${idOrSlug}`);
     },
 
     async getMembersDirectory(): Promise<PublicMemberDirectory> {
@@ -262,10 +286,10 @@ export const publicAPI = {
     },
 
     async registerForEvent(
-        eventId: number,
+        eventIdOrSlug: number | string,
         payload: CreateEventRegistrationPayload,
     ): Promise<{ confirmationCode: string }> {
-        const response = await apiFetch(`/events/${eventId}/registrations`, {
+        const response = await apiFetch(`/events/${eventIdOrSlug}/registrations`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),

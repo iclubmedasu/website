@@ -5,7 +5,7 @@ import { Link2 } from 'lucide-react';
 import { buildPublicEventUrl } from '@/lib/publicWebsiteUrl';
 
 interface CopyPublicEventLinkButtonProps {
-    eventId: number | string;
+    eventSlug: string;
     isPublished?: boolean;
 }
 
@@ -36,7 +36,7 @@ async function copyTextToClipboard(text: string): Promise<boolean> {
 }
 
 export default function CopyPublicEventLinkButton({
-    eventId,
+    eventSlug,
     isPublished = false,
 }: CopyPublicEventLinkButtonProps) {
     const [copied, setCopied] = useState(false);
@@ -53,7 +53,7 @@ export default function CopyPublicEventLinkButton({
     const handleCopy = useCallback(async () => {
         if (!isPublished) return;
 
-        const url = await buildPublicEventUrl(eventId);
+        const url = await buildPublicEventUrl(eventSlug);
         const ok = await copyTextToClipboard(url);
         if (!ok) {
             window.alert('Failed to copy link.');
@@ -65,7 +65,7 @@ export default function CopyPublicEventLinkButton({
             clearTimeout(resetTimerRef.current);
         }
         resetTimerRef.current = setTimeout(() => setCopied(false), 2000);
-    }, [eventId, isPublished]);
+    }, [eventSlug, isPublished]);
 
     const disabledTitle = 'Publish the event for the public link to work';
 

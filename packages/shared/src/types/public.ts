@@ -7,6 +7,7 @@ export interface PublicEventTypeRef {
 
 export interface PublicEventSummary {
     id: Id;
+    slug: string;
     title: string;
     description?: string | null;
     eventDate: ISODateTime;
@@ -58,6 +59,10 @@ export interface PublicEventSession {
     startTime?: string | null;
     endTime?: string | null;
     mode: string;
+    maxCapacity?: number | null;
+    registeredCount?: number;
+    spotsRemaining?: number | null;
+    isFull?: boolean;
 }
 
 export interface PublicEventRegistrationFormConfig {
@@ -77,6 +82,8 @@ export interface PublicConfirmationSession {
     endTime?: string | null;
     mode: string;
     joinUrl?: string | null;
+    maxCapacity?: number | null;
+    section?: 'waitingForYou' | 'dontMissOut';
 }
 
 export interface PublicRegistrationConfirmation {
@@ -85,6 +92,7 @@ export interface PublicRegistrationConfirmation {
     email: string;
     event: {
         id: Id;
+        slug: string;
         title: string;
         eventDate: ISODateTime;
         eventEndDate: ISODateTime;
@@ -92,6 +100,28 @@ export interface PublicRegistrationConfirmation {
     };
     tier: { name: string } | null;
     sessions: PublicConfirmationSession[];
+    waitingForYou?: PublicConfirmationSession[];
+    dontMissOut?: PublicConfirmationSession[];
+}
+
+export type PublicEventJoinStatus =
+    | "ready"
+    | "not_started"
+    | "ended"
+    | "invalid_link"
+    | "cancelled"
+    | "not_online"
+    | "error";
+
+export interface PublicEventJoinResponse {
+    status: PublicEventJoinStatus;
+    redirectUrl?: string;
+    startsAt?: ISODateTime;
+    endsAt?: ISODateTime;
+    eventId?: Id;
+    eventTitle?: string | null;
+    sessionLabel?: string | null;
+    message?: string;
 }
 
 export interface PublicProjectTag {
@@ -105,6 +135,7 @@ export interface PublicProjectTypeRef {
 
 export interface PublicProjectSummary {
     id: Id;
+    slug: string;
     title: string;
     description?: string | null;
     completedDate?: ISODateTime | null;

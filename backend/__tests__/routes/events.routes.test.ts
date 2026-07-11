@@ -31,7 +31,8 @@ const prismaMocks = vi.hoisted(() => ({
 }))
 
 const eventCodeMocks = vi.hoisted(() => ({
-    generateUniqueConfirmationCode: vi.fn()
+    generateUniqueConfirmationCode: vi.fn(),
+    generateUniqueEventSlug: vi.fn(),
 }))
 
 const activityMocks = vi.hoisted(() => ({
@@ -141,6 +142,7 @@ describe('events routes auth wiring', () => {
             eventDate: new Date('2026-06-10T10:00:00.000Z')
         })
         eventCodeMocks.generateUniqueConfirmationCode.mockResolvedValue('CONFIRM-12345')
+        eventCodeMocks.generateUniqueEventSlug.mockResolvedValue('abcdefghjkmn')
     })
 
     afterEach(() => {

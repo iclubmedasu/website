@@ -6,15 +6,16 @@ import { RegistrationConfirmation } from "@/components/registration/Registration
 import { BackLink } from "@/components/navigation/BackLink";
 import { PageContainer } from "@/components/ui";
 import { publicAPI } from "@/lib/api";
+import { publicEventPath } from "@/lib/publicSlug";
 import { DataLoadingState } from "./DataLoadingState";
 
 type LoadState = "loading" | "not_found" | "ready";
 
 export function ConfirmationPageContent({
-    eventId,
+    idOrSlug,
     code,
 }: {
-    eventId: number;
+    idOrSlug: string;
     code: string;
 }) {
     const [state, setState] = useState<LoadState>("loading");
@@ -22,7 +23,7 @@ export function ConfirmationPageContent({
 
     useEffect(() => {
         void publicAPI
-            .getRegistrationConfirmation(eventId, code)
+            .getRegistrationConfirmation(idOrSlug, code)
             .then((data) => {
                 if (!data) {
                     setState("not_found");
@@ -32,12 +33,14 @@ export function ConfirmationPageContent({
                 setState("ready");
             })
             .catch(() => setState("not_found"));
-    }, [eventId, code]);
+    }, [idOrSlug, code]);
+
+    const backHref = confirmation ? publicEventPath(confirmation.event.slug) : publicEventPath(idOrSlug);
 
     if (state === "loading") {
         return (
             <PageContainer className="max-w-3xl py-10 sm:py-14">
-                <BackLink href={`/events/${eventId}`} label="Back to event" />
+                <BackLink href={publicEventPath(idOrSlug)} label="Back to event" />
                 <DataLoadingState />
             </PageContainer>
         );
@@ -46,7 +49,7 @@ export function ConfirmationPageContent({
     if (state === "not_found" || !confirmation) {
         return (
             <PageContainer className="max-w-3xl py-10 sm:py-14">
-                <BackLink href={`/events/${eventId}`} label="Back to event" />
+                <BackLink href={publicEventPath(idOrSlug)} label="Back to event" />
                 <div className="empty-state max-w-lg">
                     <h1 className="empty-state-title">Confirmation not found</h1>
                     <p className="empty-state-text">
@@ -59,7 +62,7 @@ export function ConfirmationPageContent({
 
     return (
         <PageContainer className="max-w-3xl py-10 sm:py-14">
-            <BackLink href={`/events/${eventId}`} label="Back to event" />
+            <BackLink href={backHref} label="Back to event" />
             <RegistrationConfirmation confirmation={confirmation} />
         </PageContainer>
     );

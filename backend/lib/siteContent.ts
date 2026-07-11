@@ -12,6 +12,7 @@ import type {
 } from "@iclub/shared";
 import type { AboutSection, AboutSponsor, SitePage } from "@prisma/client";
 import { prisma } from "../db";
+import { ensureAboutPageExists, ensureContactPageExists } from "./siteContentSeed";
 
 type AboutSectionWithSponsors = AboutSection & { sponsors: AboutSponsor[] };
 
@@ -95,7 +96,10 @@ export async function getAboutPageData(): Promise<PublicAboutPage | null> {
     };
 }
 
+/** CMS-only loader: auto-creates About page defaults when missing. */
 export async function getEditorAboutPageData(): Promise<EditorAboutPage | null> {
+    await ensureAboutPageExists();
+
     const page = await prisma.sitePage.findUnique({ where: { id: "about" } });
     if (!page) return null;
 
@@ -113,6 +117,11 @@ export async function getEditorAboutPageData(): Promise<EditorAboutPage | null> 
 export async function getContactPageData(
     options: { includeInactive?: boolean } = {},
 ): Promise<PublicContactPage | EditorContactPage | null> {
+    // CMS editors pass includeInactive: true — ensure defaults so portal never 404s.
+    if (options.includeInactive) {
+        await ensureContactPageExists();
+    }
+
     const page = await prisma.sitePage.findUnique({ where: { id: "contact" } });
     if (!page) return null;
 

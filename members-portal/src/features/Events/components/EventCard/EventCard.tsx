@@ -253,6 +253,7 @@ export default function EventCard({
                     <div className="exp-card-section exp-card-section--flush">
                         <EventExpandedContent
                             eventId={fullDetail.id}
+                            eventSlug={fullDetail.slug}
                             eventTitle={fullDetail.title}
                             initialTab={initialTab}
                             allowWalkIns={fullDetail.allowWalkIns ?? false}

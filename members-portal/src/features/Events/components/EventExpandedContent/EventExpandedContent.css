@@ -817,11 +817,19 @@
 }
 
 .event-expanded-content .event-expanded-session-form-grid {
-    grid-template-columns: minmax(8rem, 1.15fr) minmax(6rem, 0.72fr) minmax(8.5rem, 1fr) minmax(4.5rem, 0.55fr) minmax(8rem, 1fr) minmax(6.5rem, 1fr);
+    /* title | start | end | type | link | capacity | actions */
+    grid-template-columns:
+        minmax(220px, 1fr)
+        repeat(3, minmax(7.25rem, 9rem))
+        minmax(10rem, 1fr)
+        minmax(7rem, 9rem)
+        minmax(220px, 1fr);
     align-items: center;
 }
 
-.event-expanded-content .event-expanded-session-form-grid .btn {
+.event-expanded-content .event-expanded-session-form-grid > .form-input,
+.event-expanded-content .event-expanded-session-form-grid > .event-session-mode-select {
+    min-width: 0;
     width: 100%;
 }
 
@@ -1692,6 +1700,13 @@
 
 .event-registration-sessions-cell__option:hover {
     background: var(--gray-50);
+}
+
+.event-registration-sessions-cell__option--select-all {
+    font-weight: 600;
+    border-bottom: 1px solid var(--gray-100);
+    margin-bottom: 0.15rem;
+    padding-bottom: 0.45rem;
 }
 
 .event-registration-sessions-cell__option input {

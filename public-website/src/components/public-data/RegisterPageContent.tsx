@@ -7,17 +7,18 @@ import { RegisterPageGuard } from "@/components/registration/RegisterPageGuard";
 import { BackLink } from "@/components/navigation/BackLink";
 import { PageContainer } from "@/components/ui";
 import { publicAPI } from "@/lib/api";
+import { publicEventPath } from "@/lib/publicSlug";
 import { DataLoadingState } from "./DataLoadingState";
 
 type LoadState = "loading" | "not_found" | "ready";
 
-export function RegisterPageContent({ eventId }: { eventId: number }) {
+export function RegisterPageContent({ idOrSlug }: { idOrSlug: string }) {
     const [state, setState] = useState<LoadState>("loading");
     const [event, setEvent] = useState<PublicEventDetail | null>(null);
 
     useEffect(() => {
         void publicAPI
-            .getEvent(eventId)
+            .getEvent(idOrSlug)
             .then((data) => {
                 if (!data) {
                     setState("not_found");
@@ -27,12 +28,12 @@ export function RegisterPageContent({ eventId }: { eventId: number }) {
                 setState("ready");
             })
             .catch(() => setState("not_found"));
-    }, [eventId]);
+    }, [idOrSlug]);
 
     if (state === "loading") {
         return (
             <PageContainer className="max-w-3xl space-y-6 py-10 sm:py-14">
-                <BackLink href={`/events/${eventId}`} label="Back to event" />
+                <BackLink href={publicEventPath(idOrSlug)} label="Back to event" />
                 <DataLoadingState />
             </PageContainer>
         );
@@ -52,14 +53,14 @@ export function RegisterPageContent({ eventId }: { eventId: number }) {
 
     return (
         <PageContainer className="max-w-3xl space-y-6 py-10 sm:py-14">
-            <BackLink href={`/events/${eventId}`} label="Back to event" />
+            <BackLink href={publicEventPath(event.slug)} label="Back to event" />
             {!event.registrationOpen ? (
                 <div className="registration-error-banner">
                     Registration is closed for this event. It may be full or past the registration deadline.
                 </div>
             ) : (
-                <RegisterPageGuard eventId={eventId}>
-                    <RegistrationForm eventId={eventId} eventTitle={event.title} />
+                <RegisterPageGuard eventId={event.id} eventSlug={event.slug}>
+                    <RegistrationForm eventId={event.id} eventSlug={event.slug} eventTitle={event.title} />
                 </RegisterPageGuard>
             )}
         </PageContainer>

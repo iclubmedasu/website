@@ -4,6 +4,8 @@ import { ConfirmationFromCache } from "@/components/registration/ConfirmationFro
 import { ConfirmationPageContent } from "@/components/public-data/ConfirmationPageContent";
 import { BackLink } from "@/components/navigation/BackLink";
 import { PageContainer } from "@/components/ui";
+import { publicAPI } from "@/lib/api";
+import { publicEventPath, redirectNumericParamToSlug } from "@/lib/publicSlug";
 
 interface ConfirmationPageProps {
     params: Promise<{ id: string }>;
@@ -17,20 +19,27 @@ export const metadata: Metadata = {
 export default async function ConfirmationPage({ params, searchParams }: ConfirmationPageProps) {
     const { id } = await params;
     const { code } = await searchParams;
-    const eventId = Number(id);
-
-    if (Number.isNaN(eventId)) {
+    const event = await publicAPI.getEvent(id);
+    if (!event) {
         notFound();
     }
+
+    redirectNumericParamToSlug({
+        param: id,
+        slug: event.slug,
+        basePath: "events",
+        suffix: "/confirmation",
+        searchParams: { code },
+    });
 
     if (!code?.trim()) {
         return (
             <PageContainer className="max-w-3xl py-10 sm:py-14">
-                <BackLink href={`/events/${eventId}`} label="Back to event" />
-                <ConfirmationFromCache eventId={eventId} />
+                <BackLink href={publicEventPath(event.slug)} label="Back to event" />
+                <ConfirmationFromCache eventId={event.id} eventSlug={event.slug} />
             </PageContainer>
         );
     }
 
-    return <ConfirmationPageContent eventId={eventId} code={code.trim()} />;
+    return <ConfirmationPageContent idOrSlug={event.slug} code={code.trim()} />;
 }

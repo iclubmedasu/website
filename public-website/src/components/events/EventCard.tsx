@@ -5,6 +5,7 @@ import { ClientEventDateRange, ClientRegistrationDeadline } from "@/components/d
 import { Badge } from "@/components/ui";
 import { EventShareMenu } from "@/components/events/EventShareMenu";
 import { formatCapacityLabel } from "@/lib/customFieldUtils";
+import { publicEventPath } from "@/lib/publicSlug";
 
 interface EventCardProps {
     event: PublicEventListItem;
@@ -66,24 +67,18 @@ function EventCardBody({
 function EventCardHeader({
     event,
     variant,
-    showShare = false,
 }: {
     event: PublicEventListItem;
     variant: "default" | "past";
-    showShare?: boolean;
 }) {
     const isPast = variant === "past";
-    const eventHref = `/events/${event.id}`;
+    const eventHref = publicEventPath(event.slug);
 
     return (
         <div className="event-card-header">
-            {showShare ? (
-                <Link href={eventHref} className="event-card-title-link">
-                    <h3 className="event-card-title">{event.title}</h3>
-                </Link>
-            ) : (
+            <Link href={eventHref} className="event-card-title-link">
                 <h3 className="event-card-title">{event.title}</h3>
-            )}
+            </Link>
             <div className="event-card-header-type">
                 {event.projectType?.name ? (
                     <Badge variant="purple" className="shrink-0">
@@ -92,32 +87,20 @@ function EventCardHeader({
                 ) : null}
                 {isPast ? <Badge variant="neutral">Completed</Badge> : null}
             </div>
-            {showShare ? (
-                <EventShareMenu eventId={event.id} eventTitle={event.title} />
-            ) : (
-                <span className="event-card-header-spacer" aria-hidden="true" />
-            )}
+            <EventShareMenu eventSlug={event.slug} eventTitle={event.title} />
         </div>
     );
 }
 
 export function EventCard({ event, variant = "default" }: EventCardProps) {
-    const eventHref = `/events/${event.id}`;
-
-    if (variant === "past") {
-        return (
-            <article className="event-card event-card--past">
-                <EventCardHeader event={event} variant="past" />
-                <EventCardBody event={event} variant="past" />
-            </article>
-        );
-    }
+    const eventHref = publicEventPath(event.slug);
+    const cardClass = variant === "past" ? "event-card event-card--past" : "event-card";
 
     return (
-        <article className="event-card">
-            <EventCardHeader event={event} variant="default" showShare />
+        <article className={cardClass}>
+            <EventCardHeader event={event} variant={variant} />
             <Link href={eventHref} className="event-card-body">
-                <EventCardBody event={event} variant="default" />
+                <EventCardBody event={event} variant={variant} />
             </Link>
         </article>
     );

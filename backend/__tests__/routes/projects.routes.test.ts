@@ -89,6 +89,11 @@ vi.mock('../../db', () => ({
 vi.mock('../../middleware/auth', () => authMocks)
 vi.mock('../../services/activityLogService', () => activityMocks)
 vi.mock('../../services/notificationService', () => notificationMocks)
+vi.mock('../../services/eventCode', () => ({
+    generateUniqueProjectSlug: vi.fn().mockResolvedValue('projslug0001'),
+    generateUniqueEventSlug: vi.fn().mockResolvedValue('abcdefghjkmn'),
+    generateUniqueConfirmationCode: vi.fn().mockResolvedValue('ABC123'),
+}))
 
 import projectsRouter from '../../routes/projects'
 

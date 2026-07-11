@@ -96,7 +96,7 @@ model TeamRole {
   roleType       String    @default("Member")
   maxCount       Int?      // Null = unlimited, number = max people allowed
   isActive       Boolean   @default(true)
-  systemRoleKey  Int?      // 1=Head of Team, 2=Vice Head of Team, 3=Member; null=custom (can be deactivated)
+  systemRoleKey  Int?      // 1=Head, 2=Vice, 3=Member; 10=Officer, 11=President, 12=Vice President (Administration only); null=custom (can be deactivated)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   
@@ -296,6 +296,7 @@ model User {
 // ============================================
 model Project {
   id              Int       @id @default(autoincrement())
+  slug            String    @unique
   projectTypeId   Int
   title           String
   description     String?
@@ -341,6 +342,7 @@ model Project {
 // ============================================
 model Event {
   id                  Int       @id @default(autoincrement())
+  slug                String    @unique
   projectId           Int?
   projectTypeId       Int?
   createdByMemberId   Int
@@ -506,6 +508,7 @@ model EventSession {
   endDateTime   DateTime?
   mode          String    @default("ONSITE")
   onlineUrl     String?
+  maxCapacity   Int?
   order         Int       @default(0)
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())

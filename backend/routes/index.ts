@@ -62,13 +62,18 @@ router.use("/administration", authenticateToken, administrationRoutes);
 router.use("/projects", authenticateToken, projectsRoutes);
 router.use("/tasks", authenticateToken, tasksRoutes);
 
-function isPublicEventRegistrationRequest(req: Request): boolean {
-    if (req.method !== "POST") return false;
-    return /^\/\d+\/registrations\/?$/.test(req.path);
+function isPublicEventRequest(req: Request): boolean {
+    if (req.method === "POST" && /^\/(?:\d+|[A-Za-z0-9]{12})\/registrations\/?$/.test(req.path)) {
+        return true;
+    }
+    if (req.method === "GET" && /^\/(?:\d+|[A-Za-z0-9]{12})\/join\/?$/.test(req.path)) {
+        return true;
+    }
+    return false;
 }
 
 router.use("/events", (req, res, next) => {
-    if (isPublicEventRegistrationRequest(req)) {
+    if (isPublicEventRequest(req)) {
         return optionalAuthenticateToken(req, res, next);
     }
     return authenticateToken(req, res, next);

@@ -33,6 +33,7 @@ export interface ProjectTeamRef {
 
 export interface ProjectSummary {
     id: Id;
+    slug: string;
     title: string;
     description?: string | null;
     status: ProjectStatus;

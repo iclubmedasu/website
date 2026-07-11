@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMocks = vi.hoisted(() => ({
     sitePageFindUnique: vi.fn(),
+    sitePageCreate: vi.fn(),
     sitePageUpdate: vi.fn(),
     aboutSectionFindMany: vi.fn(),
     aboutSectionFindUnique: vi.fn(),
@@ -11,6 +12,7 @@ const prismaMocks = vi.hoisted(() => ({
     aboutSectionUpdate: vi.fn(),
     aboutSectionDelete: vi.fn(),
     aboutSectionAggregate: vi.fn(),
+    aboutSectionCount: vi.fn(),
     aboutSponsorFindFirst: vi.fn(),
     aboutSponsorCreate: vi.fn(),
     aboutSponsorUpdate: vi.fn(),
@@ -21,17 +23,21 @@ const prismaMocks = vi.hoisted(() => ({
     contactMethodUpdate: vi.fn(),
     contactMethodDelete: vi.fn(),
     contactMethodAggregate: vi.fn(),
+    contactMethodCount: vi.fn(),
     socialLinkFindMany: vi.fn(),
     socialLinkCreate: vi.fn(),
+    socialLinkCreateMany: vi.fn(),
     socialLinkUpdate: vi.fn(),
     socialLinkDelete: vi.fn(),
     socialLinkAggregate: vi.fn(),
+    socialLinkCount: vi.fn(),
 }));
 
 vi.mock("../../db", () => ({
     prisma: {
         sitePage: {
             findUnique: prismaMocks.sitePageFindUnique,
+            create: prismaMocks.sitePageCreate,
             update: prismaMocks.sitePageUpdate,
         },
         aboutSection: {
@@ -41,6 +47,7 @@ vi.mock("../../db", () => ({
             update: prismaMocks.aboutSectionUpdate,
             delete: prismaMocks.aboutSectionDelete,
             aggregate: prismaMocks.aboutSectionAggregate,
+            count: prismaMocks.aboutSectionCount,
         },
         aboutSponsor: {
             findFirst: prismaMocks.aboutSponsorFindFirst,
@@ -55,13 +62,16 @@ vi.mock("../../db", () => ({
             update: prismaMocks.contactMethodUpdate,
             delete: prismaMocks.contactMethodDelete,
             aggregate: prismaMocks.contactMethodAggregate,
+            count: prismaMocks.contactMethodCount,
         },
         socialLink: {
             findMany: prismaMocks.socialLinkFindMany,
             create: prismaMocks.socialLinkCreate,
+            createMany: prismaMocks.socialLinkCreateMany,
             update: prismaMocks.socialLinkUpdate,
             delete: prismaMocks.socialLinkDelete,
             aggregate: prismaMocks.socialLinkAggregate,
+            count: prismaMocks.socialLinkCount,
         },
     },
 }));
@@ -110,8 +120,11 @@ describe("site content routes", () => {
             return null;
         });
         prismaMocks.aboutSectionFindMany.mockResolvedValue([bulletSection]);
+        prismaMocks.aboutSectionCount.mockResolvedValue(1);
         prismaMocks.contactMethodFindMany.mockResolvedValue([]);
+        prismaMocks.contactMethodCount.mockResolvedValue(0);
         prismaMocks.socialLinkFindMany.mockResolvedValue([]);
+        prismaMocks.socialLinkCount.mockResolvedValue(0);
         prismaMocks.aboutSectionAggregate.mockResolvedValue({ _max: { sortOrder: 1 } });
     });
 
@@ -134,6 +147,108 @@ describe("site content routes", () => {
         expect(response.body.header.title).toBe("iClub");
         expect(response.body.sections).toHaveLength(1);
         expect(response.body.sections[0].type).toBe("BULLET_LIST");
+    });
+
+    it("GET /about creates SitePage about when missing and returns 200", async () => {
+        const createdAbout = {
+            id: "about",
+            eyebrow: "About",
+            title: "iClub, MED-ASU",
+            description: "iClub, MED-ASU connects medical students through events, projects, and community initiatives at the Faculty of Medicine, Ain Shams University.",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+        let aboutExists = false;
+        prismaMocks.sitePageFindUnique.mockImplementation(async ({ where }: { where: { id: string } }) => {
+            if (where.id === "about") return aboutExists ? createdAbout : null;
+            return null;
+        });
+        prismaMocks.sitePageCreate.mockImplementation(async ({ data }: { data: typeof createdAbout }) => {
+            aboutExists = true;
+            return { ...createdAbout, ...data };
+        });
+        prismaMocks.aboutSectionCount.mockResolvedValue(0);
+        prismaMocks.aboutSectionCreate.mockResolvedValue({ id: 1 });
+        prismaMocks.aboutSectionFindMany.mockResolvedValue([
+            {
+                id: 1,
+                sortOrder: 0,
+                type: "TWO_COLUMN",
+                title: "Mission & Vision",
+                leftLabel: "Mission",
+                leftText: "Mission text",
+                rightLabel: "Vision",
+                rightText: "Vision text",
+                bullets: null,
+                emptyMessage: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                sponsors: [],
+            },
+        ]);
+
+        const response = await request(buildRouteApp(siteContentRouter, { isOfficer: true }))
+            .get("/about");
+
+        expect(response.status).toBe(200);
+        expect(prismaMocks.sitePageCreate).toHaveBeenCalledWith(
+            expect.objectContaining({ data: expect.objectContaining({ id: "about" }) }),
+        );
+        expect(prismaMocks.aboutSectionCreate).toHaveBeenCalled();
+        expect(response.body.header.eyebrow).toBe("About");
+        expect(response.body.sections.length).toBeGreaterThan(0);
+    });
+
+    it("GET /contact creates SitePage contact when missing and returns 200", async () => {
+        const createdContact = {
+            id: "contact",
+            eyebrow: "Contact",
+            title: "We would love to hear from you",
+            description: "Reach out with questions about events, partnerships, or getting involved with iClub.",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        };
+        let contactExists = false;
+        prismaMocks.sitePageFindUnique.mockImplementation(async ({ where }: { where: { id: string } }) => {
+            if (where.id === "contact") return contactExists ? createdContact : null;
+            return null;
+        });
+        prismaMocks.sitePageCreate.mockImplementation(async ({ data }: { data: typeof createdContact }) => {
+            contactExists = true;
+            return { ...createdContact, ...data };
+        });
+        prismaMocks.contactMethodCount.mockResolvedValue(0);
+        prismaMocks.socialLinkCount.mockResolvedValue(0);
+        prismaMocks.contactMethodCreate.mockResolvedValue({
+            id: 1,
+            sortOrder: 0,
+            type: "EMAIL",
+            label: "Email",
+            value: "asu.medicine.iclub@gmail.com",
+            isActive: true,
+        });
+        prismaMocks.socialLinkCreateMany.mockResolvedValue({ count: 5 });
+        prismaMocks.contactMethodFindMany.mockResolvedValue([
+            {
+                id: 1,
+                sortOrder: 0,
+                type: "EMAIL",
+                label: "Email",
+                value: "asu.medicine.iclub@gmail.com",
+                isActive: true,
+            },
+        ]);
+        prismaMocks.socialLinkFindMany.mockResolvedValue([]);
+
+        const response = await request(buildRouteApp(siteContentRouter, { isOfficer: true }))
+            .get("/contact");
+
+        expect(response.status).toBe(200);
+        expect(prismaMocks.sitePageCreate).toHaveBeenCalledWith(
+            expect.objectContaining({ data: expect.objectContaining({ id: "contact" }) }),
+        );
+        expect(response.body.header.eyebrow).toBe("Contact");
+        expect(response.body.methods).toHaveLength(1);
     });
 
     it("PUT /about/header updates header for administration", async () => {

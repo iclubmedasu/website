@@ -14,13 +14,13 @@ import { DataLoadingState } from "./DataLoadingState";
 
 type LoadState = "loading" | "not_found" | "ready";
 
-export function EventDetailContent({ eventId }: { eventId: number }) {
+export function EventDetailContent({ idOrSlug }: { idOrSlug: string }) {
     const [state, setState] = useState<LoadState>("loading");
     const [event, setEvent] = useState<PublicEventDetail | null>(null);
 
     useEffect(() => {
         void publicAPI
-            .getEvent(eventId)
+            .getEvent(idOrSlug)
             .then((data) => {
                 if (!data) {
                     setState("not_found");
@@ -30,7 +30,7 @@ export function EventDetailContent({ eventId }: { eventId: number }) {
                 setState("ready");
             })
             .catch(() => setState("not_found"));
-    }, [eventId]);
+    }, [idOrSlug]);
 
     if (state === "loading") {
         return (
@@ -60,7 +60,7 @@ export function EventDetailContent({ eventId }: { eventId: number }) {
             <BackLink href="/events" label="Back to Events" />
             <section className="max-w-3xl space-y-4">
                 <EventDetailHeader
-                    eventId={event.id}
+                    eventSlug={event.slug}
                     eventTitle={event.title}
                     projectTypeName={event.projectType?.name}
                     description={event.description}
@@ -83,10 +83,16 @@ export function EventDetailContent({ eventId }: { eventId: number }) {
                         <Users className="h-4 w-4 shrink-0 text-purple-700" />
                         {capacityLabel}
                     </p>
-                    <ClientRegistrationDeadline value={event.registrationDeadline} />
+                    {event.registrationOpen ? (
+                        <ClientRegistrationDeadline value={event.registrationDeadline} />
+                    ) : null}
                 </div>
                 <div className="pt-2">
-                    <EventDetailActions eventId={event.id} registrationOpen={event.registrationOpen} />
+                    <EventDetailActions
+                        eventId={event.id}
+                        eventSlug={event.slug}
+                        registrationOpen={event.registrationOpen}
+                    />
                 </div>
             </section>
         </PageContainer>

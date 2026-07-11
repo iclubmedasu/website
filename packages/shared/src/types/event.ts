@@ -78,6 +78,10 @@ export interface EventSessionRef {
     endTime: string | null;
     mode: EventSessionMode;
     onlineUrl: string | null;
+    maxCapacity?: number | null;
+    registeredCount?: number;
+    spotsRemaining?: number | null;
+    isFull?: boolean;
     order: number;
     isActive: boolean;
     createdAt: ISODateTime;
@@ -117,6 +121,7 @@ export interface CreateEventSessionPayload {
     endTime?: string | null;
     mode: EventSessionMode;
     onlineUrl?: string | null;
+    maxCapacity?: number | null;
     order?: number;
 }
 
@@ -152,6 +157,7 @@ export interface EventRegistrationRef {
 
 export interface EventSummary {
     id: Id;
+    slug: string;
     title: string;
     description?: string | null;
     venue?: string | null;

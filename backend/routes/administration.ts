@@ -5,8 +5,12 @@ import { looksLikePhone, sanitizePhoneForStorage } from "../lib/phoneUtils";
 const router = express.Router();
 
 const ADMINISTRATION_TEAM_NAME = "Administration";
-const ADMINISTRATION_ROLE_NAMES = ["Officer", "President", "Vice President"];
 const ADMINISTRATION_LEADERSHIP_ROLE_NAMES = ["President", "Vice President"];
+const DEFAULT_ADMINISTRATION_ROLES = [
+    { roleName: "Officer", roleType: "Officer", systemRoleKey: 10, maxCount: null as number | null },
+    { roleName: "President", roleType: "Administration", systemRoleKey: 11, maxCount: 1 },
+    { roleName: "Vice President", roleType: "Administration", systemRoleKey: 12, maxCount: 1 },
+] as const;
 const OFFICIAL_EMAIL_REGEX = /^[^\s@]+@med\.asu\.edu\.eg$/i;
 const PLACEHOLDER_FULLNAME = "Pending";
 
@@ -28,12 +32,14 @@ async function getOrCreateAdministrationTeam() {
                 data: { name: ADMINISTRATION_TEAM_NAME },
             });
 
-            for (const roleName of ADMINISTRATION_ROLE_NAMES) {
+            for (const role of DEFAULT_ADMINISTRATION_ROLES) {
                 await tx.teamRole.create({
                     data: {
                         teamId: createdTeam.id,
-                        roleName,
-                        roleType: "Leadership",
+                        roleName: role.roleName,
+                        roleType: role.roleType,
+                        systemRoleKey: role.systemRoleKey,
+                        maxCount: role.maxCount,
                     },
                 });
             }
@@ -50,17 +56,32 @@ async function getOrCreateAdministrationTeam() {
             });
         });
     } else {
-        for (const roleName of ADMINISTRATION_ROLE_NAMES) {
+        for (const roleDef of DEFAULT_ADMINISTRATION_ROLES) {
             const existingRole = await prisma.teamRole.findFirst({
-                where: { teamId: team.id, roleName },
+                where: { teamId: team.id, roleName: roleDef.roleName },
             });
 
             if (!existingRole) {
                 await prisma.teamRole.create({
                     data: {
                         teamId: team.id,
-                        roleName,
-                        roleType: "Leadership",
+                        roleName: roleDef.roleName,
+                        roleType: roleDef.roleType,
+                        systemRoleKey: roleDef.systemRoleKey,
+                        maxCount: roleDef.maxCount,
+                    },
+                });
+            } else if (
+                existingRole.roleType !== roleDef.roleType
+                || existingRole.systemRoleKey !== roleDef.systemRoleKey
+                || existingRole.maxCount !== roleDef.maxCount
+            ) {
+                await prisma.teamRole.update({
+                    where: { id: existingRole.id },
+                    data: {
+                        roleType: roleDef.roleType,
+                        systemRoleKey: roleDef.systemRoleKey,
+                        maxCount: roleDef.maxCount,
                     },
                 });
             }

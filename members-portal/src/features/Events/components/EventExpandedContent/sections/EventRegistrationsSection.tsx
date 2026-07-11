@@ -45,6 +45,7 @@ import { formatEventDuration, getActiveSessionsNow, isMultiDayEvent, isWithinEve
 
 interface EventRegistrationsSectionProps {
     eventId: Id | string;
+    eventSlug?: string;
     eventTitle?: string;
     tiers: EventTierRef[];
     sessions?: EventSessionRef[];
@@ -72,6 +73,7 @@ interface EventRegistrationsSectionProps {
 
 export default function EventRegistrationsSection({
     eventId,
+    eventSlug,
     eventTitle,
     tiers,
     sessions = [],
@@ -449,7 +451,7 @@ export default function EventRegistrationsSection({
                         </div>
                     ) : null}
                     {canPublishEvent ? <span className="event-expanded-header-divider" aria-hidden="true" /> : null}
-                    <CopyPublicEventLinkButton eventId={eventId} isPublished={isPublished} />
+                    <CopyPublicEventLinkButton eventSlug={eventSlug || String(eventId)} isPublished={isPublished} />
                 </div>
             </div>
             <div className="event-expanded-form-grid">

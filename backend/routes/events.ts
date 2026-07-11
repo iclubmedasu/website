@@ -14,9 +14,17 @@ import {
     parseEventSessionTimes,
     serializeEventSession,
 } from '../lib/eventSessionTime';
+import {
+    assertSessionsHaveCapacityForNewSelections,
+    countActiveSessionRegistrations,
+    countActiveSessionRegistrationsForSessions,
+    parseSessionMaxCapacity,
+    withSessionCapacityFields,
+} from '../lib/eventSessionCapacity';
 import express, { Request, Response } from 'express';
 import { authenticateToken, optionalAuthenticateToken } from '../middleware/auth';
-import { generateUniqueConfirmationCode } from '../services/eventCode';
+import { generateUniqueConfirmationCode, generateUniqueEventSlug } from '../services/eventCode';
+import { resolveEventByIdOrSlug } from '../lib/publicEntitySlug';
 import { formatEventDay, isWithinEventDays, parseEventDayString, resolveCheckInEventDay, eventDayStringToDate, shouldSendWalkInTicket } from '../services/eventDates';
 import { generateTokensForSession, generateTokensForRegistration } from '../services/sessionTokenService';
 import { emitNotificationEvent } from '../services/notificationService';
@@ -644,6 +652,7 @@ const SESSION_FIELD_LABELS: Record<string, string> = {
     endTime: 'end time',
     mode: 'mode',
     onlineUrl: 'online URL',
+    maxCapacity: 'max capacity',
     order: 'order',
     isActive: 'active',
 };
@@ -836,9 +845,11 @@ router.post('/', authenticateToken, async (req, res) => {
         const priority = normalizePriority(req.body?.priority);
         const teamIds = parseTeamIds(req.body?.teamIds);
 
+        const slug = await generateUniqueEventSlug();
         const created = await prisma.event.create({
             data: {
                 title,
+                slug,
                 description: normalizeDescription(req.body?.description),
                 venue: String(req.body?.venue || '').trim() || null,
                 eventDate,
@@ -1644,7 +1655,13 @@ router.get('/:id/sessions', optionalAuthenticateToken, async (req, res) => {
             include: { _count: { select: { attendances: true } } },
         });
 
-        return res.json(sessions.map((session) => serializeEventSession(session)));
+        const counts = await countActiveSessionRegistrationsForSessions(sessions.map((session) => session.id));
+        return res.json(sessions.map((session) => (
+            withSessionCapacityFields(
+                serializeEventSession(session),
+                counts.get(session.id) ?? 0,
+            )
+        )));
     } catch (error) {
         console.error(`GET /events/${req.params.id}/sessions error:`, error);
         return res.status(500).json({ error: 'Failed to fetch sessions' });
@@ -1675,6 +1692,11 @@ router.post('/:id/sessions', authenticateToken, async (req, res) => {
         const label = String(req.body?.label ?? '').trim();
         if (!label) return res.status(400).json({ error: 'Session title is required' });
 
+        const capacityParsed = parseSessionMaxCapacity(
+            req.body?.maxCapacity !== undefined ? req.body.maxCapacity : null,
+        );
+        if (!capacityParsed.ok) return res.status(400).json({ error: capacityParsed.error });
+
         const created = await prisma.eventSession.create({
             data: {
                 eventId,
@@ -1686,6 +1708,7 @@ router.post('/:id/sessions', authenticateToken, async (req, res) => {
                 endDateTime: parsedTimes.endDateTime,
                 mode,
                 onlineUrl,
+                maxCapacity: capacityParsed.value,
                 order: Number.isInteger(Number(req.body?.order)) ? Number(req.body.order) : 0,
             },
             include: { _count: { select: { attendances: true } } },
@@ -1701,6 +1724,7 @@ router.post('/:id/sessions', authenticateToken, async (req, res) => {
                 sessionDate: formatEventDay(created.sessionDate),
                 mode: created.mode,
                 onlineUrl: created.onlineUrl,
+                maxCapacity: created.maxCapacity,
             },
             description: created.label
                 ? `Session "${created.label}" created`
@@ -1711,7 +1735,7 @@ router.post('/:id/sessions', authenticateToken, async (req, res) => {
             queueSessionTokenGeneration(created.id, 'session-create');
         }
 
-        return res.status(201).json(serializeEventSession(created));
+        return res.status(201).json(withSessionCapacityFields(serializeEventSession(created), 0));
     } catch (error) {
         console.error(`POST /events/${req.params.id}/sessions error:`, error);
         return res.status(500).json({ error: 'Failed to create session' });
@@ -1785,6 +1809,21 @@ router.put('/:id/sessions/:sessionId', authenticateToken, async (req, res) => {
             : existing.label;
         if (!nextLabel) return res.status(400).json({ error: 'Session title is required' });
 
+        let nextMaxCapacity = existing.maxCapacity;
+        if (req.body?.maxCapacity !== undefined) {
+            const capacityParsed = parseSessionMaxCapacity(req.body.maxCapacity);
+            if (!capacityParsed.ok) return res.status(400).json({ error: capacityParsed.error });
+            nextMaxCapacity = capacityParsed.value;
+            if (nextMaxCapacity != null) {
+                const registeredCount = await countActiveSessionRegistrations(sessionId);
+                if (nextMaxCapacity < registeredCount) {
+                    return res.status(400).json({
+                        error: `Cannot set max capacity below current registrations (${registeredCount})`,
+                    });
+                }
+            }
+        }
+
         const updated = await prisma.eventSession.update({
             where: { id: sessionId },
             data: {
@@ -1796,6 +1835,7 @@ router.put('/:id/sessions/:sessionId', authenticateToken, async (req, res) => {
                 endDateTime: parsedTimes.endDateTime,
                 mode: mode ?? existing.mode,
                 onlineUrl,
+                maxCapacity: nextMaxCapacity,
                 order: req.body?.order !== undefined && Number.isInteger(Number(req.body.order))
                     ? Number(req.body.order)
                     : existing.order,
@@ -1832,7 +1872,8 @@ router.put('/:id/sessions/:sessionId', authenticateToken, async (req, res) => {
             queueSessionTokenGeneration(updated.id, 'session-update');
         }
 
-        return res.json(serializeEventSession(updated));
+        const registeredCount = await countActiveSessionRegistrations(sessionId);
+        return res.json(withSessionCapacityFields(serializeEventSession(updated), registeredCount));
     } catch (error) {
         console.error(`PUT /events/${req.params.id}/sessions/${req.params.sessionId} error:`, error);
         return res.status(500).json({ error: 'Failed to update session' });
@@ -1880,14 +1921,44 @@ router.delete('/:id/sessions/:sessionId', authenticateToken, async (req, res) =>
     }
 });
 
+type JoinStatusPayload = {
+    status: 'ready' | 'not_started' | 'ended' | 'invalid_link' | 'cancelled' | 'not_online' | 'error';
+    redirectUrl?: string;
+    startsAt?: string;
+    endsAt?: string;
+    eventId?: number;
+    eventTitle?: string | null;
+    sessionLabel?: string | null;
+    message?: string;
+};
+
+function wantsJsonJoinResponse(req: Request): boolean {
+    const accept = String(req.get('Accept') || '');
+    if (accept.includes('application/json')) return true;
+    // Prefer JSON when the client does not strongly prefer HTML (e.g. fetch / curl).
+    return req.accepts(['json', 'html']) === 'json';
+}
+
+function sendJoinResponse(req: Request, res: Response, statusCode: number, payload: JoinStatusPayload) {
+    if (payload.status === 'ready' && payload.redirectUrl && !wantsJsonJoinResponse(req)) {
+        return res.redirect(payload.redirectUrl);
+    }
+    return res.status(statusCode).json(payload);
+}
+
 router.get('/:id/join', async (req, res) => {
     try {
-        const eventId = parseId(req.params.id);
+        const resolved = await resolveEventByIdOrSlug(String(req.params.id || ''));
         const token = String(req.query.token || '').trim();
 
-        if (!eventId || !token) {
-            return res.status(400).json({ error: 'Invalid join link' });
+        if (!resolved || !token) {
+            return sendJoinResponse(req, res, 400, {
+                status: 'invalid_link',
+                message: 'This join link is missing required details.',
+            });
         }
+
+        const eventId = resolved.id;
 
         const sessionToken = await prisma.eventSessionToken.findFirst({
             where: {
@@ -1899,11 +1970,17 @@ router.get('/:id/join', async (req, res) => {
                 session: {
                     select: {
                         id: true,
+                        label: true,
                         onlineUrl: true,
                         mode: true,
                         sessionDate: true,
                         startTime: true,
                         endTime: true,
+                        startDateTime: true,
+                        endDateTime: true,
+                        event: {
+                            select: { id: true, slug: true, title: true },
+                        },
                     },
                 },
                 registration: {
@@ -1913,23 +1990,68 @@ router.get('/:id/join', async (req, res) => {
         });
 
         if (!sessionToken) {
-            return res.status(404).json({ error: 'Join link not found or invalid' });
-        }
-
-        if (sessionToken.registration.status === 'CANCELLED') {
-            return res.status(409).json({ error: 'Registration has been cancelled' });
+            return sendJoinResponse(req, res, 404, {
+                status: 'invalid_link',
+                eventId,
+                message: 'This join link is invalid or no longer available.',
+            });
         }
 
         const { session } = sessionToken;
-        if (session.mode === 'ONSITE' || !session.onlineUrl) {
-            return res.status(409).json({ error: 'This session is not available for online join' });
+        const eventMeta = {
+            eventId: session.event.id,
+            eventTitle: session.event.title,
+            sessionLabel: session.label,
+        };
+
+        if (sessionToken.registration.status === 'CANCELLED') {
+            return sendJoinResponse(req, res, 409, {
+                status: 'cancelled',
+                ...eventMeta,
+                message: 'Your registration for this event has been cancelled.',
+            });
         }
 
-        if (session.startTime && session.endTime) {
-            const activeNow = await getActiveSessionsAtTime(eventId, new Date());
+        if (session.mode === 'ONSITE' || !session.onlineUrl) {
+            return sendJoinResponse(req, res, 409, {
+                status: 'not_online',
+                ...eventMeta,
+                message: 'This session is not available for online join.',
+            });
+        }
+
+        const now = new Date();
+        if (session.startDateTime && session.endDateTime) {
+            const startMs = session.startDateTime.getTime();
+            const endMs = session.endDateTime.getTime();
+            const nowMs = now.getTime();
+
+            if (nowMs < startMs) {
+                return sendJoinResponse(req, res, 409, {
+                    status: 'not_started',
+                    ...eventMeta,
+                    startsAt: session.startDateTime.toISOString(),
+                    endsAt: session.endDateTime.toISOString(),
+                    message: 'This session has not started yet.',
+                });
+            }
+
+            if (nowMs >= endMs) {
+                return sendJoinResponse(req, res, 409, {
+                    status: 'ended',
+                    ...eventMeta,
+                    startsAt: session.startDateTime.toISOString(),
+                    endsAt: session.endDateTime.toISOString(),
+                    message: 'This session has ended.',
+                });
+            }
+        } else if (session.startTime && session.endTime) {
+            const activeNow = await getActiveSessionsAtTime(eventId, now);
             if (!activeNow.some((active) => active.id === session.id)) {
-                return res.status(409).json({
-                    error: 'This session is not currently active. Online join is only available during the session time.',
+                return sendJoinResponse(req, res, 409, {
+                    status: 'ended',
+                    ...eventMeta,
+                    message: 'This session is not currently available for online join.',
                 });
             }
         }
@@ -1946,15 +2068,22 @@ router.get('/:id/join', async (req, res) => {
                 sessionId: session.id,
                 registrationId: sessionToken.registrationId,
                 mode: 'ONLINE',
-                joinedAt: new Date(),
+                joinedAt: now,
             },
             update: {},
         });
 
-        return res.redirect(session.onlineUrl);
+        return sendJoinResponse(req, res, 200, {
+            status: 'ready',
+            ...eventMeta,
+            redirectUrl: session.onlineUrl,
+        });
     } catch (error) {
         console.error(`GET /events/${req.params.id}/join error:`, error);
-        return res.status(500).json({ error: 'Failed to process join link' });
+        return sendJoinResponse(req, res, 500, {
+            status: 'error',
+            message: 'Something went wrong while opening this session. Please try again.',
+        });
     }
 });
 
@@ -2343,8 +2472,9 @@ router.get('/:id/registrations/:registrationId', authenticateToken, async (req, 
 
 router.post('/:id/registrations', optionalAuthenticateToken, async (req, res) => {
     try {
-        const eventId = parseId(req.params.id);
-        if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
+        const resolved = await resolveEventByIdOrSlug(String(req.params.id || ''));
+        if (!resolved) return res.status(400).json({ error: 'Invalid event ID' });
+        const eventId = resolved.id;
 
         const event = await prisma.event.findUnique({ where: { id: eventId } });
         if (!event) return res.status(404).json({ error: 'Event not found' });
@@ -2406,6 +2536,11 @@ router.post('/:id/registrations', optionalAuthenticateToken, async (req, res) =>
 
         if (!isManager && !event.sessionFieldShowOnPublic && sessionValidation.ids.length > 0) {
             return res.status(400).json({ error: 'Session selection is not available for this event' });
+        }
+
+        const sessionCapacityCheck = await assertSessionsHaveCapacityForNewSelections(sessionValidation.ids);
+        if (!sessionCapacityCheck.ok) {
+            return res.status(sessionCapacityCheck.status).json({ error: sessionCapacityCheck.error });
         }
 
         if (tier?.maxCapacity != null) {
@@ -2619,6 +2754,14 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
                 ? sessionValidation.ids
                 : existingSelectionIds;
 
+            const existingCapacityCheck = await assertSessionsHaveCapacityForNewSelections(
+                finalSessionIds,
+                existingSelectionIds,
+            );
+            if (!existingCapacityCheck.ok) {
+                return res.status(existingCapacityCheck.status).json({ error: existingCapacityCheck.error });
+            }
+
             if (event.tierFieldRequired && !finalTierId) {
                 return res.status(400).json({ error: 'A registration tier is required' });
             }
@@ -2717,6 +2860,11 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
         }
         if (event.sessionFieldRequired && sessionValidation.ids.length === 0) {
             return res.status(400).json({ error: 'At least one session must be selected' });
+        }
+
+        const newWalkInCapacityCheck = await assertSessionsHaveCapacityForNewSelections(sessionValidation.ids);
+        if (!newWalkInCapacityCheck.ok) {
+            return res.status(newWalkInCapacityCheck.status).json({ error: newWalkInCapacityCheck.error });
         }
 
         if (walkInTierId) {
@@ -3162,6 +3310,16 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
         const existingSelectionIds = (activeRegistration.sessionSelections ?? []).map((s) => s.sessionId);
         const finalSessionIds = validatedSessionIds ?? existingSelectionIds;
 
+        if (validatedSessionIds !== undefined) {
+            const checkInCapacityCheck = await assertSessionsHaveCapacityForNewSelections(
+                validatedSessionIds,
+                existingSelectionIds,
+            );
+            if (!checkInCapacityCheck.ok) {
+                return res.status(checkInCapacityCheck.status).json({ error: checkInCapacityCheck.error });
+            }
+        }
+
         if (event.tierFieldRequired && !finalTierId) {
             return res.status(409).json({ error: 'A registration tier is required', missingTier: true });
         }
@@ -3404,6 +3562,19 @@ router.patch('/:id/registrations/:registrationId/sessions', authenticateToken, a
         const requestedSessionIds = parseSessionIds(req.body?.sessionIds);
         const validation = await validateSessionIdsForEvent(eventId, requestedSessionIds);
         if (!validation.ok) return res.status(400).json({ error: validation.error });
+
+        const existingSelections = await prisma.eventRegistrationSession.findMany({
+            where: { registrationId },
+            select: { sessionId: true },
+        });
+        const alreadySelectedIds = existingSelections.map((row) => row.sessionId);
+        const sessionCapacityCheck = await assertSessionsHaveCapacityForNewSelections(
+            validation.ids,
+            alreadySelectedIds,
+        );
+        if (!sessionCapacityCheck.ok) {
+            return res.status(sessionCapacityCheck.status).json({ error: sessionCapacityCheck.error });
+        }
 
         await prisma.$transaction(async (tx) => {
             await tx.eventRegistrationSession.deleteMany({ where: { registrationId } });

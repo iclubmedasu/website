@@ -3,8 +3,9 @@ import path from 'path';
 import QRCode from 'qrcode';
 import { formatEventDateRangeInClubTimezone, formatSessionRangeInClubTimezone } from '@iclub/shared/utils';
 import { prisma } from '../db';
-import { getSessionTokensForRegistration } from './sessionTokenService';
+import { generateTokensForRegistration, getSessionTokensForRegistration } from './sessionTokenService';
 import { sendEmail, type EmailAttachment } from './emailService';
+import { splitSessionsForTicket } from '../lib/eventSessionCapacity';
 
 export const TICKET_QR_CONTENT_ID = 'ticket-qr-code';
 export const ICLUB_AVATAR_CID = 'iclub-avatar';
@@ -32,16 +33,16 @@ export type EventRegistrationEmailVariant = 'ticket' | 'reminder';
 
 import { getPublicWebsiteUrl } from '../lib/publicWebsiteUrl';
 
-export function buildRegistrationConfirmationUrl(eventId: number, confirmationCode: string): string {
+export function buildRegistrationConfirmationUrl(eventSlugOrId: string | number, confirmationCode: string): string {
     const baseUrl = getPublicWebsiteUrl();
     const code = encodeURIComponent(confirmationCode.trim().toUpperCase());
-    return `${baseUrl}/events/${eventId}/confirmation?code=${code}`;
+    return `${baseUrl}/events/${eventSlugOrId}/confirmation?code=${code}`;
 }
 
-export function buildRegistrationJoinUrl(eventId: number, onlineAccessToken: string): string {
+export function buildRegistrationJoinUrl(eventSlugOrId: string | number, onlineAccessToken: string): string {
     const baseUrl = getPublicWebsiteUrl();
     const token = encodeURIComponent(onlineAccessToken.trim());
-    return `${baseUrl}/events/${eventId}/join?token=${token}`;
+    return `${baseUrl}/events/${eventSlugOrId}/join?token=${token}`;
 }
 
 function escapeHtml(value: string): string {
@@ -101,16 +102,18 @@ type EmailSessionRow = {
     startTime: string | null;
     endTime: string | null;
     mode: string;
+    maxCapacity?: number | null;
 };
 
-function buildSessionsEmailSection(
-    eventId: number,
+function buildSessionEmailRows(
+    eventSlug: string,
     sessions: EmailSessionRow[],
     sessionTokens: Map<number, string>,
+    options?: { includeJoinLinks?: boolean },
 ): string {
-    if (sessions.length === 0) return '';
+    const includeJoinLinks = options?.includeJoinLinks !== false;
 
-    const rows = sessions.map((session) => {
+    return sessions.map((session) => {
         const scheduleLabel = session.startDateTime && session.endDateTime
             ? formatSessionRangeInClubTimezone(session.startDateTime, session.endDateTime)
             : null;
@@ -126,9 +129,18 @@ function buildSessionsEmailSection(
 </tr>`;
         }
 
+        if (!includeJoinLinks) {
+            return `<tr>
+  <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;">
+    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0f172a;">${header}</p>
+    <p style="margin:0;font-size:12px;color:#64748b;">Online session</p>
+  </td>
+</tr>`;
+        }
+
         const token = sessionTokens.get(session.id);
         if (token) {
-            const joinUrl = buildRegistrationJoinUrl(eventId, token);
+            const joinUrl = buildRegistrationJoinUrl(eventSlug, token);
             const escapedJoinUrl = escapeHtml(joinUrl);
             return `<tr>
   <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;">
@@ -146,23 +158,46 @@ function buildSessionsEmailSection(
   </td>
 </tr>`;
     }).join('');
+}
 
+function buildSessionGroupHtml(
+    title: string,
+    rowsHtml: string,
+): string {
+    if (!rowsHtml) return '';
     return `<tr>
   <td style="padding:0 24px 18px;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;">
       <tr>
         <td style="padding:14px 16px 4px;">
-          <p style="margin:0;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:#94a3b8;font-weight:700;">Your Sessions</p>
+          <p style="margin:0;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:#94a3b8;font-weight:700;">${escapeHtml(title)}</p>
         </td>
       </tr>
       <tr>
         <td style="padding:0 16px 12px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">${rows}</table>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0">${rowsHtml}</table>
         </td>
       </tr>
     </table>
   </td>
 </tr>`;
+}
+
+function buildSessionsEmailSection(
+    eventSlug: string,
+    waitingForYou: EmailSessionRow[],
+    dontMissOut: EmailSessionRow[],
+    sessionTokens: Map<number, string>,
+): string {
+    const waitingHtml = buildSessionGroupHtml(
+        'We will be waiting for you!',
+        buildSessionEmailRows(eventSlug, waitingForYou, sessionTokens, { includeJoinLinks: true }),
+    );
+    const missHtml = buildSessionGroupHtml(
+        "Don't miss out on:",
+        buildSessionEmailRows(eventSlug, dontMissOut, sessionTokens, { includeJoinLinks: false }),
+    );
+    return `${waitingHtml}${missHtml}`;
 }
 
 function buildDetailRow(label: string, valueHtml: string, withBorder = true): string {
@@ -362,6 +397,7 @@ async function sendRegistrationEmail(
             event: {
                 select: {
                     id: true,
+                    slug: true,
                     title: true,
                     venue: true,
                     eventDate: true,
@@ -398,9 +434,18 @@ async function sendRegistrationEmail(
             startTime: true,
             endTime: true,
             mode: true,
+            maxCapacity: true,
         },
     });
 
+    const selectedRows = await prisma.eventRegistrationSession.findMany({
+        where: { registrationId },
+        select: { sessionId: true },
+    });
+    const selectedIds = selectedRows.map((row) => row.sessionId);
+    const { waitingForYou, dontMissOut } = splitSessionsForTicket(sessions, selectedIds);
+
+    await generateTokensForRegistration(registrationId);
     const sessionTokens = await getSessionTokensForRegistration(registrationId);
     const attachments = await buildTicketEmailAttachments(registration.confirmationCode);
     const html = buildRegistrationEmailHtml({
@@ -410,11 +455,12 @@ async function sendRegistrationEmail(
         attendeeName: registration.fullName,
         tierName: registration.tier?.name || 'General',
         confirmationCode: registration.confirmationCode,
-        confirmationUrl: buildRegistrationConfirmationUrl(registration.event.id, registration.confirmationCode),
+        confirmationUrl: buildRegistrationConfirmationUrl(registration.event.slug, registration.confirmationCode),
         variant,
         sessionsSectionHtml: buildSessionsEmailSection(
-            registration.event.id,
-            sessions,
+            registration.event.slug,
+            waitingForYou,
+            dontMissOut,
             sessionTokens,
         ),
     });

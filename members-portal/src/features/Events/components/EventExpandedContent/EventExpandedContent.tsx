@@ -32,6 +32,7 @@ const TABS: Array<{ key: EventTabKey; label: string; icon: ComponentType<{ size?
 
 interface EventExpandedContentProps {
     eventId: Id | string;
+    eventSlug?: string;
     eventTitle?: string;
     initialTab?: EventTabKey | null;
     allowWalkIns?: boolean;
@@ -55,6 +56,7 @@ interface EventExpandedContentProps {
 
 export default function EventExpandedContent({
     eventId,
+    eventSlug,
     eventTitle,
     initialTab,
     allowWalkIns = false,
@@ -195,6 +197,7 @@ export default function EventExpandedContent({
                 <div className="event-expanded-tab-panel">
                     <EventRegistrationsSection
                         eventId={eventId}
+                        eventSlug={eventSlug}
                         eventTitle={eventTitle}
                         tiers={tiers}
                         sessions={sessions}

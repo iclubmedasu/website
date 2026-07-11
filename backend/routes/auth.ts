@@ -13,6 +13,7 @@ import {
     sanitizeOptionalPhoneForStorage,
     validateStoredPhone,
 } from '../lib/phoneUtils';
+import { computeAuthorityFlags } from '../lib/authorityFlags';
 
 const router: any = express.Router();
 
@@ -104,31 +105,6 @@ async function findMemberByPhone(phone) {
         },
         include: { user: true }
     });
-}
-
-// Authority levels: 1=Officer/Developer, 2=President/Vice, 3=Heads/Vice heads, 4=Special roles, 5=Regular
-// Compute flags from team memberships (each with team: { name }, role: { roleName, systemRoleKey }).
-function computeAuthorityFlags(teamMemberships, isDeveloper = false) {
-    const list = teamMemberships || [];
-    let isOfficer = isDeveloper;
-    let isAdmin = false;
-    let isLeadership = false;
-    let isSpecial = false;
-    for (const tm of list) {
-        const teamName = tm.team?.name;
-        const roleName = tm.role?.roleName;
-        const systemRoleKey = tm.role?.systemRoleKey ?? null;
-        const inAdmin = teamName === 'Administration';
-        if (inAdmin && roleName === 'Officer') isOfficer = true;
-        if (inAdmin && (roleName === 'President' || roleName === 'Vice President')) isAdmin = true;
-        // Head (systemRoleKey 1) or Vice Head (2); use Number() so string values from JSON still match
-        const keyNum = systemRoleKey != null ? Number(systemRoleKey) : null;
-        if (!inAdmin && (keyNum === 1 || keyNum === 2)) isLeadership = true;
-        // Fallback: role name indicates leadership even if systemRoleKey missing (e.g. legacy data)
-        if (!inAdmin && (roleName === 'Head of Team' || roleName === 'Vice Head of Team')) isLeadership = true;
-        if (systemRoleKey === null) isSpecial = true; // Custom/special role (not default Head/Vice/Member)
-    }
-    return { isOfficer, isAdmin, isLeadership, isSpecial };
 }
 
 function buildSessionAuthority(teamMemberships, isDeveloper = false) {
@@ -231,7 +207,7 @@ router.post('/setup-password', async (req, res) => {
             select: {
                 teamId: true,
                 team: { select: { name: true } },
-                role: { select: { roleName: true, systemRoleKey: true } }
+                role: { select: { roleName: true, roleType: true, systemRoleKey: true } }
             }
         });
         const authority = buildSessionAuthority(teamMemberships, false);
@@ -598,7 +574,7 @@ router.post('/complete-profile', async (req, res) => {
             select: {
                 teamId: true,
                 team: { select: { name: true } },
-                role: { select: { roleName: true, systemRoleKey: true } }
+                role: { select: { roleName: true, roleType: true, systemRoleKey: true } }
             }
         });
         const authority = buildSessionAuthority(teamMemberships, false);
@@ -837,7 +813,7 @@ router.post('/complete-officer-profile', async (req, res) => {
             select: {
                 teamId: true,
                 team: { select: { name: true } },
-                role: { select: { roleName: true, systemRoleKey: true } }
+                role: { select: { roleName: true, roleType: true, systemRoleKey: true } }
             }
         });
         const authority = buildSessionAuthority(teamMemberships, false);
@@ -966,7 +942,7 @@ router.post('/login', async (req, res) => {
             select: {
                 teamId: true,
                 team: { select: { name: true } },
-                role: { select: { roleName: true, systemRoleKey: true } }
+                role: { select: { roleName: true, roleType: true, systemRoleKey: true } }
             }
         });
         const authority = buildSessionAuthority(teamMemberships, false);
@@ -1064,7 +1040,7 @@ router.get('/me', async (req, res) => {
                     select: {
                         teamId: true,
                         team: { select: { name: true } },
-                        role: { select: { roleName: true, systemRoleKey: true } }
+                        role: { select: { roleName: true, roleType: true, systemRoleKey: true } }
                     }
                 }
             }

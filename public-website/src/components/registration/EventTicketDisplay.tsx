@@ -31,13 +31,77 @@ function formatSessionHeader(session: PublicConfirmationSession): string {
     return [title, scheduleLabel].filter(Boolean).join(" · ");
 }
 
+function SessionRow({
+    session,
+    includeJoinLinks,
+}: {
+    session: PublicConfirmationSession;
+    includeJoinLinks: boolean;
+}) {
+    return (
+        <li className="event-ticket-session-row">
+            <p className="event-ticket-session-row__header">{formatSessionHeader(session)}</p>
+            {session.mode === "ONSITE" ? (
+                <p className="event-ticket-session-row__meta">Onsite attendance</p>
+            ) : includeJoinLinks ? (
+                session.joinUrl ? (
+                    <>
+                        <a
+                            href={session.joinUrl}
+                            className="event-ticket-session-join-btn"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            Join Online Session →
+                        </a>
+                        <p className="event-ticket-session-join-url">{session.joinUrl}</p>
+                    </>
+                ) : (
+                    <p className="event-ticket-session-row__meta">Join link will be sent when available</p>
+                )
+            ) : (
+                <p className="event-ticket-session-row__meta">Online session</p>
+            )}
+        </li>
+    );
+}
+
+function SessionGroup({
+    title,
+    sessions,
+    includeJoinLinks,
+}: {
+    title: string;
+    sessions: PublicConfirmationSession[];
+    includeJoinLinks: boolean;
+}) {
+    if (sessions.length === 0) return null;
+    return (
+        <div className="event-ticket-sessions">
+            <p className="event-ticket-sessions__title">{title}</p>
+            <ul className="event-ticket-sessions__list">
+                {sessions.map((session) => (
+                    <SessionRow
+                        key={String(session.id)}
+                        session={session}
+                        includeJoinLinks={includeJoinLinks}
+                    />
+                ))}
+            </ul>
+        </div>
+    );
+}
+
 export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {
     const ticketRef = useRef<HTMLElement>(null);
     const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
     const [exporting, setExporting] = useState<"pdf" | null>(null);
     const [exportError, setExportError] = useState("");
 
-    const sessions = confirmation.sessions ?? [];
+    const hasSplitSections = confirmation.waitingForYou != null || confirmation.dontMissOut != null;
+    const waitingForYou = confirmation.waitingForYou ?? [];
+    const dontMissOut = confirmation.dontMissOut ?? [];
+    const legacySessions = confirmation.sessions ?? [];
 
     useEffect(() => {
         let cancelled = false;
@@ -133,34 +197,25 @@ export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {
                     </div>
                 </div>
 
-                {sessions.length > 0 ? (
-                    <div className="event-ticket-sessions">
-                        <p className="event-ticket-sessions__title">Your Sessions</p>
-                        <ul className="event-ticket-sessions__list">
-                            {sessions.map((session) => (
-                                <li key={String(session.id)} className="event-ticket-session-row">
-                                    <p className="event-ticket-session-row__header">{formatSessionHeader(session)}</p>
-                                    {session.mode === "ONSITE" ? (
-                                        <p className="event-ticket-session-row__meta">Onsite attendance</p>
-                                    ) : session.joinUrl ? (
-                                        <>
-                                            <a
-                                                href={session.joinUrl}
-                                                className="event-ticket-session-join-btn"
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                            >
-                                                Join Online Session →
-                                            </a>
-                                            <p className="event-ticket-session-join-url">{session.joinUrl}</p>
-                                        </>
-                                    ) : (
-                                        <p className="event-ticket-session-row__meta">Join link will be sent when available</p>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
+                {hasSplitSections ? (
+                    <>
+                        <SessionGroup
+                            title="We will be waiting for you!"
+                            sessions={waitingForYou}
+                            includeJoinLinks
+                        />
+                        <SessionGroup
+                            title="Don't miss out on:"
+                            sessions={dontMissOut}
+                            includeJoinLinks={false}
+                        />
+                    </>
+                ) : legacySessions.length > 0 ? (
+                    <SessionGroup
+                        title="Your Sessions"
+                        sessions={legacySessions}
+                        includeJoinLinks
+                    />
                 ) : null}
 
                 <p className="event-ticket-card-note">

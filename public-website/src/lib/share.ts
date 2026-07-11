@@ -7,9 +7,14 @@ export function getPublicOrigin(): string {
     return DEFAULT_ORIGIN;
 }
 
-export function buildPublicEventUrl(eventId: number | string, origin?: string): string {
+export function buildPublicEventUrl(eventSlugOrId: number | string, origin?: string): string {
     const base = (origin ?? getPublicOrigin()).replace(/\/$/, "");
-    return `${base}/events/${eventId}`;
+    return `${base}/events/${eventSlugOrId}`;
+}
+
+export function buildPublicProjectUrl(projectSlugOrId: number | string, origin?: string): string {
+    const base = (origin ?? getPublicOrigin()).replace(/\/$/, "");
+    return `${base}/projects/${projectSlugOrId}`;
 }
 
 export function buildShareMessage(title: string, url: string): string {

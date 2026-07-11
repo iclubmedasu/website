@@ -1,11 +1,11 @@
 import type { Id, ISODateTime, MemberSummary } from "./member";
 
 export type TeamRoleType =
-    | "Leadership"
-    | "Regular"
     | "Officer"
-    | "President"
-    | "Vice President"
+    | "Administration"
+    | "Leadership"
+    | "Special Roles"
+    | "Regular"
     | (string & {});
 
 export interface TeamRef {

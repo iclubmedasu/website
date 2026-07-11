@@ -86,8 +86,8 @@ vi.mock("../../services/emailService", () => emailMocks);
 vi.mock("../../services/sessionTokenService", () => sessionTokenMocks);
 
 vi.mock("../../services/eventTicketEmailService", () => ({
-    buildRegistrationJoinUrl: (eventId: number, token: string) =>
-        `https://public.example/events/${eventId}/join?token=${token}`,
+    buildRegistrationJoinUrl: (eventSlugOrId: string | number, token: string) =>
+        `https://public.example/events/${eventSlugOrId}/join?token=${token}`,
 }));
 
 import publicRouter from "../../routes/public";
@@ -101,17 +101,19 @@ function createApp() {
 
 const baseEvent = {
     id: 1,
+    slug: "abcdefghjkmn",
     title: "Health Fair",
     description: "Community outreach",
-    eventDate: new Date("2026-07-01T10:00:00.000Z"),
-    eventEndDate: new Date("2026-07-01T18:00:00.000Z"),
+    eventDate: new Date("2026-08-01T10:00:00.000Z"),
+    eventEndDate: new Date("2026-08-01T18:00:00.000Z"),
     venue: "ASU Downtown",
-    registrationDeadline: new Date("2026-06-28T23:59:59.000Z"),
+    registrationDeadline: new Date("2026-07-28T23:59:59.000Z"),
     capacity: 100,
     status: "PUBLISHED",
     isActive: true,
     isArchived: false,
     isPublished: true,
+    isDisclosed: false,
     projectType: { name: "Workshop" },
 };
 
@@ -190,10 +192,60 @@ describe("public routes", () => {
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({
             id: 1,
+            slug: "abcdefghjkmn",
             description: "Community outreach",
             registeredCount: 12,
             spotsRemaining: 88,
         });
+    });
+
+    it("GET /public/events/:slug returns event detail by public slug", async () => {
+        prismaMocks.eventFindUnique
+            .mockResolvedValueOnce({ id: 1, slug: "abcdefghjkmn" })
+            .mockResolvedValueOnce(baseEvent);
+        prismaMocks.eventRegistrationCount.mockResolvedValue(12);
+
+        const response = await request(createApp()).get("/public/events/abcdefghjkmn");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+            id: 1,
+            slug: "abcdefghjkmn",
+            registeredCount: 12,
+        });
+    });
+
+    it("GET /public/events/:id returns disclosed archived past events", async () => {
+        const pastEvent = {
+            ...baseEvent,
+            isArchived: true,
+            isDisclosed: true,
+            isPublished: true,
+            isActive: false,
+        };
+        prismaMocks.eventFindUnique.mockResolvedValue(pastEvent);
+        prismaMocks.eventRegistrationCount.mockResolvedValue(40);
+
+        const response = await request(createApp()).get("/public/events/1");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+            id: 1,
+            slug: "abcdefghjkmn",
+            registrationOpen: false,
+        });
+    });
+
+    it("GET /public/events/:id returns 404 for archived events that are not disclosed", async () => {
+        prismaMocks.eventFindUnique.mockResolvedValue({
+            ...baseEvent,
+            isArchived: true,
+            isDisclosed: false,
+        });
+
+        const response = await request(createApp()).get("/public/events/1");
+
+        expect(response.status).toBe(404);
     });
 
     it("GET /public/events/:id/tiers returns active tiers with capacity", async () => {
@@ -262,6 +314,7 @@ describe("public routes", () => {
     });
 
     it("GET /public/events/:id/confirmation returns registration summary", async () => {
+        prismaMocks.eventFindUnique.mockResolvedValue({ id: 1, slug: "abcdefghjkmn" });
         prismaMocks.eventRegistrationFindFirst.mockResolvedValue({
             id: 42,
             confirmationCode: "ABC123",
@@ -270,6 +323,7 @@ describe("public routes", () => {
             status: "REGISTERED",
             event: {
                 id: 1,
+                slug: "abcdefghjkmn",
                 title: "Health Fair",
                 eventDate: new Date("2026-07-01T10:00:00.000Z"),
                 eventEndDate: new Date("2026-07-01T18:00:00.000Z"),
@@ -308,6 +362,7 @@ describe("public routes", () => {
             confirmationCode: "ABC123",
             fullName: "Ada Lovelace",
             tier: { name: "General" },
+            event: { id: 1, slug: "abcdefghjkmn" },
         });
         expect(sessionTokenMocks.generateTokensForRegistration).toHaveBeenCalledWith(42);
         expect(response.body.sessions).toHaveLength(2);
@@ -321,7 +376,7 @@ describe("public routes", () => {
             id: 7,
             label: "Afternoon online",
             mode: "ONLINE",
-            joinUrl: "https://public.example/events/1/join?token=tok-online-1",
+            joinUrl: "https://public.example/events/abcdefghjkmn/join?token=tok-online-1",
         });
     });
 
@@ -329,6 +384,7 @@ describe("public routes", () => {
         prismaMocks.projectFindMany.mockResolvedValue([
             {
                 id: 2,
+                slug: "projslug0001",
                 title: "Telehealth Pilot",
                 description: "Student-led pilot",
                 completedDate: "2026-05-01T00:00:00.000Z",
@@ -340,7 +396,10 @@ describe("public routes", () => {
         const response = await request(createApp()).get("/public/projects?limit=2");
 
         expect(response.status).toBe(200);
-        expect(response.body[0].title).toBe("Telehealth Pilot");
+        expect(response.body[0]).toMatchObject({
+            title: "Telehealth Pilot",
+            slug: "projslug0001",
+        });
         expect(prismaMocks.projectFindMany).toHaveBeenCalledWith(expect.objectContaining({
             where: {
                 isArchived: true,
@@ -367,6 +426,7 @@ describe("public routes", () => {
         expect(response.status).toBe(200);
         expect(response.body).toHaveLength(1);
         expect(response.body[0].title).toBe("Past Gala");
+        expect(response.body[0].slug).toBe("abcdefghjkmn");
         expect(prismaMocks.eventFindMany).toHaveBeenCalledWith(expect.objectContaining({
             where: {
                 isArchived: true,
@@ -379,6 +439,7 @@ describe("public routes", () => {
     it("GET /public/projects/:id returns disclosed archived project detail", async () => {
         prismaMocks.projectFindUnique.mockResolvedValue({
             id: 2,
+            slug: "projslug0001",
             title: "Telehealth Pilot",
             description: "Student-led pilot",
             completedDate: "2026-05-01T00:00:00.000Z",
@@ -393,6 +454,7 @@ describe("public routes", () => {
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({
             id: 2,
+            slug: "projslug0001",
             title: "Telehealth Pilot",
             projectType: { name: "Technology", category: "Technology" },
         });
@@ -402,6 +464,7 @@ describe("public routes", () => {
     it("GET /public/projects/:id returns 404 for undisclosed project", async () => {
         prismaMocks.projectFindUnique.mockResolvedValue({
             id: 3,
+            slug: "projslug0002",
             title: "Hidden Project",
             description: null,
             completedDate: null,

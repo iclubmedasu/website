@@ -94,8 +94,16 @@ const EditRoleModal = ({ isOpen, onClose, onSubmit, teamId, initialRoleId }: Edi
             const role = roles.find((r) => r.id === parseInt(selectedRoleId, 10));
             if (role) {
                 let roleType = role.roleType || 'Regular';
+                // Teams UI only edits Leadership / Special Roles / Regular.
+                // Officer / Administration are Administration-team system roles — never map them to Leadership.
                 if (!['Leadership', 'Special Roles', 'Regular'].includes(roleType)) {
-                    roleType = roleType === 'Leader' ? 'Leadership' : 'Regular';
+                    if (roleType === 'Leader') {
+                        roleType = 'Leadership';
+                    } else if (roleType === 'Officer' || roleType === 'Administration') {
+                        roleType = 'Regular';
+                    } else {
+                        roleType = 'Regular';
+                    }
                 }
                 setFormData({
                     roleName: role.roleName || '',

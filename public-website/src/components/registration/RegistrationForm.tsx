@@ -18,6 +18,7 @@ import {
 
 interface RegistrationFormProps {
     eventId: number;
+    eventSlug: string;
     eventTitle: string;
 }
 
@@ -93,7 +94,7 @@ function renderCustomFieldInput(
     );
 }
 
-export function RegistrationForm({ eventId, eventTitle }: RegistrationFormProps) {
+export function RegistrationForm({ eventId, eventSlug, eventTitle }: RegistrationFormProps) {
     const router = useRouter();
     const [draft, setDraft] = useState<RegistrationDraft>(emptyRegistrationDraft);
     const [tiers, setTiers] = useState<PublicEventTier[]>([]);
@@ -202,7 +203,7 @@ export function RegistrationForm({ eventId, eventTitle }: RegistrationFormProps)
 
         setSubmitting(true);
         try {
-            const result = await publicAPI.registerForEvent(eventId, {
+            const result = await publicAPI.registerForEvent(eventSlug, {
                 fullName: draft.fullName.trim(),
                 email: draft.email.trim(),
                 phoneNumber: draft.phoneNumber.trim() || null,
@@ -217,7 +218,7 @@ export function RegistrationForm({ eventId, eventTitle }: RegistrationFormProps)
                 email: draft.email.trim(),
             });
 
-            router.push(`/events/${eventId}/confirmation?code=${encodeURIComponent(result.confirmationCode)}`);
+            router.push(`/events/${eventSlug}/confirmation?code=${encodeURIComponent(result.confirmationCode)}`);
         } catch (error) {
             if (error instanceof ApiRequestError) {
                 setFormError(error.message);
@@ -290,11 +291,18 @@ export function RegistrationForm({ eventId, eventTitle }: RegistrationFormProps)
                             {sessions.map((session) => {
                                 const sessionId = String(session.id);
                                 const checked = draft.sessionIds.includes(sessionId);
+                                const fullAndUnchecked = Boolean(session.isFull) && !checked;
+                                const capacitySuffix = session.isFull
+                                    ? " (Full)"
+                                    : session.spotsRemaining != null
+                                        ? ` (${session.spotsRemaining} left)`
+                                        : "";
                                 return (
                                     <label key={sessionId} className="registration-session-option">
                                         <input
                                             type="checkbox"
                                             checked={checked}
+                                            disabled={fullAndUnchecked}
                                             onChange={(event) => onSessionToggle(sessionId, event.target.checked)}
                                         />
                                         <span>{formatSessionDisplayLabel({
@@ -305,7 +313,7 @@ export function RegistrationForm({ eventId, eventTitle }: RegistrationFormProps)
                                             startTime: session.startTime,
                                             endTime: session.endTime,
                                             mode: session.mode,
-                                        })}</span>
+                                        })}{capacitySuffix}</span>
                                     </label>
                                 );
                             })}

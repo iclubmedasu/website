@@ -31,6 +31,7 @@ export async function ensureSessionToken(
     return token;
 }
 
+/** Tokens for registrants who selected this ONLINE session. */
 export async function generateTokensForSession(sessionId: number): Promise<number> {
     const session = await prisma.eventSession.findUnique({
         where: { id: sessionId },
@@ -41,21 +42,30 @@ export async function generateTokensForSession(sessionId: number): Promise<numbe
         return 0;
     }
 
-    const registrations = await prisma.eventRegistration.findMany({
-        where: { eventId: session.eventId, status: { not: 'CANCELLED' } },
-        select: { id: true },
+    const selections = await prisma.eventRegistrationSession.findMany({
+        where: {
+            sessionId,
+            registration: {
+                eventId: session.eventId,
+                status: { not: 'CANCELLED' },
+            },
+        },
+        select: { registrationId: true },
     });
 
     let generated = 0;
-    for (const reg of registrations) {
+    for (const row of selections) {
         const existing = await prisma.eventSessionToken.findUnique({
             where: {
-                sessionId_registrationId: { sessionId, registrationId: reg.id },
+                sessionId_registrationId: {
+                    sessionId,
+                    registrationId: row.registrationId,
+                },
             },
             select: { id: true },
         });
         if (!existing) {
-            await ensureSessionToken(sessionId, reg.id);
+            await ensureSessionToken(sessionId, row.registrationId);
             generated += 1;
         }
     }
@@ -63,6 +73,7 @@ export async function generateTokensForSession(sessionId: number): Promise<numbe
     return generated;
 }
 
+/** Tokens only for ONLINE sessions this registration selected. */
 export async function generateTokensForRegistration(registrationId: number): Promise<number> {
     const registration = await prisma.eventRegistration.findUnique({
         where: { id: registrationId },
@@ -73,28 +84,41 @@ export async function generateTokensForRegistration(registrationId: number): Pro
         return 0;
     }
 
-    const sessions = await prisma.eventSession.findMany({
-        where: {
-            eventId: registration.eventId,
-            isActive: true,
-            mode: { not: 'ONSITE' },
+    const selections = await prisma.eventRegistrationSession.findMany({
+        where: { registrationId },
+        select: {
+            sessionId: true,
+            session: { select: { id: true, mode: true, isActive: true } },
         },
-        select: { id: true },
+    });
+
+    const onlineSelectedIds = selections
+        .filter((row) => row.session.isActive && isOnlineSessionMode(row.session.mode))
+        .map((row) => row.sessionId);
+
+    // Drop tokens for sessions the registrant no longer has selected
+    await prisma.eventSessionToken.deleteMany({
+        where: {
+            registrationId,
+            ...(onlineSelectedIds.length > 0
+                ? { sessionId: { notIn: onlineSelectedIds } }
+                : {}),
+        },
     });
 
     let generated = 0;
-    for (const session of sessions) {
+    for (const sessionId of onlineSelectedIds) {
         const existing = await prisma.eventSessionToken.findUnique({
             where: {
                 sessionId_registrationId: {
-                    sessionId: session.id,
+                    sessionId,
                     registrationId: registration.id,
                 },
             },
             select: { id: true },
         });
         if (!existing) {
-            await ensureSessionToken(session.id, registration.id);
+            await ensureSessionToken(sessionId, registration.id);
             generated += 1;
         }
     }
@@ -122,33 +146,9 @@ export async function generateTokensForAllEventRegistrations(
         select: { id: true },
     });
 
-    let total = 0;
+    let generated = 0;
     for (const session of sessions) {
-        total += await generateTokensForSession(session.id);
+        generated += await generateTokensForSession(session.id);
     }
-    return total;
-}
-
-/** @deprecated Use ensureSessionToken instead */
-export async function ensureRegistrationHasToken(
-    registrationId: number,
-): Promise<string> {
-    const sessions = await prisma.eventSession.findMany({
-        where: {
-            event: {
-                registrations: { some: { id: registrationId } },
-            },
-            isActive: true,
-            mode: { not: 'ONSITE' },
-        },
-        orderBy: [{ startDateTime: 'asc' }, { sessionDate: 'asc' }, { order: 'asc' }],
-        take: 1,
-        select: { id: true },
-    });
-
-    if (sessions.length === 0) {
-        throw new Error('No online sessions found for registration');
-    }
-
-    return ensureSessionToken(sessions[0].id, registrationId);
+    return generated;
 }

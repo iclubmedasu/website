@@ -4,14 +4,14 @@ import { Badge } from "@/components/ui";
 import { EventShareMenu } from "./EventShareMenu";
 
 interface EventDetailHeaderProps {
-    eventId: number;
+    eventSlug: string;
     eventTitle: string;
     projectTypeName?: string | null;
     description?: string | null;
 }
 
 export function EventDetailHeader({
-    eventId,
+    eventSlug,
     eventTitle,
     projectTypeName,
     description,
@@ -24,7 +24,7 @@ export function EventDetailHeader({
                 <div className="event-card-header-type">
                     {projectTypeName ? <Badge variant="purple">{projectTypeName}</Badge> : null}
                 </div>
-                <EventShareMenu eventId={eventId} eventTitle={eventTitle} />
+                <EventShareMenu eventSlug={eventSlug} eventTitle={eventTitle} />
             </div>
             {description ? (
                 <p className="text-lg leading-8 text-slate-600">{description}</p>

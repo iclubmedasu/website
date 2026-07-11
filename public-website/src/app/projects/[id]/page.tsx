@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ProjectDetailContent } from "@/components/public-data/ProjectDetailContent";
+import { publicAPI } from "@/lib/api";
+import { redirectNumericParamToSlug } from "@/lib/publicSlug";
 
 interface ProjectDetailPageProps {
     params: Promise<{ id: string }>;
@@ -12,10 +14,16 @@ export const metadata: Metadata = {
 
 export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     const { id } = await params;
-    const projectId = Number(id);
-    if (Number.isNaN(projectId)) {
+    const project = await publicAPI.getProject(id);
+    if (!project) {
         notFound();
     }
 
-    return <ProjectDetailContent projectId={projectId} />;
+    redirectNumericParamToSlug({
+        param: id,
+        slug: project.slug,
+        basePath: "projects",
+    });
+
+    return <ProjectDetailContent idOrSlug={project.slug} />;
 }

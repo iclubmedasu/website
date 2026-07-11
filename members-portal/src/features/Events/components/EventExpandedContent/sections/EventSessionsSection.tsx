@@ -32,12 +32,31 @@ function truncateUrl(url: string, maxLength = 48): string {
     return `${url.slice(0, maxLength - 1)}…`;
 }
 
+function parseMaxCapacityInput(value: string): number | null {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return Number.parseInt(trimmed, 10);
+}
+
+function formatSessionCapacity(session: EventSessionRef): string | null {
+    const registered = session.registeredCount ?? 0;
+    if (session.maxCapacity != null) {
+        return `${registered} / ${session.maxCapacity}`;
+    }
+    if (registered > 0) {
+        return `${registered} / Unlimited`;
+    }
+    return null;
+}
+
 function validateSessionInput(
     label: string,
     startDateTime: string,
     endDateTime: string,
     mode: EventSessionMode,
     onlineUrl: string,
+    maxCapacity: string,
+    options?: { registeredCount?: number },
 ): string | null {
     if (!label.trim()) return 'Session title is required.';
     if (!startDateTime.trim() || !endDateTime.trim()) return 'Session start and end are required.';
@@ -48,6 +67,17 @@ function validateSessionInput(
     if (requiresOnlineUrl(mode) && !onlineUrl.trim()) {
         return 'Meeting link is required for online sessions.';
     }
+    const trimmedCapacity = maxCapacity.trim();
+    if (trimmedCapacity) {
+        const parsed = Number.parseInt(trimmedCapacity, 10);
+        if (!Number.isInteger(parsed) || parsed < 1 || String(parsed) !== trimmedCapacity) {
+            return 'Max capacity must be a positive integer or empty for unlimited.';
+        }
+        const registeredCount = options?.registeredCount ?? 0;
+        if (parsed < registeredCount) {
+            return `Cannot set max capacity below current registrations (${registeredCount}).`;
+        }
+    }
     return null;
 }
 
@@ -57,6 +87,7 @@ function buildSessionPayload(
     endDateTime: string,
     mode: EventSessionMode,
     onlineUrl: string,
+    maxCapacity: string,
 ): CreateEventSessionPayload | null {
     const startIso = fromDateTimeLocalValue(startDateTime);
     const endIso = fromDateTimeLocalValue(endDateTime);
@@ -67,6 +98,7 @@ function buildSessionPayload(
         endDateTime: endIso,
         mode,
         onlineUrl: requiresOnlineUrl(mode) ? onlineUrl.trim() : null,
+        maxCapacity: parseMaxCapacityInput(maxCapacity),
     };
 }
 
@@ -96,12 +128,14 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
     const [endDateTime, setEndDateTime] = useState('');
     const [mode, setMode] = useState<EventSessionMode>('ONSITE');
     const [onlineUrl, setOnlineUrl] = useState('');
+    const [maxCapacity, setMaxCapacity] = useState('');
 
     const [editLabel, setEditLabel] = useState('');
     const [editStartDateTime, setEditStartDateTime] = useState('');
     const [editEndDateTime, setEditEndDateTime] = useState('');
     const [editMode, setEditMode] = useState<EventSessionMode>('ONSITE');
     const [editOnlineUrl, setEditOnlineUrl] = useState('');
+    const [editMaxCapacity, setEditMaxCapacity] = useState('');
 
     const isEditing = editingSessionId != null;
 
@@ -129,16 +163,24 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
         setEndDateTime('');
         setMode('ONSITE');
         setOnlineUrl('');
+        setMaxCapacity('');
     };
 
     const handleCreateSession = async () => {
-        const validationError = validateSessionInput(label, startDateTime, endDateTime, mode, onlineUrl);
+        const validationError = validateSessionInput(
+            label,
+            startDateTime,
+            endDateTime,
+            mode,
+            onlineUrl,
+            maxCapacity,
+        );
         if (validationError) {
             setFormError(validationError);
             return;
         }
 
-        const payload = buildSessionPayload(label, startDateTime, endDateTime, mode, onlineUrl);
+        const payload = buildSessionPayload(label, startDateTime, endDateTime, mode, onlineUrl, maxCapacity);
         if (!payload) {
             setFormError('Please enter valid session start and end times.');
             return;
@@ -162,6 +204,7 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
         setEditEndDateTime(times.end);
         setEditMode(session.mode === 'ONSITE' ? 'ONSITE' : 'ONLINE');
         setEditOnlineUrl(session.onlineUrl ?? '');
+        setEditMaxCapacity(session.maxCapacity != null ? String(session.maxCapacity) : '');
         setFormError('');
     };
 
@@ -172,6 +215,7 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
         setEditEndDateTime('');
         setEditMode('ONSITE');
         setEditOnlineUrl('');
+        setEditMaxCapacity('');
     };
 
     const saveEdit = async (session: EventSessionRef) => {
@@ -181,6 +225,8 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
             editEndDateTime,
             editMode,
             editOnlineUrl,
+            editMaxCapacity,
+            { registeredCount: session.registeredCount ?? 0 },
         );
         if (validationError) {
             setFormError(validationError);
@@ -193,6 +239,7 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
             editEndDateTime,
             editMode,
             editOnlineUrl,
+            editMaxCapacity,
         ) as UpdateEventSessionPayload | null;
         if (!payload) {
             setFormError('Please enter valid session start and end times.');
@@ -228,6 +275,7 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
             endDateTime: string;
             mode: EventSessionMode;
             onlineUrl: string;
+            maxCapacity: string;
         },
         setters: {
             setLabel: (value: string) => void;
@@ -235,6 +283,7 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
             setEndDateTime: (value: string) => void;
             setMode: (value: EventSessionMode) => void;
             setOnlineUrl: (value: string) => void;
+            setMaxCapacity: (value: string) => void;
         },
         options?: { disabled?: boolean; actions?: ReactNode },
     ) => (
@@ -251,7 +300,7 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
                 type="datetime-local"
                 value={values.startDateTime}
                 onChange={(e) => setters.setStartDateTime(e.target.value)}
-                className="form-input"
+                className="form-input event-session-date-input"
                 disabled={options?.disabled}
                 aria-label="Session start"
             />
@@ -259,7 +308,7 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
                 type="datetime-local"
                 value={values.endDateTime}
                 onChange={(e) => setters.setEndDateTime(e.target.value)}
-                className="form-input"
+                className="form-input event-session-date-input"
                 disabled={options?.disabled}
                 aria-label="Session end"
             />
@@ -287,6 +336,17 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
                 disabled={options?.disabled || values.mode === 'ONSITE'}
                 aria-label="Meeting link"
             />
+            <input
+                type="number"
+                min={1}
+                step={1}
+                value={values.maxCapacity}
+                onChange={(e) => setters.setMaxCapacity(e.target.value)}
+                placeholder="Max capacity (optional)"
+                className="form-input"
+                disabled={options?.disabled}
+                aria-label="Max capacity"
+            />
             {options?.actions}
         </>
     );
@@ -302,8 +362,8 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
             {canManage ? (
                 <div className="event-expanded-form-grid event-expanded-session-form-grid">
                     {renderSessionFormFields(
-                        { label, startDateTime, endDateTime, mode, onlineUrl },
-                        { setLabel, setStartDateTime, setEndDateTime, setMode, setOnlineUrl },
+                        { label, startDateTime, endDateTime, mode, onlineUrl, maxCapacity },
+                        { setLabel, setStartDateTime, setEndDateTime, setMode, setOnlineUrl, setMaxCapacity },
                         {
                             disabled: isEditing,
                             actions: (
@@ -331,6 +391,7 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
                         ? formatSessionRange(session.startDateTime, session.endDateTime)
                         : null;
                     const attendanceCount = session._count?.attendances ?? 0;
+                    const capacityLabel = formatSessionCapacity(session);
 
                     if (sessionIsEditing) {
                         return (
@@ -343,6 +404,7 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
                                             endDateTime: editEndDateTime,
                                             mode: editMode,
                                             onlineUrl: editOnlineUrl,
+                                            maxCapacity: editMaxCapacity,
                                         },
                                         {
                                             setLabel: setEditLabel,
@@ -350,6 +412,7 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
                                             setEndDateTime: setEditEndDateTime,
                                             setMode: setEditMode,
                                             setOnlineUrl: setEditOnlineUrl,
+                                            setMaxCapacity: setEditMaxCapacity,
                                         },
                                         {
                                             actions: (
@@ -379,6 +442,7 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
                                 </span>
                                 <p className="event-expanded-muted">
                                     {timeRange || 'No schedule set'}
+                                    {capacityLabel ? ` · ${capacityLabel}` : ''}
                                     {attendanceCount > 0 ? ` · ${attendanceCount} attended` : ''}
                                 </p>
                                 {requiresOnlineUrl(session.mode) && session.onlineUrl ? (

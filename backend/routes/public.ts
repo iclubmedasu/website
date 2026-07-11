@@ -1,6 +1,11 @@
 import express, { Request, Response } from "express";
 import { prisma } from "../db";
 import { serializeEventSession } from "../lib/eventSessionTime";
+import {
+    countActiveSessionRegistrationsForSessions,
+    splitSessionsForTicket,
+    withSessionCapacityFields,
+} from "../lib/eventSessionCapacity";
 import { sendEmail } from "../services/emailService";
 import { buildRegistrationJoinUrl } from "../services/eventTicketEmailService";
 import { generateTokensForRegistration, getSessionTokensForRegistration } from "../services/sessionTokenService";
@@ -9,6 +14,7 @@ import { buildPublicMemberDirectory } from "../lib/publicMemberDirectory";
 import { getPublicWebsiteUrl } from "../lib/publicWebsiteUrl";
 import { getAboutPageData, getActiveSocialLinks, getContactPageData } from "../lib/siteContent";
 import { createIncidentReportSubmission, getSupportPageData } from "../lib/supportContent";
+import { resolveEventByIdOrSlug, resolveProjectByIdOrSlug } from "../lib/publicEntitySlug";
 
 const router = express.Router();
 
@@ -17,6 +23,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type EventCapacityRow = {
     id: number;
+    slug: string;
     title: string;
     description: string | null;
     eventDate: Date;
@@ -28,11 +35,13 @@ type EventCapacityRow = {
     isActive: boolean;
     isArchived: boolean;
     isPublished: boolean;
+    isDisclosed?: boolean;
     projectType?: { name: string } | null;
 };
 
 const publicEventSelect = {
     id: true,
+    slug: true,
     title: true,
     description: true,
     eventDate: true,
@@ -44,11 +53,13 @@ const publicEventSelect = {
     isActive: true,
     isArchived: true,
     isPublished: true,
+    isDisclosed: true,
     projectType: { select: { name: true } },
 } as const;
 
 const publicProjectSelect = {
     id: true,
+    slug: true,
     title: true,
     description: true,
     completedDate: true,
@@ -78,10 +89,6 @@ function parseEventId(value: string): number | null {
     return Number.isNaN(parsed) ? null : parsed;
 }
 
-function parseProjectId(value: string): number | null {
-    return parseEventId(value);
-}
-
 function parseMemberId(value: string): number | null {
     return parseEventId(value);
 }
@@ -104,8 +111,22 @@ function isUpcomingQuery(value: unknown): boolean {
     return normalized === "" || normalized === "true" || normalized === "1";
 }
 
+/** Live published events (registration-capable). */
 function canPublicViewEvent(event: { isPublished: boolean; isActive: boolean; isArchived: boolean }): boolean {
     return event.isActive && !event.isArchived && event.isPublished;
+}
+
+/** Live published OR archived+disclosed (past public detail). */
+function canPublicViewEventDetail(event: {
+    isPublished: boolean;
+    isActive: boolean;
+    isArchived: boolean;
+    isDisclosed: boolean;
+}): boolean {
+    if (event.isArchived) {
+        return event.isDisclosed;
+    }
+    return canPublicViewEvent(event);
 }
 
 function computeSpotsRemaining(capacity: number | null | undefined, registeredCount: number): number | null {
@@ -180,6 +201,7 @@ function serializePublicEventListItem(
 
     return {
         id: event.id,
+        slug: event.slug,
         title: event.title,
         ...(options?.includeDescription ? { description: event.description } : {}),
         eventDate: event.eventDate,
@@ -265,27 +287,34 @@ router.get("/events", async (req: Request, res: Response) => {
 
 router.get("/events/:id", async (req: Request, res: Response) => {
     try {
-        const eventId = parseEventId(String(req.params.id));
-        if (eventId == null) {
-            return res.status(400).json({ error: "Invalid event id" });
+        const resolved = await resolveEventByIdOrSlug(String(req.params.id));
+        if (!resolved) {
+            return res.status(404).json({ error: "Event not found" });
         }
 
         const event = await prisma.event.findUnique({
-            where: { id: eventId },
+            where: { id: resolved.id },
             select: publicEventSelect,
         });
 
-        if (!event || event.isArchived || !canPublicViewEvent(event)) {
+        if (!event || !canPublicViewEventDetail(event)) {
             return res.status(404).json({ error: "Event not found" });
         }
 
         const registeredCount = await prisma.eventRegistration.count({
-            where: { eventId, status: { not: "CANCELLED" } },
+            where: { eventId: resolved.id, status: { not: "CANCELLED" } },
         });
 
-        return res.json(
-            serializePublicEventListItem(event, registeredCount, new Date(), { includeDescription: true }),
-        );
+        const payload = serializePublicEventListItem(event, registeredCount, new Date(), {
+            includeDescription: true,
+        });
+
+        // Past/archived events are view-only: registration is closed.
+        if (event.isArchived) {
+            return res.json({ ...payload, registrationOpen: false });
+        }
+
+        return res.json(payload);
     } catch (error) {
         console.error("GET /public/events/:id error:", error);
         return res.status(500).json({ error: "Failed to load event" });
@@ -294,10 +323,11 @@ router.get("/events/:id", async (req: Request, res: Response) => {
 
 router.get("/events/:id/tiers", async (req: Request, res: Response) => {
     try {
-        const eventId = parseEventId(String(req.params.id));
-        if (eventId == null) {
-            return res.status(400).json({ error: "Invalid event id" });
+        const resolved = await resolveEventByIdOrSlug(String(req.params.id));
+        if (!resolved) {
+            return res.status(404).json({ error: "Event not found" });
         }
+        const eventId = resolved.id;
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
@@ -346,10 +376,11 @@ router.get("/events/:id/tiers", async (req: Request, res: Response) => {
 
 router.get("/events/:id/custom-fields", async (req: Request, res: Response) => {
     try {
-        const eventId = parseEventId(String(req.params.id));
-        if (eventId == null) {
-            return res.status(400).json({ error: "Invalid event id" });
+        const resolved = await resolveEventByIdOrSlug(String(req.params.id));
+        if (!resolved) {
+            return res.status(404).json({ error: "Event not found" });
         }
+        const eventId = resolved.id;
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
@@ -386,10 +417,11 @@ router.get("/events/:id/custom-fields", async (req: Request, res: Response) => {
 
 router.get("/events/:id/sessions", async (req: Request, res: Response) => {
     try {
-        const eventId = parseEventId(String(req.params.id));
-        if (eventId == null) {
-            return res.status(400).json({ error: "Invalid event id" });
+        const resolved = await resolveEventByIdOrSlug(String(req.params.id));
+        if (!resolved) {
+            return res.status(404).json({ error: "Event not found" });
         }
+        const eventId = resolved.id;
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
@@ -405,7 +437,13 @@ router.get("/events/:id/sessions", async (req: Request, res: Response) => {
             orderBy: [{ startDateTime: "asc" }, { sessionDate: "asc" }, { order: "asc" }],
         });
 
-        return res.json(sessions.map((session) => serializeEventSession(session)));
+        const counts = await countActiveSessionRegistrationsForSessions(sessions.map((session) => session.id));
+        return res.json(sessions.map((session) => (
+            withSessionCapacityFields(
+                serializeEventSession(session),
+                counts.get(session.id) ?? 0,
+            )
+        )));
     } catch (error) {
         console.error("GET /public/events/:id/sessions error:", error);
         return res.status(500).json({ error: "Failed to load event sessions" });
@@ -414,10 +452,11 @@ router.get("/events/:id/sessions", async (req: Request, res: Response) => {
 
 router.get("/events/:id/registration-form", async (req: Request, res: Response) => {
     try {
-        const eventId = parseEventId(String(req.params.id));
-        if (eventId == null) {
-            return res.status(400).json({ error: "Invalid event id" });
+        const resolved = await resolveEventByIdOrSlug(String(req.params.id));
+        if (!resolved) {
+            return res.status(404).json({ error: "Event not found" });
         }
+        const eventId = resolved.id;
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
@@ -451,15 +490,17 @@ router.get("/events/:id/registration-form", async (req: Request, res: Response) 
 
 router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
     try {
-        const eventId = parseEventId(String(req.params.id));
+        const resolved = await resolveEventByIdOrSlug(String(req.params.id));
         const confirmationCode = String(req.query.code ?? "").trim().toUpperCase();
 
-        if (eventId == null) {
-            return res.status(400).json({ error: "Invalid event id" });
+        if (!resolved) {
+            return res.status(404).json({ error: "Event not found" });
         }
         if (!confirmationCode) {
             return res.status(400).json({ error: "code is required" });
         }
+
+        const eventId = resolved.id;
 
         const registration = await prisma.eventRegistration.findFirst({
             where: {
@@ -475,6 +516,7 @@ router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
                 event: {
                     select: {
                         id: true,
+                        slug: true,
                         title: true,
                         eventDate: true,
                         eventEndDate: true,
@@ -508,20 +550,37 @@ router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
             orderBy: [{ startDateTime: "asc" }, { sessionDate: "asc" }, { order: "asc" }],
         });
 
+        const selectedRows = await prisma.eventRegistrationSession.findMany({
+            where: { registrationId: registration.id },
+            select: { sessionId: true },
+        });
+        const selectedIds = selectedRows.map((row) => row.sessionId);
+        const { waitingForYou, dontMissOut } = splitSessionsForTicket(eventSessions, selectedIds);
+
         const sessionTokens = await getSessionTokensForRegistration(registration.id);
 
-        const sessions = eventSessions.map((session) => {
+        const mapSession = (
+            session: (typeof eventSessions)[number],
+            section: "waitingForYou" | "dontMissOut",
+        ) => {
             const serialized = serializeEventSession(session);
             const token = sessionTokens.get(session.id);
-            const joinUrl = session.mode === "ONLINE" && token
-                ? buildRegistrationJoinUrl(eventId, token)
+            const joinUrl = section === "waitingForYou"
+                && session.mode === "ONLINE"
+                && token
+                ? buildRegistrationJoinUrl(registration.event.slug, token)
                 : null;
 
             return {
                 ...serialized,
+                maxCapacity: session.maxCapacity ?? null,
                 joinUrl,
+                section,
             };
-        });
+        };
+
+        const waitingForYouSessions = waitingForYou.map((session) => mapSession(session, "waitingForYou"));
+        const dontMissOutSessions = dontMissOut.map((session) => mapSession(session, "dontMissOut"));
 
         return res.json({
             confirmationCode: registration.confirmationCode,
@@ -529,13 +588,16 @@ router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
             email: registration.email,
             event: {
                 id: registration.event.id,
+                slug: registration.event.slug,
                 title: registration.event.title,
                 eventDate: registration.event.eventDate,
                 eventEndDate: registration.event.eventEndDate,
                 venue: registration.event.venue,
             },
             tier: registration.tier ? { name: registration.tier.name } : null,
-            sessions,
+            sessions: [...waitingForYouSessions, ...dontMissOutSessions],
+            waitingForYou: waitingForYouSessions,
+            dontMissOut: dontMissOutSessions,
         });
     } catch (error) {
         console.error("GET /public/events/:id/confirmation error:", error);
@@ -569,13 +631,13 @@ router.get("/projects", async (req: Request, res: Response) => {
 
 router.get("/projects/:id", async (req: Request, res: Response) => {
     try {
-        const projectId = parseProjectId(String(req.params.id));
-        if (projectId == null) {
-            return res.status(400).json({ error: "Invalid project id" });
+        const resolved = await resolveProjectByIdOrSlug(String(req.params.id));
+        if (!resolved) {
+            return res.status(404).json({ error: "Project not found" });
         }
 
         const project = await prisma.project.findUnique({
-            where: { id: projectId },
+            where: { id: resolved.id },
             select: {
                 ...publicProjectSelect,
                 isArchived: true,

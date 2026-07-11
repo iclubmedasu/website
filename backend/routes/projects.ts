@@ -14,6 +14,7 @@ import {
     updateProjectOptimistic,
 } from '../lib/optimisticLock';
 import { publishProjectChanged } from '../lib/resourceRealtime';
+import { generateUniqueProjectSlug } from '../services/eventCode';
 
 const router: any = express.Router();
 
@@ -448,9 +449,11 @@ router.post('/', async (req, res) => {
             return res.status(403).json({ error: 'Only developer, officer, administration and leadership can create projects' });
         }
 
+        const slug = await generateUniqueProjectSlug();
         const project = await prisma.project.create({
             data: {
                 title: toTitleCase(title.trim()),
+                slug,
                 description: description?.trim() || null,
                 projectTypeId: parseInt(projectTypeId),
                 priority,

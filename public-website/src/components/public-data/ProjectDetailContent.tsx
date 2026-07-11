@@ -5,19 +5,20 @@ import { useEffect, useState } from "react";
 import type { PublicProjectDetail } from "@iclub/shared";
 import { BackLink } from "@/components/navigation/BackLink";
 import { ClientFormattedDate } from "@/components/datetime/ClientDateTime";
+import { ProjectShareMenu } from "@/components/projects/ProjectShareMenu";
 import { Badge, PageContainer } from "@/components/ui";
 import { publicAPI } from "@/lib/api";
 import { DataLoadingState } from "./DataLoadingState";
 
 type LoadState = "loading" | "not_found" | "ready";
 
-export function ProjectDetailContent({ projectId }: { projectId: number }) {
+export function ProjectDetailContent({ idOrSlug }: { idOrSlug: string }) {
     const [state, setState] = useState<LoadState>("loading");
     const [project, setProject] = useState<PublicProjectDetail | null>(null);
 
     useEffect(() => {
         void publicAPI
-            .getProject(projectId)
+            .getProject(idOrSlug)
             .then((data) => {
                 if (!data) {
                     setState("not_found");
@@ -27,7 +28,7 @@ export function ProjectDetailContent({ projectId }: { projectId: number }) {
                 setState("ready");
             })
             .catch(() => setState("not_found"));
-    }, [projectId]);
+    }, [idOrSlug]);
 
     if (state === "loading") {
         return (
@@ -54,13 +55,18 @@ export function ProjectDetailContent({ projectId }: { projectId: number }) {
         <PageContainer className="space-y-8 py-10 sm:py-14">
             <BackLink href="/projects" label="Back to Projects" />
             <section className="max-w-3xl space-y-4">
-                <div className="flex flex-wrap items-center gap-3">
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-purple-700">Project</p>
-                    {project.projectType?.name ? (
-                        <Badge variant="purple">{project.projectType.name}</Badge>
-                    ) : null}
+                <div className="event-detail-title-row">
+                    <div className="space-y-2 min-w-0 flex-1">
+                        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-purple-700">Project</p>
+                        <h1 className="text-4xl font-bold text-purple-900">{project.title}</h1>
+                    </div>
+                    <div className="event-card-header-type">
+                        {project.projectType?.name ? (
+                            <Badge variant="purple">{project.projectType.name}</Badge>
+                        ) : null}
+                    </div>
+                    <ProjectShareMenu projectSlug={project.slug} projectTitle={project.title} />
                 </div>
-                <h1 className="text-4xl font-bold text-purple-900">{project.title}</h1>
                 {project.description ? (
                     <p className="text-lg leading-8 text-slate-600">{project.description}</p>
                 ) : null}

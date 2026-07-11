@@ -59,12 +59,8 @@
 }
 
 .event-card--past {
-    cursor: default;
-}
-
-.event-card--past:hover {
-    transform: none;
-    box-shadow: var(--shadow-sm);
+    /* Same interactive affordances as default cards; badge/content differ in JSX. */
+    opacity: 1;
 }
 
 .event-card-title {
@@ -166,12 +162,12 @@
     color: inherit;
 }
 
-.project-card:hover {
+.project-card:has(.event-card-body):hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
 }
 
-.project-card:focus-visible {
+.project-card:focus-within {
     outline: 2px solid var(--purple-600);
     outline-offset: 2px;
 }

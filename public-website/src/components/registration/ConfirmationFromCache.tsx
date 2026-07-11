@@ -3,20 +3,24 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { readRegistrationCache } from "@/lib/registrationCache";
+import { publicEventPath } from "@/lib/publicSlug";
 
 interface ConfirmationFromCacheProps {
     eventId: number;
+    eventSlug: string;
 }
 
-export function ConfirmationFromCache({ eventId }: ConfirmationFromCacheProps) {
+export function ConfirmationFromCache({ eventId, eventSlug }: ConfirmationFromCacheProps) {
     const router = useRouter();
 
     useEffect(() => {
         const cached = readRegistrationCache(eventId);
         if (cached?.confirmationCode) {
-            router.replace(`/events/${eventId}/confirmation?code=${encodeURIComponent(cached.confirmationCode)}`);
+            router.replace(
+                `${publicEventPath(eventSlug, "/confirmation")}?code=${encodeURIComponent(cached.confirmationCode)}`,
+            );
         }
-    }, [eventId, router]);
+    }, [eventId, eventSlug, router]);
 
     return (
         <p className="text-sm text-slate-600">

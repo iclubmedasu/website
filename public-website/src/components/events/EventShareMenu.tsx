@@ -15,13 +15,13 @@ import {
 import "./event-share.css";
 
 interface EventShareMenuProps {
-    eventId: number;
+    eventSlug: string;
     eventTitle: string;
     className?: string;
 }
 
 export function EventShareMenu({
-    eventId,
+    eventSlug,
     eventTitle,
     className = "",
 }: EventShareMenuProps) {
@@ -31,7 +31,7 @@ export function EventShareMenu({
     const [copied, setCopied] = useState(false);
     const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const url = buildPublicEventUrl(eventId);
+    const url = buildPublicEventUrl(eventSlug);
     const message = buildShareMessage(eventTitle, url);
     const showNativeShare = canUseNativeShare();
 
