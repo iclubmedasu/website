@@ -439,6 +439,7 @@ function MembersPage() {
                     </div>
                 </div>
                 <div className="card-body">
+                    <div className="members-table-shell">
                     {!loading && filteredRows.length === 0 ? (
                         <div className="empty-state">
                             <Users className="empty-state-icon" />
@@ -527,6 +528,7 @@ function MembersPage() {
                             </table>
                         </div>
                     )}
+                    </div>
                 </div>
                 {totalPages > 1 && (
                     <div className="pagination-controls">

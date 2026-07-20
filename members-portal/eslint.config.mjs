@@ -13,4 +13,20 @@ export default [
             'public/fallback-*.js',
         ],
     },
+    {
+        files: ['src/**/*.{ts,tsx}'],
+        rules: {
+            'no-restricted-syntax': [
+                'warn',
+                {
+                    selector: 'CallExpression[callee.property.name="toLocaleDateString"]',
+                    message: 'Use formatDate from @iclub/shared/utils instead of toLocaleDateString.',
+                },
+                {
+                    selector: 'CallExpression[callee.property.name="toLocaleString"][arguments.length>0]',
+                    message: 'Use formatDateTime from @iclub/shared/utils instead of toLocaleString.',
+                },
+            ],
+        },
+    },
 ]

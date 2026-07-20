@@ -1,0 +1,32 @@
+# Gitleaks — lightweight secret scan on PRs (no Gitleaks org license required).
+# Prefer also enabling GitHub secret scanning in repo Settings (see .github/SECRETS.md).
+
+name: Gitleaks — Secret Scan
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/repo" \
+            zricethezav/gitleaks:v8.24.3 \
+            detect --source=/repo --verbose --redact

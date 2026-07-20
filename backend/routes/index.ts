@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express";
 import { authenticateToken, optionalAuthenticateToken } from "../middleware/auth";
+import { publicCertificateReadLimiter } from "../middleware/rateLimit";
 
 import authRoutes from "./auth";
 import teamsRoutes from "./teams";
@@ -22,6 +23,8 @@ import publicRoutes from "./public";
 import siteContentRoutes from "./siteContent";
 import supportContentRoutes from "./supportContent";
 import financeRoutes from "./finance";
+import certificateTemplatesRoutes from "./certificateTemplates";
+import certificatesRoutes from "./certificates";
 
 import { downloadProfilePhoto } from "../services/githubStorage";
 
@@ -88,6 +91,29 @@ router.use("/site-content", authenticateToken, siteContentRoutes);
 router.use("/site-content/support", authenticateToken, supportContentRoutes);
 router.use("/finance", authenticateToken, financeRoutes);
 
+function isPublicCertificateRequest(req: Request): boolean {
+    if (req.method === "GET" && /^\/verify\/[^/]+\/?$/.test(req.path)) return true;
+    if (req.method === "GET" && /^\/verify\/[^/]+\/background\/?$/.test(req.path)) return true;
+    if (
+        req.method === "GET"
+        && (req.path === "/" || req.path === "")
+        && !req.headers.authorization
+        && String(req.query.status ?? "") === "ISSUED"
+        && !!req.query.recipientMemberId
+    ) {
+        return true;
+    }
+    return false;
+}
+
+router.use("/certificate-templates", authenticateToken, certificateTemplatesRoutes);
+router.use("/certificates", (req, res, next) => {
+    if (isPublicCertificateRequest(req)) {
+        return publicCertificateReadLimiter(req, res, next);
+    }
+    return authenticateToken(req, res, next);
+}, certificatesRoutes);
+
 router.get("/", (_req: Request, res: Response) => {
     res.json({
         message: "iClub Management API",
@@ -112,6 +138,8 @@ router.get("/", (_req: Request, res: Response) => {
             notifications: "/api/notifications",
             siteContent: "/api/site-content",
             finance: "/api/finance",
+            certificateTemplates: "/api/certificate-templates",
+            certificates: "/api/certificates",
             public: "/api/public",
         },
     });

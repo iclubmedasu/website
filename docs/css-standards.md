@@ -79,6 +79,7 @@ Before writing any CSS, search the existing centralized files to check if the de
 | `components/page/page.css` | Page containers, page titles, page headers, title dividers, info display (label/value pairs), empty states, responsive |
 | `components/modal/modal.css` | Modal backdrop/container/header/body/footer, form elements, buttons, detail cards, checkboxes, radio cards, badge picker, timeline, loading/error states |
 | `components/cards/universalcard.css` | Card base, card header, card body, card footer, variants |
+| `components/table/table.css` | Data table (`.members-table`), table shell frame, member cells, status badges, table action buttons |
 | `components/buttons/buttons.css` | Login-page button variant |
 | `components/toggle/toggle.css` | Toggle switch |
 | `components/scrollbar/scrollbar.css` | Global scrollbar styles |
@@ -170,6 +171,7 @@ This prevents future developers (or AI agents) from re-adding the styles.
 9. [Naming Conventions](#9-naming-conventions)
 10. [File Organization & Architecture](#10-file-organization--architecture)
 11. [Quick Reference: Implementing a New Feature](#11-quick-reference-implementing-a-new-feature)
+12. [Data Tables](#12-data-tables)
 
 ---
 
@@ -370,6 +372,7 @@ color: var(--gray-600);
 | Inputs, selects, textareas | `--radius-md` (16px) |
 | Nav items | `--radius-md` (16px) |
 | Table status badges | `--radius-md` (16px) |
+| Data table shells | `--radius-md` (16px) |
 | Cards | `--radius-lg` (8px) |
 | Modals | `--radius-lg` (8px) |
 | Dropdown menus | `--radius-lg` (8px) |
@@ -780,6 +783,7 @@ The following centralizations have been completed and should never be undone:
 | Empty states | `page.css` | Icon, title, text, button — extracted from modal.css and page CSS files |
 | Toggle switch | `toggle.css` | Extracted from TeamsPage.css |
 | Scrollbar | `scrollbar.css` | Global scrollbar styling |
+| Data table shell | `table.css` | Thin brand border + `--radius-md` inner frame nested inside a normal `.card` around `.members-table` |
 | Hard-coded colors | All files | Replaced hex/rgb with CSS variable tokens |
 | px → rem conversion | All files | Converted px units to rem |
 | Responsive breakpoints | All pages | Added standard breakpoint rules |
@@ -805,4 +809,63 @@ If you encounter any of these non-standard tokens in old code, replace them:
 | `#ffebee` | `var(--error-bg)` |
 | `#3f51b5` | `var(--purple-700)` |
 | `#e0e0e0` | `var(--gray-80)` |
+
+---
+
+## 12. Data Tables
+
+> **App-wide rule:** Page tables live inside a normal `.card`. Nest `.members-table-shell` around the table inside the card body. Do **not** neutralize or replace the card with the shell.
+
+### Required markup (page tables)
+
+```tsx
+<div className="card members-table-card">
+  <div className="card-header">...</div>   {/* keep full card look */}
+  <div className="card-body">
+    {/* filters stay here, outside the shell */}
+    <div className="members-table-shell">
+      <div className="table-container">
+        <table className="members-table">...</table>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+- **Outer card:** normal `.card` chrome (border, `--radius-lg`, shadow, padding) + title/actions/filters
+- **Inner shell:** thin `1px solid var(--border-brand)` + `--radius-md` flush around the table only
+
+Empty states that replace the table also go inside the shell.
+
+### Frame tokens (defined once in `components/table/table.css`)
+
+| Property | Value |
+|---|---|
+| Border | `1px solid var(--border-brand)` |
+| Radius | `var(--radius-md)` (16px squircle) |
+| Background | `var(--bg-card)` |
+| Overflow | `hidden` (flush table edges to the frame) |
+| Shadow | **None** |
+
+Shared selectors (multi-selector model):
+
+```css
+.members-table-shell,
+.event-registrations-table-shell,
+.certificates-table-shell {
+    border: 1px solid var(--border-brand);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    overflow: hidden;
+}
+```
+
+Context-specific layout (flex sizing, row-height vars, scroll max-height) stays as overrides on the Events/Certificates selectors — do **not** re-declare the frame tokens there.
+
+### Card + shell usage
+
+- Page tables use both: full `.card` / `.members-table-card` for page chrome, and `.members-table-shell` nested inside the card body around the table.
+- Do **not** neutralize `.card.members-table-card` (no transparent/borderless overrides). `.members-table-card` is a margin helper only.
+- Prefer `.members-table-shell` for new page tables. Keep `.event-registrations-table-shell` / `.certificates-table-shell` where layout overrides already exist — they share the same frame via the multi-selector.
+- Events registration/tickets (and similar embedded tables) may stay shell-only without a page `.card` — that exception is intentional.
 

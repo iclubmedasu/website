@@ -5,8 +5,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiRequestError, publicAPI } from "@/lib/api";
 import { YesNoField } from "@/components/ui/YesNoToggle";
+import EmailInputWithDomainSuggestions from "@/components/EmailInputWithDomainSuggestions";
 import { saveRegistrationCache } from "@/lib/registrationCache";
-import { formatSessionDisplayLabel } from "@/lib/sessionUtils";
+import { formatSessionDisplayLabelDual, isSessionEnded } from "@/lib/sessionUtils";
 import {
     dropdownOptions,
     emptyRegistrationDraft,
@@ -104,12 +105,14 @@ export function RegistrationForm({ eventId, eventSlug, eventTitle }: Registratio
         tierFieldRequired: true,
         sessionFieldShowOnPublic: false,
         sessionFieldRequired: false,
+        phoneFieldRequired: false,
     });
     const [customFields, setCustomFields] = useState<PublicEventCustomField[]>([]);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [formError, setFormError] = useState("");
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [eventTimezone, setEventTimezone] = useState<string>("Africa/Cairo");
 
     useEffect(() => {
         let cancelled = false;
@@ -117,11 +120,12 @@ export function RegistrationForm({ eventId, eventSlug, eventTitle }: Registratio
         async function loadFormData() {
             setLoading(true);
             try {
-                const [loadedTiers, loadedFields, loadedSessions, loadedFormConfig] = await Promise.all([
+                const [loadedTiers, loadedFields, loadedSessions, loadedFormConfig, loadedEvent] = await Promise.all([
                     publicAPI.getEventTiers(eventId),
                     publicAPI.getEventCustomFields(eventId),
                     publicAPI.getEventSessions(eventId),
                     publicAPI.getEventRegistrationForm(eventId),
+                    publicAPI.getEvent(eventId),
                 ]);
 
                 if (cancelled) return;
@@ -133,6 +137,7 @@ export function RegistrationForm({ eventId, eventSlug, eventTitle }: Registratio
                 setCustomFields(loadedFields);
                 setSessions(loadedSessions);
                 setFormConfig(loadedFormConfig);
+                setEventTimezone(loadedEvent?.timezone ?? "Africa/Cairo");
 
                 if (availableTiers.length === 1) {
                     setDraft((current) => ({ ...current, tierId: String(availableTiers[0].id) }));
@@ -195,6 +200,8 @@ export function RegistrationForm({ eventId, eventSlug, eventTitle }: Registratio
         const validationErrors = validateRegistrationDraft(draft, customFields, {
             requireTier: formConfig.tierFieldShowOnPublic && formConfig.tierFieldRequired && tiers.length > 0,
             requireSessions: formConfig.sessionFieldShowOnPublic && formConfig.sessionFieldRequired,
+            requirePhone: formConfig.phoneFieldRequired,
+            sessions,
         });
         if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
@@ -234,6 +241,7 @@ export function RegistrationForm({ eventId, eventSlug, eventTitle }: Registratio
     }
 
     const selectedTier = tiers.find((tier) => String(tier.id) === draft.tierId) ?? null;
+    const registerableSessions = sessions.filter((session) => !session.isFull && !isSessionEnded(session));
 
     if (loading) {
         return <p className="text-sm text-slate-600">Loading registration form…</p>;
@@ -291,21 +299,24 @@ export function RegistrationForm({ eventId, eventSlug, eventTitle }: Registratio
                             {sessions.map((session) => {
                                 const sessionId = String(session.id);
                                 const checked = draft.sessionIds.includes(sessionId);
-                                const fullAndUnchecked = Boolean(session.isFull) && !checked;
+                                const ended = isSessionEnded(session);
+                                const unavailableAndUnchecked = (Boolean(session.isFull) || ended) && !checked;
                                 const capacitySuffix = session.isFull
                                     ? " (Full)"
-                                    : session.spotsRemaining != null
-                                        ? ` (${session.spotsRemaining} left)`
-                                        : "";
+                                    : ended
+                                        ? " (Ended)"
+                                        : session.spotsRemaining != null
+                                            ? ` (${session.spotsRemaining} left)`
+                                            : "";
                                 return (
                                     <label key={sessionId} className="registration-session-option">
                                         <input
                                             type="checkbox"
                                             checked={checked}
-                                            disabled={fullAndUnchecked}
+                                            disabled={unavailableAndUnchecked}
                                             onChange={(event) => onSessionToggle(sessionId, event.target.checked)}
                                         />
-                                        <span>{formatSessionDisplayLabel({
+                                        <span>{formatSessionDisplayLabelDual({
                                             label: session.label,
                                             startDateTime: session.startDateTime,
                                             endDateTime: session.endDateTime,
@@ -313,11 +324,14 @@ export function RegistrationForm({ eventId, eventSlug, eventTitle }: Registratio
                                             startTime: session.startTime,
                                             endTime: session.endTime,
                                             mode: session.mode,
-                                        })}{capacitySuffix}</span>
+                                        }, eventTimezone)}{capacitySuffix}</span>
                                     </label>
                                 );
                             })}
                         </div>
+                        {formConfig.sessionFieldRequired && registerableSessions.length === 0 ? (
+                            <p className="form-hint">No sessions are currently open for registration.</p>
+                        ) : null}
                     </fieldset>
                     {errors.sessionIds ? <p className="field-error">{errors.sessionIds}</p> : null}
                 </div>
@@ -344,14 +358,13 @@ export function RegistrationForm({ eventId, eventSlug, eventTitle }: Registratio
                     <label className="form-label" htmlFor="email">
                         Email *
                     </label>
-                    <input
+                    <EmailInputWithDomainSuggestions
                         id="email"
-                        type="email"
                         className={`form-input${errors.email ? " form-input--error" : ""}`}
                         value={draft.email}
-                        onChange={(event) => {
+                        onChange={(value) => {
                             clearError("email");
-                            updateDraft({ email: event.target.value });
+                            updateDraft({ email: value });
                         }}
                     />
                     {errors.email ? <p className="field-error">{errors.email}</p> : null}
@@ -360,15 +373,19 @@ export function RegistrationForm({ eventId, eventSlug, eventTitle }: Registratio
 
             <div className="form-group">
                 <label className="form-label" htmlFor="phoneNumber">
-                    Phone number
+                    Phone number{formConfig.phoneFieldRequired ? " *" : ""}
                 </label>
                 <input
                     id="phoneNumber"
                     type="tel"
-                    className="form-input"
+                    className={`form-input${errors.phoneNumber ? " form-input--error" : ""}`}
                     value={draft.phoneNumber}
-                    onChange={(event) => updateDraft({ phoneNumber: event.target.value })}
+                    onChange={(event) => {
+                        clearError("phoneNumber");
+                        updateDraft({ phoneNumber: event.target.value });
+                    }}
                 />
+                {errors.phoneNumber ? <p className="field-error">{errors.phoneNumber}</p> : null}
             </div>
 
             {customFields.map((field) =>

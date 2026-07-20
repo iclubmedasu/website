@@ -1,7 +1,8 @@
 import {
-    combineClubLocalDateTime,
-    extractClubLocalTime,
-    toClubDayString,
+    CLUB_TIMEZONE,
+    combineEventLocalDateTime,
+    extractEventLocalTime,
+    toEventDayString,
 } from '@iclub/shared/utils';
 
 export interface EventSessionInstantInput {
@@ -34,24 +35,26 @@ function parseLegacySessionTime(value: unknown): string | null {
 }
 
 function parseLegacySessionDay(value: unknown): string | null {
-    const trimmed = String(value ?? '').trim().slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
-    return trimmed;
+    const match = String(value ?? '').trim().match(/^(\d{4}-\d{2}-\d{2})/);
+    return match?.[1] ?? null;
 }
 
-export function parseEventSessionTimes(input: EventSessionInstantInput): ParsedEventSessionTimes | null {
+export function parseEventSessionTimes(
+    input: EventSessionInstantInput,
+    eventTimezone: string = CLUB_TIMEZONE,
+): ParsedEventSessionTimes | null {
     const startInstant = parseIsoInstant(input.startDateTime);
     const endInstant = parseIsoInstant(input.endDateTime);
     if (startInstant && endInstant) {
         if (endInstant.getTime() < startInstant.getTime()) return null;
-        const clubDay = toClubDayString(startInstant);
-        const sessionDate = clubDay ? new Date(`${clubDay}T00:00:00.000Z`) : startInstant;
+        const eventDay = toEventDayString(startInstant, eventTimezone);
+        const sessionDate = eventDay ? new Date(`${eventDay}T00:00:00.000Z`) : startInstant;
         return {
             startDateTime: startInstant,
             endDateTime: endInstant,
             sessionDate,
-            startTime: extractClubLocalTime(startInstant),
-            endTime: extractClubLocalTime(endInstant),
+            startTime: extractEventLocalTime(startInstant, eventTimezone),
+            endTime: extractEventLocalTime(endInstant, eventTimezone),
         };
     }
 
@@ -59,8 +62,8 @@ export function parseEventSessionTimes(input: EventSessionInstantInput): ParsedE
     if (!sessionDay) return null;
     const startTime = parseLegacySessionTime(input.startTime);
     const endTime = parseLegacySessionTime(input.endTime);
-    const startIso = combineClubLocalDateTime(sessionDay, startTime ?? '00:00');
-    const endIso = combineClubLocalDateTime(sessionDay, endTime ?? startTime ?? '23:59');
+    const startIso = combineEventLocalDateTime(sessionDay, startTime ?? '00:00', eventTimezone);
+    const endIso = combineEventLocalDateTime(sessionDay, endTime ?? startTime ?? '23:59', eventTimezone);
     if (!startIso || !endIso) return null;
     const startDateTime = new Date(startIso);
     const endDateTime = new Date(endIso);
@@ -81,12 +84,12 @@ export function serializeEventSession<T extends {
     endTime: string | null;
     startDateTime: Date | null;
     endDateTime: Date | null;
-}>(session: T) {
+}>(session: T, eventTimezone: string = CLUB_TIMEZONE) {
     const startDateTime = session.startDateTime ?? null;
     const endDateTime = session.endDateTime ?? null;
     return {
         ...session,
-        sessionDate: toClubDayString(session.sessionDate) ?? session.sessionDate.toISOString().slice(0, 10),
+        sessionDate: toEventDayString(session.sessionDate, eventTimezone) ?? '',
         startDateTime: startDateTime?.toISOString() ?? null,
         endDateTime: endDateTime?.toISOString() ?? null,
     };
@@ -100,6 +103,16 @@ export function isSessionActiveAt(
     if (!session.startDateTime || !session.endDateTime) return false;
     const now = referenceDate.getTime();
     return session.startDateTime.getTime() <= now && now < session.endDateTime.getTime();
+}
+
+export function isSessionEndedAt(
+    session: EventSessionInstantInput,
+    referenceDate: Date,
+    eventTimezone: string = CLUB_TIMEZONE,
+): boolean {
+    const parsed = parseEventSessionTimes(session, eventTimezone);
+    if (!parsed) return false;
+    return referenceDate.getTime() >= parsed.endDateTime.getTime();
 }
 
 export function doSessionInstantsOverlap(

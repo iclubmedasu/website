@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import { prisma } from "../db";
-import { serializeEventSession } from "../lib/eventSessionTime";
+import { isSessionEndedAt, serializeEventSession } from "../lib/eventSessionTime";
 import {
     countActiveSessionRegistrationsForSessions,
     splitSessionsForTicket,
@@ -15,6 +15,7 @@ import { getPublicWebsiteUrl } from "../lib/publicWebsiteUrl";
 import { getAboutPageData, getActiveSocialLinks, getContactPageData } from "../lib/siteContent";
 import { createIncidentReportSubmission, getSupportPageData } from "../lib/supportContent";
 import { resolveEventByIdOrSlug, resolveProjectByIdOrSlug } from "../lib/publicEntitySlug";
+import { contactPostLimiter, incidentReportPostLimiter } from "../middleware/rateLimit";
 
 const router = express.Router();
 
@@ -29,6 +30,7 @@ type EventCapacityRow = {
     eventDate: Date;
     eventEndDate: Date;
     venue: string | null;
+    timezone: string;
     registrationDeadline: Date | null;
     capacity: number | null;
     status: string;
@@ -47,6 +49,7 @@ const publicEventSelect = {
     eventDate: true,
     eventEndDate: true,
     venue: true,
+    timezone: true,
     registrationDeadline: true,
     capacity: true,
     status: true,
@@ -207,6 +210,7 @@ function serializePublicEventListItem(
         eventDate: event.eventDate,
         eventEndDate: event.eventEndDate,
         venue: event.venue,
+        timezone: event.timezone,
         registrationDeadline: event.registrationDeadline,
         capacity: event.capacity,
         registeredCount,
@@ -425,25 +429,28 @@ router.get("/events/:id/sessions", async (req: Request, res: Response) => {
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
-            select: { id: true, isActive: true, isArchived: true, isPublished: true },
+            select: { id: true, isActive: true, isArchived: true, isPublished: true, timezone: true },
         });
 
         if (!event || event.isArchived || !canPublicViewEvent(event)) {
             return res.status(404).json({ error: "Event not found" });
         }
 
+        const tz = event.timezone?.trim() || "Africa/Cairo";
         const sessions = await prisma.eventSession.findMany({
             where: { eventId, isActive: true },
             orderBy: [{ startDateTime: "asc" }, { sessionDate: "asc" }, { order: "asc" }],
         });
 
         const counts = await countActiveSessionRegistrationsForSessions(sessions.map((session) => session.id));
-        return res.json(sessions.map((session) => (
-            withSessionCapacityFields(
-                serializeEventSession(session),
+        const now = new Date();
+        return res.json(sessions.map((session) => ({
+            ...withSessionCapacityFields(
+                serializeEventSession(session, tz),
                 counts.get(session.id) ?? 0,
-            )
-        )));
+            ),
+            hasEnded: isSessionEndedAt(session, now, tz),
+        })));
     } catch (error) {
         console.error("GET /public/events/:id/sessions error:", error);
         return res.status(500).json({ error: "Failed to load event sessions" });
@@ -469,6 +476,7 @@ router.get("/events/:id/registration-form", async (req: Request, res: Response) 
                 tierFieldRequired: true,
                 sessionFieldShowOnPublic: true,
                 sessionFieldRequired: true,
+                phoneFieldRequired: true,
             },
         });
 
@@ -481,6 +489,7 @@ router.get("/events/:id/registration-form", async (req: Request, res: Response) 
             tierFieldRequired: event.tierFieldRequired,
             sessionFieldShowOnPublic: event.sessionFieldShowOnPublic,
             sessionFieldRequired: event.sessionFieldRequired,
+            phoneFieldRequired: event.phoneFieldRequired,
         });
     } catch (error) {
         console.error("GET /public/events/:id/registration-form error:", error);
@@ -521,6 +530,7 @@ router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
                         eventDate: true,
                         eventEndDate: true,
                         venue: true,
+                        timezone: true,
                         isActive: true,
                         isArchived: true,
                         isPublished: true,
@@ -559,11 +569,13 @@ router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
 
         const sessionTokens = await getSessionTokensForRegistration(registration.id);
 
+        const eventTimezone = registration.event.timezone?.trim() || "Africa/Cairo";
+
         const mapSession = (
             session: (typeof eventSessions)[number],
             section: "waitingForYou" | "dontMissOut",
         ) => {
-            const serialized = serializeEventSession(session);
+            const serialized = serializeEventSession(session, eventTimezone);
             const token = sessionTokens.get(session.id);
             const joinUrl = section === "waitingForYou"
                 && session.mode === "ONLINE"
@@ -593,6 +605,7 @@ router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
                 eventDate: registration.event.eventDate,
                 eventEndDate: registration.event.eventEndDate,
                 venue: registration.event.venue,
+                timezone: eventTimezone,
             },
             tier: registration.tier ? { name: registration.tier.name } : null,
             sessions: [...waitingForYouSessions, ...dontMissOutSessions],
@@ -670,7 +683,7 @@ function escapeHtml(value: string): string {
         .replace(/'/g, "&#39;");
 }
 
-router.post("/contact", async (req: Request, res: Response) => {
+router.post("/contact", contactPostLimiter, async (req: Request, res: Response) => {
     try {
         const body = req.body as Record<string, unknown>;
         const name = String(body.name ?? "").trim();
@@ -778,7 +791,7 @@ router.get("/site/support", async (_req: Request, res: Response) => {
     }
 });
 
-router.post("/support/incident-reports", async (req: Request, res: Response) => {
+router.post("/support/incident-reports", incidentReportPostLimiter, async (req: Request, res: Response) => {
     try {
         const honeypot = String(req.body?.website ?? "").trim();
         if (honeypot) {

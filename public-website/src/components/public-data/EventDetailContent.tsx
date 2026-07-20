@@ -6,7 +6,7 @@ import type { PublicEventDetail } from "@iclub/shared";
 import { EventDetailActions } from "@/components/events/EventDetailActions";
 import { EventDetailHeader } from "@/components/events/EventDetailHeader";
 import { BackLink } from "@/components/navigation/BackLink";
-import { ClientEventDateRange, ClientRegistrationDeadline } from "@/components/datetime/ClientDateTime";
+import { ClientEventDateRangeDual, ClientRegistrationDeadline } from "@/components/datetime/ClientDateTime";
 import { PageContainer } from "@/components/ui";
 import { publicAPI } from "@/lib/api";
 import { formatCapacityLabel } from "@/lib/customFieldUtils";
@@ -68,9 +68,10 @@ export function EventDetailContent({ idOrSlug }: { idOrSlug: string }) {
                 <div className="flex flex-col gap-3 text-sm text-slate-600">
                     <p className="inline-flex items-start gap-2">
                         <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-purple-700" />
-                        <ClientEventDateRange
+                        <ClientEventDateRangeDual
                             eventDate={event.eventDate}
                             eventEndDate={event.eventEndDate}
+                            timezone={event.timezone}
                         />
                     </p>
                     {event.venue ? (

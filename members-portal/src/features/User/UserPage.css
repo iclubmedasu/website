@@ -121,52 +121,7 @@
     color: #6ee7b7;
 }
 
-/* ── Tab bar ── */
-.user-page-tabs {
-    display: flex;
-    gap: 0;
-    background: var(--bg-card);
-    border-bottom: 2px solid var(--gray-200);
-    overflow-x: auto;
-}
-
-.user-page-tabs::-webkit-scrollbar {
-    display: none;
-}
-
-.user-page-tab-btn {
-    flex-shrink: 0;
-    padding: 0.75rem 1.25rem;
-    border: none;
-    background: none;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--gray-500);
-    cursor: pointer;
-    white-space: nowrap;
-    position: relative;
-    transition: color 0.15s;
-}
-
-.user-page-tab-btn:hover {
-    color: var(--gray-900);
-}
-
-.user-page-tab-btn.active {
-    color: var(--purple-700);
-    font-weight: 600;
-}
-
-.user-page-tab-btn.active::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -2px;
-    height: 2px;
-    background: var(--purple-700);
-    border-radius: 1px 1px 0 0;
-}
+/* ── Tab bar: shared base in page.css (.user-page-tabs / .certificates-tabs) ── */
 
 /* ── Tab panel ── */
 .user-page-tab-panel {
@@ -502,11 +457,6 @@
 
     .user-profile-data-grid {
         grid-template-columns: 1fr;
-    }
-
-    .user-page-tab-btn {
-        padding: 0.65rem 1rem;
-        font-size: 0.8rem;
     }
 }
 

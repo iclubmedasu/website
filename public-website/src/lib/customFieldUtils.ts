@@ -1,4 +1,5 @@
-import type { PublicEventCustomField } from "@iclub/shared";
+import type { PublicEventCustomField, PublicEventSession } from "@iclub/shared";
+import { isSessionEnded } from "@/lib/sessionUtils";
 
 export interface RegistrationDraft {
     fullName: string;
@@ -65,6 +66,8 @@ export function validateRegistrationDraft(
     options?: {
         requireTier?: boolean;
         requireSessions?: boolean;
+        requirePhone?: boolean;
+        sessions?: PublicEventSession[];
     },
 ): Record<string, string> {
     const errors: Record<string, string> = {};
@@ -77,11 +80,24 @@ export function validateRegistrationDraft(
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim())) {
         errors.email = "A valid email address is required.";
     }
+    if (options?.requirePhone && !draft.phoneNumber.trim()) {
+        errors.phoneNumber = "Phone number is required.";
+    }
     if (options?.requireTier && !draft.tierId) {
         errors.tierId = "Please select a tier.";
     }
     if (options?.requireSessions && draft.sessionIds.length === 0) {
         errors.sessionIds = "Please select at least one session.";
+    }
+    if (options?.sessions && draft.sessionIds.length > 0) {
+        const sessionById = new Map(options.sessions.map((session) => [String(session.id), session]));
+        const hasEndedSelection = draft.sessionIds.some((sessionId) => {
+            const session = sessionById.get(sessionId);
+            return session != null && isSessionEnded(session);
+        });
+        if (hasEndedSelection) {
+            errors.sessionIds = "One or more selected sessions have ended.";
+        }
     }
 
     return {

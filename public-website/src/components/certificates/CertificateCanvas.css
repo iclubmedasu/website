@@ -1,0 +1,63 @@
+/* Live-rendered certificate canvas on the public verify page */
+
+.certificate-canvas-viewport {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.certificate-canvas-scale-wrap {
+    position: relative;
+    flex-shrink: 0;
+    max-width: 100%;
+}
+
+.certificate-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: top left;
+    background: var(--bg-card);
+    overflow: hidden;
+}
+
+.certificate-canvas-bg,
+.certificate-canvas-bg-placeholder {
+    position: absolute;
+    inset: 0;
+}
+
+.certificate-canvas-bg-placeholder {
+    background: var(--gray-100);
+}
+
+.certificate-canvas-bg-placeholder--error {
+    background: linear-gradient(135deg, var(--gray-100) 0%, var(--purple-50) 100%);
+}
+
+.certificate-canvas-element {
+    position: absolute;
+    display: flex;
+    align-items: flex-start;
+    overflow: hidden;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.2;
+    pointer-events: none;
+    font-family: var(--font-heading);
+    box-sizing: border-box;
+    padding: 0 0.25rem;
+}
+
+.certificate-canvas-element--align-left {
+    justify-content: flex-start;
+}
+
+.certificate-canvas-element--align-center {
+    justify-content: center;
+}
+
+.certificate-canvas-element--align-right {
+    justify-content: flex-end;
+}

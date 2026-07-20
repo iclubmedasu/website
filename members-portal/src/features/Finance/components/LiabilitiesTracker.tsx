@@ -2,6 +2,7 @@
 
 import { Pencil } from 'lucide-react';
 import type { FinanceLiabilityRow } from '@iclub/shared';
+import { formatDate } from '@iclub/shared/utils';
 import '@/components/badges/badge.css';
 
 interface LiabilitiesTrackerProps {
@@ -94,7 +95,7 @@ export default function LiabilitiesTracker({
                             <div className="finance-liability-meta">
                                 <span>Account: {liability.accountName}</span>
                                 <span>Remaining: {formatMoney(liability.remainingAmount, liability.currency || currency)}</span>
-                                <span>Due: {liability.dueDate ?? '—'}</span>
+                                <span>Due: {liability.dueDate ? formatDate(liability.dueDate) : '—'}</span>
                             </div>
 
                             <div className="finance-progress-track" aria-hidden="true">

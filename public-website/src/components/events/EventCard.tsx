@@ -1,7 +1,7 @@
 import type { PublicEventListItem } from "@iclub/shared";
 import { CalendarDays, MapPin, Users } from "lucide-react";
 import Link from "next/link";
-import { ClientEventDateRange, ClientRegistrationDeadline } from "@/components/datetime/ClientDateTime";
+import { ClientEventDateRangeDual, ClientRegistrationDeadline } from "@/components/datetime/ClientDateTime";
 import { Badge } from "@/components/ui";
 import { EventShareMenu } from "@/components/events/EventShareMenu";
 import { formatCapacityLabel } from "@/lib/customFieldUtils";
@@ -32,9 +32,10 @@ function EventCardBody({
             <div className="event-card-meta">
                 <p className="event-card-meta-item">
                     <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-purple-700" />
-                    <ClientEventDateRange
+                    <ClientEventDateRangeDual
                         eventDate={event.eventDate}
                         eventEndDate={event.eventEndDate}
+                        timezone={event.timezone}
                     />
                 </p>
                 {event.venue ? (

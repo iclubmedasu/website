@@ -1,5 +1,7 @@
 import type { MemberRoleHistoryTimelineEntry } from '@iclub/shared';
 
+import { formatDate } from '@iclub/shared/utils';
+
 export function getChangeTypeColor(changeType: string): string {
     const colors: Record<string, string> = {
         New: 'change-type-new',
@@ -15,13 +17,7 @@ export function getChangeTypeColor(changeType: string): string {
 
 export function formatRoleHistoryDate(date: string | null | undefined): string {
     if (!date) return '—';
-    const parsedDate = new Date(date);
-    if (Number.isNaN(parsedDate.getTime())) return '—';
-    return parsedDate.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-    });
+    return formatDate(date);
 }
 
 export function getDurationText(duration: number | string | null | undefined): string {

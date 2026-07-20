@@ -31,6 +31,10 @@ docker-compose.override.yml
 .DS_Store
 Thumbs.db
 
+# Local AI pentest configs / outputs (never commit credentials)
+shannon.local.yaml
+strix_runs/
+
 .turbo/
 .pnpm-store/
 

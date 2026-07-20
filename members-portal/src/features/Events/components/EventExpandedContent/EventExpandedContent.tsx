@@ -3,7 +3,7 @@
 import type { ComponentType } from 'react';
 import { useEffect, useState, useCallback } from 'react';
 import { useResourceChannel } from '@/hooks/useResourceChannel';
-import { ListChecks, Mail, RefreshCw, Settings2, Users } from 'lucide-react';
+import { Award, ListChecks, Mail, RefreshCw, Settings2, Users } from 'lucide-react';
 import type {
     EventCustomFieldRef,
     EventSessionRef,
@@ -13,6 +13,7 @@ import type {
     ImportRegistrationsResult,
 } from '@/types/backend-contracts';
 import { eventsAPI } from '@/services/api';
+import EventCertificatesSection from './sections/EventCertificatesSection';
 import EventRegistrationsSection from './sections/EventRegistrationsSection';
 import EventStatisticsSection from './sections/EventStatisticsSection';
 import EventTasksSection from './sections/EventTasksSection';
@@ -20,6 +21,12 @@ import EventTicketsSection from './sections/EventTicketsSection';
 import EventTiersSection from './sections/EventTiersSection';
 import EventSessionsSection from './sections/EventSessionsSection';
 import type { EventTabKey } from '../eventUtils';
+import {
+    EMPTY_CERTIFICATES_FUNNEL,
+    EMPTY_REGISTRATION_TABLE_FUNNEL,
+    type CertificatesFunnelState,
+    type RegistrationTableFunnelState,
+} from './eventExpandedFunnelState';
 import './EventExpandedContent.css';
 
 const TABS: Array<{ key: EventTabKey; label: string; icon: ComponentType<{ size?: number }> }> = [
@@ -28,6 +35,7 @@ const TABS: Array<{ key: EventTabKey; label: string; icon: ComponentType<{ size?
     { key: 'registrations', label: 'Registrations', icon: Users },
     { key: 'tickets', label: 'Tickets', icon: Mail },
     { key: 'tasks', label: 'Tasks', icon: ListChecks },
+    { key: 'certificates', label: 'Certificates', icon: Award },
 ];
 
 interface EventExpandedContentProps {
@@ -39,7 +47,10 @@ interface EventExpandedContentProps {
     allowDirectCheckIn?: boolean;
     eventDate?: string | null;
     eventEndDate?: string | null;
+    eventTimezone?: string;
     isPublished?: boolean;
+    isCertifiable?: boolean;
+    isFinalized?: boolean;
     canPublishEvent?: boolean;
     canRemoveAttendance?: boolean;
     onPublishedChange?: (eventId: Id, published: boolean) => Promise<void>;
@@ -47,10 +58,14 @@ interface EventExpandedContentProps {
     canManageSessions?: boolean;
     canManageTasks?: boolean;
     canManageFields?: boolean;
+    canManageCertificates?: boolean;
     tierFieldShowOnPublic?: boolean;
     tierFieldRequired?: boolean;
     sessionFieldShowOnPublic?: boolean;
     sessionFieldRequired?: boolean;
+    phoneFieldRequired?: boolean;
+    sessionFieldOrder?: number;
+    tierFieldOrder?: number;
     onReload: () => void;
 }
 
@@ -63,7 +78,10 @@ export default function EventExpandedContent({
     allowDirectCheckIn = false,
     eventDate,
     eventEndDate,
+    eventTimezone,
     isPublished = false,
+    isCertifiable = false,
+    isFinalized = false,
     canPublishEvent = false,
     canRemoveAttendance = false,
     onPublishedChange,
@@ -71,10 +89,14 @@ export default function EventExpandedContent({
     canManageSessions = false,
     canManageTasks = false,
     canManageFields = false,
+    canManageCertificates = false,
     tierFieldShowOnPublic: initialTierFieldShowOnPublic = true,
     tierFieldRequired: initialTierFieldRequired = true,
     sessionFieldShowOnPublic: initialSessionFieldShowOnPublic = false,
     sessionFieldRequired: initialSessionFieldRequired = false,
+    phoneFieldRequired: initialPhoneFieldRequired = false,
+    sessionFieldOrder: initialSessionFieldOrder = 0,
+    tierFieldOrder: initialTierFieldOrder = 1,
     onReload,
 }: EventExpandedContentProps) {
     const [stats, setStats] = useState<EventStatistics | null>(null);
@@ -85,18 +107,42 @@ export default function EventExpandedContent({
     const [tierFieldRequired, setTierFieldRequired] = useState(initialTierFieldRequired);
     const [sessionFieldShowOnPublic, setSessionFieldShowOnPublic] = useState(initialSessionFieldShowOnPublic);
     const [sessionFieldRequired, setSessionFieldRequired] = useState(initialSessionFieldRequired);
+    const [phoneFieldRequired, setPhoneFieldRequired] = useState(initialPhoneFieldRequired);
+    const [sessionFieldOrder, setSessionFieldOrder] = useState(initialSessionFieldOrder);
+    const [tierFieldOrder, setTierFieldOrder] = useState(initialTierFieldOrder);
     const [activeTab, setActiveTab] = useState<EventTabKey>(() => initialTab ?? 'statistics');
+    const [registrationsFunnel, setRegistrationsFunnel] = useState<RegistrationTableFunnelState>(
+        EMPTY_REGISTRATION_TABLE_FUNNEL,
+    );
+    const [ticketsFunnel, setTicketsFunnel] = useState<RegistrationTableFunnelState>(
+        EMPTY_REGISTRATION_TABLE_FUNNEL,
+    );
+    const [certificatesFunnel, setCertificatesFunnel] = useState<CertificatesFunnelState>(
+        EMPTY_CERTIFICATES_FUNNEL,
+    );
+
+    useEffect(() => {
+        setRegistrationsFunnel(EMPTY_REGISTRATION_TABLE_FUNNEL);
+        setTicketsFunnel(EMPTY_REGISTRATION_TABLE_FUNNEL);
+        setCertificatesFunnel(EMPTY_CERTIFICATES_FUNNEL);
+    }, [eventId]);
 
     useEffect(() => {
         setTierFieldShowOnPublic(initialTierFieldShowOnPublic);
         setTierFieldRequired(initialTierFieldRequired);
         setSessionFieldShowOnPublic(initialSessionFieldShowOnPublic);
         setSessionFieldRequired(initialSessionFieldRequired);
+        setPhoneFieldRequired(initialPhoneFieldRequired);
+        setSessionFieldOrder(initialSessionFieldOrder);
+        setTierFieldOrder(initialTierFieldOrder);
     }, [
         initialTierFieldShowOnPublic,
         initialTierFieldRequired,
         initialSessionFieldShowOnPublic,
         initialSessionFieldRequired,
+        initialPhoneFieldRequired,
+        initialSessionFieldOrder,
+        initialTierFieldOrder,
     ]);
 
     useEffect(() => {
@@ -189,6 +235,7 @@ export default function EventExpandedContent({
                     <hr className="event-setup-divider" />
                     <EventSessionsSection
                         eventId={eventId}
+                        eventTimezone={eventTimezone}
                         canManage={canManageSessions}
                     />
                 </div>
@@ -208,6 +255,7 @@ export default function EventExpandedContent({
                         allowDirectCheckIn={allowDirectCheckIn}
                         eventDate={eventDate}
                         eventEndDate={eventEndDate}
+                        eventTimezone={eventTimezone}
                         isPublished={isPublished}
                         canPublishEvent={canPublishEvent}
                         canRemoveAttendance={canRemoveAttendance}
@@ -217,6 +265,9 @@ export default function EventExpandedContent({
                         tierFieldRequired={tierFieldRequired}
                         sessionFieldShowOnPublic={sessionFieldShowOnPublic}
                         sessionFieldRequired={sessionFieldRequired}
+                        phoneFieldRequired={phoneFieldRequired}
+                        sessionFieldOrder={sessionFieldOrder}
+                        tierFieldOrder={tierFieldOrder}
                         onRegistrationColumnsChange={(columns) => {
                             if (columns.tierFieldShowOnPublic !== undefined) {
                                 setTierFieldShowOnPublic(columns.tierFieldShowOnPublic);
@@ -230,10 +281,21 @@ export default function EventExpandedContent({
                             if (columns.sessionFieldRequired !== undefined) {
                                 setSessionFieldRequired(columns.sessionFieldRequired);
                             }
+                            if (columns.phoneFieldRequired !== undefined) {
+                                setPhoneFieldRequired(columns.phoneFieldRequired);
+                            }
+                            if (columns.sessionFieldOrder !== undefined) {
+                                setSessionFieldOrder(columns.sessionFieldOrder);
+                            }
+                            if (columns.tierFieldOrder !== undefined) {
+                                setTierFieldOrder(columns.tierFieldOrder);
+                            }
                         }}
                         onRegistrationAdded={() => void reloadAll()}
                         onCheckIn={() => void reloadAll()}
                         onImportComplete={handleImportComplete}
+                        funnel={registrationsFunnel}
+                        onFunnelChange={setRegistrationsFunnel}
                     />
                 </div>
             )}
@@ -243,6 +305,13 @@ export default function EventExpandedContent({
                         eventId={eventId}
                         eventDate={eventDate}
                         eventEndDate={eventEndDate}
+                        eventTimezone={eventTimezone}
+                        sessions={sessions}
+                        tiers={tiers}
+                        fields={fields}
+                        canRemoveAttendance={canRemoveAttendance}
+                        funnel={ticketsFunnel}
+                        onFunnelChange={setTicketsFunnel}
                     />
                 </div>
             )}
@@ -254,6 +323,18 @@ export default function EventExpandedContent({
                         eventDate={eventDate}
                         eventEndDate={eventEndDate}
                         canManage={canManageTasks}
+                    />
+                </div>
+            )}
+            {activeTab === 'certificates' && (
+                <div className="event-expanded-tab-panel">
+                    <EventCertificatesSection
+                        eventId={eventId}
+                        isFinalized={isFinalized}
+                        isCertifiable={isCertifiable}
+                        canManage={canManageCertificates}
+                        funnel={certificatesFunnel}
+                        onFunnelChange={setCertificatesFunnel}
                     />
                 </div>
             )}

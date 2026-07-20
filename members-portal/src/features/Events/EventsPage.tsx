@@ -115,6 +115,7 @@ export default function EventsPage() {
     }, [user?.id, user?.isAdmin, user?.isDeveloper, user?.isLeadership, user?.isOfficer, user?.isSpecial]);
 
     const canCreateEvent = eventPermissions.canCreateEvent;
+    const canManageCertificates = !!(user?.isAdmin || user?.isOfficer || user?.isLeadership || user?.isDeveloper);
 
     const filters = useMemo(() => ({
         dateFrom: dateFrom || undefined,
@@ -404,6 +405,7 @@ export default function EventsPage() {
                                 canManageSessions={eventPermissions.canManageSessions}
                                 canManageTasks={eventPermissions.canManageTasks}
                                 canManageFields={eventPermissions.canManageFields}
+                                canManageCertificates={canManageCertificates}
                                 canPublishEvent={eventPermissions.canPublishEvent}
                                 canRemoveAttendance={eventPermissions.canRemoveAttendance}
                                 onPublishedChange={handlePublishedChange}
@@ -490,6 +492,7 @@ export default function EventsPage() {
                     canManageSessions={eventPermissions.canManageSessions}
                     canManageTasks={eventPermissions.canManageTasks}
                     canManageFields={eventPermissions.canManageFields}
+                    canManageCertificates={canManageCertificates}
                     canPublishEvent={eventPermissions.canPublishEvent}
                     canRemoveAttendance={eventPermissions.canRemoveAttendance}
                     onPublishedChange={handlePublishedChange}

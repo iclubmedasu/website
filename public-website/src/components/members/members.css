@@ -514,6 +514,85 @@
     line-height: 1.6;
 }
 
+.member-profile-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.member-profile-certificates {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.member-profile-cert-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: 1fr;
+    margin-top: 0;
+}
+
+@media (min-width: 640px) {
+    .member-profile-cert-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .member-profile-cert-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.member-profile-cert-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+    border: 1px solid var(--gray-80, var(--purple-200));
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+}
+
+.member-profile-cert-card-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.member-profile-cert-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--gray-900);
+    line-height: 1.35;
+}
+
+.member-profile-cert-meta {
+    font-size: 0.875rem;
+    color: var(--gray-700);
+}
+
+.member-profile-cert-date {
+    font-size: 0.8125rem;
+    color: var(--gray-600);
+}
+
+.member-profile-cert-verify {
+    margin-top: 0.35rem;
+    align-self: flex-start;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--purple-800);
+    text-decoration: none;
+}
+
+.member-profile-cert-verify:hover {
+    text-decoration: underline;
+}
+
 /* Role history timeline */
 .member-timeline {
     display: flex;

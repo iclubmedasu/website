@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
+import { formatDate } from '@iclub/shared/utils';
 import { membersAPI, getProfilePhotoUrl } from '../../../../services/api';
 import { MemberRoleHistory } from '@/components/MemberRoleHistory/MemberRoleHistory';
 import type { MemberPublicProfile } from '@iclub/shared';
@@ -21,16 +22,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
     return fallback;
 }
 
-function formatDate(date: string | null | undefined): string {
-    if (!date) return '—';
-    const parsedDate = new Date(date);
-    if (Number.isNaN(parsedDate.getTime())) return '—';
-    return parsedDate.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-    });
-}
 
 const ViewMemberModal = ({ isOpen, onClose, memberId }: ViewMemberModalProps) => {
     const router = useRouter();

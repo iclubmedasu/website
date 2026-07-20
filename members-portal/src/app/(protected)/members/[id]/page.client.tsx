@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Calendar, Link as LinkIcon, Mail, Phone, Trophy } from 'lucide-react';
+import { formatDate } from '@iclub/shared/utils';
 import { useAuth } from '@/context/AuthContext';
 import { membersAPI, getProfilePhotoUrl } from '@/services/api';
 import { MemberRoleHistory } from '@/components/MemberRoleHistory/MemberRoleHistory';
@@ -20,12 +21,6 @@ const TABS: { key: ProfileTab; label: string }[] = [
     { key: 'achievements', label: 'Achievements' },
 ];
 
-function formatDate(date: string | null | undefined): string {
-    if (!date) return '—';
-    const parsed = new Date(date);
-    if (Number.isNaN(parsed.getTime())) return '—';
-    return parsed.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-}
 
 function getErrorMessage(error: unknown, fallback: string): string {
     if (error instanceof Error && error.message) return error.message;
@@ -194,7 +189,7 @@ export default function MemberProfilePage() {
                                         </div>
                                         <div className="user-profile-data-item">
                                             <span className="user-profile-data-label">Join Date</span>
-                                            <span className="user-profile-data-value">{formatDate(profile.joinDate)}</span>
+                                            <span className="user-profile-data-value">{profile.joinDate ? formatDate(profile.joinDate) : '—'}</span>
                                         </div>
                                     </div>
                                 </div>

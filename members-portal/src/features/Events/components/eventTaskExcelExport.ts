@@ -1,4 +1,6 @@
 import type { EventTaskRef } from '@/types/backend-contracts';
+import { downloadBlob } from '@/utils/downloadBlob';
+import { generateXlsxBlob } from '@/utils/generateXlsxBlob';
 import {
     HOURS_PER_DAY,
     buildDaySections,
@@ -40,17 +42,6 @@ interface BuiltSheetResult {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     sheet: any;
     richTextCells: InlineRichTextCell[];
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
 function hexToArgb(hex: string): string {
@@ -515,6 +506,6 @@ export async function exportEventTasksExcel({ days, tasks, fileName }: ExportEve
         });        workbookZip.file(sheetPath, sheetXml);
     }
 
-    const workbookBlob = await workbookZip.generateAsync({ type: 'blob' });
+    const workbookBlob = await generateXlsxBlob(workbookZip);
     downloadBlob(workbookBlob, `${sanitizeFileName(fileName)}-tasks.xlsx`);
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { X } from 'lucide-react';
+import { formatDate } from '@iclub/shared/utils';
 import { teamMembersAPI } from '../../../../services/api';
 import type { Id } from '../../../../types/backend-contracts';
 
@@ -437,8 +438,8 @@ const EditAdminMembersModal = ({
                                 <div className="info-item">
                                     <label className="info-label">Joined Date</label>
                                     <p className="info-value">
-                                        {currentTeamAssignment.joinedDate && !Number.isNaN(new Date(currentTeamAssignment.joinedDate).getTime())
-                                            ? new Date(currentTeamAssignment.joinedDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+                                        {currentTeamAssignment.joinedDate
+                                            ? formatDate(currentTeamAssignment.joinedDate)
                                             : '-'}
                                     </p>
                                 </div>

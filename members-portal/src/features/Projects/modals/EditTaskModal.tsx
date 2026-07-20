@@ -2,6 +2,7 @@
 
 import { useState, useEffect, type ChangeEvent } from 'react';
 import { X, Link2, Trash2 } from 'lucide-react';
+import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
 import { tasksAPI } from '../../../services/api';
 import { toTitleCase } from '../../../utils/titleCase';
 import type {
@@ -165,8 +166,8 @@ export default function EditTaskModal({
                 status: task.status || 'NOT_STARTED',
                 priority: toLegacyPriority(task.priority),
                 difficulty: task.difficulty || 'MEDIUM',
-                startDate: task.startDate ? task.startDate.slice(0, 10) : '',
-                dueDate: task.dueDate ? task.dueDate.slice(0, 10) : '',
+                startDate: task.startDate ? toDateInputValue(task.startDate) : '',
+                dueDate: task.dueDate ? toDateInputValue(task.dueDate) : '',
                 estimatedHours: task.estimatedHours != null ? String(task.estimatedHours) : '',
                 actualHours: task.actualHours != null ? String(task.actualHours) : '',
                 leaderId: task.leader?.id ?? task.leaderId ?? null,
@@ -305,8 +306,8 @@ export default function EditTaskModal({
                     status: form.status,
                     priority: normalizedPriority,
                     difficulty: form.difficulty,
-                    startDate: form.startDate || null,
-                    dueDate: form.dueDate || null,
+                    startDate: form.startDate ? fromDateInputValue(form.startDate) : null,
+                    dueDate: form.dueDate ? fromDateInputValue(form.dueDate) : null,
                     estimatedHours: form.estimatedHours !== '' ? parseFloat(form.estimatedHours) : null,
                     actualHours: form.actualHours !== '' ? parseFloat(form.actualHours) : null,
                     leaderId: form.leaderId,

@@ -544,7 +544,7 @@ router.get('/deleted', async (req, res) => {
 // GET /api/event-files/:id/download
 // Proxy the file from GitHub so the browser can view/download it.
 // Accepts auth via Authorization header OR ?token= query param
-// (needed for browser-opened links / <a href>).
+// (legacy browser <a href> / window.open downloads). Prefer header/cookie for API clients.
 // ============================================
 router.get('/:id/download', async (req, res) => {
     try {

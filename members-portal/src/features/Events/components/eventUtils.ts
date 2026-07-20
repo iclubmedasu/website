@@ -1,6 +1,6 @@
 import { formatSessionRange } from '@iclub/shared/utils';
 
-export type EventTabKey = 'tiers' | 'registrations' | 'tickets' | 'statistics' | 'tasks';
+export type EventTabKey = 'tiers' | 'registrations' | 'tickets' | 'statistics' | 'tasks' | 'certificates';
 
 export const EVENT_TABS = [
     { key: 'statistics' as const, label: 'Statistics' },
@@ -8,6 +8,7 @@ export const EVENT_TABS = [
     { key: 'registrations' as const, label: 'Registrations' },
     { key: 'tickets' as const, label: 'Tickets' },
     { key: 'tasks' as const, label: 'Tasks' },
+    { key: 'certificates' as const, label: 'Certificates' },
 ];
 
 export const EVENT_STATUS_CLASS: Record<string, string> = {
@@ -22,7 +23,7 @@ export function parseEventTab(value: string | null): EventTabKey | null {
     if (value === 'overview') return 'statistics';
     if (value === 'builder') return 'registrations';
     if (value === 'checkin') return 'registrations';
-    const valid: EventTabKey[] = ['tiers', 'registrations', 'tickets', 'statistics', 'tasks'];
+    const valid: EventTabKey[] = ['tiers', 'registrations', 'tickets', 'statistics', 'tasks', 'certificates'];
     return valid.includes(value as EventTabKey) ? (value as EventTabKey) : null;
 }
 

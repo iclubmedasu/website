@@ -12,6 +12,8 @@ interface CustomFieldColumnMenuProps {
     onDelete: () => void;
     onMoveLeft: () => void;
     onMoveRight: () => void;
+    canMoveLeft?: boolean;
+    canMoveRight?: boolean;
 }
 
 function MenuItem({
@@ -49,7 +51,11 @@ export default function CustomFieldColumnMenu({
     onDelete,
     onMoveLeft,
     onMoveRight,
+    canMoveLeft,
+    canMoveRight,
 }: CustomFieldColumnMenuProps) {
+    const moveLeftDisabled = canMoveLeft !== undefined ? !canMoveLeft : index === 0;
+    const moveRightDisabled = canMoveRight !== undefined ? !canMoveRight : index >= total - 1;
     return (
         <div className="event-registrations-col-header">
             <span className="event-registrations-col-label" title={field.label}>
@@ -75,7 +81,7 @@ export default function CustomFieldColumnMenu({
                     <>
                         <MenuItem
                             label="Move left"
-                            disabled={index === 0}
+                            disabled={moveLeftDisabled}
                             onClick={() => {
                                 onMoveLeft();
                                 closeMenu();
@@ -83,7 +89,7 @@ export default function CustomFieldColumnMenu({
                         />
                         <MenuItem
                             label="Move right"
-                            disabled={index >= total - 1}
+                            disabled={moveRightDisabled}
                             onClick={() => {
                                 onMoveRight();
                                 closeMenu();

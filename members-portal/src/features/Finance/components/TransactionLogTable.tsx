@@ -16,6 +16,7 @@ import type {
     FinanceTransactionRow,
     FinanceTransactionType,
 } from '@iclub/shared';
+import { formatDate } from '@iclub/shared/utils';
 import { financeAPI } from '@/services/api';
 import '@/features/Projects/ProjectsPage.css';
 
@@ -108,7 +109,7 @@ export default function TransactionLogTable({
         () => [
             columnHelper.accessor('transactionDate', {
                 header: 'Date',
-                cell: (info) => info.getValue(),
+                cell: (info) => formatDate(info.getValue()),
             }),
             columnHelper.accessor('accountName', {
                 header: 'Account',
@@ -264,46 +265,50 @@ export default function TransactionLogTable({
 
                 {loading ? (
                     <p className="loading-message">Loading transactions…</p>
-                ) : rows.length === 0 ? (
-                    <p className="empty-message">No transactions found.</p>
                 ) : (
-                    <div className="table-container">
-                        <table className="members-table">
-                            <thead>
-                                {table.getHeaderGroups().map((headerGroup) => (
-                                    <tr key={headerGroup.id}>
-                                        {headerGroup.headers.map((header) => (
-                                            <th key={header.id}>
-                                                {header.isPlaceholder ? null : (
-                                                    <button
-                                                        type="button"
-                                                        className="finance-table-sort"
-                                                        onClick={header.column.getToggleSortingHandler()}
-                                                    >
-                                                        {flexRender(header.column.columnDef.header, header.getContext())}
-                                                        {{
-                                                            asc: ' ↑',
-                                                            desc: ' ↓',
-                                                        }[header.column.getIsSorted() as string] ?? ''}
-                                                    </button>
-                                                )}
-                                            </th>
+                    <div className="members-table-shell">
+                        {rows.length === 0 ? (
+                            <p className="empty-message">No transactions found.</p>
+                        ) : (
+                            <div className="table-container">
+                                <table className="members-table">
+                                    <thead>
+                                        {table.getHeaderGroups().map((headerGroup) => (
+                                            <tr key={headerGroup.id}>
+                                                {headerGroup.headers.map((header) => (
+                                                    <th key={header.id}>
+                                                        {header.isPlaceholder ? null : (
+                                                            <button
+                                                                type="button"
+                                                                className="finance-table-sort"
+                                                                onClick={header.column.getToggleSortingHandler()}
+                                                            >
+                                                                {flexRender(header.column.columnDef.header, header.getContext())}
+                                                                {{
+                                                                    asc: ' ↑',
+                                                                    desc: ' ↓',
+                                                                }[header.column.getIsSorted() as string] ?? ''}
+                                                            </button>
+                                                        )}
+                                                    </th>
+                                                ))}
+                                            </tr>
                                         ))}
-                                    </tr>
-                                ))}
-                            </thead>
-                            <tbody>
-                                {table.getRowModel().rows.map((row, index) => (
-                                    <tr key={row.id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
-                                        {row.getVisibleCells().map((cell) => (
-                                            <td key={cell.id}>
-                                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                            </td>
+                                    </thead>
+                                    <tbody>
+                                        {table.getRowModel().rows.map((row, index) => (
+                                            <tr key={row.id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
+                                                {row.getVisibleCells().map((cell) => (
+                                                    <td key={cell.id}>
+                                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                                    </td>
+                                                ))}
+                                            </tr>
                                         ))}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                 )}
 

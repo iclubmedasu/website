@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { CLUB_TIMEZONE, toEventDayString } from '@iclub/shared/utils';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useResourceChannel } from '@/hooks/useResourceChannel';
-import { FileSpreadsheet, Plus } from 'lucide-react';
+import { FileSpreadsheet, Filter, Plus, Search } from 'lucide-react';
 import Toggle from '@/components/toggle/Toggle';
 import { fmtDate } from '@/components/cards/LifecycleCardView/LifecycleCardView';
 import { eventsAPI } from '@/services/api';
@@ -11,7 +12,6 @@ import { exportEventRegistrationsExcel } from '@/features/Events/components/regi
 import type {
     EventCustomFieldRef,
     EventRegistrationRef,
-    EventRegistrationSourceGroup,
     EventSessionRef,
     EventTierRef,
     Id,
@@ -23,8 +23,6 @@ import type {
 import {
     emptyAttendeeDraft,
     formatRegistrationSource,
-    formatRegistrationStatus,
-    REGISTRATION_SOURCE_GROUP_OPTIONS,
     validateAttendeeDraft,
     type AttendeeDraft,
 } from '../customFieldUtils';
@@ -37,11 +35,34 @@ import EditableRegistrationTierCell from './EditableRegistrationTierCell';
 import EditableRegistrationSessionCell from './EditableRegistrationSessionCell';
 import CollapsibleAttendanceChips, { type AttendanceRemovalTarget } from './CollapsibleAttendanceChips';
 import EventCheckInPanel from './EventCheckInSection';
+import {
+    buildMiddleColumns,
+    extractColumnOrderState,
+    swapMiddleColumnOrders,
+    type MiddleColumn,
+} from '../registrationColumnOrderUtils';
 import WalkInDraftFields from './WalkInDraftFields';
 import SessionAttendanceOptions from './SessionAttendanceOptions';
 import EventStaffModal from '@/features/Events/components/EventStaffModal';
 import { useCheckInFlow } from '../useCheckInFlow';
 import { formatEventDuration, getActiveSessionsNow, isMultiDayEvent, isWithinEventDays } from '../../eventDateUtils';
+import RegistrationColumnFilterModal, {
+    DEFAULT_REGISTRATION_SORT,
+    EMPTY_REGISTRATION_SERVER_FILTERS,
+    isRegistrationFunnelActive,
+    RegistrationFilterChips,
+    type RegistrationServerFilters,
+} from './RegistrationColumnFilterModal';
+import {
+    applyRegistrationColumnFilters,
+    applyRegistrationTextSearch,
+    buildFilterableColumns,
+    normalizeSortSpec,
+    sortRegistrations,
+    type RegistrationColumnFilter,
+    type RegistrationSortSpec,
+} from '../registrationTableFilterUtils';
+import type { RegistrationTableFunnelState } from '../eventExpandedFunnelState';
 
 interface EventRegistrationsSectionProps {
     eventId: Id | string;
@@ -56,6 +77,7 @@ interface EventRegistrationsSectionProps {
     allowDirectCheckIn?: boolean;
     eventDate?: string | null;
     eventEndDate?: string | null;
+    eventTimezone?: string;
     isPublished?: boolean;
     canPublishEvent?: boolean;
     canRemoveAttendance?: boolean;
@@ -65,10 +87,19 @@ interface EventRegistrationsSectionProps {
     tierFieldRequired?: boolean;
     sessionFieldShowOnPublic?: boolean;
     sessionFieldRequired?: boolean;
+    phoneFieldRequired?: boolean;
+    sessionFieldOrder?: number;
+    tierFieldOrder?: number;
     onRegistrationColumnsChange?: (columns: UpdateEventRegistrationColumnsPayload) => void;
     onRegistrationAdded?: () => void;
     onCheckIn?: () => void;
     onImportComplete?: (result: ImportRegistrationsResult) => void;
+    funnel: RegistrationTableFunnelState;
+    onFunnelChange: (
+        next:
+            | RegistrationTableFunnelState
+            | ((prev: RegistrationTableFunnelState) => RegistrationTableFunnelState),
+    ) => void;
 }
 
 export default function EventRegistrationsSection({
@@ -84,6 +115,7 @@ export default function EventRegistrationsSection({
     allowDirectCheckIn = false,
     eventDate,
     eventEndDate,
+    eventTimezone = CLUB_TIMEZONE,
     isPublished = false,
     canPublishEvent = false,
     canRemoveAttendance = false,
@@ -93,16 +125,49 @@ export default function EventRegistrationsSection({
     tierFieldRequired = true,
     sessionFieldShowOnPublic = false,
     sessionFieldRequired = false,
+    phoneFieldRequired = false,
+    sessionFieldOrder = 0,
+    tierFieldOrder = 1,
     onRegistrationColumnsChange,
     onRegistrationAdded,
     onCheckIn,
     onImportComplete,
+    funnel,
+    onFunnelChange,
 }: EventRegistrationsSectionProps) {
     const [registrations, setRegistrations] = useState<EventRegistrationRef[]>([]);
-    const [registrationSearch, setRegistrationSearch] = useState('');
-    const [registrationTier, setRegistrationTier] = useState('');
-    const [registrationCheckIn, setRegistrationCheckIn] = useState('');
-    const [registrationSourceGroup, setRegistrationSourceGroup] = useState<EventRegistrationSourceGroup | ''>('');
+    const registrationSearch = funnel.search;
+    const columnFilters = funnel.columnFilters;
+    const sortSpec = funnel.sortSpec;
+    const serverFilters = funnel.serverFilters;
+    const setRegistrationSearch = (search: string) => {
+        onFunnelChange((prev) => ({ ...prev, search }));
+    };
+    const setColumnFilters = (
+        next: RegistrationColumnFilter[] | ((current: RegistrationColumnFilter[]) => RegistrationColumnFilter[]),
+    ) => {
+        onFunnelChange((prev) => ({
+            ...prev,
+            columnFilters: typeof next === 'function' ? next(prev.columnFilters) : next,
+        }));
+    };
+    const setSortSpec = (
+        next: RegistrationSortSpec | ((current: RegistrationSortSpec) => RegistrationSortSpec),
+    ) => {
+        onFunnelChange((prev) => ({
+            ...prev,
+            sortSpec: typeof next === 'function' ? next(prev.sortSpec) : next,
+        }));
+    };
+    const setServerFilters = (
+        next: RegistrationServerFilters | ((current: RegistrationServerFilters) => RegistrationServerFilters),
+    ) => {
+        onFunnelChange((prev) => ({
+            ...prev,
+            serverFilters: typeof next === 'function' ? next(prev.serverFilters) : next,
+        }));
+    };
+    const [filterModalOpen, setFilterModalOpen] = useState(false);
     const [isAddingAttendee, setIsAddingAttendee] = useState(false);
     const [draft, setDraft] = useState<AttendeeDraft>(emptyAttendeeDraft);
     const [draftErrors, setDraftErrors] = useState<Record<string, string>>({});
@@ -116,36 +181,65 @@ export default function EventRegistrationsSection({
     const [walkInAttendanceOpen, setWalkInAttendanceOpen] = useState(false);
     const [walkInAttendanceSessionId, setWalkInAttendanceSessionId] = useState<string | null>(null);
     const [editingField, setEditingField] = useState<EventCustomFieldRef | null>(null);
-    const dragFieldId = useRef<number | null>(null);
     const tableScrollRef = useRef<HTMLDivElement>(null);
 
     const hasRegistrations = totalRegistered > 0;
-    const sortedFields = [...fields].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    const withinEventDays = isWithinEventDays(eventDate, eventEndDate);
+    const middleColumns = buildMiddleColumns(fields, sessionFieldOrder, tierFieldOrder);
+    const sortedFields = middleColumns
+        .filter((column): column is Extract<MiddleColumn, { kind: 'custom' }> => column.kind === 'custom')
+        .map((column) => column.field);
+    const withinEventDays = isWithinEventDays(eventDate, eventEndDate, new Date(), eventTimezone);
     const walkInsEnabled = allowWalkIns && withinEventDays;
     const directCheckInEnabled = allowDirectCheckIn && withinEventDays;
     const canEditCustomFieldValues = withinEventDays;
     const eventDurationLabel = formatEventDuration(eventDate, eventEndDate ?? eventDate);
-    const multiDayEvent = isMultiDayEvent(eventDate, eventEndDate);
+    const multiDayEvent = isMultiDayEvent(eventDate, eventEndDate, eventTimezone);
     const activeSessionsNow = getActiveSessionsNow(sessions);
     const sessionDateById = new Map(
-        sessions.map((session) => [String(session.id), session.sessionDate.slice(0, 10)]),
+        sessions.map((session) => {
+            const instant = session.startDateTime ?? session.sessionDate;
+            const day = instant ? toEventDayString(instant, eventTimezone) : null;
+            return [String(session.id), day ?? ''] as const;
+        }),
     );
+    const filterableColumns = useMemo(
+        () => buildFilterableColumns('registrations', fields, tiers, sessions, multiDayEvent),
+        [fields, multiDayEvent, sessions, tiers],
+    );
+    const tableContext = useMemo(() => ({
+        tableKind: 'registrations' as const,
+        fields,
+        tiers,
+        sessions,
+        multiDayEvent,
+    }), [fields, multiDayEvent, sessions, tiers]);
+
+    useEffect(() => {
+        setSortSpec((current) => normalizeSortSpec(current, filterableColumns));
+    }, [filterableColumns]);
+
+    useEffect(() => {
+        setColumnFilters((current) => current.filter((filter) => (
+            filterableColumns.some((column) => column.id === filter.columnId)
+        )));
+    }, [filterableColumns]);
 
     const loadRegistrations = useCallback(async () => {
         try {
             const result = await eventsAPI.getRegistrations(eventId, {
-                tierId: registrationTier || undefined,
-                checkInStatus: registrationCheckIn === 'CHECKED_IN' || registrationCheckIn === 'NOT_CHECKED_IN' || registrationCheckIn === 'CHECKED_IN_TODAY'
-                    ? registrationCheckIn
+                tierId: serverFilters.tierId || undefined,
+                checkInStatus: serverFilters.checkInStatus === 'CHECKED_IN'
+                    || serverFilters.checkInStatus === 'NOT_CHECKED_IN'
+                    || serverFilters.checkInStatus === 'CHECKED_IN_TODAY'
+                    ? serverFilters.checkInStatus
                     : undefined,
-                sourceGroup: registrationSourceGroup || undefined,
+                sourceGroup: serverFilters.sourceGroup || undefined,
             });
             setRegistrations(result);
         } catch {
             setRegistrations([]);
         }
-    }, [eventId, registrationCheckIn, registrationSourceGroup, registrationTier]);
+    }, [eventId, serverFilters.checkInStatus, serverFilters.sourceGroup, serverFilters.tierId]);
 
     useEffect(() => {
         void loadRegistrations();
@@ -207,7 +301,31 @@ export default function EventRegistrationsSection({
             tierFieldRequired: updated.tierFieldRequired,
             sessionFieldShowOnPublic: updated.sessionFieldShowOnPublic,
             sessionFieldRequired: updated.sessionFieldRequired,
+            phoneFieldRequired: updated.phoneFieldRequired,
+            sessionFieldOrder: updated.sessionFieldOrder,
+            tierFieldOrder: updated.tierFieldOrder,
         });
+    };
+
+    const persistMiddleColumnState = async (nextColumns: MiddleColumn[]) => {
+        const state = extractColumnOrderState(nextColumns);
+        onFieldsChange(state.fields);
+        await handleRegistrationColumnsChange({
+            sessionFieldOrder: state.sessionFieldOrder,
+            tierFieldOrder: state.tierFieldOrder,
+        });
+        if (state.fields.some((field) => field.order !== fields.find((item) => item.id === field.id)?.order)) {
+            const payload: ReorderEventCustomFieldsPayload = {
+                order: state.fields.map((field, index) => ({ id: field.id, order: field.order ?? index })),
+            };
+            await eventsAPI.reorderCustomFields(eventId, payload);
+        }
+    };
+
+    const moveMiddleColumn = async (index: number, direction: 'left' | 'right') => {
+        const nextColumns = swapMiddleColumnOrders(middleColumns, index, direction);
+        if (!nextColumns) return;
+        await persistMiddleColumnState(nextColumns);
     };
 
     const handleRemoveField = async (fieldId: number) => {
@@ -217,18 +335,6 @@ export default function EventRegistrationsSection({
         } catch {
             window.alert('Cannot delete this field after registrations exist.');
         }
-    };
-
-    const moveField = async (fromIndex: number, toIndex: number) => {
-        if (toIndex < 0 || toIndex >= sortedFields.length || fromIndex === toIndex) return;
-        const next = [...sortedFields];
-        const [moved] = next.splice(fromIndex, 1);
-        next.splice(toIndex, 0, moved);
-        onFieldsChange(next.map((field, index) => ({ ...field, order: index })));
-        const payload: ReorderEventCustomFieldsPayload = {
-            order: next.map((field, index) => ({ id: field.id, order: index })),
-        };
-        await eventsAPI.reorderCustomFields(eventId, payload);
     };
 
     const handleFieldSaved = (saved: EventCustomFieldRef) => {
@@ -325,6 +431,7 @@ export default function EventRegistrationsSection({
         const errors = validateAttendeeDraft(draft, sortedFields, {
             tierFieldRequired,
             sessionFieldRequired,
+            phoneFieldRequired,
         });
         if (Object.keys(errors).length > 0) {
             setDraftErrors(errors);
@@ -376,24 +483,15 @@ export default function EventRegistrationsSection({
         }
     };
 
-    const filtered = registrations.filter((registration) => {
-        const query = registrationSearch.trim().toLowerCase();
-        if (!query) return true;
-        const normalizedQuery = query.replace(/[\s\-()]/g, '');
-        return [
-            registration.fullName,
-            registration.email,
-            registration.confirmationCode,
-            registration.phoneNumber,
-        ].some((value) => {
-            const text = String(value || '').toLowerCase();
-            if (text.includes(query)) return true;
-            if (registration.phoneNumber) {
-                return text.replace(/[\s\-()]/g, '').includes(normalizedQuery);
-            }
-            return false;
-        });
-    });
+    const filtered = useMemo(() => {
+        let rows = registrations;
+        rows = applyRegistrationTextSearch(rows, registrationSearch);
+        rows = applyRegistrationColumnFilters(rows, columnFilters, tableContext);
+        rows = sortRegistrations(rows, sortSpec, tableContext);
+        return rows;
+    }, [columnFilters, registrationSearch, registrations, sortSpec, tableContext]);
+
+    const hasFunnelFiltersActive = isRegistrationFunnelActive(columnFilters, sortSpec, serverFilters);
 
     const handleImportCompleted = (_importResult: ImportRegistrationsResult, refreshedFields: EventCustomFieldRef[]) => {
         onFieldsChange(refreshedFields);
@@ -411,6 +509,7 @@ export default function EventRegistrationsSection({
                 sessions,
                 multiDayEvent,
                 fileName: eventTitle?.trim() || `event-${eventId}`,
+                eventTimezone,
             });
         } catch {
             window.alert('Failed to export registrations to Excel.');
@@ -422,15 +521,130 @@ export default function EventRegistrationsSection({
     const walkInDraftFieldProps = {
         draft,
         draftErrors,
-        sortedFields,
+        middleColumns,
         tiers,
         sessions,
         tierFieldRequired,
         sessionFieldRequired,
+        phoneFieldRequired,
         multiDayEvent,
         onDraftChange: handleDraftChange,
         onClearError: clearDraftError,
         onCustomFieldChange: updateDraftCustomField,
+    };
+
+    const renderMiddleColumnHeader = (column: MiddleColumn, index: number) => {
+        if (column.kind === 'sessions') {
+            return (
+                <th key="sessions" className="event-registrations-col-th">
+                    {canManageFields ? (
+                        <SpecialColumnMenu
+                            label="Sessions"
+                            required={sessionFieldRequired}
+                            showOnPublic={sessionFieldShowOnPublic}
+                            onToggleRequired={() => void handleRegistrationColumnsChange({
+                                sessionFieldRequired: !sessionFieldRequired,
+                            })}
+                            onToggleShowOnPublic={() => void handleRegistrationColumnsChange({
+                                sessionFieldShowOnPublic: !sessionFieldShowOnPublic,
+                            })}
+                            onMoveLeft={() => void moveMiddleColumn(index, 'left')}
+                            onMoveRight={() => void moveMiddleColumn(index, 'right')}
+                            canMoveLeft={index > 0}
+                            canMoveRight={index < middleColumns.length - 1}
+                        />
+                    ) : 'Sessions'}
+                </th>
+            );
+        }
+
+        if (column.kind === 'tier') {
+            return (
+                <th key="tier" className="event-registrations-col-th">
+                    {canManageFields ? (
+                        <SpecialColumnMenu
+                            label="Tier"
+                            required={tierFieldRequired}
+                            showOnPublic={tierFieldShowOnPublic}
+                            onToggleRequired={() => void handleRegistrationColumnsChange({
+                                tierFieldRequired: !tierFieldRequired,
+                            })}
+                            onToggleShowOnPublic={() => void handleRegistrationColumnsChange({
+                                tierFieldShowOnPublic: !tierFieldShowOnPublic,
+                            })}
+                            onMoveLeft={() => void moveMiddleColumn(index, 'left')}
+                            onMoveRight={() => void moveMiddleColumn(index, 'right')}
+                            canMoveLeft={index > 0}
+                            canMoveRight={index < middleColumns.length - 1}
+                        />
+                    ) : 'Tier'}
+                </th>
+            );
+        }
+
+        const fieldIndex = sortedFields.findIndex((field) => field.id === column.field.id);
+        const field = column.field;
+        return (
+            <th key={field.id} className="event-registrations-col-th">
+                {canManageFields ? (
+                    <CustomFieldColumnMenu
+                        field={field}
+                        index={fieldIndex}
+                        total={sortedFields.length}
+                        onEdit={() => {
+                            setEditingField(field);
+                            setFieldModalOpen(true);
+                        }}
+                        onToggleRequired={() => void handleUpdateField(field, { required: !field.required })}
+                        onToggleShowOnPublic={() => void handleUpdateField(field, { showOnPublic: !field.showOnPublic })}
+                        onDelete={() => void handleRemoveField(Number(field.id))}
+                        onMoveLeft={() => void moveMiddleColumn(index, 'left')}
+                        onMoveRight={() => void moveMiddleColumn(index, 'right')}
+                        canMoveLeft={index > 0}
+                        canMoveRight={index < middleColumns.length - 1}
+                    />
+                ) : field.label}
+            </th>
+        );
+    };
+
+    const renderMiddleColumnCell = (column: MiddleColumn, registration: EventRegistrationRef) => {
+        if (column.kind === 'sessions') {
+            return (
+                <EditableRegistrationSessionCell
+                    key="sessions"
+                    eventId={eventId}
+                    registration={registration}
+                    sessions={sessions}
+                    editable={canEditCustomFieldValues}
+                    onUpdated={handleRegistrationUpdated}
+                />
+            );
+        }
+
+        if (column.kind === 'tier') {
+            return (
+                <EditableRegistrationTierCell
+                    key="tier"
+                    eventId={eventId}
+                    registration={registration}
+                    tiers={tiers}
+                    editable={canEditCustomFieldValues}
+                    onUpdated={handleRegistrationUpdated}
+                />
+            );
+        }
+
+        return (
+            <EditableCustomFieldCell
+                key={column.field.id}
+                eventId={eventId}
+                registration={registration}
+                field={column.field}
+                editable={canEditCustomFieldValues}
+                onUpdated={handleRegistrationUpdated}
+            />
+        );
     };
 
     return (
@@ -454,24 +668,75 @@ export default function EventRegistrationsSection({
                     <CopyPublicEventLinkButton eventSlug={eventSlug || String(eventId)} isPublished={isPublished} />
                 </div>
             </div>
-            <div className="event-expanded-form-grid">
-                <input value={registrationSearch} onChange={(e) => setRegistrationSearch(e.target.value)} placeholder="Search by name, email, phone, or code" className="form-input" />
-                <select aria-label="Filter by tier" value={registrationTier} onChange={(e) => setRegistrationTier(e.target.value)} className="form-input">
-                    <option value="">All tiers</option>
-                    {tiers.map((tier) => <option key={tier.id} value={tier.id}>{tier.name}</option>)}
-                </select>
-                <select aria-label="Filter by check-in status" value={registrationCheckIn} onChange={(e) => setRegistrationCheckIn(e.target.value)} className="form-input">
-                    <option value="">Check-in status</option>
-                    <option value="CHECKED_IN">Checked in</option>
-                    <option value="NOT_CHECKED_IN">Not checked in</option>
-                    {multiDayEvent && withinEventDays ? <option value="CHECKED_IN_TODAY">Checked in today</option> : null}
-                </select>
-                <select aria-label="Filter by source" value={registrationSourceGroup} onChange={(e) => setRegistrationSourceGroup(e.target.value as EventRegistrationSourceGroup | '')} className="form-input">
-                    {REGISTRATION_SOURCE_GROUP_OPTIONS.map((option) => (
-                        <option key={option.value || 'all'} value={option.value}>{option.label}</option>
-                    ))}
-                </select>
+            <div className="page-search-row event-registration-search-row">
+                <div className="page-search-field page-search-field--full event-registration-search-field">
+                    <Search className="page-search-icon" size={16} />
+                    <input
+                        type="search"
+                        className="page-search-input"
+                        value={registrationSearch}
+                        onChange={(e) => setRegistrationSearch(e.target.value)}
+                        placeholder="Search by name, email, phone, or code"
+                        aria-label="Search registrations"
+                    />
+                    <button
+                        type="button"
+                        className={`page-search-filter-btn${hasFunnelFiltersActive ? ' page-search-filter-btn--active' : ''}`}
+                        onClick={() => setFilterModalOpen(true)}
+                        aria-label="Open sort and filters"
+                    >
+                        <Filter size={16} />
+                        <span className="page-search-filter-label">Sort & Filters</span>
+                    </button>
+                </div>
             </div>
+            <RegistrationFilterChips
+                filters={columnFilters}
+                serverFilters={serverFilters}
+                columns={filterableColumns}
+                context={tableContext}
+                tiers={tiers}
+                onRemove={(index) => setColumnFilters((current) => current.filter((_, filterIndex) => filterIndex !== index))}
+                onRemoveServerFilter={(key) => {
+                    setServerFilters((current) => ({ ...current, [key]: EMPTY_REGISTRATION_SERVER_FILTERS[key] }));
+                }}
+                onClearAll={() => {
+                    setColumnFilters([]);
+                    setServerFilters(EMPTY_REGISTRATION_SERVER_FILTERS);
+                }}
+            />
+            <RegistrationColumnFilterModal
+                open={filterModalOpen}
+                columns={filterableColumns}
+                activeFilters={columnFilters}
+                sortSpec={sortSpec}
+                serverFilters={serverFilters}
+                serverFilterConfig={{
+                    showTier: true,
+                    showSource: true,
+                    showCheckIn: true,
+                    showCheckedInToday: multiDayEvent && withinEventDays,
+                }}
+                context={tableContext}
+                tiers={tiers}
+                sessions={sessions}
+                onClose={() => setFilterModalOpen(false)}
+                onApply={(filters, nextSort, nextServerFilters) => {
+                    setColumnFilters(filters);
+                    setSortSpec(nextSort);
+                    setServerFilters({
+                        ...EMPTY_REGISTRATION_SERVER_FILTERS,
+                        tierId: nextServerFilters.tierId,
+                        sourceGroup: nextServerFilters.sourceGroup,
+                        checkInStatus: nextServerFilters.checkInStatus,
+                    });
+                }}
+                onClear={() => {
+                    setColumnFilters([]);
+                    setSortSpec(DEFAULT_REGISTRATION_SORT);
+                    setServerFilters(EMPTY_REGISTRATION_SERVER_FILTERS);
+                }}
+            />
             {draftErrors._form ? <p className="error-message">{draftErrors._form}</p> : null}
             <div className="event-registrations-layout">
                 <div className="event-registrations-table-column">
@@ -482,71 +747,22 @@ export default function EventRegistrationsSection({
                                     <tr>
                                         <th className="event-registrations-name-cell">Name</th>
                                         <th>Email</th>
-                                        <th>Phone</th>
-                                        {sortedFields.map((field, index) => (
-                                            <th
-                                                key={field.id}
-                                                className="event-registrations-col-th"
-                                                draggable={canManageFields}
-                                                onDragStart={canManageFields ? () => { dragFieldId.current = Number(field.id); } : undefined}
-                                                onDragOver={canManageFields ? (event) => event.preventDefault() : undefined}
-                                                onDrop={canManageFields ? () => {
-                                                    const fromIndex = sortedFields.findIndex((item) => Number(item.id) === dragFieldId.current);
-                                                    dragFieldId.current = null;
-                                                    if (fromIndex >= 0) void moveField(fromIndex, index);
-                                                } : undefined}
-                                            >
-                                                {canManageFields ? (
-                                                    <CustomFieldColumnMenu
-                                                        field={field}
-                                                        index={index}
-                                                        total={sortedFields.length}
-                                                        onEdit={() => {
-                                                            setEditingField(field);
-                                                            setFieldModalOpen(true);
-                                                        }}
-                                                        onToggleRequired={() => void handleUpdateField(field, { required: !field.required })}
-                                                        onToggleShowOnPublic={() => void handleUpdateField(field, { showOnPublic: !field.showOnPublic })}
-                                                        onDelete={() => void handleRemoveField(Number(field.id))}
-                                                        onMoveLeft={() => void moveField(index, Math.max(0, index - 1))}
-                                                        onMoveRight={() => void moveField(index, Math.min(sortedFields.length - 1, index + 1))}
-                                                    />
-                                                ) : field.label}
-                                            </th>
-                                        ))}
                                         <th className="event-registrations-col-th">
                                             {canManageFields ? (
                                                 <SpecialColumnMenu
-                                                    label="Sessions"
-                                                    required={sessionFieldRequired}
-                                                    showOnPublic={sessionFieldShowOnPublic}
+                                                    label="Phone"
+                                                    required={phoneFieldRequired}
                                                     onToggleRequired={() => void handleRegistrationColumnsChange({
-                                                        sessionFieldRequired: !sessionFieldRequired,
-                                                    })}
-                                                    onToggleShowOnPublic={() => void handleRegistrationColumnsChange({
-                                                        sessionFieldShowOnPublic: !sessionFieldShowOnPublic,
+                                                        phoneFieldRequired: !phoneFieldRequired,
                                                     })}
                                                 />
-                                            ) : 'Sessions'}
+                                            ) : 'Phone'}
                                         </th>
-                                        <th className="event-registrations-col-th">
-                                            {canManageFields ? (
-                                                <SpecialColumnMenu
-                                                    label="Tier"
-                                                    required={tierFieldRequired}
-                                                    showOnPublic={tierFieldShowOnPublic}
-                                                    onToggleRequired={() => void handleRegistrationColumnsChange({
-                                                        tierFieldRequired: !tierFieldRequired,
-                                                    })}
-                                                    onToggleShowOnPublic={() => void handleRegistrationColumnsChange({
-                                                        tierFieldShowOnPublic: !tierFieldShowOnPublic,
-                                                    })}
-                                                />
-                                            ) : 'Tier'}
-                                        </th>
+                                        {middleColumns.map((column, index) => renderMiddleColumnHeader(column, index))}
                                         <th>Code</th>
                                         {multiDayEvent ? <th>Attendance</th> : null}
-                                        <th className="event-registrations-status-cell">Status</th>
+                                        {/* Status column hidden */}
+                                        {/* <th className="event-registrations-status-cell">Status</th> */}
                                         <th>Source</th>
                                         <th>Registered</th>
                                         <th className="event-registrations-add-field-col">
@@ -593,33 +809,11 @@ export default function EventRegistrationsSection({
                                                 registration={registration}
                                                 field="phoneNumber"
                                                 editable={canEditCustomFieldValues}
+                                                phoneFieldRequired={phoneFieldRequired}
                                                 className="event-registrations-phone-cell"
                                                 onUpdated={handleRegistrationUpdated}
                                             />
-                                            {sortedFields.map((field) => (
-                                                <EditableCustomFieldCell
-                                                    key={field.id}
-                                                    eventId={eventId}
-                                                    registration={registration}
-                                                    field={field}
-                                                    editable={canEditCustomFieldValues}
-                                                    onUpdated={handleRegistrationUpdated}
-                                                />
-                                            ))}
-                                            <EditableRegistrationSessionCell
-                                                eventId={eventId}
-                                                registration={registration}
-                                                sessions={sessions}
-                                                editable={canEditCustomFieldValues}
-                                                onUpdated={handleRegistrationUpdated}
-                                            />
-                                            <EditableRegistrationTierCell
-                                                eventId={eventId}
-                                                registration={registration}
-                                                tiers={tiers}
-                                                editable={canEditCustomFieldValues}
-                                                onUpdated={handleRegistrationUpdated}
-                                            />
+                                            {middleColumns.map((column) => renderMiddleColumnCell(column, registration))}
                                             <td><code>{registration.confirmationCode}</code></td>
                                             {multiDayEvent ? (
                                                 <td>
@@ -632,7 +826,8 @@ export default function EventRegistrationsSection({
                                                     />
                                                 </td>
                                             ) : null}
-                                            <td className="event-registrations-status-cell">{formatRegistrationStatus(registration)}</td>
+                                            {/* Status column hidden */}
+                                            {/* <td className="event-registrations-status-cell">{formatRegistrationStatus(registration)}</td> */}
                                             <td>{formatRegistrationSource(registration)}</td>
                                             <td>{fmtDate(registration.createdAt) || '—'}</td>
                                             <td className="event-registrations-add-field-col" aria-hidden="true" />

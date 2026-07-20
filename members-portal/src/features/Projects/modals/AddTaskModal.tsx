@@ -2,6 +2,7 @@
 
 import { useState, type ChangeEvent } from 'react';
 import { X } from 'lucide-react';
+import { fromDateInputValue } from '@iclub/shared/utils';
 import { tasksAPI } from '../../../services/api';
 import { toTitleCase } from '../../../utils/titleCase';
 import type {
@@ -145,8 +146,8 @@ export default function AddTaskModal({
                 status: form.status,
                 priority: normalizedPriority,
                 difficulty: form.difficulty,
-                startDate: form.startDate || null,
-                dueDate: form.dueDate || null,
+                startDate: form.startDate ? fromDateInputValue(form.startDate) : null,
+                dueDate: form.dueDate ? fromDateInputValue(form.dueDate) : null,
                 estimatedHours: form.estimatedHours ? parseFloat(form.estimatedHours) : null,
                 leaderId: form.leaderId,
                 assigneeIds: form.assigneeIds,

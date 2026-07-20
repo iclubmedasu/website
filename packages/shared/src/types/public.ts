@@ -13,6 +13,7 @@ export interface PublicEventSummary {
     eventDate: ISODateTime;
     eventEndDate: ISODateTime;
     venue?: string | null;
+    timezone?: string;
     registrationDeadline?: ISODateTime | null;
     projectType?: PublicEventTypeRef | null;
 }
@@ -63,6 +64,7 @@ export interface PublicEventSession {
     registeredCount?: number;
     spotsRemaining?: number | null;
     isFull?: boolean;
+    hasEnded?: boolean;
 }
 
 export interface PublicEventRegistrationFormConfig {
@@ -70,6 +72,7 @@ export interface PublicEventRegistrationFormConfig {
     tierFieldRequired: boolean;
     sessionFieldShowOnPublic: boolean;
     sessionFieldRequired: boolean;
+    phoneFieldRequired: boolean;
 }
 
 export interface PublicConfirmationSession {
@@ -97,6 +100,7 @@ export interface PublicRegistrationConfirmation {
         eventDate: ISODateTime;
         eventEndDate: ISODateTime;
         venue?: string | null;
+        timezone?: string;
     };
     tier: { name: string } | null;
     sessions: PublicConfirmationSession[];

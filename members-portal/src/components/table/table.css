@@ -9,6 +9,18 @@
    TABLE LAYOUT
    ============================================ */
 
+/* Shared data-table frame — thin brand border + radius-md squircle, flush edges */
+.members-table-shell,
+.event-registrations-table-shell,
+.certificates-table-shell,
+.event-cert-table-shell,
+.project-cert-table-shell {
+    border: 1px solid var(--border-brand);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    overflow: hidden;
+}
+
 .table-container {
     overflow-x: auto;
 }
@@ -143,6 +155,41 @@
     color: #3730a3;
 }
 
+.status-badge.revoked {
+    background-color: var(--status-cancelled-bg);
+    color: var(--status-cancelled-text);
+}
+
+.status-badge--revocable {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: var(--font-heading);
+    line-height: inherit;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-md);
+}
+
+.status-badge--revocable:hover,
+.status-badge--revocable:focus-visible {
+    background: var(--error-bg);
+    border-color: var(--error-border);
+    color: var(--error-text);
+    outline: none;
+}
+
+.status-badge__remove {
+    font-size: 0.875rem;
+    line-height: 1;
+    opacity: 0.75;
+}
+
 
 /* ============================================
    TABLE ACTION BUTTONS
@@ -190,4 +237,46 @@
     background: #2563eb;
     color: white;
     transform: scale(1.1);
+}
+
+.table-action-btn.hold-btn {
+    color: #d97706;
+}
+
+.table-action-btn.hold-btn:hover {
+    background: #f59e0b;
+    color: white;
+    transform: scale(1.1);
+}
+
+.table-action-btn.reactivate-btn {
+    color: #2563eb;
+}
+
+.table-action-btn.reactivate-btn:hover {
+    background: #2563eb;
+    color: white;
+    transform: scale(1.1);
+}
+
+.table-action-btn.deactivate-btn {
+    color: var(--error-text);
+}
+
+.table-action-btn.deactivate-btn:hover {
+    background: var(--error-text);
+    color: white;
+    transform: scale(1.1);
+}
+
+.table-action-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.table-action-btn:disabled:hover {
+    background: transparent;
+    color: inherit;
+    transform: none;
 }

@@ -2,13 +2,18 @@ import "dotenv/config";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import express, { NextFunction, Request, Response } from "express";
+import helmet from "helmet";
 import routes from "./routes";
 import { prisma } from "./db";
+import { resolveJwtSecret } from "./lib/securityEnv";
 import { attachNotificationsWebSocketServer } from "./services/notificationsRealtime";
+
+// Fail closed early if production is missing required secrets.
+resolveJwtSecret();
 
 console.log("DATABASE_URL:", process.env.DATABASE_URL ? "loaded" : "NOT LOADED");
 console.log("JWT_SECRET:", process.env.JWT_SECRET ? "loaded" : "NOT LOADED");
-console.log("DEVELOPER_EMAIL:", process.env.DEVELOPER_EMAIL || "dev@iclub.com");
+console.log("DEVELOPER_EMAIL:", process.env.DEVELOPER_EMAIL ? "set" : "not set");
 console.log(
     "GITHUB_STORAGE_REPO:",
     process.env.GITHUB_STORAGE_REPO ? "loaded" : "NOT SET",
@@ -22,6 +27,14 @@ console.log("RESEND_API_KEY:", process.env.RESEND_API_KEY ? "loaded" : "NOT SET"
 const app = express();
 app.set("trust proxy", 1);
 
+app.use(
+    helmet({
+        // API serves JSON / file downloads; CSP is owned by the frontend apps.
+        contentSecurityPolicy: false,
+        crossOriginResourcePolicy: { policy: "cross-origin" },
+    }),
+);
+
 const frontendOrigins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -30,6 +43,7 @@ const frontendOrigins = [
     "http://localhost:3002",
     "http://127.0.0.1:3002",
     "https://iclubmedasu-members-portal.hf.space",
+    "https://iclubmedasu-public-website.hf.space",
     process.env.FRONTEND_URL,
     ...(process.env.FRONTEND_ORIGINS
         ? process.env.FRONTEND_ORIGINS.split(",").map((value) => value.trim())
@@ -54,14 +68,6 @@ function isPrivateNetworkOrigin(origin: string): boolean {
     }
 }
 
-function isHuggingFaceOrigin(origin: string): boolean {
-    try {
-        return new URL(origin).hostname.endsWith(".hf.space");
-    } catch {
-        return false;
-    }
-}
-
 app.use(
     cors({
         origin: (origin, callback) => {
@@ -75,11 +81,7 @@ app.use(
                 return;
             }
 
-            if (!isDevelopment && isHuggingFaceOrigin(origin)) {
-                callback(null, true);
-                return;
-            }
-
+            // Dev-only: allow LAN origins for mobile testing.
             if (isDevelopment && isPrivateNetworkOrigin(origin)) {
                 callback(null, true);
                 return;
@@ -111,16 +113,19 @@ app.get("/health", (_req: Request, res: Response) => {
     res.json({ status: "ok" });
 });
 
-app.get("/test-db", async (_req: Request, res: Response) => {
-    try {
-        await prisma.$connect();
-        const count = await prisma.team.count();
-        res.json({ status: "connected", teamCount: count });
-    } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown DB error";
-        res.status(500).json({ status: "failed", error: message });
-    }
-});
+// Debug DB probe — disabled in production.
+if (isDevelopment) {
+    app.get("/test-db", async (_req: Request, res: Response) => {
+        try {
+            await prisma.$connect();
+            const count = await prisma.team.count();
+            res.json({ status: "connected", teamCount: count });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Unknown DB error";
+            res.status(500).json({ status: "failed", error: message });
+        }
+    });
+}
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     void _next;

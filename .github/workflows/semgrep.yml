@@ -1,0 +1,35 @@
+# Semgrep Community Edition (OSS) — SAST on PRs and mainline pushes.
+#
+# Why not CodeQL? Code scanning with CodeQL requires GitHub Code Security / Advanced
+# Security on private repos. Semgrep CE runs for free without GHAS.
+# If the repo is public (or you enable Code Security later), you can add a CodeQL
+# workflow alongside or instead of this one.
+
+name: Semgrep — SAST
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: Semgrep CE Scan
+    runs-on: ubuntu-latest
+    # Dependabot PRs already get dependency alerts; skip to avoid noisy duplicate runs.
+    if: github.actor != 'dependabot[bot]'
+
+    container:
+      image: semgrep/semgrep
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep (OSS rules)
+        run: semgrep scan --config auto --error --metrics=off

@@ -10,14 +10,24 @@ import {
     useState,
     type ReactNode,
 } from 'react';
-import { getAuthToken, getNotificationsWebSocketUrl } from '@/services/api';
+import { getAuthToken, getNotificationsWebSocketUrl, setClientInstanceId } from '@/services/api';
 import type { NotificationRealtimeMessage, RealtimeSubscribeMessage } from '@/types/backend-contracts';
 
 type RealtimeListener = (message: NotificationRealtimeMessage) => void;
+type ReconnectListener = () => void;
+
+function createClientInstanceId(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    return `client-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 interface RealtimeContextValue {
     subscribe: (topic: string, listener: RealtimeListener) => () => void;
+    onReconnect: (listener: ReconnectListener) => () => void;
     isConnected: boolean;
+    clientInstanceId: string;
 }
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
@@ -27,6 +37,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     const socketRef = useRef<WebSocket | null>(null);
     const listenersRef = useRef<Map<string, Set<RealtimeListener>>>(new Map());
     const subscribedTopicsRef = useRef<Set<string>>(new Set());
+    const reconnectListenersRef = useRef<Set<ReconnectListener>>(new Set());
+    const hasConnectedOnceRef = useRef(false);
+    const clientInstanceIdRef = useRef(createClientInstanceId());
+
+    useEffect(() => {
+        setClientInstanceId(clientInstanceIdRef.current);
+    }, []);
 
     const dispatchMessage = useCallback((message: NotificationRealtimeMessage) => {
         if (message.type === 'resource.changed' && message.resource && message.id != null) {
@@ -53,9 +70,15 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         }
     }, [sendSocketMessage]);
 
+    const notifyReconnect = useCallback(() => {
+        reconnectListenersRef.current.forEach((listener) => listener());
+    }, []);
+
     useEffect(() => {
         let disposed = false;
         let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+        // Prefer httpOnly cookie on the WS upgrade; only put JWT in the query string if cookie auth fails.
+        let allowQueryTokenFallback = false;
 
         const connect = () => {
             if (disposed) return;
@@ -65,7 +88,9 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
             if (!token || !baseUrl) return;
 
             const url = new URL(baseUrl);
-            url.searchParams.set('token', token);
+            if (allowQueryTokenFallback) {
+                url.searchParams.set('token', token);
+            }
 
             const socket = new WebSocket(url.toString());
             socketRef.current = socket;
@@ -74,6 +99,11 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
                 if (disposed) return;
                 setIsConnected(true);
                 resubscribeAllTopics();
+                if (hasConnectedOnceRef.current) {
+                    notifyReconnect();
+                } else {
+                    hasConnectedOnceRef.current = true;
+                }
             };
 
             socket.onmessage = (event) => {
@@ -93,6 +123,12 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
                 setIsConnected(false);
                 socketRef.current = null;
                 if (disposed) return;
+                // First failure without query token → retry once with ?token= fallback.
+                if (!allowQueryTokenFallback) {
+                    allowQueryTokenFallback = true;
+                    connect();
+                    return;
+                }
                 reconnectTimer = setTimeout(connect, 2000);
             };
         };
@@ -105,7 +141,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
             socketRef.current?.close();
             socketRef.current = null;
         };
-    }, [dispatchMessage, resubscribeAllTopics]);
+    }, [dispatchMessage, notifyReconnect, resubscribeAllTopics]);
 
     const subscribe = useCallback((topic: string, listener: RealtimeListener) => {
         const current = listenersRef.current.get(topic) ?? new Set<RealtimeListener>();
@@ -129,7 +165,22 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         };
     }, [sendSocketMessage]);
 
-    const value = useMemo(() => ({ subscribe, isConnected }), [isConnected, subscribe]);
+    const onReconnect = useCallback((listener: ReconnectListener) => {
+        reconnectListenersRef.current.add(listener);
+        return () => {
+            reconnectListenersRef.current.delete(listener);
+        };
+    }, []);
+
+    const value = useMemo(
+        () => ({
+            subscribe,
+            onReconnect,
+            isConnected,
+            clientInstanceId: clientInstanceIdRef.current,
+        }),
+        [isConnected, onReconnect, subscribe],
+    );
 
     return (
         <RealtimeContext.Provider value={value}>

@@ -585,6 +585,7 @@ const MembersTable = ({ members, onViewMember, onEditMember, onAddMember, canMan
                 )}
             </div>
             <div className="card-body">
+                <div className="members-table-shell">
                 {members.length === 0 ? (
                     <div className="empty-state">
                         <Users className="empty-state-icon" />
@@ -661,6 +662,7 @@ const MembersTable = ({ members, onViewMember, onEditMember, onAddMember, canMan
                         </table>
                     </div>
                 )}
+                </div>
             </div>
         </div>
     );

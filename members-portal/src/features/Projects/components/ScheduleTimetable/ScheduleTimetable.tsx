@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, type CSSProperties } from 'react';
-import { formatDateTime } from '@iclub/shared/utils';
+import { formatDateCompact, formatDateTime, toLocalDayKey } from '@iclub/shared/utils';
 import { getProfilePhotoUrl } from '../../../../services/api';
 import './ScheduleTimetable.css';
 import type { Id, MemberSummary, ScheduleSlot } from '../../../../types/backend-contracts';
@@ -79,7 +79,7 @@ function addDays(date: Date, amount: number): Date {
 }
 
 function getLocalDateKey(date: Date): string {
-    return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+    return toLocalDayKey(date);
 }
 
 function getTimelineMinuteOffset(date: Date, dayIndexByKey: Map<string, number>): number | null {
@@ -94,7 +94,7 @@ function getTimelineMinuteOffset(date: Date, dayIndexByKey: Map<string, number>)
 function formatDateLabel(value: string | Date | null | undefined): string {
     const date = getDateOrNull(value);
     if (!date) return '—';
-    return date.toLocaleDateString([], { month: 'short', day: '2-digit' });
+    return formatDateCompact(date);
 }
 
 function formatHourLabel(value: string | Date | null | undefined): string {

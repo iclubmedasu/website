@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Archive, Calendar, Paperclip, SquareCheckBig } from 'lucide-react';
+import { Archive, Award, Calendar, Paperclip, SquareCheckBig } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { phasesAPI, projectFilesAPI } from '@/services/api';
 import FileUploadZone from '@/components/FileUpload/FileUploadZone';
@@ -14,6 +14,7 @@ import LifecycleCardView, {
 } from '@/components/cards/LifecycleCardView/LifecycleCardView';
 import LifecycleCardActions from '@/components/cards/LifecycleCardView/LifecycleCardActions';
 import GanttChart from '../GanttChart/GanttChart';
+import ProjectCertificatesSection from '../ProjectCertificatesSection';
 import AddPhaseModal from '../../modals/AddPhaseModal';
 import AddTaskModal from '../../modals/AddTaskModal';
 import EditTaskModal from '../../modals/EditTaskModal';
@@ -59,6 +60,7 @@ export interface ProjectCardProps {
     allMembers?: any[];
     canEdit?: boolean;
     canManage?: boolean;
+    canManageCertificates?: boolean;
     canUpload?: boolean;
     canEditStructure?: boolean;
     canEditStatus?: boolean;
@@ -83,6 +85,7 @@ export default function ProjectCard({
     allMembers = [],
     canEdit = false,
     canManage = false,
+    canManageCertificates = false,
     canUpload = false,
     canEditStructure = false,
     canEditStatus = false,
@@ -323,6 +326,20 @@ export default function ProjectCard({
                             onRefresh={archivedView ? () => { } : () => onRefreshDetail?.(detail.id as Id)}
                         />
                     </div>
+                    {canManageCertificates && (
+                        <div className="exp-card-section">
+                            <div className="exp-card-section-header">
+                                <Award size={14} className="exp-card-section-icon" />
+                                Certificates
+                            </div>
+                            <ProjectCertificatesSection
+                                projectId={detail.id}
+                                projectTitle={detail.title}
+                                isFinalized={!!detail.isFinalized}
+                                canManage={canManageCertificates}
+                            />
+                        </div>
+                    )}
                     <div className="exp-card-section">
                         <div className="exp-card-section-header">
                             <Paperclip size={14} className="exp-card-section-icon" />

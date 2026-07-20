@@ -7,11 +7,20 @@ import {
     isHrHeadOrVice,
 } from "../lib/supportPermissions";
 import { canViewFinance, isFrHeadOrVice } from "../lib/financePermissions";
+import { resolveJwtSecret } from "../lib/securityEnv";
 import type { RequestUser } from "../types/auth";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-this";
+const JWT_SECRET = resolveJwtSecret();
 const ADMINISTRATION_TEAM_NAME = "Administration";
 
+/**
+ * Query-string JWT (`?token=`) is opt-in only.
+ * Remaining callers that still need it (document intentionally):
+ * - WebSocket upgrade (`/api/notifications/ws`) — browsers cannot set Authorization on WS handshake;
+ *   prefer httpOnly cookie when present, query token as fallback.
+ * - File download/version routes that may be opened as bare browser navigation (`<a href>`).
+ * Prefer Authorization header or cookie for normal API/fetch traffic.
+ */
 type AuthTokenSourceOptions = {
     allowQueryToken?: boolean;
 };

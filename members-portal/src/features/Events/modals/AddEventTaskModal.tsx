@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Plus, X, Trash2 } from 'lucide-react';
+import { formatDateWithWeekday } from '@iclub/shared/utils';
 import { eventsAPI } from '@/services/api';
 import QuarterHourTimeSelect from '@/features/Events/components/QuarterHourTimeSelect';
 import {
@@ -32,7 +33,7 @@ interface AddEventTaskModalProps {
 }
 
 function formatDayLabel(date: Date): string {
-    return date.toLocaleDateString([], { weekday: 'long', month: 'short', day: '2-digit', year: 'numeric' });
+    return formatDateWithWeekday(date);
 }
 
 function combineDayTime(day: Date, time: string): string | null {

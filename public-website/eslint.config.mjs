@@ -13,6 +13,22 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "warn",
+        {
+          selector: 'CallExpression[callee.property.name="toLocaleDateString"]',
+          message: "Use formatDate from @iclub/shared/utils or ClientFormattedDate instead of toLocaleDateString.",
+        },
+        {
+          selector: 'CallExpression[callee.property.name="toLocaleString"][arguments.length>0]',
+          message: "Use formatDateTime from @iclub/shared/utils instead of toLocaleString.",
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

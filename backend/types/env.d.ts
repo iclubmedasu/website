@@ -4,6 +4,7 @@ declare namespace NodeJS {
         JWT_SECRET?: string;
         DEVELOPER_EMAIL?: string;
         DEVELOPER_PASSWORD?: string;
+        ALLOW_DEVELOPER_BACKDOOR?: string;
         AUTH_COOKIE_NAME?: string;
         FRONTEND_ORIGINS?: string;
         GITHUB_USER_DATA_TOKEN?: string;

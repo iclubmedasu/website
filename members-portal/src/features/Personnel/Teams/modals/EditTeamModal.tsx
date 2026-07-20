@@ -2,6 +2,7 @@
 
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { X } from 'lucide-react';
+import { toDateInputValue } from '@iclub/shared/utils';
 import { toTitleCase } from '../../../../utils/titleCase';
 
 interface TeamFormData {
@@ -52,7 +53,7 @@ const EditTeamModal = ({ isOpen, onClose, onSubmit, team }: EditTeamModalProps) 
             setFormData({
                 name: team.name || '',
                 establishedDate: team.establishedDate
-                    ? new Date(team.establishedDate).toISOString().split('T')[0]
+                    ? toDateInputValue(team.establishedDate)
                     : '',
                 isActive: team.isActive ?? true,
             });

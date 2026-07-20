@@ -2,6 +2,7 @@
 
 import { useState, useEffect, type FormEvent, type MouseEvent } from 'react';
 import { X } from 'lucide-react';
+import { formatDate } from '@iclub/shared/utils';
 import type { Id } from '../../../../types/backend-contracts';
 
 const MODES = {
@@ -183,9 +184,7 @@ function OfficerHandoverModal({
                                     <div className="info-item">
                                         <label className="info-label">Since</label>
                                         <p className="info-value">
-                                            {!Number.isNaN(new Date(currentOfficerAssignee.joinedDate).getTime())
-                                                ? new Date(currentOfficerAssignee.joinedDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-                                                : '—'}
+                                            {formatDate(currentOfficerAssignee.joinedDate)}
                                         </p>
                                     </div>
                                 )}

@@ -161,6 +161,7 @@ export interface EventSummary {
     title: string;
     description?: string | null;
     venue?: string | null;
+    timezone?: string;
     eventDate: ISODateTime;
     eventEndDate: ISODateTime;
     registrationDeadline?: ISODateTime | null;
@@ -182,6 +183,9 @@ export interface EventSummary {
     tierFieldRequired?: boolean;
     sessionFieldShowOnPublic?: boolean;
     sessionFieldRequired?: boolean;
+    phoneFieldRequired?: boolean;
+    sessionFieldOrder?: number;
+    tierFieldOrder?: number;
     deletedAt?: ISODateTime | null;
     createdAt?: ISODateTime;
     updatedAt?: ISODateTime;
@@ -259,6 +263,7 @@ export interface CreateEventPayload {
     title: string;
     description?: string | null;
     venue?: string | null;
+    timezone?: string;
     eventDate: ISODateTime | string;
     eventEndDate?: ISODateTime | string;
     registrationDeadline?: ISODateTime | string | null;
@@ -315,6 +320,9 @@ export interface UpdateEventRegistrationColumnsPayload {
     tierFieldRequired?: boolean;
     sessionFieldShowOnPublic?: boolean;
     sessionFieldRequired?: boolean;
+    phoneFieldRequired?: boolean;
+    sessionFieldOrder?: number;
+    tierFieldOrder?: number;
 }
 
 export interface CreateEventRegistrationPayload {

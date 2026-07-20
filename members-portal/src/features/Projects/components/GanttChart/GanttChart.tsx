@@ -26,13 +26,20 @@ import {
     Calendar,
 } from 'lucide-react';
 import { tasksAPI, phasesAPI, getProfilePhotoUrl } from '../../../../services/api';
-import { toLocalDayKey } from '@iclub/shared/utils';
+import {
+    formatDate,
+    formatDateCompact,
+    formatMonthShort,
+    formatMonthYear,
+    toLocalDayKey,
+} from '@iclub/shared/utils';
 import DeletePhaseTaskModal from '../../modals/DeletePhaseTaskModal';
 import ScheduleTimetable from '../ScheduleTimetable/ScheduleTimetable';
 import {
     buildScheduleTimelineSheet,
     collectScheduleTimelineSlots,
 } from './scheduleTimelineExport';
+import { generateXlsxBlob } from '@/utils/generateXlsxBlob';
 import './GanttChart.css';
 
 type ScaleKey = 'quarter' | 'month' | 'week' | 'day';
@@ -733,7 +740,7 @@ function hexToArgb(hex: any) {
 function formatExportShortDate(value: any) {
     const date = getDateOrNull(value);
     if (!date) return '';
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    return formatDateCompact(date);
 }
 
 function waitForNextPaint(): Promise<void> {
@@ -916,7 +923,7 @@ function buildExportTimeline(rangeStart: any, rangeEnd: any) {
         ),
         monthBands: buildBands(
             (day) => `${day.getFullYear()}-${day.getMonth()}`,
-            (day) => day.toLocaleDateString('en-GB', { month: 'short' }),
+            (day) => formatMonthShort(day),
         ),
         weekBands: buildBands(
             (day) => toLocalDayKey(getWeekStartDate(day)),
@@ -979,7 +986,7 @@ function generateTimeline(rangeStart: any, rangeEnd: any, scale: ScaleKey) {
             if (mk !== prevMonth) {
                 topH.push({
                     key: `top-${cur.getFullYear()}-${cur.getMonth()}`,
-                    label: cur.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+                    label: formatMonthYear(cur),
                     colSpan: 0,
                 });
                 prevMonth = mk;
@@ -1006,7 +1013,7 @@ function generateTimeline(rangeStart: any, rangeEnd: any, scale: ScaleKey) {
             if (mk !== prevMonth) {
                 topH.push({
                     key: `top-${cur.getFullYear()}-${cur.getMonth()}`,
-                    label: cur.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+                    label: formatMonthYear(cur),
                     colSpan: 0,
                 });
                 prevMonth = mk;
@@ -1038,7 +1045,7 @@ function generateTimeline(rangeStart: any, rangeEnd: any, scale: ScaleKey) {
             const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
             cols.push({
                 key: `m-${cur.getFullYear()}-${cur.getMonth()}`,
-                label: cur.toLocaleDateString('en-US', { month: 'short' }),
+                label: formatMonthShort(cur),
                 date: new Date(cur),
                 endDate: new Date(next),
                 isToday: today.getFullYear() === cur.getFullYear() && today.getMonth() === cur.getMonth(),
@@ -1140,12 +1147,12 @@ function getPhaseStatus(phase: any) {
 // ─────────────────────────────────────────────────────────
 function fmtDate(d: any) {
     if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return formatDate(d);
 }
 
 function fmtDateCompact(d: any) {
     if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    return formatDateCompact(d);
 }
 
 // ─────────────────────────────────────────────────────────
@@ -2841,7 +2848,7 @@ export default function GanttChart({
                 workbookZip.file(scheduleSheetPath, patchedScheduleSheetXml);
             }
 
-            const workbookBlob = await workbookZip.generateAsync({ type: 'blob' });
+            const workbookBlob = await generateXlsxBlob(workbookZip);
             downloadBlob(workbookBlob, `${exportBaseName}-gantt.xlsx`);
         } catch (error) {
             console.error('Excel export failed', error);

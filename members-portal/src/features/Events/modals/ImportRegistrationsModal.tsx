@@ -452,6 +452,7 @@ export default function ImportRegistrationsModal({
                                 <span><FileSpreadsheet size={16} /> {parsed.rows.length} rows</span>
                                 <span>{importPayload.newCustomFields.length} new fields</span>
                             </div>
+                            <div className="members-table-shell">
                             <div className="table-container">
                                 <table className="members-table">
                                     <thead>
@@ -473,6 +474,7 @@ export default function ImportRegistrationsModal({
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
                             </div>
 
                             {result ? (

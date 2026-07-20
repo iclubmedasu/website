@@ -25,14 +25,15 @@ function parseInstant(value: string): Date | null {
 }
 
 /** Format event start/end for display in the viewer's local timezone. */
-export function formatEventDateRange(eventDate: string, eventEndDate: string): string {
+export function formatEventDateRange(eventDate: string, eventEndDate: string, timeZone?: string): string {
     const start = parseInstant(eventDate);
     const end = parseInstant(eventEndDate);
     if (!start || !end) return "—";
 
-    const sameDay = start.toDateString() === end.toDateString();
-    const dateFormatter = new Intl.DateTimeFormat("en-US", DATE_FORMAT);
-    const timeFormatter = new Intl.DateTimeFormat("en-US", TIME_FORMAT);
+    const tzOptions = timeZone ? { timeZone } : {};
+    const sameDay = start.toLocaleDateString("en-US", tzOptions) === end.toLocaleDateString("en-US", tzOptions);
+    const dateFormatter = new Intl.DateTimeFormat("en-US", { ...DATE_FORMAT, ...tzOptions });
+    const timeFormatter = new Intl.DateTimeFormat("en-US", { ...TIME_FORMAT, ...tzOptions });
 
     if (sameDay) {
         return `${dateFormatter.format(start)} · ${timeFormatter.format(start)} – ${timeFormatter.format(end)}`;

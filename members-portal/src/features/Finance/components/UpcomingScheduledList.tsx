@@ -1,8 +1,9 @@
 'use client';
 
-import { format, isPast, parseISO } from 'date-fns';
+import { isPast, parseISO } from 'date-fns';
 import { ArrowDownLeft, ArrowUpRight, Pencil } from 'lucide-react';
 import type { FinanceScheduledItemRow } from '@iclub/shared';
+import { formatDate } from '@iclub/shared/utils';
 
 interface UpcomingScheduledListProps {
     items: FinanceScheduledItemRow[];
@@ -76,7 +77,7 @@ export default function UpcomingScheduledList({
                                 <div className="finance-scheduled-content">
                                     <h4 className="finance-scheduled-title">{item.title}</h4>
                                     <p className="finance-scheduled-meta">
-                                        {format(parseISO(item.dueDate), 'MMM d, yyyy')}
+                                        {formatDate(item.dueDate)}
                                         {item.accountName ? ` · ${item.accountName}` : ''}
                                         {item.recurrence ? ` · ${item.recurrence}` : ''}
                                     </p>

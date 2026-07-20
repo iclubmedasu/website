@@ -42,6 +42,7 @@ export interface EventCardProps {
     canManageSessions?: boolean;
     canManageTasks?: boolean;
     canManageFields?: boolean;
+    canManageCertificates?: boolean;
     canPublishEvent?: boolean;
     canRemoveAttendance?: boolean;
     onPublishedChange?: (eventId: Id, published: boolean) => Promise<void>;
@@ -71,6 +72,7 @@ export default function EventCard({
     canManageSessions = false,
     canManageTasks = false,
     canManageFields = false,
+    canManageCertificates = false,
     canPublishEvent = false,
     canRemoveAttendance = false,
     onPublishedChange,
@@ -260,6 +262,7 @@ export default function EventCard({
                             allowDirectCheckIn={fullDetail.allowDirectCheckIn ?? false}
                             eventDate={fullDetail.eventDate}
                             eventEndDate={fullDetail.eventEndDate}
+                            eventTimezone={fullDetail.timezone}
                             isPublished={fullDetail.isPublished ?? false}
                             canPublishEvent={canPublishEvent}
                             canRemoveAttendance={canRemoveAttendance}
@@ -268,10 +271,16 @@ export default function EventCard({
                             canManageSessions={canManageSessions}
                             canManageTasks={canManageTasks}
                             canManageFields={canManageFields}
+                            canManageCertificates={canManageCertificates}
+                            isCertifiable={fullDetail.isCertifiable ?? false}
+                            isFinalized={fullDetail.isFinalized ?? false}
                             tierFieldShowOnPublic={fullDetail.tierFieldShowOnPublic ?? true}
                             tierFieldRequired={fullDetail.tierFieldRequired ?? true}
                             sessionFieldShowOnPublic={fullDetail.sessionFieldShowOnPublic ?? false}
                             sessionFieldRequired={fullDetail.sessionFieldRequired ?? false}
+                            phoneFieldRequired={fullDetail.phoneFieldRequired ?? false}
+                            sessionFieldOrder={fullDetail.sessionFieldOrder ?? 0}
+                            tierFieldOrder={fullDetail.tierFieldOrder ?? 1}
                             onReload={() => onReloadDetail?.()}
                         />
                     </div>

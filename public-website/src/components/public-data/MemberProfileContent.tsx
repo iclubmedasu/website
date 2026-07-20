@@ -5,12 +5,18 @@ import type { PublicMemberProfile } from "@iclub/shared";
 import { BackLink } from "@/components/navigation/BackLink";
 import { MemberProfileView } from "@/components/members/MemberProfileView";
 import { PageContainer } from "@/components/ui";
-import { publicAPI } from "@/lib/api";
+import { publicAPI, type PublicMemberCertificate } from "@/lib/api";
 import { DataLoadingState } from "./DataLoadingState";
 
 type LoadState = "loading" | "not_found" | "ready";
 
-export function MemberProfileContent({ memberId }: { memberId: number }) {
+export function MemberProfileContent({
+    memberId,
+    certificates = [],
+}: {
+    memberId: number;
+    certificates?: PublicMemberCertificate[];
+}) {
     const [state, setState] = useState<LoadState>("loading");
     const [profile, setProfile] = useState<PublicMemberProfile | null>(null);
 
@@ -52,7 +58,7 @@ export function MemberProfileContent({ memberId }: { memberId: number }) {
     return (
         <PageContainer className="space-y-8 py-10 sm:py-14">
             <BackLink href="/members" label="Back to Members" />
-            <MemberProfileView profile={profile} />
+            <MemberProfileView profile={profile} certificates={certificates} />
         </PageContainer>
     );
 }

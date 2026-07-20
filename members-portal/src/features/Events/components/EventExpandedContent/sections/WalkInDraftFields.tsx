@@ -1,22 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import type { EventCustomFieldRef, EventSessionRef, EventTierRef } from '@/types/backend-contracts';
 import { YesNoField } from '@/components/YesNoField/YesNoField';
+import EmailInputWithDomainSuggestions from '@/components/EmailInputWithDomainSuggestions';
 import {
     dropdownOptions,
     parseCustomFieldInputValue,
     type AttendeeDraft,
 } from '../customFieldUtils';
+import type { MiddleColumn } from '../registrationColumnOrderUtils';
 import { compareSessionsBySchedule } from '../../eventUtils';
 
 interface WalkInDraftFieldsProps {
     variant: 'table' | 'stack';
     draft: AttendeeDraft;
     draftErrors: Record<string, string>;
-    sortedFields: EventCustomFieldRef[];
+    middleColumns: MiddleColumn[];
     tiers: EventTierRef[];
     sessions: EventSessionRef[];
     tierFieldRequired: boolean;
     sessionFieldRequired: boolean;
+    phoneFieldRequired: boolean;
     multiDayEvent: boolean;
     onDraftChange: (patch: Partial<AttendeeDraft>) => void;
     onClearError: (key: string) => void;
@@ -89,7 +92,62 @@ function SessionSelectionsPicker({
         onClearError('sessionIds');
     };
 
+    const selectableSessionIds = activeSessions
+        .filter((session) => !session.isFull || draft.sessionIds.includes(String(session.id)))
+        .map((session) => String(session.id));
+    const allSelected = selectableSessionIds.length > 0
+        && selectableSessionIds.every((sessionId) => draft.sessionIds.includes(sessionId));
+
+    const toggleSelectAll = () => {
+        if (allSelected) {
+            onDraftChange({ sessionIds: [] });
+            onClearError('sessionIds');
+            return;
+        }
+        const next = new Set(draft.sessionIds);
+        for (const session of activeSessions) {
+            const sessionId = String(session.id);
+            if (!session.isFull || draft.sessionIds.includes(sessionId)) {
+                next.add(sessionId);
+            }
+        }
+        onDraftChange({ sessionIds: [...next] });
+        onClearError('sessionIds');
+    };
+
     const label = getSessionSelectionLabel(draft.sessionIds, activeSessions);
+
+    const sessionMenu = open && activeSessions.length > 0 ? (
+        <div className="event-registration-sessions-cell__menu" role="listbox" aria-multiselectable="true">
+            <label className="event-registration-sessions-cell__option event-registration-sessions-cell__option--select-all">
+                <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                />
+                <span>Select all</span>
+            </label>
+            {activeSessions.map((session) => {
+                const sessionId = String(session.id);
+                const checked = draft.sessionIds.includes(sessionId);
+                const fullAndUnselected = Boolean(session.isFull) && !checked;
+                return (
+                    <label key={sessionId} className="event-registration-sessions-cell__option">
+                        <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={fullAndUnselected}
+                            onChange={() => toggleSession(sessionId)}
+                        />
+                        <span>
+                            {getSessionTitle(session)}
+                            {fullAndUnselected ? ' (Full)' : ''}
+                        </span>
+                    </label>
+                );
+            })}
+        </div>
+    ) : null;
 
     if (variant === 'stack') {
         return (
@@ -112,29 +170,7 @@ function SessionSelectionsPicker({
                     >
                         {activeSessions.length === 0 ? 'No sessions configured' : label}
                     </button>
-                    {open && activeSessions.length > 0 ? (
-                        <div className="event-registration-sessions-cell__menu" role="listbox" aria-multiselectable="true">
-                            {activeSessions.map((session) => {
-                                const sessionId = String(session.id);
-                                const checked = draft.sessionIds.includes(sessionId);
-                                const fullAndUnselected = Boolean(session.isFull) && !checked;
-                                return (
-                                    <label key={sessionId} className="event-registration-sessions-cell__option">
-                                        <input
-                                            type="checkbox"
-                                            checked={checked}
-                                            disabled={fullAndUnselected}
-                                            onChange={() => toggleSession(sessionId)}
-                                        />
-                                        <span>
-                                            {getSessionTitle(session)}
-                                            {fullAndUnselected ? ' (Full)' : ''}
-                                        </span>
-                                    </label>
-                                );
-                            })}
-                        </div>
-                    ) : null}
+                    {sessionMenu}
                 </div>
                 {draftErrors.sessionIds ? (
                     <p className="error-message">{draftErrors.sessionIds}</p>
@@ -162,29 +198,7 @@ function SessionSelectionsPicker({
                 >
                     {activeSessions.length === 0 ? 'No sessions configured' : label}
                 </button>
-                {open && activeSessions.length > 0 ? (
-                    <div className="event-registration-sessions-cell__menu" role="listbox" aria-multiselectable="true">
-                        {activeSessions.map((session) => {
-                            const sessionId = String(session.id);
-                            const checked = draft.sessionIds.includes(sessionId);
-                            const fullAndUnselected = Boolean(session.isFull) && !checked;
-                            return (
-                                <label key={sessionId} className="event-registration-sessions-cell__option">
-                                    <input
-                                        type="checkbox"
-                                        checked={checked}
-                                        disabled={fullAndUnselected}
-                                        onChange={() => toggleSession(sessionId)}
-                                    />
-                                    <span>
-                                        {getSessionTitle(session)}
-                                        {fullAndUnselected ? ' (Full)' : ''}
-                                    </span>
-                                </label>
-                            );
-                        })}
-                    </div>
-                ) : null}
+                {sessionMenu}
             </div>
         </td>
     );
@@ -313,20 +327,129 @@ function renderCustomFieldTableCell(
     );
 }
 
-export default function WalkInDraftFields({
-    variant,
-    draft,
-    draftErrors,
-    sortedFields,
-    tiers,
-    sessions,
-    tierFieldRequired,
-    sessionFieldRequired,
-    multiDayEvent,
-    onDraftChange,
-    onClearError,
-    onCustomFieldChange,
-}: WalkInDraftFieldsProps) {
+function renderMiddleColumnStack(
+    column: MiddleColumn,
+    props: WalkInDraftFieldsProps,
+) {
+    const {
+        draft,
+        draftErrors,
+        tiers,
+        sessions,
+        tierFieldRequired,
+        sessionFieldRequired,
+        onDraftChange,
+        onClearError,
+        onCustomFieldChange,
+    } = props;
+
+    if (column.kind === 'sessions') {
+        return (
+            <SessionSelectionsPicker
+                key="sessions"
+                draft={draft}
+                sessions={sessions}
+                sessionFieldRequired={sessionFieldRequired}
+                draftErrors={draftErrors}
+                onDraftChange={onDraftChange}
+                onClearError={onClearError}
+                variant="stack"
+            />
+        );
+    }
+
+    if (column.kind === 'tier') {
+        return (
+            <div key="tier" className={`form-group${cellErrorClass(draftErrors, 'tierId').trim() ? ' event-registrations-walkin-stack-field--error' : ''}`}>
+                <label className="form-label" htmlFor="walkin-stack-tier">
+                    Tier{tierFieldRequired ? ' *' : ''}
+                </label>
+                <select
+                    id="walkin-stack-tier"
+                    aria-label="Tier"
+                    value={draft.tierId}
+                    onChange={(event) => {
+                        onDraftChange({ tierId: event.target.value });
+                        onClearError('tierId');
+                    }}
+                    className="form-input"
+                >
+                    <option value="">{tierFieldRequired ? 'Select tier…' : 'No tier'}</option>
+                    {tiers.map((tier) => <option key={tier.id} value={tier.id}>{tier.name}</option>)}
+                </select>
+                {draftErrors.tierId ? <p className="error-message">{draftErrors.tierId}</p> : null}
+            </div>
+        );
+    }
+
+    return renderCustomFieldStackInput(column.field, draft, draftErrors, onCustomFieldChange);
+}
+
+function renderMiddleColumnTable(
+    column: MiddleColumn,
+    props: WalkInDraftFieldsProps,
+) {
+    const {
+        draft,
+        draftErrors,
+        tiers,
+        sessions,
+        tierFieldRequired,
+        sessionFieldRequired,
+        onDraftChange,
+        onClearError,
+        onCustomFieldChange,
+    } = props;
+
+    if (column.kind === 'sessions') {
+        return (
+            <SessionSelectionsPicker
+                key="sessions"
+                draft={draft}
+                sessions={sessions}
+                sessionFieldRequired={sessionFieldRequired}
+                draftErrors={draftErrors}
+                onDraftChange={onDraftChange}
+                onClearError={onClearError}
+                variant="table"
+            />
+        );
+    }
+
+    if (column.kind === 'tier') {
+        return (
+            <td key="tier" className={cellErrorClass(draftErrors, 'tierId').trim() || undefined}>
+                <select
+                    aria-label="Tier"
+                    value={draft.tierId}
+                    onChange={(event) => {
+                        onDraftChange({ tierId: event.target.value });
+                        onClearError('tierId');
+                    }}
+                    className="event-registrations-table-input form-input"
+                >
+                    <option value="">{tierFieldRequired ? 'Select tier…' : 'No tier'}</option>
+                    {tiers.map((tier) => <option key={tier.id} value={tier.id}>{tier.name}</option>)}
+                </select>
+            </td>
+        );
+    }
+
+    return renderCustomFieldTableCell(column.field, draft, draftErrors, onCustomFieldChange);
+}
+
+export default function WalkInDraftFields(props: WalkInDraftFieldsProps) {
+    const {
+        variant,
+        draft,
+        draftErrors,
+        middleColumns,
+        phoneFieldRequired,
+        multiDayEvent,
+        onDraftChange,
+        onClearError,
+    } = props;
+
     const updateField = (key: keyof AttendeeDraft, value: string) => {
         onDraftChange({ [key]: value });
         onClearError(key);
@@ -347,17 +470,18 @@ export default function WalkInDraftFields({
                 </div>
                 <div className={`form-group${cellErrorClass(draftErrors, 'email').trim() ? ' event-registrations-walkin-stack-field--error' : ''}`}>
                     <label className="form-label" htmlFor="walkin-stack-email">Email *</label>
-                    <input
+                    <EmailInputWithDomainSuggestions
                         id="walkin-stack-email"
-                        type="email"
                         value={draft.email}
-                        onChange={(event) => updateField('email', event.target.value)}
+                        onChange={(value) => updateField('email', value)}
                         placeholder="Email"
                         className="form-input"
                     />
                 </div>
-                <div className="form-group">
-                    <label className="form-label" htmlFor="walkin-stack-phone">Phone</label>
+                <div className={`form-group${cellErrorClass(draftErrors, 'phoneNumber').trim() ? ' event-registrations-walkin-stack-field--error' : ''}`}>
+                    <label className="form-label" htmlFor="walkin-stack-phone">
+                        Phone{phoneFieldRequired ? ' *' : ''}
+                    </label>
                     <input
                         id="walkin-stack-phone"
                         value={draft.phoneNumber}
@@ -365,33 +489,9 @@ export default function WalkInDraftFields({
                         placeholder="Phone"
                         className="form-input"
                     />
+                    {draftErrors.phoneNumber ? <p className="error-message">{draftErrors.phoneNumber}</p> : null}
                 </div>
-                {sortedFields.map((field) => renderCustomFieldStackInput(field, draft, draftErrors, onCustomFieldChange))}
-                <SessionSelectionsPicker
-                    draft={draft}
-                    sessions={sessions}
-                    sessionFieldRequired={sessionFieldRequired}
-                    draftErrors={draftErrors}
-                    onDraftChange={onDraftChange}
-                    onClearError={onClearError}
-                    variant="stack"
-                />
-                <div className={`form-group${cellErrorClass(draftErrors, 'tierId').trim() ? ' event-registrations-walkin-stack-field--error' : ''}`}>
-                    <label className="form-label" htmlFor="walkin-stack-tier">
-                        Tier{tierFieldRequired ? ' *' : ''}
-                    </label>
-                    <select
-                        id="walkin-stack-tier"
-                        aria-label="Tier"
-                        value={draft.tierId}
-                        onChange={(event) => updateField('tierId', event.target.value)}
-                        className="form-input"
-                    >
-                        <option value="">{tierFieldRequired ? 'Select tier…' : 'No tier'}</option>
-                        {tiers.map((tier) => <option key={tier.id} value={tier.id}>{tier.name}</option>)}
-                    </select>
-                    {draftErrors.tierId ? <p className="error-message">{draftErrors.tierId}</p> : null}
-                </div>
+                {middleColumns.map((column) => renderMiddleColumnStack(column, props))}
             </div>
         );
     }
@@ -408,16 +508,15 @@ export default function WalkInDraftFields({
                 />
             </td>
             <td className={cellErrorClass(draftErrors, 'email').trim() || undefined}>
-                <input
-                    type="email"
+                <EmailInputWithDomainSuggestions
                     value={draft.email}
-                    onChange={(event) => updateField('email', event.target.value)}
+                    onChange={(value) => updateField('email', value)}
                     placeholder="Email"
                     className="event-registrations-table-input form-input"
                     aria-label="Email"
                 />
             </td>
-            <td>
+            <td className={cellErrorClass(draftErrors, 'phoneNumber').trim() || undefined}>
                 <input
                     value={draft.phoneNumber}
                     onChange={(event) => updateField('phoneNumber', event.target.value)}
@@ -426,30 +525,11 @@ export default function WalkInDraftFields({
                     aria-label="Phone"
                 />
             </td>
-            {sortedFields.map((field) => renderCustomFieldTableCell(field, draft, draftErrors, onCustomFieldChange))}
-            <SessionSelectionsPicker
-                draft={draft}
-                sessions={sessions}
-                sessionFieldRequired={sessionFieldRequired}
-                draftErrors={draftErrors}
-                onDraftChange={onDraftChange}
-                onClearError={onClearError}
-                variant="table"
-            />
-            <td className={cellErrorClass(draftErrors, 'tierId').trim() || undefined}>
-                <select
-                    aria-label="Tier"
-                    value={draft.tierId}
-                    onChange={(event) => updateField('tierId', event.target.value)}
-                    className="event-registrations-table-input form-input"
-                >
-                    <option value="">{tierFieldRequired ? 'Select tier…' : 'No tier'}</option>
-                    {tiers.map((tier) => <option key={tier.id} value={tier.id}>{tier.name}</option>)}
-                </select>
-            </td>
+            {middleColumns.map((column) => renderMiddleColumnTable(column, props))}
             <td>—</td>
             {multiDayEvent ? <td>—</td> : null}
-            <td>—</td>
+            {/* Status column hidden — walk-in placeholder */}
+            {/* <td>—</td> */}
             <td>—</td>
             <td>—</td>
             <td className="event-registrations-add-field-col" aria-hidden="true" />

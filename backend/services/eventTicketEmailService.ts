@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import QRCode from 'qrcode';
-import { formatEventDateRangeInClubTimezone, formatSessionRangeInClubTimezone } from '@iclub/shared/utils';
+import { CLUB_TIMEZONE, formatEventDateRangeInTimezone, formatSessionRangeInTimezone } from '@iclub/shared/utils';
 import { prisma } from '../db';
 import { generateTokensForRegistration, getSessionTokensForRegistration } from './sessionTokenService';
 import { sendEmail, type EmailAttachment } from './emailService';
@@ -54,8 +54,8 @@ function escapeHtml(value: string): string {
         .replace(/'/g, '&#39;');
 }
 
-function formatEventDateLabel(eventDate: Date, eventEndDate: Date): string {
-    return formatEventDateRangeInClubTimezone(eventDate.toISOString(), eventEndDate.toISOString());
+function formatEventDateLabel(eventDate: Date, eventEndDate: Date, timeZone: string = CLUB_TIMEZONE): string {
+    return formatEventDateRangeInTimezone(eventDate.toISOString(), eventEndDate.toISOString(), timeZone);
 }
 
 function loadEmailAsset(filename: string, contentId: string): EmailAttachment {
@@ -109,13 +109,14 @@ function buildSessionEmailRows(
     eventSlug: string,
     sessions: EmailSessionRow[],
     sessionTokens: Map<number, string>,
+    eventTimezone: string,
     options?: { includeJoinLinks?: boolean },
 ): string {
     const includeJoinLinks = options?.includeJoinLinks !== false;
 
     return sessions.map((session) => {
         const scheduleLabel = session.startDateTime && session.endDateTime
-            ? formatSessionRangeInClubTimezone(session.startDateTime, session.endDateTime)
+            ? formatSessionRangeInTimezone(session.startDateTime, session.endDateTime, eventTimezone)
             : null;
         const label = session.label ? escapeHtml(session.label) : '';
         const header = [label, scheduleLabel ? escapeHtml(scheduleLabel) : null].filter(Boolean).join(' · ');
@@ -188,14 +189,15 @@ function buildSessionsEmailSection(
     waitingForYou: EmailSessionRow[],
     dontMissOut: EmailSessionRow[],
     sessionTokens: Map<number, string>,
+    eventTimezone: string,
 ): string {
     const waitingHtml = buildSessionGroupHtml(
         'We will be waiting for you!',
-        buildSessionEmailRows(eventSlug, waitingForYou, sessionTokens, { includeJoinLinks: true }),
+        buildSessionEmailRows(eventSlug, waitingForYou, sessionTokens, eventTimezone, { includeJoinLinks: true }),
     );
     const missHtml = buildSessionGroupHtml(
         "Don't miss out on:",
-        buildSessionEmailRows(eventSlug, dontMissOut, sessionTokens, { includeJoinLinks: false }),
+        buildSessionEmailRows(eventSlug, dontMissOut, sessionTokens, eventTimezone, { includeJoinLinks: false }),
     );
     return `${waitingHtml}${missHtml}`;
 }
@@ -402,6 +404,7 @@ async function sendRegistrationEmail(
                     venue: true,
                     eventDate: true,
                     eventEndDate: true,
+                    timezone: true,
                 },
             },
             tier: {
@@ -448,9 +451,10 @@ async function sendRegistrationEmail(
     await generateTokensForRegistration(registrationId);
     const sessionTokens = await getSessionTokensForRegistration(registrationId);
     const attachments = await buildTicketEmailAttachments(registration.confirmationCode);
+    const eventTimezone = registration.event.timezone?.trim() || CLUB_TIMEZONE;
     const html = buildRegistrationEmailHtml({
         eventTitle: registration.event.title,
-        eventDateLabel: formatEventDateLabel(registration.event.eventDate, registration.event.eventEndDate),
+        eventDateLabel: formatEventDateLabel(registration.event.eventDate, registration.event.eventEndDate, eventTimezone),
         venue: registration.event.venue?.trim() || 'TBA',
         attendeeName: registration.fullName,
         tierName: registration.tier?.name || 'General',
@@ -462,6 +466,7 @@ async function sendRegistrationEmail(
             waitingForYou,
             dontMissOut,
             sessionTokens,
+            eventTimezone,
         ),
     });
 

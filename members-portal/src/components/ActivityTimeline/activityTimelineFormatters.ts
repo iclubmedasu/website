@@ -1,3 +1,5 @@
+import { formatDate, formatDateTime } from '@iclub/shared/utils';
+
 export interface ActivityTimelineContextEntity {
     label?: string | null;
     type?: string | null;
@@ -191,24 +193,14 @@ function formatDateValue(value: unknown): string {
     if (!value) return '—';
     const date = new Date(value as string | number | Date);
     if (Number.isNaN(date.getTime())) return String(value);
-    return date.toLocaleDateString([], {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-    });
+    return formatDate(date);
 }
 
 function formatDateTimeValue(value: unknown): string {
     if (!value) return '—';
     const date = new Date(value as string | number | Date);
     if (Number.isNaN(date.getTime())) return String(value);
-    return date.toLocaleString([], {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-    });
+    return formatDateTime(date);
 }
 
 function isDateTimeFieldKey(key: string): boolean {

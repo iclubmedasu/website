@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { FinanceAccountSummary, FinanceLiabilityRow, FinanceLiabilityStatus } from '@iclub/shared';
+import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
 import { financeAPI } from '@/services/api';
 import { FinanceModal } from '../components/FinanceModal';
 
@@ -24,7 +25,9 @@ export function LiabilityFormModal({ liability, accounts, onClose, onSaved }: Li
     );
     const [totalAmount, setTotalAmount] = useState(liability ? String(liability.totalAmount) : '');
     const [paidAmount, setPaidAmount] = useState(liability ? String(liability.paidAmount) : '0');
-    const [dueDate, setDueDate] = useState(liability?.dueDate ?? '');
+    const [dueDate, setDueDate] = useState(
+        liability?.dueDate ? toDateInputValue(liability.dueDate) : '',
+    );
     const [currency, setCurrency] = useState(liability?.currency ?? 'EGP');
     const [status, setStatus] = useState<FinanceLiabilityStatus>(liability?.status ?? 'ACTIVE');
     const [busy, setBusy] = useState(false);
@@ -60,7 +63,7 @@ export function LiabilityFormModal({ liability, accounts, onClose, onSaved }: Li
                 accountId: Number(accountId),
                 totalAmount: parsedTotal,
                 paidAmount: parsedPaid,
-                dueDate: dueDate || null,
+                dueDate: dueDate ? fromDateInputValue(dueDate) : null,
                 currency: currency.trim() || 'EGP',
                 status,
             };

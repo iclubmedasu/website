@@ -1,5 +1,7 @@
+import { toDateInputValue } from '@iclub/shared/utils';
 import type { FinanceExportResponse } from '@iclub/shared';
 import { downloadBlob } from '@/utils/downloadBlob';
+import { generateXlsxBlob } from '@/utils/generateXlsxBlob';
 
 const HEADER_FILL = '#561789';
 const ZEBRA_FILL = '#F9FAFB';
@@ -208,7 +210,7 @@ export async function exportFinanceExcel(data: FinanceExportResponse): Promise<v
         workbookZip.file(sheetPath, sheetXml);
     }
 
-    const exportDate = data.exportedAt.slice(0, 10);
-    const workbookBlob = await workbookZip.generateAsync({ type: 'blob' });
+    const exportDate = toDateInputValue(data.exportedAt);
+    const workbookBlob = await generateXlsxBlob(workbookZip);
     downloadBlob(workbookBlob, `finance-export-${exportDate}.xlsx`);
 }

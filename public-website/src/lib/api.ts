@@ -122,6 +122,47 @@ function buildQuery(params: Record<string, string | number | boolean | undefined
     return query ? `?${query}` : "";
 }
 
+export type PublicCertificateBackgroundFocus = {
+    scale: number;
+    offsetX: number;
+    offsetY: number;
+};
+
+/** Public-safe template fields returned with verify JSON when the cert has a template. */
+export type PublicCertificateTemplate = {
+    canvasWidth: number;
+    canvasHeight: number;
+    layout: unknown;
+    backgroundFocus: PublicCertificateBackgroundFocus | null;
+    hasBackground: boolean;
+};
+
+export type PublicCertificateVerify = {
+    id: number;
+    verificationCode: string;
+    recipientName: string;
+    title: string;
+    description: string;
+    type: string;
+    issuedAt: string | null;
+    fieldValues?: Record<string, unknown> | null;
+    templateId?: number | null;
+    template?: PublicCertificateTemplate | null;
+    event?: { id: number; title: string } | null;
+    project?: { id: number; title: string } | null;
+};
+
+export type PublicMemberCertificate = {
+    id: number;
+    title: string;
+    description: string;
+    type: string;
+    issuedAt: string | null;
+    verificationCode: string;
+    event?: { id: number; title: string } | null;
+    project?: { id: number; title: string } | null;
+};
+
 export const publicAPI = {
     async getPublishedEvents(options?: { limit?: number }): Promise<PublicEventListItem[]> {
         const query = buildQuery({
@@ -179,6 +220,7 @@ export const publicAPI = {
             tierFieldRequired: true,
             sessionFieldShowOnPublic: false,
             sessionFieldRequired: false,
+            phoneFieldRequired: false,
         };
     },
 
@@ -249,6 +291,26 @@ export const publicAPI = {
 
     async getMemberProfile(id: number): Promise<PublicMemberProfile | null> {
         return fetchPublicOrThrow<PublicMemberProfile>(`/public/members/${id}/profile`);
+    },
+
+    async getCertificate(code: string): Promise<PublicCertificateVerify | null> {
+        return fetchPublicOrThrow<PublicCertificateVerify>(
+            `/certificates/verify/${encodeURIComponent(code)}`,
+        );
+    },
+
+    /** URL for the certificate template background (public, keyed by verification code). */
+    getCertificateBackgroundUrl(code: string): string {
+        return `${getApiBaseUrl()}/certificates/verify/${encodeURIComponent(code)}/background`;
+    },
+
+
+    async getMemberCertificates(memberId: number): Promise<PublicMemberCertificate[]> {
+        const query = buildQuery({
+            recipientMemberId: memberId,
+            status: "ISSUED",
+        });
+        return fetchPublic<PublicMemberCertificate[]>(`/certificates${query}`, []);
     },
 
     async getAboutPage(): Promise<PublicAboutPage | null> {

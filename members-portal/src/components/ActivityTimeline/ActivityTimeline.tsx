@@ -1,6 +1,7 @@
 'use client';
 
 import { Calendar, User } from 'lucide-react';
+import { formatDateTime } from '@iclub/shared/utils';
 import { getProfilePhotoUrl } from '@/services/api';
 import {
     collectReadableChanges,
@@ -68,7 +69,7 @@ export default function ActivityTimeline({
                                         <span className={`change-type-badge ${toneClass}`}>{label}</span>
                                         <span className="timeline-date">
                                             <Calendar size={12} style={{ marginRight: '0.35rem' }} />
-                                            {new Date(event.createdAt ?? Date.now()).toLocaleString()}
+                                            {formatDateTime(event.createdAt != null ? new Date(event.createdAt) : new Date())}
                                         </span>
                                     </div>
 

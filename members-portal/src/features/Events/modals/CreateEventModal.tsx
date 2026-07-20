@@ -5,7 +5,13 @@ import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { Checkbox } from '@/components/checkbox';
 import { eventsAPI, projectsAPI, projectTypesAPI } from '@/services/api';
-import { fromDateTimeLocalValue, toDateTimeLocalValue } from '@iclub/shared/utils';
+import {
+    CLUB_TIMEZONE,
+    COMMON_EVENT_TIMEZONES,
+    fromEventDateTimeLocalValue,
+    getTimezoneLabel,
+    toEventDateTimeLocalValue,
+} from '@iclub/shared/utils';
 import { toTitleCase } from '@/utils/titleCase';
 import type {
     CreateEventPayload,
@@ -99,11 +105,14 @@ export default function CreateEventModal({
         priority: (initial?.priority as LegacyPriority | undefined) ?? 'MEDIUM',
         status: (initial?.status as ProjectStatus | undefined) ?? 'NOT_STARTED',
         venue: initial?.venue ?? '',
-        eventDate: initial?.eventDate ? toDateTimeLocalValue(initial.eventDate) : '',
+        timezone: initial?.timezone ?? CLUB_TIMEZONE,
+        eventDate: initial?.eventDate ? toEventDateTimeLocalValue(initial.eventDate, initial.timezone ?? CLUB_TIMEZONE) : '',
         eventEndDate: initial?.eventEndDate
-            ? toDateTimeLocalValue(initial.eventEndDate)
-            : (initial?.eventDate ? toDateTimeLocalValue(initial.eventDate) : ''),
-        registrationDeadline: initial?.registrationDeadline ? toDateTimeLocalValue(initial.registrationDeadline) : '',
+            ? toEventDateTimeLocalValue(initial.eventEndDate, initial.timezone ?? CLUB_TIMEZONE)
+            : (initial?.eventDate ? toEventDateTimeLocalValue(initial.eventDate, initial.timezone ?? CLUB_TIMEZONE) : ''),
+        registrationDeadline: initial?.registrationDeadline
+            ? toEventDateTimeLocalValue(initial.registrationDeadline, initial.timezone ?? CLUB_TIMEZONE)
+            : '',
         capacity: initial?.capacity != null ? String(initial.capacity) : '',
         projectId: initial?.projectId != null ? String(initial.projectId) : '',
         allowWalkIns: initial?.allowWalkIns ?? false,
@@ -183,6 +192,26 @@ export default function CreateEventModal({
         });
     };
 
+    const handleTimezoneChange = (event: ChangeEvent<HTMLSelectElement>) => {
+        const nextTimezone = event.target.value;
+        setForm((current) => {
+            const convert = (local: string) => {
+                if (!local.trim()) return '';
+                const iso = fromEventDateTimeLocalValue(local, current.timezone);
+                return iso ? toEventDateTimeLocalValue(iso, nextTimezone) : '';
+            };
+            return {
+                ...current,
+                timezone: nextTimezone,
+                eventDate: convert(current.eventDate),
+                eventEndDate: convert(current.eventEndDate),
+                registrationDeadline: convert(current.registrationDeadline),
+            };
+        });
+    };
+
+    const timezoneLabel = getTimezoneLabel(form.timezone);
+
     const handleClose = () => {
         if (onClose) {
             onClose();
@@ -211,19 +240,19 @@ export default function CreateEventModal({
         }
 
         const endDateValue = form.eventEndDate || form.eventDate;
-        if (new Date(endDateValue).getTime() < new Date(form.eventDate).getTime()) {
-            setError('Duration end must be on or after the start date');
-            return;
-        }
-
-        const eventDateIso = fromDateTimeLocalValue(form.eventDate);
-        const eventEndDateIso = fromDateTimeLocalValue(endDateValue);
+        const eventDateIso = fromEventDateTimeLocalValue(form.eventDate, form.timezone);
+        const eventEndDateIso = fromEventDateTimeLocalValue(endDateValue, form.timezone);
         const registrationDeadlineIso = form.registrationDeadline
-            ? fromDateTimeLocalValue(form.registrationDeadline)
+            ? fromEventDateTimeLocalValue(form.registrationDeadline, form.timezone)
             : null;
 
         if (!eventDateIso || !eventEndDateIso) {
             setError('Please enter valid event dates');
+            return;
+        }
+
+        if (new Date(eventEndDateIso).getTime() < new Date(eventDateIso).getTime()) {
+            setError('Duration end must be on or after the start date');
             return;
         }
 
@@ -235,6 +264,7 @@ export default function CreateEventModal({
                 title: toTitleCase(form.title.trim()),
                 description: form.description.trim() || null,
                 venue: form.venue.trim() || null,
+                timezone: form.timezone,
                 eventDate: eventDateIso,
                 eventEndDate: eventEndDateIso,
                 registrationDeadline: registrationDeadlineIso,
@@ -377,7 +407,26 @@ export default function CreateEventModal({
 
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label className="form-label" htmlFor="event-start-date">Duration start *</label>
+                                    <label className="form-label" htmlFor="event-timezone">Event timezone *</label>
+                                    <select
+                                        id="event-timezone"
+                                        className="form-input"
+                                        value={form.timezone}
+                                        onChange={handleTimezoneChange}
+                                    >
+                                        {COMMON_EVENT_TIMEZONES.map((entry) => (
+                                            <option key={entry.id} value={entry.id}>{entry.label}</option>
+                                        ))}
+                                    </select>
+                                    <p className="form-hint-text">
+                                        Enter all times below in {timezoneLabel} local time (venue timezone).
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label className="form-label" htmlFor="event-start-date">Duration start ({timezoneLabel}) *</label>
                                     <input
                                         id="event-start-date"
                                         type="datetime-local"
@@ -388,7 +437,7 @@ export default function CreateEventModal({
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label" htmlFor="event-end-date">Duration end *</label>
+                                    <label className="form-label" htmlFor="event-end-date">Duration end ({timezoneLabel}) *</label>
                                     <input
                                         id="event-end-date"
                                         type="datetime-local"
@@ -412,7 +461,7 @@ export default function CreateEventModal({
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label" htmlFor="event-deadline">Registration deadline</label>
+                                    <label className="form-label" htmlFor="event-deadline">Registration deadline ({timezoneLabel})</label>
                                     <input
                                         id="event-deadline"
                                         type="datetime-local"

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
+import { formatDate, formatDateTime } from '@iclub/shared/utils';
 import { useAuth } from '@/context/AuthContext';
 import {
     Users,
@@ -372,9 +373,10 @@ function UserPage() {
         return `${duration} days`;
     };
 
-    const formatDate = (d: string | number | Date | null | undefined): string => {
-        if (!d) return '—';
-        return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const formatProfileDate = (d: string | number | Date | null | undefined): string => {
+        if (d == null || d === '') return '—';
+        const value = typeof d === 'number' ? new Date(d) : d;
+        return formatDate(value);
     };
 
     const getTimelineLineClass = (items: RoleHistoryEntry[]): string => {
@@ -526,7 +528,7 @@ function UserPage() {
                                         </div>
                                         <div className="user-profile-data-item">
                                             <span className="user-profile-data-label">Join Date</span>
-                                            <span className="user-profile-data-value">{formatDate(joinDateValue)}</span>
+                                            <span className="user-profile-data-value">{formatProfileDate(joinDateValue)}</span>
                                         </div>
                                     </div>
 
@@ -774,7 +776,7 @@ function UserPage() {
                                                                 {entry.changeType}
                                                             </span>
                                                             <span className="timeline-date">
-                                                                {formatDate(entry.period?.start)}
+                                                                {formatProfileDate(entry.period?.start)}
                                                             </span>
                                                         </div>
 
@@ -802,8 +804,8 @@ function UserPage() {
                                                             <Calendar size={14} />
                                                             <span className="duration-text">
                                                                 {entry.period?.end
-                                                                    ? `${formatDate(entry.period.start)} – ${formatDate(entry.period.end)} (${getDurationText(entry.period.duration)})`
-                                                                    : `${formatDate(entry.period?.start)} – Ongoing`}
+                                                                    ? `${formatProfileDate(entry.period.start)} – ${formatProfileDate(entry.period.end)} (${getDurationText(entry.period.duration)})`
+                                                                    : `${formatProfileDate(entry.period?.start)} – Ongoing`}
                                                             </span>
                                                         </div>
 
@@ -1059,13 +1061,7 @@ function UserPage() {
                                                 <div className="user-notification-meta">
                                                     <span className="user-notification-event">{notification.eventType.replaceAll('_', ' ')}</span>
                                                     <span className="user-notification-time">
-                                                        {new Date(notification.createdAt).toLocaleString('en-GB', {
-                                                            day: '2-digit',
-                                                            month: 'short',
-                                                            year: 'numeric',
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                        })}
+                                                        {formatDateTime(notification.createdAt)}
                                                     </span>
                                                 </div>
                                                 <h4 className="user-notification-item-title">{notification.title}</h4>

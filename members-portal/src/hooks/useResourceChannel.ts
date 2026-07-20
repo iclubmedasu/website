@@ -44,15 +44,36 @@ export function useResourceChannel({
         }
 
         const topic = `${resource}:${resourceId}`;
-        return realtime.subscribe(topic, (message: NotificationRealtimeMessage) => {
+        const currentMemberId = user?.id != null ? String(user.id) : null;
+        const localInstanceId = realtime.clientInstanceId;
+
+        const unsubscribeTopic = realtime.subscribe(topic, (message: NotificationRealtimeMessage) => {
             if (message.type !== 'resource.changed') return;
             const actorId = message.actorMemberId != null ? String(message.actorMemberId) : null;
-            const currentMemberId = user?.id != null ? String(user.id) : null;
-            if (actorId && currentMemberId && actorId === currentMemberId) {
+            const messageInstanceId = message.clientInstanceId ?? null;
+            // Suppress only the acting tab's own echo. Same member on another device/tab
+            // (or messages without clientInstanceId) still refresh.
+            if (
+                actorId
+                && currentMemberId
+                && actorId === currentMemberId
+                && messageInstanceId
+                && localInstanceId
+                && messageInstanceId === localInstanceId
+            ) {
                 return;
             }
             scheduleRefresh();
         });
+
+        const unsubscribeReconnect = realtime.onReconnect(() => {
+            scheduleRefresh();
+        });
+
+        return () => {
+            unsubscribeTopic();
+            unsubscribeReconnect();
+        };
     }, [enabled, realtime, resource, resourceId, scheduleRefresh, user?.id]);
 
     useEffect(() => {

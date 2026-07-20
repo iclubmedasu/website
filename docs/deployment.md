@@ -51,8 +51,9 @@ Set these in your backend Hugging Face Space → Settings → Variables and secr
 | JWT_EXPIRES_IN            | e.g. 7d                                          |
 | PORT                      | 7860 (HF requires this port)                      |
 | NODE_ENV                  | production                                       |
-| DEVELOPER_EMAIL           | Your dev backdoor email                          |
-| DEVELOPER_PASSWORD        | Your dev backdoor password                       |
+| DEVELOPER_EMAIL           | Optional; both email+password required to enable dev backdoor |
+| DEVELOPER_PASSWORD        | Optional; leave unset in production if unused                 |
+| ALLOW_DEVELOPER_BACKDOOR  | Must be `true` to enable the backdoor when `NODE_ENV=production` (default: disabled) |
 | GITHUB_STORAGE_OWNER      | e.g. iclubmedasu                                 |
 | GITHUB_STORAGE_REPO       | e.g. file-storage                                |
 | GITHUB_STORAGE_TOKEN      | Your GitHub PAT for file storage                 |
@@ -60,7 +61,7 @@ Set these in your backend Hugging Face Space → Settings → Variables and secr
 | GITHUB_USER_DATA_REPO     | e.g. user-data                                   |
 | GITHUB_USER_DATA_TOKEN    | Your GitHub PAT for user data                    |
 | FRONTEND_URL              | https://iclubmedasu-members-portal.hf.space      |
-| FRONTEND_ORIGINS          | Comma-separated origins, e.g. `https://iclubmedasu-members-portal.hf.space,https://iclubmedasu-public-website.hf.space` (`*.hf.space` is also allowed at runtime) |
+| FRONTEND_ORIGINS          | Comma-separated origins, e.g. `https://iclubmedasu-members-portal.hf.space,https://iclubmedasu-public-website.hf.space` (list every allowed origin; arbitrary `*.hf.space` is not allowed) |
 | RESEND_API_KEY            | Resend API key for ticket emails                 |
 | RESEND_FROM_EMAIL         | Verified sender in Resend (not @gmail.com); use your domain e.g. tickets@yourdomain.com |
 | RESEND_REPLY_TO           | Optional reply-to address e.g. asu.medicine.iclub@gmail.com |

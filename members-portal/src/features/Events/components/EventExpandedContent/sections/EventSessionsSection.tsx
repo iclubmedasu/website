@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
+    CLUB_TIMEZONE,
     formatSessionRange,
-    fromDateTimeLocalValue,
-    toDateTimeLocalValue,
+    fromEventDateTimeLocalValue,
+    toEventDateTimeLocalValue,
+    toEventDayString,
 } from '@iclub/shared/utils';
 import { eventsAPI } from '@/services/api';
 import type {
@@ -15,6 +17,7 @@ import type {
 
 interface EventSessionsSectionProps {
     eventId: Id | string;
+    eventTimezone?: string;
     canManage?: boolean;
 }
 
@@ -88,9 +91,10 @@ function buildSessionPayload(
     mode: EventSessionMode,
     onlineUrl: string,
     maxCapacity: string,
+    eventTimezone: string,
 ): CreateEventSessionPayload | null {
-    const startIso = fromDateTimeLocalValue(startDateTime);
-    const endIso = fromDateTimeLocalValue(endDateTime);
+    const startIso = fromEventDateTimeLocalValue(startDateTime, eventTimezone);
+    const endIso = fromEventDateTimeLocalValue(endDateTime, eventTimezone);
     if (!startIso || !endIso) return null;
     return {
         label: label.trim(),
@@ -102,21 +106,27 @@ function buildSessionPayload(
     };
 }
 
-function hydrateSessionTimes(session: EventSessionRef): { start: string; end: string } {
+function hydrateSessionTimes(session: EventSessionRef, eventTimezone: string): { start: string; end: string } {
     if (session.startDateTime && session.endDateTime) {
         return {
-            start: toDateTimeLocalValue(session.startDateTime),
-            end: toDateTimeLocalValue(session.endDateTime),
+            start: toEventDateTimeLocalValue(session.startDateTime, eventTimezone),
+            end: toEventDateTimeLocalValue(session.endDateTime, eventTimezone),
         };
     }
-    const day = session.sessionDate.slice(0, 10);
+    const day = session.sessionDate
+        ? toEventDayString(session.sessionDate, eventTimezone)
+        : null;
     return {
-        start: session.startTime ? `${day}T${session.startTime}` : '',
-        end: session.endTime ? `${day}T${session.endTime}` : '',
+        start: session.startTime && day ? `${day}T${session.startTime}` : '',
+        end: session.endTime && day ? `${day}T${session.endTime}` : '',
     };
 }
 
-export default function EventSessionsSection({ eventId, canManage = false }: EventSessionsSectionProps) {
+export default function EventSessionsSection({
+    eventId,
+    eventTimezone = CLUB_TIMEZONE,
+    canManage = false,
+}: EventSessionsSectionProps) {
     const [sessions, setSessions] = useState<EventSessionRef[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -180,7 +190,7 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
             return;
         }
 
-        const payload = buildSessionPayload(label, startDateTime, endDateTime, mode, onlineUrl, maxCapacity);
+        const payload = buildSessionPayload(label, startDateTime, endDateTime, mode, onlineUrl, maxCapacity, eventTimezone);
         if (!payload) {
             setFormError('Please enter valid session start and end times.');
             return;
@@ -197,7 +207,7 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
     };
 
     const startEdit = (session: EventSessionRef) => {
-        const times = hydrateSessionTimes(session);
+        const times = hydrateSessionTimes(session, eventTimezone);
         setEditingSessionId(Number(session.id));
         setEditLabel(session.label ?? '');
         setEditStartDateTime(times.start);
@@ -240,6 +250,7 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
             editMode,
             editOnlineUrl,
             editMaxCapacity,
+            eventTimezone,
         ) as UpdateEventSessionPayload | null;
         if (!payload) {
             setFormError('Please enter valid session start and end times.');
@@ -329,14 +340,6 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
                 <option value="ONLINE">Online</option>
             </select>
             <input
-                value={values.onlineUrl}
-                onChange={(e) => setters.setOnlineUrl(e.target.value)}
-                placeholder="https://zoom.us/j/..."
-                className="form-input"
-                disabled={options?.disabled || values.mode === 'ONSITE'}
-                aria-label="Meeting link"
-            />
-            <input
                 type="number"
                 min={1}
                 step={1}
@@ -346,6 +349,14 @@ export default function EventSessionsSection({ eventId, canManage = false }: Eve
                 className="form-input"
                 disabled={options?.disabled}
                 aria-label="Max capacity"
+            />
+            <input
+                value={values.onlineUrl}
+                onChange={(e) => setters.setOnlineUrl(e.target.value)}
+                placeholder="https://zoom.us/j/..."
+                className="form-input"
+                disabled={options?.disabled || values.mode === 'ONSITE'}
+                aria-label="Meeting link"
             />
             {options?.actions}
         </>

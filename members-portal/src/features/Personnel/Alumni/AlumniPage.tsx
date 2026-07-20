@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Eye, Search, Users, Filter } from 'lucide-react';
+import { formatDate } from '@iclub/shared/utils';
 import { alumniAPI, teamsAPI, getProfilePhotoUrl } from '../../../services/api';
 import ViewMemberModal from '../Teams/modals/ViewMemberModal';
 import AlumniFiltersModal, { type AlumniFiltersState } from './modals/AlumniFiltersModal';
@@ -169,10 +170,9 @@ function AlumniPage() {
         return filteredRows.slice(start, start + ROWS_PER_PAGE);
     }, [filteredRows, currentPage]);
 
-    const formatDate = (d: string | null | undefined): string => {
-        if (!d || Number.isNaN(new Date(d).getTime())) return '—';
-        return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-    };
+    const formatAlumniDate = (d: string | null | undefined): string => (
+        d ? formatDate(d) : '—'
+    );
 
     return (
         <div className="alumni-page members-page">
@@ -216,6 +216,7 @@ function AlumniPage() {
                     </div>
                 </div>
                 <div className="card-body">
+                    <div className="members-table-shell">
                     {!loading && filteredRows.length === 0 ? (
                         <div className="empty-state">
                             <Users className="empty-state-icon" />
@@ -263,7 +264,7 @@ function AlumniPage() {
                                             <td>{row.subteamName || '—'}</td>
                                             <td className="email-cell">{row.email}</td>
                                             <td>{row.leaveType}</td>
-                                            <td>{formatDate(row.leftDate)}</td>
+                                            <td>{formatAlumniDate(row.leftDate)}</td>
                                             <td>
                                                 <div className="action-buttons">
                                                     <button
@@ -285,6 +286,7 @@ function AlumniPage() {
                             </table>
                         </div>
                     )}
+                    </div>
                 </div>
                 {totalPages > 1 && (
                     <div className="pagination-controls">

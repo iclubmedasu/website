@@ -127,3 +127,8 @@ export async function buildPublicProjectUrl(projectSlugOrId: number | string): P
     const origin = await resolvePublicWebsiteOrigin();
     return `${origin}/projects/${projectSlugOrId}`;
 }
+
+export async function buildPublicVerifyUrl(verificationCode: string): Promise<string> {
+    const origin = await resolvePublicWebsiteOrigin();
+    return `${origin}/verify/${encodeURIComponent(verificationCode)}`;
+}

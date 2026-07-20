@@ -81,6 +81,7 @@ export default function PastProjectsPage() {
     const [detailLoading, setDetailLoading] = useState(false);
     const [actionProject, setActionProject] = useState<{ type: ProjectActionType; project: ProjectActionPayload } | null>(null);
     const canManageProjectLifecycle = !!(user?.isDeveloper || user?.isOfficer || user?.isAdmin || user?.isLeadership);
+    const canManageCertificates = !!(user?.isAdmin || user?.isOfficer || user?.isDeveloper || user?.isLeadership);
     const hasActiveFilters = filterTeam !== '' || filterCategory !== '' || filterPriority !== ''
         || filterStatus !== '' || dateFrom !== '' || dateTo !== '';
 
@@ -265,6 +266,7 @@ export default function PastProjectsPage() {
                                 fullDetail={expandedProjectId === p.id ? expandedProjectDetail : null}
                                 detailLoading={expandedProjectId === p.id && detailLoading}
                                 canManage={canManageProjectLifecycle}
+                                canManageCertificates={canManageCertificates}
                                 onToggle={handleToggleExpand}
                                 onReactivate={(proj) => setActionProject({ type: 'reactivate', project: proj })}
                                 onAbort={(proj) => setActionProject({ type: 'abort', project: proj })}

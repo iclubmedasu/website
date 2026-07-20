@@ -1,4 +1,5 @@
 import type { CardPriorityValue, CardStatusValue } from './types';
+import { formatDate } from '@iclub/shared/utils';
 
 const STATUS_LABELS: Record<string, string> = {
     NOT_STARTED: 'Not Started',
@@ -20,7 +21,7 @@ const PRIORITY_LABELS: Record<string, string> = {
 
 export function fmtDate(d: string | Date | null | undefined): string {
     if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return formatDate(d);
 }
 
 export function getCategoryClass(category: string | null | undefined): string {

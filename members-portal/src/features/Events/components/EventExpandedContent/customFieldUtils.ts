@@ -89,7 +89,7 @@ export function validateRequiredCustomFields(
 export function validateAttendeeDraft(
     draft: AttendeeDraft,
     fields: EventCustomFieldRef[],
-    options?: { tierFieldRequired?: boolean; sessionFieldRequired?: boolean },
+    options?: { tierFieldRequired?: boolean; sessionFieldRequired?: boolean; phoneFieldRequired?: boolean },
 ): Record<string, string> {
     const errors: Record<string, string> = {};
 
@@ -98,6 +98,9 @@ export function validateAttendeeDraft(
     }
     if (!draft.email.trim()) {
         errors.email = 'Email is required.';
+    }
+    if (options?.phoneFieldRequired && !draft.phoneNumber.trim()) {
+        errors.phoneNumber = 'Phone is required.';
     }
 
     if (options?.tierFieldRequired && !draft.tierId) {
@@ -163,7 +166,8 @@ export function formatRegistrationStatus(registration: EventRegistrationRef): st
     return 'Registered';
 }
 
-export const REGISTRATION_NAME_DISPLAY_LIMIT = 20;
+export const REGISTRATION_NAME_DISPLAY_LIMIT = 15;
+export const REGISTRATION_EMAIL_DISPLAY_LIMIT = 15;
 export const REGISTRATION_PHONE_DISPLAY_LIMIT = 15;
 
 export function truncateRegistrationCell(value: string, maxLength: number): string {

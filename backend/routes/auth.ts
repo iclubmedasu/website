@@ -5,6 +5,8 @@ import { prisma } from '../db';
 import { computeIsSupportFormsEditor } from '../lib/supportPermissions';
 import { computeIsFinanceViewer } from '../lib/financePermissions';
 import { JWT_SECRET, authenticateToken } from '../middleware/auth';
+import { authPostLimiter } from '../middleware/rateLimit';
+import { resolveDeveloperCredentials } from '../lib/securityEnv';
 import type { RequestUser } from '../types/auth';
 import {
     normalizePhone,
@@ -36,9 +38,10 @@ function toTitleCase(str) {
     }).join(' ');
 }
 
-// Developer backdoor email
-const DEVELOPER_EMAIL = process.env.DEVELOPER_EMAIL || 'dev@iclub.com';
-const DEVELOPER_PASSWORD = process.env.DEVELOPER_PASSWORD || 'dev123456';
+// Optional developer backdoor — resolved per request (no hardcoded fallbacks).
+function getDeveloperCredentials() {
+    return resolveDeveloperCredentials();
+}
 
 // Official email: studentId@med.asu.edu.eg (same as members.js)
 const OFFICIAL_EMAIL_DOMAIN = '@med.asu.edu.eg';
@@ -168,7 +171,7 @@ async function findMemberByEmail(email) {
 }
 
 // Setup password - Member completes registration (email can be primary, email2, or email3)
-router.post('/setup-password', async (req, res) => {
+router.post('/setup-password', authPostLimiter, async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -244,17 +247,18 @@ router.post('/setup-password', async (req, res) => {
 
 // Check if email or student ID exists and needs password setup
 // Accepts either official email (e.g. 213256@med.asu.edu.eg) or student ID (e.g. 213256) – both identify the same member
-router.post('/check-email', async (req, res) => {
+router.post('/check-email', authPostLimiter, async (req, res) => {
     try {
         const input = (req.body.email ?? '').toString().trim();
 
-        // Developer backdoor check
-        if (input === DEVELOPER_EMAIL) {
+        // Developer backdoor check (only when credentials are configured via env)
+        const developer = getDeveloperCredentials();
+        if (developer && input === developer.email) {
             return res.json({
                 exists: true,
                 needsSetup: false,
                 isDeveloper: true,
-                email: DEVELOPER_EMAIL,
+                email: developer.email,
                 message: 'Developer access. Please enter password.'
             });
         }
@@ -331,7 +335,7 @@ router.post('/check-email', async (req, res) => {
 });
 
 // Update profile for invited member (no password yet): name, phone, optional phone2, email2/email3
-router.post('/update-invited-profile', async (req, res) => {
+router.post('/update-invited-profile', authPostLimiter, async (req, res) => {
     try {
         const { email, fullName, phoneNumber, phoneNumber2, email2, email3 } = req.body;
         if (!email || !email.trim()) {
@@ -412,7 +416,7 @@ router.post('/update-invited-profile', async (req, res) => {
 });
 
 // Check if student ID can set up account (member exists, no user yet, has placeholder data)
-router.post('/check-student-id', async (req, res) => {
+router.post('/check-student-id', authPostLimiter, async (req, res) => {
     try {
         const { studentId } = req.body;
         if (studentId === undefined || studentId === null || studentId === '') {
@@ -458,7 +462,7 @@ router.post('/check-student-id', async (req, res) => {
 
 // Complete profile and create account (for placeholder members: fullName, phone, optional phone2, email2/email3, password)
 // Primary email stays official (studentId@med.asu.edu.eg)
-router.post('/complete-profile', async (req, res) => {
+router.post('/complete-profile', authPostLimiter, async (req, res) => {
     try {
         const { studentId, fullName, phoneNumber, phoneNumber2, password, email2, email3 } = req.body;
 
@@ -610,7 +614,7 @@ router.post('/complete-profile', async (req, res) => {
 });
 
 // Check officer identifier (email or phone) — Task 1.1 step 3
-router.post('/check-officer-identifier', async (req, res) => {
+router.post('/check-officer-identifier', authPostLimiter, async (req, res) => {
     try {
         const identifier = (req.body.identifier ?? '').toString().trim();
         if (!identifier) {
@@ -672,7 +676,7 @@ router.post('/check-officer-identifier', async (req, res) => {
 });
 
 // Complete officer profile — Task 1.1 step 4
-router.post('/complete-officer-profile', async (req, res) => {
+router.post('/complete-officer-profile', authPostLimiter, async (req, res) => {
     try {
         const { identifier, fullName, phoneNumber, phoneNumber2, email2, email3, officerEmail, password, confirmPassword } = req.body;
 
@@ -849,18 +853,19 @@ router.post('/complete-officer-profile', async (req, res) => {
 });
 
 // Login endpoint
-router.post('/login', async (req, res) => {
+router.post('/login', authPostLimiter, async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // Developer backdoor
-        if (email === DEVELOPER_EMAIL) {
-            if (password === DEVELOPER_PASSWORD) {
+        // Developer backdoor (only when credentials are configured via env)
+        const developer = getDeveloperCredentials();
+        if (developer && email === developer.email) {
+            if (password === developer.password) {
                 const token = jwt.sign(
                     {
                         userId: 0,
                         memberId: 0,
-                        email: DEVELOPER_EMAIL,
+                        email: developer.email,
                         isDeveloper: true,
                         isSupportFormsEditor: true,
                         isFinanceViewer: true,
@@ -874,7 +879,7 @@ router.post('/login', async (req, res) => {
                 return res.json({
                     user: {
                         id: 0,
-                        email: DEVELOPER_EMAIL,
+                        email: developer.email,
                         fullName: 'Developer 🔧',
                         isDeveloper: true,
                         isOfficer: true,
@@ -995,10 +1000,11 @@ router.get('/me', async (req, res) => {
 
         // Developer backdoor (authority level 1)
         if (decoded.isDeveloper) {
+            const developer = getDeveloperCredentials();
             return res.json({
                 user: {
                     id: 0,
-                    email: DEVELOPER_EMAIL,
+                    email: decoded.email || developer?.email || 'developer',
                     fullName: 'Developer 🔧',
                     isDeveloper: true,
                     isOfficer: true,

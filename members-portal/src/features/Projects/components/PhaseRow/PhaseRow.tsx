@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDateCompact } from '@iclub/shared/utils';
 import { useState, useCallback, useMemo, useRef } from 'react';
 import {
     ChevronRight,
@@ -40,7 +41,7 @@ const DIFFICULTIES = ['EASY', 'MEDIUM', 'HARD'];
 
 function fmtDate(d: string | null | undefined) {
     if (!d) return '';
-    return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    return formatDateCompact(d);
 }
 
 /* ── Inline select for status/priority/difficulty ── */

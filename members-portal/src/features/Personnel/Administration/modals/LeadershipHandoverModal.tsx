@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent, type MouseEvent } from 'react';
 import { X } from 'lucide-react';
+import { formatDate } from '@iclub/shared/utils';
 import { membersAPI, teamMembersAPI, teamRolesAPI, teamsAPI } from '../../../../services/api';
 import type { Id } from '../../../../types/backend-contracts';
 
@@ -311,9 +312,7 @@ function LeadershipHandoverModal({
                                     <div className="info-item">
                                         <label className="info-label">Since</label>
                                         <p className="info-value">
-                                            {!Number.isNaN(new Date(currentLeadershipAssignee.joinedDate).getTime())
-                                                ? new Date(currentLeadershipAssignee.joinedDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-                                                : '—'}
+                                            {formatDate(currentLeadershipAssignee.joinedDate)}
                                         </p>
                                     </div>
                                 )}

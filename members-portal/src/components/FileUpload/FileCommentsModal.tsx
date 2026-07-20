@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { X, Loader } from 'lucide-react';
+import { formatDateTime } from '@iclub/shared/utils';
 import { getProfilePhotoUrl } from '@/services/api';
 import type { Id } from '@/types/backend-contracts';
 import type { EntityFileCommentRef, EntityFilesAPI } from './types';
@@ -120,7 +121,7 @@ export default function FileCommentsModal({ file, filesAPI, onClose }: FileComme
                                                     <strong>{comment.member?.fullName ?? 'Unknown'}</strong>
                                                 </div>
                                                 <span className="form-hint modal-comment-meta">
-                                                    {comment.createdAt ? new Date(comment.createdAt).toLocaleString() : 'Unknown date'}
+                                                    {comment.createdAt ? formatDateTime(comment.createdAt) : 'Unknown date'}
                                                     {comment.isEdited ? ' · edited' : ''}
                                                 </span>
                                             </div>

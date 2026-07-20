@@ -19,6 +19,7 @@
         "@tanstack/react-table": "^8.21.3",
         "apexcharts": "^5.10.4",
         "date-fns": "^4.4.0",
+        "exceljs": "^4.4.0",
         "html2canvas": "^1.4.1",
         "html5-qrcode": "^2.3.8",
         "jszip": "^3.10.1",

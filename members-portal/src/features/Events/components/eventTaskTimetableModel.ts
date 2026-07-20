@@ -1,3 +1,4 @@
+import { formatDateWithWeekday } from '@iclub/shared/utils';
 import type { EventTaskRef } from '@/types/backend-contracts';
 
 export const HOUR_WIDTH = 60;
@@ -55,7 +56,7 @@ function getLocalDateKey(date: Date): string {
 }
 
 export function formatDateLabel(date: Date): string {
-    return date.toLocaleDateString([], { weekday: 'short', month: 'short', day: '2-digit' });
+    return formatDateWithWeekday(date);
 }
 
 export function formatHourLabel(hour: number): string {

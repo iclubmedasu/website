@@ -1,0 +1,59 @@
+# Example Shannon config for iClub local Compose staging.
+# Copy to repo root as shannon.local.yaml (gitignored) and fill real staging credentials.
+# Docs: https://github.com/KeygraphHQ/shannon/blob/main/docs/configuration.md
+
+description: >
+  iClub monorepo — Express API (backend/) + Next.js members portal.
+  Local Docker Compose staging only. Do not use production *.hf.space hosts.
+
+# Optional: limit classes for a cheaper first pass
+# vuln_classes: [auth, authz, injection, xss]
+
+rules_of_engagement: |
+  - Only test http://localhost:3000 and http://localhost:7860 (or documented staging hosts).
+  - Never target production Hugging Face Spaces (*.hf.space) or production Supabase.
+  - Cap login attempts at 5 per account; throttle under ~5 rps; back off on 429.
+  - Prefer proven PoCs; skip pure missing-header nits unless they enable an exploit.
+  - Focus: JWT/auth, IDOR, admin RBAC, /api/public abuse, file upload, finance authz.
+
+authentication:
+  login_type: form
+  login_url: "http://localhost:7860/login"
+  credentials:
+    username: "member-test@example.local"
+    password: "REPLACE_WITH_STAGING_MEMBER_PASSWORD"
+  login_flow:
+    - "Type $username into the email field"
+    - "Type $password into the password field"
+    - "Click the sign-in button"
+  success_condition:
+    type: url_contains
+    value: "/"
+
+# After a member-scoped run, duplicate this file with admin credentials and re-run.
+
+rules:
+  avoid:
+    - description: "Do not waste cycles on logout"
+      type: url_path
+      value: "/logout"
+  focus:
+    - description: "API surface"
+      type: url_path
+      value: "/api"
+    - description: "Public unauthenticated API"
+      type: url_path
+      value: "/api/public"
+    - description: "Auth routes"
+      type: url_path
+      value: "/api/auth"
+    - description: "Finance module"
+      type: url_path
+      value: "/api/finance"
+
+report:
+  min_severity: low
+  min_confidence: low
+  guidance: |
+    Keep findings with working PoCs only.
+    Drop pure missing security-header findings unless chained into a PoC.

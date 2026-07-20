@@ -8,9 +8,11 @@ import {
     validateRequiredCustomFieldValues,
 } from '../lib/customFields';
 import { prisma } from '../db';
+import { CLUB_TIMEZONE, isValidIanaTimezone, toEventDayString } from '@iclub/shared/utils';
 import {
     doSessionInstantsOverlap,
     isSessionActiveAt,
+    isSessionEndedAt,
     parseEventSessionTimes,
     serializeEventSession,
 } from '../lib/eventSessionTime';
@@ -23,6 +25,7 @@ import {
 } from '../lib/eventSessionCapacity';
 import express, { Request, Response } from 'express';
 import { authenticateToken, optionalAuthenticateToken } from '../middleware/auth';
+import { registrationPostLimiter } from '../middleware/rateLimit';
 import { generateUniqueConfirmationCode, generateUniqueEventSlug } from '../services/eventCode';
 import { resolveEventByIdOrSlug } from '../lib/publicEntitySlug';
 import { formatEventDay, isWithinEventDays, parseEventDayString, resolveCheckInEventDay, eventDayStringToDate, shouldSendWalkInTicket } from '../services/eventDates';
@@ -72,6 +75,40 @@ const VALID_PROGRESS_STATUSES = new Set(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETE
 const VALID_PRIORITIES = new Set(['LOW', 'MEDIUM', 'HIGH', 'URGENT', 'CRITICAL']);
 const VALID_TIER_CURRENCIES = new Set(['USD', 'EUR', 'EGP']);
 const VALID_SESSION_MODES = new Set(['ONSITE', 'ONLINE']);
+
+function eventTz(event: { timezone?: string | null } | null | undefined): string {
+    const trimmed = String(event?.timezone ?? '').trim();
+    return trimmed && isValidIanaTimezone(trimmed) ? trimmed : CLUB_TIMEZONE;
+}
+
+function parseTimezoneInput(value: unknown, fallback = CLUB_TIMEZONE): string | { error: string } {
+    if (value === undefined || value === null || String(value).trim() === '') {
+        return fallback;
+    }
+    const trimmed = String(value).trim();
+    if (!isValidIanaTimezone(trimmed)) {
+        return { error: 'Invalid timezone' };
+    }
+    return trimmed;
+}
+
+/** Per-tab id from portal mutations; echoed on resource.changed for self-ignore. */
+function readClientInstanceId(req: Request): string | null {
+    const raw = req.headers['x-client-instance-id'];
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.length > 128) return null;
+    return trimmed;
+}
+
+async function loadEventTimezone(eventId: number): Promise<string> {
+    const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        select: { timezone: true },
+    });
+    return eventTz(event);
+}
 
 function queueTicketEmail(registrationId: number, context: string): void {
     void sendEventTicketEmail(registrationId).catch((error) => {
@@ -152,14 +189,16 @@ type RegistrationWithDays = Prisma.EventRegistrationGetPayload<{ include: typeof
 
 function serializeAttendanceDays(
     days: Array<{ eventDay: Date; checkedInAt: Date }>,
+    timeZone: string = CLUB_TIMEZONE,
 ): Array<{ eventDay: string; checkedInAt: string }> {
     return days.map((day) => ({
-        eventDay: formatEventDay(day.eventDay),
+        eventDay: formatEventDay(day.eventDay, timeZone),
         checkedInAt: day.checkedInAt.toISOString(),
     }));
 }
 
-function serializeRegistration(registration: RegistrationWithDays | (Omit<RegistrationWithDays, 'sessionSelections'> & {
+function serializeRegistration(
+    registration: RegistrationWithDays | (Omit<RegistrationWithDays, 'sessionSelections'> & {
     sessionSelections?: Array<{
         sessionId: number;
         createdAt?: Date | null;
@@ -173,7 +212,9 @@ function serializeRegistration(registration: RegistrationWithDays | (Omit<Regist
             mode: string;
         } | null;
     }>;
-})) {
+}),
+    timeZone: string = CLUB_TIMEZONE,
+) {
     const { attendanceDays, onlineAccessToken: _token, sessionSelections, ...rest } = registration;
     const selections = (sessionSelections ?? [])
         .map((selection) => ({
@@ -182,7 +223,7 @@ function serializeRegistration(registration: RegistrationWithDays | (Omit<Regist
             label: selection.session?.label ?? null,
             startDateTime: selection.session?.startDateTime?.toISOString() ?? null,
             endDateTime: selection.session?.endDateTime?.toISOString() ?? null,
-            sessionDate: selection.session ? formatEventDay(selection.session.sessionDate) : '',
+            sessionDate: selection.session ? formatEventDay(selection.session.sessionDate, timeZone) : '',
             startTime: selection.session?.startTime ?? null,
             endTime: selection.session?.endTime ?? null,
             mode: selection.session?.mode ?? 'ONSITE',
@@ -196,13 +237,17 @@ function serializeRegistration(registration: RegistrationWithDays | (Omit<Regist
 
     return {
         ...rest,
-        attendanceDays: serializeAttendanceDays(attendanceDays ?? []),
+        attendanceDays: serializeAttendanceDays(attendanceDays ?? [], timeZone),
         sessionSelections: selections,
     };
 }
 
-function hasAttendanceOnDay(attendanceDays: Array<{ eventDay: Date }>, eventDay: string): boolean {
-    return attendanceDays.some((day) => formatEventDay(day.eventDay) === eventDay);
+function hasAttendanceOnDay(
+    attendanceDays: Array<{ eventDay: Date }>,
+    eventDay: string,
+    timeZone: string = CLUB_TIMEZONE,
+): boolean {
+    return attendanceDays.some((day) => formatEventDay(day.eventDay, timeZone) === eventDay);
 }
 
 async function findActiveEventRegistration(
@@ -441,12 +486,12 @@ type SessionTimeWindow = {
     endDateTime: Date | null;
 };
 
-function doSessionsOverlap(a: SessionTimeWindow, b: SessionTimeWindow): boolean {
+function doSessionsOverlap(a: SessionTimeWindow, b: SessionTimeWindow, timeZone: string = CLUB_TIMEZONE): boolean {
     if (a.startDateTime && a.endDateTime && b.startDateTime && b.endDateTime) {
         return doSessionInstantsOverlap(a, b);
     }
     if (!a.startTime || !a.endTime || !b.startTime || !b.endTime) return false;
-    if (formatEventDay(a.sessionDate) !== formatEventDay(b.sessionDate)) return false;
+    if (formatEventDay(a.sessionDate, timeZone) !== formatEventDay(b.sessionDate, timeZone)) return false;
     return a.startTime < b.endTime && b.startTime < a.endTime;
 }
 
@@ -466,6 +511,7 @@ async function getActiveSessionsAtTime(eventId: number, referenceDate: Date) {
 async function findOverlappingSessionAttendance(
     registrationId: number,
     target: SessionTimeWindow,
+    timeZone: string = CLUB_TIMEZONE,
 ) {
     const attendances = await prisma.eventSessionAttendance.findMany({
         where: { registrationId, mode: 'ONSITE' },
@@ -482,24 +528,60 @@ async function findOverlappingSessionAttendance(
             },
         },
     });
-    return attendances.find((attendance) => attendance.session && doSessionsOverlap(attendance.session, target)) ?? null;
+    return attendances.find((attendance) => attendance.session && doSessionsOverlap(attendance.session, target, timeZone)) ?? null;
+}
+
+interface ValidateSessionIdsOptions {
+    rejectEndedSessions?: boolean;
+    referenceDate?: Date;
 }
 
 async function validateSessionIdsForEvent(
     eventId: number,
     sessionIds: number[],
-): Promise<{ ok: true; ids: number[] } | { ok: false; error: string }> {
+    options?: ValidateSessionIdsOptions,
+): Promise<{ ok: true; ids: number[] } | { ok: false; error: string; status?: number }> {
     if (sessionIds.length === 0) {
         return { ok: true, ids: [] };
     }
 
+    const sessionSelect = {
+        id: true,
+        sessionDate: true,
+        startTime: true,
+        endTime: true,
+        startDateTime: true,
+        endDateTime: true,
+    } as const;
+
     const sessions = await prisma.eventSession.findMany({
         where: { eventId, id: { in: sessionIds }, isActive: true },
-        select: { id: true },
+        select: options?.rejectEndedSessions ? sessionSelect : { id: true },
     });
 
     if (sessions.length !== sessionIds.length) {
         return { ok: false, error: 'One or more selected sessions are invalid' };
+    }
+
+    if (options?.rejectEndedSessions) {
+        const event = await prisma.event.findUnique({
+            where: { id: eventId },
+            select: { timezone: true },
+        });
+        const tz = eventTz(event);
+        const referenceDate = options.referenceDate ?? new Date();
+        const detailedSessions = await prisma.eventSession.findMany({
+            where: { eventId, id: { in: sessionIds }, isActive: true },
+            select: sessionSelect,
+        });
+        const hasEndedSession = detailedSessions.some((session) => isSessionEndedAt(session, referenceDate, tz));
+        if (hasEndedSession) {
+            return {
+                ok: false,
+                error: 'One or more selected sessions have ended',
+                status: 409,
+            };
+        }
     }
 
     return { ok: true, ids: sessionIds };
@@ -844,6 +926,10 @@ router.post('/', authenticateToken, async (req, res) => {
         const status = normalizeProgressStatus(req.body?.status ?? req.body?.progressStatus);
         const priority = normalizePriority(req.body?.priority);
         const teamIds = parseTeamIds(req.body?.teamIds);
+        const timezoneResult = parseTimezoneInput(req.body?.timezone);
+        if (typeof timezoneResult === 'object') {
+            return res.status(400).json({ error: timezoneResult.error });
+        }
 
         const slug = await generateUniqueEventSlug();
         const created = await prisma.event.create({
@@ -852,6 +938,7 @@ router.post('/', authenticateToken, async (req, res) => {
                 slug,
                 description: normalizeDescription(req.body?.description),
                 venue: String(req.body?.venue || '').trim() || null,
+                timezone: timezoneResult,
                 eventDate,
                 eventEndDate,
                 registrationDeadline: registrationDeadline && !Number.isNaN(registrationDeadline.getTime()) ? registrationDeadline : null,
@@ -975,6 +1062,14 @@ router.put('/:id', authenticateToken, async (req, res) => {
             const nextStatus = normalizeProgressStatus(req.body?.status ?? req.body?.progressStatus);
             data.status = nextStatus;
             data.progressStatus = nextStatus;
+        }
+
+        if (req.body?.timezone !== undefined) {
+            const timezoneResult = parseTimezoneInput(req.body.timezone, eventTz(existing));
+            if (typeof timezoneResult === 'object') {
+                return res.status(400).json({ error: timezoneResult.error });
+            }
+            data.timezone = timezoneResult;
         }
 
         const updated = await prisma.event.update({
@@ -1642,13 +1737,14 @@ router.get('/:id/sessions', optionalAuthenticateToken, async (req, res) => {
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
-            select: { id: true, isArchived: true, isActive: true, isPublished: true },
+            select: { id: true, isArchived: true, isActive: true, isPublished: true, timezone: true },
         });
         if (!event) return res.status(404).json({ error: 'Event not found' });
 
         const canView = await canUserViewEvent(req.user, eventId, event.isArchived);
         if (!canView && !canPublicView(event)) return res.status(404).json({ error: 'Event not found' });
 
+        const tz = eventTz(event);
         const sessions = await prisma.eventSession.findMany({
             where: { eventId, isActive: true },
             orderBy: [{ startDateTime: 'asc' }, { sessionDate: 'asc' }, { order: 'asc' }],
@@ -1658,7 +1754,7 @@ router.get('/:id/sessions', optionalAuthenticateToken, async (req, res) => {
         const counts = await countActiveSessionRegistrationsForSessions(sessions.map((session) => session.id));
         return res.json(sessions.map((session) => (
             withSessionCapacityFields(
-                serializeEventSession(session),
+                serializeEventSession(session, tz),
                 counts.get(session.id) ?? 0,
             )
         )));
@@ -1674,7 +1770,8 @@ router.post('/:id/sessions', authenticateToken, async (req, res) => {
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
         if (!await ensureEventOperationsAccess(res, req, eventId)) return;
 
-        const parsedTimes = parseEventSessionTimes(req.body ?? {});
+        const tz = await loadEventTimezone(eventId);
+        const parsedTimes = parseEventSessionTimes(req.body ?? {}, tz);
         if (!parsedTimes) {
             return res.status(400).json({ error: 'Valid startDateTime and endDateTime are required' });
         }
@@ -1721,21 +1818,21 @@ router.post('/:id/sessions', authenticateToken, async (req, res) => {
             entityType: 'SESSION',
             newValue: {
                 label: created.label,
-                sessionDate: formatEventDay(created.sessionDate),
+                sessionDate: formatEventDay(created.sessionDate, tz),
                 mode: created.mode,
                 onlineUrl: created.onlineUrl,
                 maxCapacity: created.maxCapacity,
             },
             description: created.label
                 ? `Session "${created.label}" created`
-                : `Session on ${formatEventDay(created.sessionDate)} created`,
+                : `Session on ${formatEventDay(created.sessionDate, tz)} created`,
         });
 
         if (created.mode === 'ONLINE') {
             queueSessionTokenGeneration(created.id, 'session-create');
         }
 
-        return res.status(201).json(withSessionCapacityFields(serializeEventSession(created), 0));
+        return res.status(201).json(withSessionCapacityFields(serializeEventSession(created, tz), 0));
     } catch (error) {
         console.error(`POST /events/${req.params.id}/sessions error:`, error);
         return res.status(500).json({ error: 'Failed to create session' });
@@ -1776,13 +1873,14 @@ router.put('/:id/sessions/:sessionId', authenticateToken, async (req, res) => {
         const existing = await prisma.eventSession.findFirst({ where: { id: sessionId, eventId } });
         if (!existing) return res.status(404).json({ error: 'Session not found' });
 
+        const tz = await loadEventTimezone(eventId);
         const parsedTimes = parseEventSessionTimes({
             startDateTime: req.body?.startDateTime ?? existing.startDateTime?.toISOString(),
             endDateTime: req.body?.endDateTime ?? existing.endDateTime?.toISOString(),
-            sessionDate: req.body?.sessionDate ?? formatEventDay(existing.sessionDate),
+            sessionDate: req.body?.sessionDate ?? formatEventDay(existing.sessionDate, tz),
             startTime: req.body?.startTime ?? existing.startTime,
             endTime: req.body?.endTime ?? existing.endTime,
-        });
+        }, tz);
         if (!parsedTimes) {
             return res.status(400).json({ error: 'Valid startDateTime and endDateTime are required' });
         }
@@ -1847,11 +1945,11 @@ router.put('/:id/sessions/:sessionId', authenticateToken, async (req, res) => {
         const sessionChanges = collectChangedFields(
             {
                 ...existing,
-                sessionDate: formatEventDay(existing.sessionDate),
+                sessionDate: formatEventDay(existing.sessionDate, tz),
             },
             {
                 ...updated,
-                sessionDate: formatEventDay(updated.sessionDate),
+                sessionDate: formatEventDay(updated.sessionDate, tz),
             },
             SESSION_FIELD_LABELS,
         );
@@ -1873,7 +1971,7 @@ router.put('/:id/sessions/:sessionId', authenticateToken, async (req, res) => {
         }
 
         const registeredCount = await countActiveSessionRegistrations(sessionId);
-        return res.json(withSessionCapacityFields(serializeEventSession(updated), registeredCount));
+        return res.json(withSessionCapacityFields(serializeEventSession(updated, tz), registeredCount));
     } catch (error) {
         console.error(`PUT /events/${req.params.id}/sessions/${req.params.sessionId} error:`, error);
         return res.status(500).json({ error: 'Failed to update session' });
@@ -1898,6 +1996,8 @@ router.delete('/:id/sessions/:sessionId', authenticateToken, async (req, res) =>
             return res.status(409).json({ error: 'Cannot delete a session that has attendance records' });
         }
 
+        const tz = await loadEventTimezone(eventId);
+
         await prisma.eventSession.deleteMany({ where: { id: sessionId, eventId } });
 
         await logEventActivity({
@@ -1907,11 +2007,11 @@ router.delete('/:id/sessions/:sessionId', authenticateToken, async (req, res) =>
             entityType: 'SESSION',
             oldValue: {
                 label: session.label,
-                sessionDate: formatEventDay(session.sessionDate),
+                sessionDate: formatEventDay(session.sessionDate, tz),
             },
             description: session.label
                 ? `Session "${session.label}" deleted`
-                : `Session on ${formatEventDay(session.sessionDate)} deleted`,
+                : `Session on ${formatEventDay(session.sessionDate, tz)} deleted`,
         });
 
         return res.json({ success: true });
@@ -2101,6 +2201,9 @@ router.patch('/:id/registration-columns', authenticateToken, async (req, res) =>
                 tierFieldRequired: true,
                 sessionFieldShowOnPublic: true,
                 sessionFieldRequired: true,
+                phoneFieldRequired: true,
+                sessionFieldOrder: true,
+                tierFieldOrder: true,
             },
         });
         if (!event) return res.status(404).json({ error: 'Event not found' });
@@ -2118,6 +2221,23 @@ router.patch('/:id/registration-columns', authenticateToken, async (req, res) =>
         if (req.body?.sessionFieldRequired !== undefined) {
             data.sessionFieldRequired = Boolean(req.body.sessionFieldRequired);
         }
+        if (req.body?.phoneFieldRequired !== undefined) {
+            data.phoneFieldRequired = Boolean(req.body.phoneFieldRequired);
+        }
+        if (req.body?.sessionFieldOrder !== undefined) {
+            const sessionFieldOrder = Number(req.body.sessionFieldOrder);
+            if (!Number.isInteger(sessionFieldOrder) || sessionFieldOrder < 0) {
+                return res.status(400).json({ error: 'sessionFieldOrder must be a non-negative integer' });
+            }
+            data.sessionFieldOrder = sessionFieldOrder;
+        }
+        if (req.body?.tierFieldOrder !== undefined) {
+            const tierFieldOrder = Number(req.body.tierFieldOrder);
+            if (!Number.isInteger(tierFieldOrder) || tierFieldOrder < 0) {
+                return res.status(400).json({ error: 'tierFieldOrder must be a non-negative integer' });
+            }
+            data.tierFieldOrder = tierFieldOrder;
+        }
 
         if (Object.keys(data).length === 0) {
             return res.status(400).json({ error: 'No registration column settings provided' });
@@ -2132,6 +2252,9 @@ router.patch('/:id/registration-columns', authenticateToken, async (req, res) =>
                 tierFieldRequired: true,
                 sessionFieldShowOnPublic: true,
                 sessionFieldRequired: true,
+                phoneFieldRequired: true,
+                sessionFieldOrder: true,
+                tierFieldOrder: true,
             },
         });
 
@@ -2196,7 +2319,9 @@ router.post('/:id/custom-fields', authenticateToken, async (req, res) => {
                 options: toJsonInput(req.body?.options),
                 required: Boolean(req.body?.required),
                 showOnPublic: Boolean(req.body?.showOnPublic),
-                order: Number.isInteger(Number(req.body?.order)) ? Number(req.body.order) : (highestOrder._max.order ?? -1) + 1,
+                order: Number.isInteger(Number(req.body?.order))
+                    ? Number(req.body.order)
+                    : Math.max(highestOrder._max.order ?? 1, 1) + 1,
                 isLocked: Boolean(req.body?.isLocked),
             },
         });
@@ -2364,10 +2489,12 @@ router.get('/:id/registrations', authenticateToken, async (req, res) => {
         } else if (checkInStatus === 'CHECKED_IN_TODAY') {
             const event = await prisma.event.findUnique({
                 where: { id: eventId },
-                select: { eventDate: true, eventEndDate: true },
+                select: { eventDate: true, eventEndDate: true, timezone: true },
             });
             if (!event) return res.status(404).json({ error: 'Event not found' });
-            const resolved = resolveCheckInEventDay(event.eventDate, event.eventEndDate);
+            const resolved = resolveCheckInEventDay(event.eventDate, event.eventEndDate, {
+                timeZone: eventTz(event),
+            });
             if (!resolved) {
                 where.id = -1;
             } else {
@@ -2398,7 +2525,8 @@ router.get('/:id/registrations', authenticateToken, async (req, res) => {
             include: registrationInclude,
         });
 
-        return res.json(registrations.map(serializeRegistration));
+        const tz = await loadEventTimezone(eventId);
+        return res.json(registrations.map((registration) => serializeRegistration(registration, tz)));
     } catch (error) {
         console.error(`GET /events/${req.params.id}/registrations error:`, error);
         return res.status(500).json({ error: 'Failed to fetch registrations' });
@@ -2422,21 +2550,24 @@ router.get('/:id/registrations/lookup', authenticateToken, async (req, res) => {
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
-            select: { eventDate: true, eventEndDate: true },
+            select: { eventDate: true, eventEndDate: true, timezone: true },
         });
         if (!event) return res.status(404).json({ error: 'Event not found' });
 
         const fields = await getActiveCustomFields(eventId);
         const missingRequiredFields = getMissingRequiredCustomFieldsFromValues(fields, registration.customFieldValues);
-        const resolved = resolveCheckInEventDay(event.eventDate, event.eventEndDate);
+        const resolved = resolveCheckInEventDay(event.eventDate, event.eventEndDate, {
+            timeZone: eventTz(event),
+        });
+        const tz = eventTz(event);
         const eventDay = resolved?.eventDay ?? '';
         const checkedInToday = resolved
-            ? hasAttendanceOnDay(registration.attendanceDays ?? [], resolved.eventDay)
+            ? hasAttendanceOnDay(registration.attendanceDays ?? [], resolved.eventDay, tz)
             : false;
         const activeSessionsNow = await getActiveSessionsAtTime(eventId, new Date());
 
         return res.json({
-            registration: serializeRegistration(registration),
+            registration: serializeRegistration(registration, tz),
             missingRequiredFields,
             eventDay,
             checkedInToday,
@@ -2463,14 +2594,15 @@ router.get('/:id/registrations/:registrationId', authenticateToken, async (req, 
         });
 
         if (!registration) return res.status(404).json({ error: 'Registration not found' });
-        return res.json(serializeRegistration(registration));
+        const tz = await loadEventTimezone(eventId);
+        return res.json(serializeRegistration(registration, tz));
     } catch (error) {
         console.error(`GET /events/${req.params.id}/registrations/${req.params.registrationId} error:`, error);
         return res.status(500).json({ error: 'Failed to fetch registration' });
     }
 });
 
-router.post('/:id/registrations', optionalAuthenticateToken, async (req, res) => {
+router.post('/:id/registrations', registrationPostLimiter, optionalAuthenticateToken, async (req, res) => {
     try {
         const resolved = await resolveEventByIdOrSlug(String(req.params.id || ''));
         if (!resolved) return res.status(400).json({ error: 'Invalid event ID' });
@@ -2525,9 +2657,13 @@ router.post('/:id/registrations', optionalAuthenticateToken, async (req, res) =>
         }
 
         const requestedSessionIds = parseSessionIds(req.body?.sessionIds);
-        const sessionValidation = await validateSessionIdsForEvent(eventId, requestedSessionIds);
+        const sessionValidation = await validateSessionIdsForEvent(
+            eventId,
+            requestedSessionIds,
+            !isManager ? { rejectEndedSessions: true } : undefined,
+        );
         if (!sessionValidation.ok) {
-            return res.status(400).json({ error: sessionValidation.error });
+            return res.status(sessionValidation.status ?? 400).json({ error: sessionValidation.error });
         }
 
         if (!isManager && event.sessionFieldShowOnPublic && event.sessionFieldRequired && sessionValidation.ids.length === 0) {
@@ -2553,6 +2689,11 @@ router.post('/:id/registrations', optionalAuthenticateToken, async (req, res) =>
         const fullName = String(req.body?.fullName || '').trim();
         const email = String(req.body?.email || '').trim().toLowerCase();
         if (!fullName || !email) return res.status(400).json({ error: 'fullName and email are required' });
+
+        const phoneNumber = String(req.body?.phoneNumber || '').trim();
+        if (event.phoneFieldRequired && !phoneNumber) {
+            return res.status(400).json({ error: 'Phone number is required' });
+        }
 
         const registrationMemberId = req.user?.memberId ?? await resolveMemberIdByEmail(email);
         const existingRegistration = await findActiveEventRegistration(eventId, {
@@ -2598,7 +2739,7 @@ router.post('/:id/registrations', optionalAuthenticateToken, async (req, res) =>
                     memberId: registrationMemberId,
                     fullName,
                     email,
-                    phoneNumber: String(req.body?.phoneNumber || '').trim() || null,
+                    phoneNumber: phoneNumber || null,
                     confirmationCode,
                     source: isManager ? 'PORTAL' : 'PUBLIC',
                     status: 'REGISTERED',
@@ -2640,6 +2781,7 @@ router.post('/:id/registrations', optionalAuthenticateToken, async (req, res) =>
             eventId,
             version: registration.version,
             actorMemberId: req.user?.memberId ?? registration.memberId ?? null,
+            clientInstanceId: readClientInstanceId(req),
         });
 
         const { onlineAccessToken: _token, ...safeRegistration } = registration;
@@ -2668,13 +2810,18 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
         const event = await prisma.event.findUnique({ where: { id: eventId } });
         if (!event) return res.status(404).json({ error: 'Event not found' });
         if (!event.allowWalkIns) return res.status(409).json({ error: 'Walk-ins are disabled for this event' });
-        if (!isWithinEventDays(event.eventDate, event.eventEndDate)) {
+        if (!isWithinEventDays(event.eventDate, event.eventEndDate, new Date(), eventTz(event))) {
             return res.status(409).json({ error: 'Walk-ins are only available on event days' });
         }
 
         const fullName = String(req.body?.fullName || '').trim();
         const email = String(req.body?.email || '').trim().toLowerCase();
         if (!fullName || !email) return res.status(400).json({ error: 'fullName and email are required' });
+
+        const walkInPhoneNumber = String(req.body?.phoneNumber || '').trim();
+        if (event.phoneFieldRequired && !walkInPhoneNumber) {
+            return res.status(400).json({ error: 'Phone number is required' });
+        }
 
         const walkInFields = await getActiveCustomFields(eventId);
         const walkInFieldErrors = validateRequiredCustomFieldValues(walkInFields, req.body?.customFieldValues);
@@ -2685,10 +2832,14 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
         const bodyMemberId = req.body?.memberId ? parseId(req.body.memberId) : null;
         const resolvedMemberId = bodyMemberId ?? await resolveMemberIdByEmail(email);
         const walkInCheckedInAt = new Date();
-        const resolvedDay = resolveCheckInEventDay(event.eventDate, event.eventEndDate, { referenceDate: walkInCheckedInAt });
+        const resolvedDay = resolveCheckInEventDay(event.eventDate, event.eventEndDate, {
+            referenceDate: walkInCheckedInAt,
+            timeZone: eventTz(event),
+        });
         if (!resolvedDay) {
             return res.status(409).json({ error: 'Walk-ins are only available on event days' });
         }
+        const tz = eventTz(event);
 
         const sessionId = parseId(req.body?.sessionId);
         const requestedSessionIds = parseSessionIds(req.body?.sessionIds);
@@ -2724,13 +2875,13 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
         });
 
         if (existingRegistration) {
-            const alreadyCheckedInForDay = hasAttendanceOnDay(existingRegistration.attendanceDays ?? [], resolvedDay.eventDay);
+            const alreadyCheckedInForDay = hasAttendanceOnDay(existingRegistration.attendanceDays ?? [], resolvedDay.eventDay, tz);
             if (!sessionId && alreadyCheckedInForDay) {
                 return res.status(409).json({ error: 'This person is already checked in today' });
             }
 
             if (sessionId && targetSession) {
-                const conflict = await findOverlappingSessionAttendance(existingRegistration.id, targetSession);
+                const conflict = await findOverlappingSessionAttendance(existingRegistration.id, targetSession, tz);
                 if (conflict) {
                     const sessionLabel = conflict.session?.label ?? 'session';
                     return res.status(409).json({
@@ -2847,10 +2998,11 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
                 eventId,
                 version: updated.version,
                 actorMemberId: req.user!.memberId!,
+                clientInstanceId: readClientInstanceId(req),
             });
 
             return res.status(200).json({
-                ...serializeRegistration(updated),
+                ...serializeRegistration(updated, tz),
                 action: 'checked_in_existing',
             });
         }
@@ -2932,7 +3084,7 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
             description: `Walk-in registration for ${registration.fullName} (${registration.email})`,
         });
 
-        if (shouldSendWalkInTicket(event.eventDate, event.eventEndDate, walkInCheckedInAt)) {
+        if (shouldSendWalkInTicket(event.eventDate, event.eventEndDate, walkInCheckedInAt, eventTz(event))) {
             queueTicketEmail(registration.id, 'walk-in');
         }
 
@@ -2940,10 +3092,11 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
             eventId,
             version: registration.version,
             actorMemberId: req.user!.memberId!,
+            clientInstanceId: readClientInstanceId(req),
         });
 
         return res.status(201).json({
-            ...serializeRegistration(registration),
+            ...serializeRegistration(registration, tz),
             action: 'created',
         });
     } catch (error) {
@@ -3186,6 +3339,7 @@ router.post('/:id/registrations/import', authenticateToken, async (req, res) => 
             eventId,
             version: 0,
             actorMemberId: req.user!.memberId!,
+            clientInstanceId: readClientInstanceId(req),
         });
 
         return res.json(result);
@@ -3208,7 +3362,7 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
-            select: { eventDate: true, eventEndDate: true, tierFieldRequired: true, sessionFieldRequired: true },
+            select: { eventDate: true, eventEndDate: true, tierFieldRequired: true, sessionFieldRequired: true, timezone: true },
         });
         if (!event) return res.status(404).json({ error: 'Event not found' });
 
@@ -3232,13 +3386,15 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
 
         const resolvedDay = resolveCheckInEventDay(event.eventDate, event.eventEndDate, {
             eventDay: req.body?.eventDay,
+            timeZone: eventTz(event),
         });
         if (!resolvedDay) {
             return res.status(409).json({ error: 'Check-in is only available on event days' });
         }
+        const tz = eventTz(event);
 
         const sessionId = parseId(req.body?.sessionId);
-        const alreadyCheckedInForDay = hasAttendanceOnDay(activeRegistration.attendanceDays ?? [], resolvedDay.eventDay);
+        const alreadyCheckedInForDay = hasAttendanceOnDay(activeRegistration.attendanceDays ?? [], resolvedDay.eventDay, tz);
 
         if (!sessionId && alreadyCheckedInForDay) {
             return res.status(409).json({ error: 'Already checked in for this day' });
@@ -3263,7 +3419,7 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
             }
             targetSession = session;
 
-            const conflict = await findOverlappingSessionAttendance(activeRegistration.id, session);
+            const conflict = await findOverlappingSessionAttendance(activeRegistration.id, session, tz);
             if (conflict) {
                 const sessionLabel = conflict.session?.label ?? 'session';
                 return res.status(409).json({
@@ -3397,9 +3553,10 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
             eventId,
             version: updated.version,
             actorMemberId: req.user!.memberId!,
+            clientInstanceId: readClientInstanceId(req),
         });
 
-        return res.json(serializeRegistration(updated));
+        return res.json(serializeRegistration(updated, tz));
     } catch (error) {
         const prismaConflict = respondWithPrismaConflict(
             res,
@@ -3423,6 +3580,7 @@ router.delete('/:id/registrations/:registrationId/attendance', authenticateToken
 
         const eventDay = parseEventDayString(req.body?.eventDay);
         if (!eventDay) return res.status(400).json({ error: 'Invalid event day' });
+        const tz = await loadEventTimezone(eventId);
 
         const registration = await prisma.eventRegistration.findFirst({
             where: { id: registrationId, eventId },
@@ -3434,7 +3592,7 @@ router.delete('/:id/registrations/:registrationId/attendance', authenticateToken
         }
 
         const dayRecord = registration.attendanceDays.find(
-            (day) => formatEventDay(day.eventDay) === eventDay,
+            (day) => formatEventDay(day.eventDay, tz) === eventDay,
         );
         if (!dayRecord) return res.status(404).json({ error: 'Attendance record not found' });
 
@@ -3473,7 +3631,14 @@ router.delete('/:id/registrations/:registrationId/attendance', authenticateToken
             description: `Removed check-in for ${registration.fullName} on ${eventDay}`,
         });
 
-        return res.json(serializeRegistration(updated));
+        publishEventChanged({
+            eventId,
+            version: updated.version,
+            actorMemberId: req.user!.memberId!,
+            clientInstanceId: readClientInstanceId(req),
+        });
+
+        return res.json(serializeRegistration(updated, tz));
     } catch (error) {
         console.error(`DELETE /events/${req.params.id}/registrations/${req.params.registrationId}/attendance error:`, error);
         return res.status(500).json({ error: 'Failed to remove attendance' });
@@ -3517,7 +3682,8 @@ router.delete('/:id/registrations/:registrationId/session-attendance/:sessionAtt
         });
         if (!updated) return res.status(404).json({ error: 'Registration not found' });
 
-        const sessionDateLabel = formatEventDay(attendance.session.sessionDate);
+        const tz = await loadEventTimezone(eventId);
+        const sessionDateLabel = formatEventDay(attendance.session.sessionDate, tz);
         const sessionLabel = attendance.session.label?.trim();
         await logEventActivity({
             eventId,
@@ -3536,7 +3702,14 @@ router.delete('/:id/registrations/:registrationId/session-attendance/:sessionAtt
             description: `Removed online check-in for ${registration.fullName}${sessionLabel ? ` (${sessionLabel})` : ''} on ${sessionDateLabel}`,
         });
 
-        return res.json(serializeRegistration(updated));
+        publishEventChanged({
+            eventId,
+            version: updated.version,
+            actorMemberId: req.user!.memberId!,
+            clientInstanceId: readClientInstanceId(req),
+        });
+
+        return res.json(serializeRegistration(updated, tz));
     } catch (error) {
         console.error(`DELETE /events/${req.params.id}/registrations/${req.params.registrationId}/session-attendance/${req.params.sessionAttendanceId} error:`, error);
         return res.status(500).json({ error: 'Failed to remove session attendance' });
@@ -3594,6 +3767,8 @@ router.patch('/:id/registrations/:registrationId/sessions', authenticateToken, a
         });
         if (!updated) return res.status(404).json({ error: 'Registration not found' });
 
+        const tz = await loadEventTimezone(eventId);
+
         await logEventActivity({
             eventId,
             memberId: req.user!.memberId!,
@@ -3610,9 +3785,10 @@ router.patch('/:id/registrations/:registrationId/sessions', authenticateToken, a
             eventId,
             version: updated.version,
             actorMemberId: req.user!.memberId!,
+            clientInstanceId: readClientInstanceId(req),
         });
 
-        return res.json(serializeRegistration(updated));
+        return res.json(serializeRegistration(updated, tz));
     } catch (error) {
         console.error(`PATCH /events/${req.params.id}/registrations/${req.params.registrationId}/sessions error:`, error);
         return res.status(500).json({ error: 'Failed to update registration sessions' });
@@ -3830,6 +4006,8 @@ router.patch('/:id/registrations/:registrationId', authenticateToken, async (req
         if (!eventId || !registrationId) return res.status(400).json({ error: 'Invalid registration ID' });
         if (!(await ensureEventOperationsAccess(res, req, eventId))) return;
 
+        const tz = await loadEventTimezone(eventId);
+
         const existing = await prisma.eventRegistration.findFirst({ where: { id: registrationId, eventId } });
         if (!existing) return res.status(404).json({ error: 'Registration not found' });
 
@@ -3842,9 +4020,9 @@ router.patch('/:id/registrations/:registrationId', authenticateToken, async (req
         if (hasCustomFieldPatch) {
             const event = await prisma.event.findUnique({
                 where: { id: eventId },
-                select: { eventDate: true, eventEndDate: true },
+                select: { eventDate: true, eventEndDate: true, timezone: true },
             });
-            if (!event || !isWithinEventDays(event.eventDate, event.eventEndDate)) {
+            if (!event || !isWithinEventDays(event.eventDate, event.eventEndDate, new Date(), eventTz(event))) {
                 return res.status(409).json({ error: 'Custom fields can only be updated during event days' });
             }
         }
@@ -3893,7 +4071,7 @@ router.patch('/:id/registrations/:registrationId', authenticateToken, async (req
             if (!scalarResult.ok) {
                 return respondVersionConflict(
                     res,
-                    scalarResult.latest ? serializeRegistration(scalarResult.latest) : null,
+                    scalarResult.latest ? serializeRegistration(scalarResult.latest, tz) : null,
                 );
             }
 
@@ -3926,7 +4104,7 @@ router.patch('/:id/registrations/:registrationId', authenticateToken, async (req
             if (!versionResult.ok) {
                 return respondVersionConflict(
                     res,
-                    versionResult.latest ? serializeRegistration(versionResult.latest) : null,
+                    versionResult.latest ? serializeRegistration(versionResult.latest, tz) : null,
                 );
             }
         }
@@ -3947,9 +4125,10 @@ router.patch('/:id/registrations/:registrationId', authenticateToken, async (req
             eventId,
             version: updated.version,
             actorMemberId: req.user!.memberId!,
+            clientInstanceId: readClientInstanceId(req),
         });
 
-        return res.json(serializeRegistration(updated));
+        return res.json(serializeRegistration(updated, tz));
     } catch (error) {
         const prismaConflict = respondWithPrismaConflict(res, error);
         if (prismaConflict) return prismaConflict;
@@ -3983,6 +4162,13 @@ router.delete('/:id/registrations/:registrationId', authenticateToken, async (re
             description: `Registration cancelled for ${existing.fullName}`,
         });
 
+        publishEventChanged({
+            eventId,
+            version: updated.version,
+            actorMemberId: req.user!.memberId!,
+            clientInstanceId: readClientInstanceId(req),
+        });
+
         return res.json(updated);
     } catch (error) {
         console.error(`DELETE /events/${req.params.id}/registrations/${req.params.registrationId} error:`, error);
@@ -3998,9 +4184,11 @@ router.get('/:id/statistics', authenticateToken, async (req, res) => {
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
 
-        const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, capacity: true, isArchived: true } });
+        const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, capacity: true, isArchived: true, timezone: true } });
         if (!event) return res.status(404).json({ error: 'Event not found' });
         if (!(await ensureCanViewEvent(res, req, eventId, event.isArchived))) return;
+
+        const tz = eventTz(event);
 
         const [totalRegistered, totalCheckedIn, walkInCount, noShowCount, byTier, registrationTimeline, attendanceDayRows] = await Promise.all([
             prisma.eventRegistration.count({ where: { eventId, isWalkIn: false, status: { not: 'CANCELLED' } } }),
@@ -4040,13 +4228,13 @@ router.get('/:id/statistics', authenticateToken, async (req, res) => {
 
         const registrationsByDay = new Map<string, number>();
         for (const item of registrationTimeline) {
-            const day = item.createdAt.toISOString().slice(0, 10);
+            const day = toEventDayString(item.createdAt, tz) ?? '';
             registrationsByDay.set(day, (registrationsByDay.get(day) ?? 0) + 1);
         }
 
         const attendanceByDay = new Map<string, number>();
         for (const item of attendanceDayRows) {
-            const day = formatEventDay(item.eventDay);
+            const day = formatEventDay(item.eventDay, tz);
             attendanceByDay.set(day, (attendanceByDay.get(day) ?? 0) + 1);
         }
 
@@ -4067,7 +4255,7 @@ router.get('/:id/statistics', authenticateToken, async (req, res) => {
             sessionAttendance: sessionAttendanceCounts.map((session) => ({
                 id: session.id,
                 label: session.label,
-                sessionDate: formatEventDay(session.sessionDate),
+                sessionDate: formatEventDay(session.sessionDate, tz),
                 mode: session.mode,
                 attendances: session._count.attendances,
             })),
@@ -4219,8 +4407,9 @@ router.post('/:id/tasks', authenticateToken, async (req, res) => {
         const eventId = parseId(req.params.id);
         if (!eventId) return res.status(400).json({ error: 'Invalid event ID' });
 
-        const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, title: true } });
+        const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, title: true, timezone: true } });
         if (!event) return res.status(404).json({ error: 'Event not found' });
+        const tz = eventTz(event);
 
         const title = String(req.body?.title || '').trim();
         const location = String(req.body?.location || '').trim();
@@ -4341,7 +4530,7 @@ router.post('/:id/tasks', authenticateToken, async (req, res) => {
                     actionType: 'ASSIGNED',
                     entityType: 'ASSIGNMENT',
                     newValue: buildAssignmentActivityValue(assignment),
-                    description: buildAssignedDescription(created.title, assignment),
+                    description: buildAssignedDescription(created.title, assignment, tz),
                 });
             }
         }
@@ -4361,8 +4550,9 @@ router.put('/:id/tasks/:taskId', authenticateToken, async (req, res) => {
         const taskId = parseId(req.params.taskId);
         if (!eventId || !taskId) return res.status(400).json({ error: 'Invalid event or task ID' });
 
-        const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, title: true } });
+        const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, title: true, timezone: true } });
         if (!event) return res.status(404).json({ error: 'Event not found' });
+        const tz = eventTz(event);
 
         const existing = await prisma.eventTask.findFirst({
             where: { id: taskId, eventId },
@@ -4559,7 +4749,7 @@ router.put('/:id/tasks/:taskId', authenticateToken, async (req, res) => {
                             actionType: 'ASSIGNED',
                             entityType: 'ASSIGNMENT',
                             newValue: buildAssignmentActivityValue(assignment),
-                            description: buildAssignedDescription(updated.title, assignment),
+                            description: buildAssignedDescription(updated.title, assignment, tz),
                         });
                     }
                 }

@@ -21,6 +21,24 @@ describe('resourceRealtime', () => {
         });
     });
 
+    it('includes clientInstanceId when provided', () => {
+        publishEventChanged({
+            eventId: 9,
+            version: 3,
+            actorMemberId: 4,
+            clientInstanceId: 'tab-abc',
+        });
+
+        expect(publishToTopic).toHaveBeenCalledWith('event:9', {
+            type: 'resource.changed',
+            resource: 'event',
+            id: 9,
+            version: 3,
+            actorMemberId: 4,
+            clientInstanceId: 'tab-abc',
+        });
+    });
+
     it('publishes project changes to the project topic', () => {
         publishProjectChanged({ projectId: 3, version: 5, actorMemberId: null });
 

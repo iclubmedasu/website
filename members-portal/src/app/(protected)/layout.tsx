@@ -27,6 +27,7 @@ import {
     Mail,
     LifeBuoy,
     Wallet,
+    Award,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -60,6 +61,11 @@ const NAV_ITEMS = [
             { label: 'Events', href: '/events', icon: Calendar },
             { label: 'Past Events', href: '/past-events', icon: Archive },
         ],
+    },
+    {
+        label: 'Certificates',
+        href: '/certificates',
+        icon: Award,
     },
     {
         label: 'Finance',

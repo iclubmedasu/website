@@ -4,8 +4,10 @@ import {
     formatDate,
     formatDateTime,
     formatEventDateRange,
+    formatEventDateRangeDual,
     formatRegistrationDeadline,
     formatSessionRange,
+    formatSessionRangeDual,
 } from "@iclub/shared/utils";
 import { useEffect, useState } from "react";
 
@@ -161,4 +163,54 @@ export function ClientSessionRange({
             className={className}
         />
     );
+}
+
+interface ClientEventDateRangeDualProps {
+    eventDate: string;
+    eventEndDate: string;
+    timezone?: string;
+    className?: string;
+}
+
+export function ClientEventDateRangeDual({
+    eventDate,
+    eventEndDate,
+    timezone = "Africa/Cairo",
+    className,
+}: ClientEventDateRangeDualProps) {
+    const [label, setLabel] = useState<string | null>(null);
+
+    useEffect(() => {
+        setLabel(formatEventDateRangeDual(eventDate, eventEndDate, timezone));
+    }, [eventDate, eventEndDate, timezone]);
+
+    if (!label) {
+        return <span className={className} aria-busy="true">…</span>;
+    }
+
+    return <span className={className}>{label}</span>;
+}
+
+export function ClientSessionRangeDual({
+    startDateTime,
+    endDateTime,
+    timezone = "Africa/Cairo",
+    className,
+}: {
+    startDateTime: string;
+    endDateTime: string;
+    timezone?: string;
+    className?: string;
+}) {
+    const [label, setLabel] = useState<string | null>(null);
+
+    useEffect(() => {
+        setLabel(formatSessionRangeDual(startDateTime, endDateTime, timezone));
+    }, [startDateTime, endDateTime, timezone]);
+
+    if (!label) {
+        return <span className={className} aria-busy="true">…</span>;
+    }
+
+    return <span className={className}>{label}</span>;
 }

@@ -1,3 +1,5 @@
+import { formatDateCompact, toLocalDayKey } from '@iclub/shared/utils';
+
 interface SheetCellStyleOptions {
     fill?: string;
     fontColor?: string;
@@ -43,7 +45,7 @@ function hexToArgb(hex: any) {
 function formatExportShortDate(value: any) {
     const date = getDateOrNull(value);
     if (!date) return '';
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    return formatDateCompact(date);
 }
 
 function getExportContentWidth(values: any[] = [], { minWidth = 8, maxWidth = 16, padding = 2 }: { minWidth?: number; maxWidth?: number; padding?: number } = {}) {
@@ -71,7 +73,7 @@ function formatScheduleClockRange(start: any, end: any) {
 }
 
 function getLocalDateKey(date: Date) {
-    return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+    return toLocalDayKey(date);
 }
 
 function getScheduleTimelineMinuteOffset(date: any, timelineStart: Date | null) {

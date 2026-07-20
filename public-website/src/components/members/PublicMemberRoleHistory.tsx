@@ -1,12 +1,6 @@
 import type { MemberRoleHistoryTimelineEntry } from "@iclub/shared";
+import { formatDate } from "@iclub/shared/utils";
 import { Briefcase, MapPin, MessageCircle } from "lucide-react";
-
-function formatDate(date: string | null | undefined): string {
-    if (!date) return "—";
-    const parsed = new Date(date);
-    if (Number.isNaN(parsed.getTime())) return "—";
-    return parsed.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-}
 
 function getDurationText(duration: number | string | null | undefined): string {
     if (duration === "Ongoing") return "Ongoing";
@@ -44,7 +38,7 @@ export function PublicMemberRoleHistory({ entries }: PublicMemberRoleHistoryProp
                     <div className="member-timeline-content">
                         <div className="member-timeline-header">
                             <span className="member-timeline-badge">{entry.changeType}</span>
-                            <span className="member-timeline-date">{formatDate(entry.period.start)}</span>
+                            <span className="member-timeline-date">{formatDate(entry.period.start ?? "")}</span>
                         </div>
                         <div className="member-timeline-role-row">
                             <Briefcase className="mt-0.5 h-3.5 w-3.5 shrink-0 text-purple-700" />
@@ -65,8 +59,8 @@ export function PublicMemberRoleHistory({ entries }: PublicMemberRoleHistoryProp
                         ) : null}
                         <p className="member-timeline-period">
                             {entry.period.end
-                                ? `${formatDate(entry.period.start)} – ${formatDate(entry.period.end)} (${getDurationText(entry.period.duration)})`
-                                : `${formatDate(entry.period.start)} – Present (${getDurationText(entry.period.duration)})`}
+                                ? `${formatDate(entry.period.start ?? "")} – ${formatDate(entry.period.end)} (${getDurationText(entry.period.duration)})`
+                                : `${formatDate(entry.period.start ?? "")} – Present (${getDurationText(entry.period.duration)})`}
                         </p>
                         {entry.changeReason ? (
                             <p className="member-timeline-notes">

@@ -73,6 +73,8 @@ function unsubscribeSocket(socket: WebSocket, topic: string): void {
 
 function getMemberIdFromRequest(req: IncomingMessage): number | null {
     try {
+        // Cookie/Authorization preferred; query token allowed for WS handshake fallback
+        // (browsers cannot set custom headers on WebSocket upgrade).
         const token = extractAuthToken(req, { allowQueryToken: true });
         if (!token) return null;
 

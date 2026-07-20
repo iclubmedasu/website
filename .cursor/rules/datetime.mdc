@@ -1,0 +1,41 @@
+---
+description: Datetime storage, formatting, and form input conventions
+globs: **/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Datetime conventions
+
+## Storage
+- Persist UTC ISO strings in API and database.
+- Never store local wall-clock strings without timezone context.
+
+## Date-only form inputs
+- Use `toDateInputValue` / `fromDateInputValue` from `@iclub/shared/utils` for `<input type="date">`.
+- Do not use `toISOString().split('T')[0]` or `.slice(0, 10)` on ISO instants in app code.
+
+## Event datetimes (portal forms)
+- Staff enter wall-clock times in the **event's IANA timezone** (`event.timezone`).
+- Use `toEventDateTimeLocalValue` / `fromEventDateTimeLocalValue` for `<input type="datetime-local">`.
+- Use `toEventDayString` for event-day gates and calendar comparisons.
+- Default event timezone: `Africa/Cairo`.
+
+## Display — members portal
+- Use `@iclub/shared/utils` formatters: `formatDate`, `formatDateTime`, `formatDateCompact`, etc.
+- Do not call `toLocaleDateString`, `toLocaleString`, or inline `Intl.DateTimeFormat` in feature code.
+
+## Display — public website (SSR)
+- Use `ClientFormattedDate`, `ClientEventDateRangeDual`, `ClientSessionRangeDual` from `@/components/datetime/ClientDateTime`.
+- Dual display (venue + viewer) is required for event/session times on the public site.
+
+## Server / emails
+- Format with event timezone + label via `formatEventDateRangeInTimezone`, `formatSessionRangeInTimezone`.
+- Use `formatEventDay(..., eventTimezone)` for event-day logic in backend routes.
+
+## Banned patterns (outside `packages/shared/src/utils/**`)
+- `Date.prototype.toLocaleDateString`
+- `Date.prototype.toLocaleString`
+- `.toISOString().split('T')[0]` for form hydration
+- `.slice(0, 10)` on datetime ISO strings (use shared day-key helpers instead)
+
+Run `pnpm datetime:audit` before merging datetime-related changes.

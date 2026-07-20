@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Check, LogIn, Pencil, X } from 'lucide-react';
 import { eventsAPI } from '@/services/api';
+import EmailInputWithDomainSuggestions from '@/components/EmailInputWithDomainSuggestions';
 import type { EventRegistrationRef, Id } from '@/types/backend-contracts';
 import { handleRegistrationConflict } from '../registrationConflictUtils';
 import {
+    REGISTRATION_EMAIL_DISPLAY_LIMIT,
     REGISTRATION_NAME_DISPLAY_LIMIT,
     REGISTRATION_PHONE_DISPLAY_LIMIT,
     truncateRegistrationCell,
@@ -23,6 +25,7 @@ interface EditableRegistrationContactCellProps {
     field: ContactField;
     editable?: boolean;
     className?: string;
+    phoneFieldRequired?: boolean;
     onUpdated: (updated: EventRegistrationRef) => void;
     onCheckIn?: () => void;
     checkInDisabled?: boolean;
@@ -35,7 +38,7 @@ function truncateDisplay(value: string, max: number): string {
 
 const DISPLAY_LIMITS: Record<ContactField, number> = {
     fullName: REGISTRATION_NAME_DISPLAY_LIMIT,
-    email: 20,
+    email: REGISTRATION_EMAIL_DISPLAY_LIMIT,
     phoneNumber: REGISTRATION_PHONE_DISPLAY_LIMIT,
 };
 
@@ -44,12 +47,15 @@ function readFieldValue(registration: EventRegistrationRef, field: ContactField)
     return registration[field] || '';
 }
 
-function validateField(field: ContactField, value: string): string | null {
+function validateField(field: ContactField, value: string, phoneFieldRequired = false): string | null {
     const trimmed = value.trim();
     if (field === 'fullName' && !trimmed) return 'Name is required.';
     if (field === 'email') {
         if (!trimmed) return 'Email is required.';
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return 'Enter a valid email.';
+    }
+    if (field === 'phoneNumber' && phoneFieldRequired && !trimmed) {
+        return 'Phone is required.';
     }
     return null;
 }
@@ -60,6 +66,7 @@ export default function EditableRegistrationContactCell({
     field,
     editable = true,
     className,
+    phoneFieldRequired = false,
     onUpdated,
     onCheckIn,
     checkInDisabled = false,
@@ -104,7 +111,7 @@ export default function EditableRegistrationContactCell({
     };
 
     const saveEdit = async () => {
-        const validationError = validateField(field, draft);
+        const validationError = validateField(field, draft, phoneFieldRequired);
         if (validationError) {
             setError(validationError);
             return;
@@ -147,22 +154,40 @@ export default function EditableRegistrationContactCell({
         return (
             <td className={cellClass}>
                 <div className="event-registrations-contact-cell event-registrations-contact-cell--editing">
-                    <input
-                        type={field === 'email' ? 'email' : 'text'}
-                        value={draft}
-                        disabled={saving}
-                        onChange={(event) => {
-                            setDraft(event.target.value);
-                            if (error) setError('');
-                        }}
-                        onKeyDown={(event) => {
-                            if (event.key === 'Enter') void saveEdit();
-                            if (event.key === 'Escape') cancelEdit();
-                        }}
-                        className="event-registrations-table-input form-input"
-                        aria-label={label}
-                        autoFocus
-                    />
+                    {field === 'email' ? (
+                        <EmailInputWithDomainSuggestions
+                            value={draft}
+                            disabled={saving}
+                            onChange={(next) => {
+                                setDraft(next);
+                                if (error) setError('');
+                            }}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter') void saveEdit();
+                                if (event.key === 'Escape') cancelEdit();
+                            }}
+                            className="event-registrations-table-input form-input"
+                            aria-label={label}
+                            autoFocus
+                        />
+                    ) : (
+                        <input
+                            type="text"
+                            value={draft}
+                            disabled={saving}
+                            onChange={(event) => {
+                                setDraft(event.target.value);
+                                if (error) setError('');
+                            }}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter') void saveEdit();
+                                if (event.key === 'Escape') cancelEdit();
+                            }}
+                            className="event-registrations-table-input form-input"
+                            aria-label={label}
+                            autoFocus
+                        />
+                    )}
                     <div className="event-registrations-contact-cell__actions">
                         <button
                             type="button"

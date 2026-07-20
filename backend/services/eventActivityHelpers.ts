@@ -12,8 +12,12 @@ export function getAssignmentMemberName(assignment: AssignmentActivityInput): st
     return name || `Member #${assignment.memberId}`;
 }
 
-export function formatAssignmentSlot(startDateTime: Date, endDateTime: Date): string {
-    return formatDateRange(startDateTime, endDateTime, { timeZone: CLUB_TIMEZONE });
+export function formatAssignmentSlot(
+    startDateTime: Date,
+    endDateTime: Date,
+    timeZone: string = CLUB_TIMEZONE,
+): string {
+    return formatDateRange(startDateTime, endDateTime, { timeZone });
 }
 
 export function buildAssignmentActivityValue(assignment: AssignmentActivityInput) {
@@ -25,9 +29,13 @@ export function buildAssignmentActivityValue(assignment: AssignmentActivityInput
     };
 }
 
-export function buildAssignedDescription(taskTitle: string, assignment: AssignmentActivityInput): string {
+export function buildAssignedDescription(
+    taskTitle: string,
+    assignment: AssignmentActivityInput,
+    timeZone: string = CLUB_TIMEZONE,
+): string {
     const memberName = getAssignmentMemberName(assignment);
-    const slot = formatAssignmentSlot(assignment.startDateTime, assignment.endDateTime);
+    const slot = formatAssignmentSlot(assignment.startDateTime, assignment.endDateTime, timeZone);
     return `Assigned ${memberName} to "${taskTitle}" (${slot})`;
 }
 

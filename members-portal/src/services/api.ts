@@ -109,7 +109,7 @@ function resolveApiBaseUrl(): string {
     return 'http://localhost:3000/api';
 }
 
-const API_BASE_URL = resolveApiBaseUrl();
+export const API_BASE_URL = resolveApiBaseUrl();
 
 export function shouldSendCredentials(): boolean {
     if (typeof window === 'undefined') return false;
@@ -171,6 +171,17 @@ export function initToken() {
     } catch {
         return null;
     }
+}
+
+/** Per-tab id set by RealtimeProvider; echoed on event mutations for self-ignore. */
+let clientInstanceId: string | null = null;
+
+export function setClientInstanceId(id: string) {
+    clientInstanceId = id;
+}
+
+export function getClientInstanceId(): string | null {
+    return clientInstanceId;
 }
 
 // Base fetch function that always includes the token
@@ -254,10 +265,19 @@ interface NotificationQueryParams {
 }
 
 // Helper function to get auth headers
-const getAuthHeaders = (): JsonHeaders => {
+export const getAuthHeaders = (): JsonHeaders => {
     return {
         'Content-Type': 'application/json',
     };
+};
+
+/** Auth JSON headers plus X-Client-Instance-Id for event mutation echo suppression. */
+export const getEventMutationHeaders = (): JsonHeaders => {
+    const headers = getAuthHeaders();
+    if (clientInstanceId) {
+        headers['X-Client-Instance-Id'] = clientInstanceId;
+    }
+    return headers;
 };
 
 // Auth-only headers (no Content-Type — used for FormData uploads)
@@ -266,7 +286,7 @@ const getAuthOnlyHeaders = (): JsonHeaders => {
 };
 
 // Helper function to handle API responses
-const handleResponse = async <T = unknown>(response: Response): Promise<T> => {
+export const handleResponse = async <T = unknown>(response: Response): Promise<T> => {
     if (!response.ok) {
         const error = (await response.json().catch(() => ({ error: 'An error occurred' }))) as ApiErrorResponse & ConflictErrorResponse;
         if (response.status === 409 && error.code) {
@@ -2041,7 +2061,7 @@ export const eventsAPI = {
     createRegistration: async (eventId: Id | string, data: CreateEventRegistrationPayload): Promise<EventRegistrationRef> => {
         const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations`, {
             method: 'POST',
-            headers: getAuthHeaders(),
+            headers: getEventMutationHeaders(),
             body: JSON.stringify(data),
         });
 
@@ -2051,7 +2071,7 @@ export const eventsAPI = {
     createWalkInRegistration: async (eventId: Id | string, data: CreateEventRegistrationPayload): Promise<WalkInRegistrationResult> => {
         const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/walk-in`, {
             method: 'POST',
-            headers: getAuthHeaders(),
+            headers: getEventMutationHeaders(),
             body: JSON.stringify(data),
         });
 
@@ -2102,7 +2122,7 @@ export const eventsAPI = {
         const safeRegistrationId = String(registrationId || 'code');
         const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${safeRegistrationId}/check-in`, {
             method: 'PATCH',
-            headers: getAuthHeaders(),
+            headers: getEventMutationHeaders(),
             body: JSON.stringify(payload),
         });
 
@@ -2116,7 +2136,7 @@ export const eventsAPI = {
     ): Promise<EventRegistrationRef> => {
         const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${registrationId}/attendance`, {
             method: 'DELETE',
-            headers: getAuthHeaders(),
+            headers: getEventMutationHeaders(),
             body: JSON.stringify(payload),
         });
 
@@ -2132,7 +2152,7 @@ export const eventsAPI = {
             `${API_BASE_URL}/events/${eventId}/registrations/${registrationId}/session-attendance/${sessionAttendanceId}`,
             {
                 method: 'DELETE',
-                headers: getAuthHeaders(),
+                headers: getEventMutationHeaders(),
             },
         );
 
@@ -2146,7 +2166,7 @@ export const eventsAPI = {
     ): Promise<EventRegistrationRef> => {
         const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${registrationId}/sessions`, {
             method: 'PATCH',
-            headers: getAuthHeaders(),
+            headers: getEventMutationHeaders(),
             body: JSON.stringify(payload),
         });
 
@@ -2156,7 +2176,7 @@ export const eventsAPI = {
     updateRegistration: async (eventId: Id | string, registrationId: Id | string, data: UpdateEventRegistrationPayload): Promise<EventRegistrationRef> => {
         const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${registrationId}`, {
             method: 'PATCH',
-            headers: getAuthHeaders(),
+            headers: getEventMutationHeaders(),
             body: JSON.stringify(data),
         });
 
@@ -2166,7 +2186,7 @@ export const eventsAPI = {
     cancelRegistration: async (eventId: Id | string, registrationId: Id | string): Promise<EventRegistrationRef> => {
         const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${registrationId}`, {
             method: 'DELETE',
-            headers: getAuthHeaders(),
+            headers: getEventMutationHeaders(),
         });
 
         return handleResponse<EventRegistrationRef>(response);

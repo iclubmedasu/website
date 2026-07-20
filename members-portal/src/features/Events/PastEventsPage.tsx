@@ -73,6 +73,7 @@ export default function PastEventsPage() {
     }, [user?.id, user?.isAdmin, user?.isDeveloper, user?.isLeadership, user?.isOfficer, user?.isSpecial]);
 
     const canManageLifecycle = eventPermissions.canManageLifecycle;
+    const canManageCertificates = !!(user?.isAdmin || user?.isOfficer || user?.isLeadership || user?.isDeveloper);
     const hasActiveFilters = status !== '' || dateFrom !== '' || dateTo !== ''
         || filterTeam !== '' || filterCategory !== '' || filterPriority !== '';
 
@@ -261,6 +262,7 @@ export default function PastEventsPage() {
                                 canManageSessions={eventPermissions.canManageSessions}
                                 canManageTasks={eventPermissions.canManageTasks}
                                 canManageFields={eventPermissions.canManageFields}
+                                canManageCertificates={canManageCertificates}
                                 archivedView
                                 onToggle={handleToggleExpand}
                                 onEdit={() => {}}

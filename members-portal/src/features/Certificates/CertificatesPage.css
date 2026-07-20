@@ -1,0 +1,167 @@
+/* Certificates page — layout overrides only.
+   Tabs: shared underline tab styles in page.css
+   Page container / header / empty-state: page.css
+   Table / revoked badge: table.css
+*/
+
+.certificates-main-card {
+    overflow: hidden;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.certificates-main-card--editor {
+    min-height: calc(100vh - 10rem);
+}
+
+.certificates-main-card .certificates-tabs {
+    margin: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    flex-shrink: 0;
+}
+
+.certificates-tab-panel {
+    padding: 1.25rem 1.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1;
+}
+
+.certificates-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-shrink: 0;
+}
+
+.certificates-action-buttons {
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* Keep page-local alias in sync with shared .btn.certificates-action-btn */
+.certificates-page .btn.certificates-action-btn {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.8rem;
+    line-height: 1.2;
+    gap: 0.25rem;
+    min-height: 0;
+}
+
+.certificates-page .btn.certificates-action-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.certificates-page .page-header .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.certificates-page .badge {
+    background: var(--gray-100);
+    color: var(--gray-700);
+}
+
+/* Table shell layout — frame tokens live in table.css (multi-selector) */
+.certificates-table-shell {
+    --certificates-row-height: 3rem;
+    --certificates-header-height: 2.75rem;
+    --certificates-table-max-height: calc(
+        var(--certificates-row-height) * 10 + var(--certificates-header-height)
+    );
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.certificates-table-scroll {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: auto;
+    max-height: var(--certificates-table-max-height);
+}
+
+.certificates-table-pagination {
+    flex-shrink: 0;
+    border-top: 1px solid var(--gray-200);
+    margin: 0;
+}
+
+.certificates-table-footer {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    z-index: 2;
+    text-align: center;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border-brand, var(--gray-200));
+    background: var(--bg-card);
+}
+
+.certificates-add-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    width: 100%;
+    padding: 0.65rem 1rem;
+    border: none;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--success-accent);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.certificates-add-btn:hover {
+    background: var(--gradient-success);
+    color: white;
+}
+
+/* Nested template editor chrome */
+.certificates-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-shrink: 0;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--bg-card);
+}
+
+.certificates-editor-title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--gray-900);
+}
+
+.certificates-editor-header .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.certificates-editor-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+@media (max-width: 640px) {
+    .certificates-page .page-search-filter-label {
+        display: none;
+    }
+}

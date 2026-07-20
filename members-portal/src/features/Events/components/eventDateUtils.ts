@@ -1,15 +1,16 @@
-import { formatDate, formatEventDateRange, toDateInputValue } from '@iclub/shared/utils';
+import {
+    CLUB_TIMEZONE,
+    formatDate,
+    formatEventDateRange,
+    toEventDayString,
+} from '@iclub/shared/utils';
 
-function toLocalDayString(date: Date): string {
-    return toDateInputValue(date);
-}
-
-function toDayString(value: string): string | null {
+function toDayString(value: string, timeZone: string): string | null {
     const trimmed = value.trim();
     if (!trimmed) return null;
     const parsed = new Date(trimmed);
     if (Number.isNaN(parsed.getTime())) return null;
-    return toLocalDayString(parsed);
+    return toEventDayString(parsed, timeZone);
 }
 
 export function formatEventDuration(start?: string | null, end?: string | null): string {
@@ -21,10 +22,11 @@ export function formatEventDuration(start?: string | null, end?: string | null):
 export function getEventDayRange(
     start?: string | null,
     end?: string | null,
+    eventTimezone: string = CLUB_TIMEZONE,
 ): { startDay: string; endDay: string } | null {
-    const startDay = start ? toDayString(start) : null;
+    const startDay = start ? toDayString(start, eventTimezone) : null;
     if (!startDay) return null;
-    const endDay = end ? toDayString(end) : startDay;
+    const endDay = end ? toDayString(end, eventTimezone) : startDay;
     if (!endDay) return null;
     return { startDay, endDay: endDay < startDay ? startDay : endDay };
 }
@@ -33,21 +35,28 @@ export function isWithinEventDays(
     start?: string | null,
     end?: string | null,
     referenceDate: Date = new Date(),
+    eventTimezone: string = CLUB_TIMEZONE,
 ): boolean {
-    const range = getEventDayRange(start, end);
+    const range = getEventDayRange(start, end, eventTimezone);
     if (!range) return false;
-    const today = toLocalDayString(referenceDate);
+    const today = toEventDayString(referenceDate, eventTimezone);
+    if (!today) return false;
     return today >= range.startDay && today <= range.endDay;
 }
 
-export function isMultiDayEvent(start?: string | null, end?: string | null): boolean {
-    const range = getEventDayRange(start, end);
+export function isMultiDayEvent(
+    start?: string | null,
+    end?: string | null,
+    eventTimezone: string = CLUB_TIMEZONE,
+): boolean {
+    const range = getEventDayRange(start, end, eventTimezone);
     if (!range) return false;
     return range.startDay !== range.endDay;
 }
 
 export function formatAttendanceDayLabel(eventDay: string): string {
-    const parsed = new Date(`${eventDay.slice(0, 10)}T12:00:00`);
+    const dayKey = eventDay.split('T')[0];
+    const parsed = new Date(`${dayKey}T12:00:00`);
     if (Number.isNaN(parsed.getTime())) return eventDay;
     return formatDate(parsed);
 }
@@ -73,12 +82,7 @@ export function isSessionActiveNow(
         const now = referenceDate.getTime();
         return start.getTime() <= now && now < end.getTime();
     }
-    if (!session.startTime || !session.endTime || !session.sessionDate) return false;
-    const sessionDay = session.sessionDate.slice(0, 10);
-    const today = toLocalDayString(referenceDate);
-    if (sessionDay !== today) return false;
-    const hhmm = `${String(referenceDate.getHours()).padStart(2, '0')}:${String(referenceDate.getMinutes()).padStart(2, '0')}`;
-    return session.startTime <= hhmm && hhmm < session.endTime;
+    return false;
 }
 
 export function getActiveSessionsNow<T extends SessionTimeWindowLike>(

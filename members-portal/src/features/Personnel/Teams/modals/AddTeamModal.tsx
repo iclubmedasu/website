@@ -2,6 +2,7 @@
 
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { X } from 'lucide-react';
+import { toDateInputValue } from '@iclub/shared/utils';
 import { toTitleCase } from '../../../../utils/titleCase';
 
 interface TeamFormData {
@@ -31,7 +32,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 const AddTeamModal = ({ isOpen, onClose, onSubmit }: AddTeamModalProps) => {
     const [formData, setFormData] = useState<TeamFormData>({
         name: '',
-        establishedDate: new Date().toISOString().split('T')[0], // Default to today
+        establishedDate: toDateInputValue(new Date()),
     });
     const [errors, setErrors] = useState<AddTeamErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,7 +90,7 @@ const AddTeamModal = ({ isOpen, onClose, onSubmit }: AddTeamModalProps) => {
     const handleClose = () => {
         setFormData({
             name: '',
-            establishedDate: new Date().toISOString().split('T')[0],
+            establishedDate: toDateInputValue(new Date()),
         });
         setErrors({});
         setIsSubmitting(false);

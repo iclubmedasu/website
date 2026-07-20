@@ -62,6 +62,7 @@ model Member {
   notificationEventsAuthored NotificationEvent[] @relation("NotificationEventActor")
   notifications      Notification[]
   incidentReports    IncidentReport[]
+  certificates       Certificate[] @relation("MemberCertificates")
 }
 
 // ============================================
@@ -325,6 +326,7 @@ model Project {
   folders         ProjectFolder[]  // Folder containers for attached files
   files           ProjectFile[]    // Files attached to this project
   events          Event[]          // Events linked to this project
+  certificates    Certificate[]
   projectType     ProjectType      @relation(fields: [projectTypeId], references: [id], onDelete: Restrict)
   
   @@index([createdByMemberId])
@@ -349,6 +351,7 @@ model Event {
   title               String
   description         String?
   venue               String?
+  timezone            String    @default("Africa/Cairo")
   eventDate           DateTime
   eventEndDate        DateTime
   registrationDeadline DateTime?
@@ -368,6 +371,9 @@ model Event {
   tierFieldRequired       Boolean   @default(true)
   sessionFieldShowOnPublic Boolean  @default(false)
   sessionFieldRequired    Boolean   @default(false)
+  phoneFieldRequired      Boolean   @default(false)
+  sessionFieldOrder       Int       @default(0)
+  tierFieldOrder          Int       @default(1)
   deletedAt           DateTime?
   version             Int       @default(0)
   createdAt           DateTime  @default(now())
@@ -386,6 +392,7 @@ model Event {
   folders             EventFolder[]
   activityLog         EventActivityLog[]
   sessions            EventSession[]
+  certificates        Certificate[]
 
   @@index([projectId])
   @@index([projectTypeId])
@@ -1382,4 +1389,82 @@ model FinanceScheduledItem {
 
   @@index([dueDate])
   @@index([isCompleted])
+}
+
+// ============================================
+// CERTIFICATES - Templates and issued certificates
+// ============================================
+enum CertificateType {
+  ATTENDANCE
+  ORGANIZATION
+  CONTRIBUTION
+  LEADERSHIP
+  CUSTOM
+}
+
+enum CertificateStatus {
+  DRAFT
+  ISSUED
+  REVOKED
+}
+
+model CertificateTemplate {
+  id                  Int       @id @default(autoincrement())
+  name                String
+  backgroundImagePath String?
+  backgroundImageSha  String?
+  /// Focus/crop for background: { scale: number (>=1), offsetX: number (0-1), offsetY: number (0-1) }. Null = cover, centered.
+  backgroundFocus     Json?
+  canvasWidth         Int       @default(1122)
+  canvasHeight        Int       @default(794)
+  layout              Json
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  certificates Certificate[]
+
+  @@index([isActive])
+}
+
+// layout is a JSON array of elements. Each element shape:
+// { id: string, type: "field"|"static", field?: string, text?: string,
+//   x: number, y: number, width: number, height: number,
+//   fontSize: number, fontWeight: "normal"|"bold",
+//   align: "left"|"center"|"right", color: string }
+// Valid field values: recipientName, title, description, issuedDate, verificationCode, issuerName
+
+model Certificate {
+  id                Int               @id @default(autoincrement())
+  templateId        Int?
+  type              CertificateType
+  status            CertificateStatus @default(DRAFT)
+  eventId           Int?
+  projectId         Int?
+  recipientMemberId Int?
+  recipientName     String
+  recipientEmail    String
+  title             String
+  description       String
+  fieldValues       Json
+  verificationCode  String            @unique
+  issuedAt          DateTime?
+  revokedAt         DateTime?
+  revokedReason     String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  template        CertificateTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  event           Event?               @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  project         Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  recipientMember Member?              @relation("MemberCertificates", fields: [recipientMemberId], references: [id], onDelete: SetNull)
+
+  @@index([templateId])
+  @@index([eventId])
+  @@index([projectId])
+  @@index([recipientMemberId])
+  @@index([verificationCode])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
 }

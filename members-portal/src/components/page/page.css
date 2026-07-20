@@ -14,6 +14,7 @@
 .projects-page,
 .events-page,
 .members-page,
+.certificates-page,
 .finance-page,
 .help-support-page,
 .administration-page {
@@ -69,6 +70,71 @@
     align-items: center;
     gap: 1rem;
     flex-wrap: wrap;
+}
+
+/* ============================================
+   UNDERLINE TABS (User page + Certificates page)
+   ============================================ */
+
+.user-page-tabs,
+.certificates-tabs {
+    display: flex;
+    gap: 0;
+    background: var(--bg-card);
+    border-bottom: 2px solid var(--gray-200);
+    overflow-x: auto;
+}
+
+.user-page-tabs::-webkit-scrollbar,
+.certificates-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.user-page-tab-btn,
+.certificates-tab-btn {
+    flex-shrink: 0;
+    padding: 0.75rem 1.25rem;
+    border: none;
+    background: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: var(--font-heading);
+    color: var(--gray-500);
+    cursor: pointer;
+    white-space: nowrap;
+    position: relative;
+    transition: color 0.15s;
+}
+
+.user-page-tab-btn:hover,
+.certificates-tab-btn:hover {
+    color: var(--gray-900);
+}
+
+.user-page-tab-btn.active,
+.certificates-tab-btn.active {
+    color: var(--purple-700);
+    font-weight: 600;
+}
+
+.user-page-tab-btn.active::after,
+.certificates-tab-btn.active::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -2px;
+    height: 2px;
+    background: var(--purple-700);
+    border-radius: 1px 1px 0 0;
+}
+
+@media (max-width: 768px) {
+    .user-page-tab-btn,
+    .certificates-tab-btn {
+        padding: 0.65rem 1rem;
+        font-size: 0.8rem;
+    }
 }
 
 
@@ -274,7 +340,7 @@
 
 
 /* ============================================
-   TABLE CARD — shared margin resets
+   TABLE CARD — margin helper (full .card chrome applies)
    ============================================ */
 
 .members-table-card {
@@ -290,16 +356,20 @@
    ============================================ */
 
 .members-page .error-message,
-.members-page .loading-message {
+.members-page .loading-message,
+.certificates-page .error-message,
+.certificates-page .loading-message {
     margin-bottom: 1rem;
     font-size: 0.9375rem;
 }
 
-.members-page .loading-message {
+.members-page .loading-message,
+.certificates-page .loading-message {
     color: var(--gray-500);
 }
 
-.members-page .error-message {
+.members-page .error-message,
+.certificates-page .error-message {
     color: var(--error-text);
 }
 

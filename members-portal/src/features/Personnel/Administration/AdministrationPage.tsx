@@ -2,6 +2,7 @@
 
 import { useState, useEffect, type FormEvent, type MouseEvent } from 'react';
 import { Eye, Pencil, Shield, UserCog, UserPlus, X } from 'lucide-react';
+import { formatDate } from '@iclub/shared/utils';
 import { useAuth } from '../../../context/AuthContext';
 import { administrationAPI, membersAPI, teamsAPI, teamMembersAPI, teamRolesAPI, teamSubteamsAPI, getProfilePhotoUrl } from '../../../services/api';
 import ViewMemberModal from '../Teams/modals/ViewMemberModal';
@@ -795,10 +796,9 @@ function AdministrationPage() {
         }
     };
 
-    const formatDate = (d: string | null | undefined): string => {
-        if (!d || Number.isNaN(new Date(d).getTime())) return '-';
-        return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-    };
+    const formatAdminDate = (d: string | null | undefined): string => (
+        d ? formatDate(d) : '-'
+    );
 
     const getAssigneeByRole = (roleName: AdminRoleName): TeamMemberAssignment | null =>
         (adminTeam?.members || []).find((member) => member.role?.roleName === roleName) || null;
@@ -839,7 +839,7 @@ function AdministrationPage() {
                             onOfficerManage={handleOfficerManage}
                             onLeadershipManage={handleLeadershipManage}
                             onRemove={handleRemove}
-                            formatDate={formatDate}
+                            formatDate={formatAdminDate}
                         />
                     ))}
                 </div>

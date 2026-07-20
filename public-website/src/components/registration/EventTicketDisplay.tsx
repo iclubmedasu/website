@@ -4,7 +4,10 @@ import type { PublicConfirmationSession, PublicRegistrationConfirmation } from "
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { Button } from "@/components/ui";
-import { formatEventDateRange, formatSessionRange } from "@iclub/shared/utils";
+import { formatSessionRangeDual } from "@iclub/shared/utils";
+import {
+    ClientEventDateRangeDual,
+} from "@/components/datetime/ClientDateTime";
 import {
     downloadTicketAsPdf,
     // downloadTicketAsPng,
@@ -23,10 +26,10 @@ function buildTicketFilename(confirmation: PublicRegistrationConfirmation, exten
     return `${slug}-ticket.${extension}`;
 }
 
-function formatSessionHeader(session: PublicConfirmationSession): string {
+function formatSessionHeader(session: PublicConfirmationSession, eventTimezone: string): string {
     const title = session.label?.trim();
     const scheduleLabel = session.startDateTime && session.endDateTime
-        ? formatSessionRange(session.startDateTime, session.endDateTime)
+        ? formatSessionRangeDual(session.startDateTime, session.endDateTime, eventTimezone)
         : null;
     return [title, scheduleLabel].filter(Boolean).join(" · ");
 }
@@ -34,13 +37,15 @@ function formatSessionHeader(session: PublicConfirmationSession): string {
 function SessionRow({
     session,
     includeJoinLinks,
+    eventTimezone,
 }: {
     session: PublicConfirmationSession;
     includeJoinLinks: boolean;
+    eventTimezone: string;
 }) {
     return (
         <li className="event-ticket-session-row">
-            <p className="event-ticket-session-row__header">{formatSessionHeader(session)}</p>
+            <p className="event-ticket-session-row__header">{formatSessionHeader(session, eventTimezone)}</p>
             {session.mode === "ONSITE" ? (
                 <p className="event-ticket-session-row__meta">Onsite attendance</p>
             ) : includeJoinLinks ? (
@@ -70,10 +75,12 @@ function SessionGroup({
     title,
     sessions,
     includeJoinLinks,
+    eventTimezone,
 }: {
     title: string;
     sessions: PublicConfirmationSession[];
     includeJoinLinks: boolean;
+    eventTimezone: string;
 }) {
     if (sessions.length === 0) return null;
     return (
@@ -85,6 +92,7 @@ function SessionGroup({
                         key={String(session.id)}
                         session={session}
                         includeJoinLinks={includeJoinLinks}
+                        eventTimezone={eventTimezone}
                     />
                 ))}
             </ul>
@@ -102,6 +110,8 @@ export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {
     const waitingForYou = confirmation.waitingForYou ?? [];
     const dontMissOut = confirmation.dontMissOut ?? [];
     const legacySessions = confirmation.sessions ?? [];
+
+    const eventTimezone = confirmation.event.timezone ?? "Africa/Cairo";
 
     useEffect(() => {
         let cancelled = false;
@@ -175,7 +185,11 @@ export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {
                         <div className="confirmation-detail-row">
                             <span className="confirmation-detail-label">Date</span>
                             <span className="confirmation-detail-value">
-                                {formatEventDateRange(confirmation.event.eventDate, confirmation.event.eventEndDate)}
+                                <ClientEventDateRangeDual
+                                    eventDate={confirmation.event.eventDate}
+                                    eventEndDate={confirmation.event.eventEndDate}
+                                    timezone={eventTimezone}
+                                />
                             </span>
                         </div>
                         {confirmation.event.venue ? (
@@ -203,11 +217,13 @@ export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {
                             title="We will be waiting for you!"
                             sessions={waitingForYou}
                             includeJoinLinks
+                            eventTimezone={eventTimezone}
                         />
                         <SessionGroup
                             title="Don't miss out on:"
                             sessions={dontMissOut}
                             includeJoinLinks={false}
+                            eventTimezone={eventTimezone}
                         />
                     </>
                 ) : legacySessions.length > 0 ? (
@@ -215,6 +231,7 @@ export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {
                         title="Your Sessions"
                         sessions={legacySessions}
                         includeJoinLinks
+                        eventTimezone={eventTimezone}
                     />
                 ) : null}
 

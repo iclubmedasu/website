@@ -1,11 +1,13 @@
 'use client';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { FileText, Image, File, Folder, FolderOpen, Upload, Check, X, RotateCcw, Trash2, Loader, Download, AlertTriangle, History, ArchiveRestore, Pencil, ChevronDown, ChevronRight, Plus, MessageCircle } from 'lucide-react';
+import { formatDateTime } from '@iclub/shared/utils';
 import FileCommentsModal from './FileCommentsModal';
 import '@/components/modal/modal.css';
 import './FileUploadZone.css';
 import type { Id } from '../../types/backend-contracts';
 import type { EntityFileRef, EntityFolderRef, EntityFilesAPI } from './types';
+import { compareAlphanumeric } from '@/utils/compareAlphanumeric';
 
 export interface FileUploadZoneProps {
     entityId: Id | string;
@@ -127,7 +129,8 @@ export default function FileUploadZone({ entityId, filesAPI, memberId, onFileUpl
             const inProgress = prev.filter((f) => !f.done);
             const existingIds = new Set(existing.map((f) => String(f.id)));
             const keptInProgress = inProgress.filter((f) => !existingIds.has(String(f.id)));
-            return [...keptInProgress, ...existing];
+            const sortedExisting = [...existing].sort((a, b) => compareAlphanumeric(a.name, b.name));
+            return [...keptInProgress, ...sortedExisting];
         });
     }, [existingFiles]);
 
@@ -136,20 +139,36 @@ export default function FileUploadZone({ entityId, filesAPI, memberId, onFileUpl
         setExpandedFolders((prev) => prev);
     }, [existingFolders]);
 
-    const activeFolders = useMemo(() => folders.filter((folder) => folder.isActive), [folders]);
-    const deletedFolders = useMemo(() => folders.filter((folder) => !folder.isActive), [folders]);
+    const activeFolders = useMemo(
+        () => folders
+            .filter((folder) => folder.isActive)
+            .sort((a, b) => compareAlphanumeric(a.folderName, b.folderName)),
+        [folders],
+    );
+    const deletedFolders = useMemo(
+        () => folders
+            .filter((folder) => !folder.isActive)
+            .sort((a, b) => compareAlphanumeric(a.folderName, b.folderName)),
+        [folders],
+    );
 
     const filesByFolder = useMemo(() => {
-        const map = new Map();
+        const map = new Map<string | number, UploadFileEntry[]>();
         for (const file of uploadingFiles.filter((f) => f.done)) {
             const key = file.folderId ?? 'root';
             if (!map.has(key)) map.set(key, []);
-            map.get(key).push(file);
+            map.get(key)!.push(file);
         }
+        map.forEach((files, key) => {
+            map.set(key, [...files].sort((a, b) => compareAlphanumeric(a.name, b.name)));
+        });
         return map;
     }, [uploadingFiles]);
 
-    const rootFiles = (filesByFolder.get('root') || []) as UploadFileEntry[];
+    const rootFiles = useMemo(
+        () => [...((filesByFolder.get('root') || []) as UploadFileEntry[])],
+        [filesByFolder],
+    );
 
     const updateFile = useCallback((id: Id | string, updates: Partial<UploadFileEntry>) => {
         setUploadingFiles((prev) => prev.map((f) => (f.id === id ? { ...f, ...updates } : f)));
@@ -379,11 +398,7 @@ export default function FileUploadZone({ entityId, filesAPI, memberId, onFileUpl
         setCommentTarget(null);
     };
 
-    const formatHistoryDate = (iso: string) => {
-        const d = new Date(iso);
-        return d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })
-            + ' ' + d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
-    };
+    const formatHistoryDate = (iso: string) => formatDateTime(iso);
 
     const refreshFoldersAfterAction = useCallback((updatedFolder: EntityFolderRef) => {
         setFolders((prev) => prev.map((folder) => (folder.id === updatedFolder.id ? updatedFolder : folder)));
@@ -489,7 +504,7 @@ export default function FileUploadZone({ entityId, filesAPI, memberId, onFileUpl
         setDeletedLoading(true);
         try {
             const files = await filesAPI.getDeleted(entityId);
-            setDeletedFiles(files);
+            setDeletedFiles([...files].sort((a, b) => compareAlphanumeric(a.fileName, b.fileName)));
         } catch (err) {
             console.error('Fetch deleted files failed:', err);
             setDeletedFiles([]);

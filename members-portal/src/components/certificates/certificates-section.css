@@ -1,0 +1,232 @@
+/* Shared Event + Project certificate section styles
+   Used by EventCertificatesSection and ProjectCertificatesSection.
+*/
+
+.event-cert-layout,
+.project-cert-layout {
+    --event-cert-row-height: 3rem;
+    --event-cert-header-height: 2.75rem;
+    --event-cert-table-max-height: calc(
+        var(--event-cert-row-height) * 10 + var(--event-cert-header-height)
+    );
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    gap: 0.5rem;
+    overflow: hidden;
+}
+
+.event-expanded-tab-panel > .event-expanded-panel:has(.event-cert-layout) {
+    gap: 0.5rem;
+}
+
+.event-expanded-tab-panel > .event-expanded-panel:has(.event-cert-layout) > .event-expanded-header,
+.event-expanded-tab-panel > .event-expanded-panel:has(.event-cert-layout) > .event-cert-message,
+.event-expanded-tab-panel > .event-expanded-panel:has(.event-cert-layout) > .error-message {
+    flex-shrink: 0;
+}
+
+.event-expanded-tab-panel > .event-expanded-panel:has(.event-cert-layout) > .event-registration-search-row,
+.event-expanded-tab-panel > .event-expanded-panel:has(.event-cert-layout) > .event-registration-filter-chips,
+.project-cert-section > .event-registration-search-row,
+.project-cert-section > .event-registration-filter-chips {
+    flex-shrink: 0;
+}
+
+/* Layout chrome comes from .event-registrations-table-shell (table.css) */
+.event-cert-table-shell,
+.project-cert-table-shell {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.event-cert-table-scroll,
+.project-cert-table-scroll {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: auto;
+    max-height: var(--event-cert-table-max-height);
+}
+
+.event-cert-table-scroll .members-table thead th,
+.project-cert-table-scroll .members-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--gray-50);
+    box-shadow: var(--shadow-sm);
+}
+
+.event-cert-io-bar,
+.project-cert-io-bar {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border-brand);
+    background: var(--bg-card);
+    z-index: 2;
+}
+
+/* Equal-width slots — same visual language as .event-tickets-io-btn */
+.event-cert-io-bar > .event-cert-io-btn,
+.event-cert-io-bar > .event-cert-io-template,
+.project-cert-io-bar > .project-cert-io-btn,
+.project-cert-io-bar > .project-cert-io-template {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    flex: 1 1 0;
+    min-width: 0;
+    width: 0;
+}
+
+.event-cert-io-template,
+.project-cert-io-template {
+    /* Inherit default form-input / btn sizing; only constrain flex share */
+    max-width: none;
+}
+
+/* Beat global .btn padding so compact table actions match Certificates page */
+.btn.certificates-action-btn {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.8rem;
+    line-height: 1.2;
+    gap: 0.25rem;
+    min-height: 0;
+}
+
+.btn.certificates-action-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.event-cert-chip,
+.project-cert-chip {
+    display: inline-block;
+    margin-left: 0.4rem;
+    padding: 0.1rem 0.45rem;
+    font-family: var(--font-heading);
+    font-size: 0.7rem;
+    font-weight: 600;
+    border-radius: 99px;
+    background: var(--gray-100);
+    color: var(--gray-500);
+    vertical-align: middle;
+}
+
+.event-cert-message,
+.project-cert-message {
+    margin: 0 0 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+.event-cert-message--success,
+.project-cert-message--success {
+    background: var(--success-bg);
+    color: var(--success-text);
+}
+
+.event-cert-code,
+.project-cert-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8rem;
+    color: var(--gray-700);
+}
+
+.project-cert-muted,
+.event-cert-muted {
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    color: var(--gray-500);
+}
+
+.event-cert-inline-actions,
+.project-cert-inline-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+/* Shared with registration “copy public link” control */
+.event-expanded-copy-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.event-expanded-copy-link-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 1.375rem;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--gray-500);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.event-expanded-copy-link-btn svg {
+    width: 1.125rem;
+    height: 1.125rem;
+}
+
+.event-expanded-copy-link-btn:hover:not(:disabled) {
+    color: var(--purple-600, #7c3aed);
+    background: var(--gray-100);
+}
+
+.event-expanded-copy-link-btn:focus-visible {
+    outline: 2px solid var(--purple-500, #8b5cf6);
+    outline-offset: 2px;
+}
+
+.event-expanded-copy-link-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.event-expanded-copy-link-feedback {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    white-space: nowrap;
+}
+
+.project-cert-section .badge,
+.event-expanded-panel .badge {
+    background: var(--gray-100);
+    color: var(--gray-700);
+}
+
+.project-cert-section {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    gap: 0.5rem;
+}
+
+@media (max-width: 640px) {
+    .project-cert-section .page-search-filter-label {
+        display: none;
+    }
+}

@@ -58,13 +58,24 @@ function getTokenCookie(setCookieHeader: string | string[] | undefined): string 
 
 describe('auth routes cookie security headers', () => {
     const originalNodeEnv = process.env.NODE_ENV
+    const originalDevEmail = process.env.DEVELOPER_EMAIL
+    const originalDevPassword = process.env.DEVELOPER_PASSWORD
+    const originalAllowDev = process.env.ALLOW_DEVELOPER_BACKDOOR
 
     afterEach(() => {
         process.env.NODE_ENV = originalNodeEnv
+        if (originalDevEmail === undefined) delete process.env.DEVELOPER_EMAIL
+        else process.env.DEVELOPER_EMAIL = originalDevEmail
+        if (originalDevPassword === undefined) delete process.env.DEVELOPER_PASSWORD
+        else process.env.DEVELOPER_PASSWORD = originalDevPassword
+        if (originalAllowDev === undefined) delete process.env.ALLOW_DEVELOPER_BACKDOOR
+        else process.env.ALLOW_DEVELOPER_BACKDOOR = originalAllowDev
     })
 
     it('sets httpOnly token cookie on developer login and returns token in body', async () => {
         process.env.NODE_ENV = 'test'
+        process.env.DEVELOPER_EMAIL = 'dev@iclub.com'
+        process.env.DEVELOPER_PASSWORD = 'dev123456'
 
         const response = await request(buildAuthApp())
             .post('/login')
@@ -82,8 +93,11 @@ describe('auth routes cookie security headers', () => {
         expect(tokenCookie).toContain('Secure')
     })
 
-    it('sets secure token cookie in production mode', async () => {
+    it('sets secure token cookie in production mode when backdoor is explicitly allowed', async () => {
         process.env.NODE_ENV = 'production'
+        process.env.ALLOW_DEVELOPER_BACKDOOR = 'true'
+        process.env.DEVELOPER_EMAIL = 'dev@iclub.com'
+        process.env.DEVELOPER_PASSWORD = 'dev123456'
 
         const response = await request(buildAuthApp())
             .post('/login')
