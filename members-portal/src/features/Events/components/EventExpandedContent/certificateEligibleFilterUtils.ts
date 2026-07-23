@@ -1,7 +1,8 @@
-export type CertificateEligibleColumnKind = 'text' | 'number' | 'dropdown' | 'checkbox';
+export type CertificateEligibleColumnKind = 'text' | 'number' | 'dropdown' | 'checkbox' | 'idSet';
 
 export type TextFilterOperator = 'contains' | 'equals' | 'isEmpty';
 export type NumberFilterOperator = 'equals' | 'greaterThan' | 'lessThan' | 'isEmpty';
+export type IdSetFilterOperator = 'includesAll' | 'includesAny';
 export type CheckboxFilterValue = 'yes' | 'no' | 'any';
 export type SortDirection = 'asc' | 'desc';
 
@@ -12,13 +13,16 @@ export interface CertificateEligibleColumn {
     label: string;
     kind: CertificateEligibleColumnKind;
     options?: string[];
+    /** Display labels keyed by option value (ISO day or session id string). */
+    optionLabels?: Record<string, string>;
 }
 
 export type CertificateEligibleFilter =
     | { columnId: string; kind: 'text'; operator: TextFilterOperator; value?: string }
     | { columnId: string; kind: 'number'; operator: NumberFilterOperator; value?: number }
     | { columnId: string; kind: 'dropdown'; values: string[] }
-    | { columnId: string; kind: 'checkbox'; value: CheckboxFilterValue };
+    | { columnId: string; kind: 'checkbox'; value: CheckboxFilterValue }
+    | { columnId: string; kind: 'idSet'; operator: IdSetFilterOperator; values: string[] };
 
 export interface CertificateEligibleSortSpec {
     columnId: string;
@@ -46,6 +50,8 @@ export interface CertificateEligibleRow {
     alreadyIssued: boolean;
     attendanceDaysCount?: number;
     sessionsAttendedCount?: number;
+    attendedDays?: string[];
+    attendedSessionIds?: number[];
     taskCount?: number;
     /** ISO date string used for issue-date range filtering */
     issueDate?: string | null;
@@ -65,7 +71,15 @@ export const EVENT_ELIGIBLE_COLUMNS: CertificateEligibleColumn[] = [
         id: 'type',
         label: 'Type',
         kind: 'dropdown',
-        options: ['ATTENDANCE', 'LEADERSHIP', 'ORGANIZATION', 'CUSTOM'],
+        options: [
+            'ATTENDANCE',
+            'LEADERSHIP',
+            'ORGANIZATION',
+            'ADMINISTRATION',
+            'SUPERVISION',
+            'PARTICIPATION',
+            'CUSTOM',
+        ],
     },
     { id: 'attendanceDaysCount', label: 'Days attended', kind: 'number' },
     { id: 'sessionsAttendedCount', label: 'Sessions attended', kind: 'number' },
@@ -85,7 +99,14 @@ export const PROJECT_ELIGIBLE_COLUMNS: CertificateEligibleColumn[] = [
         id: 'type',
         label: 'Type',
         kind: 'dropdown',
-        options: ['LEADERSHIP', 'CONTRIBUTION', 'CUSTOM'],
+        options: [
+            'LEADERSHIP',
+            'CONTRIBUTION',
+            'ADMINISTRATION',
+            'SUPERVISION',
+            'PARTICIPATION',
+            'CUSTOM',
+        ],
     },
     { id: 'taskCount', label: 'Tasks', kind: 'number' },
     {
@@ -131,6 +152,8 @@ export function createDefaultCertificateEligibleFilter(
             return { columnId: column.id, kind: 'dropdown', values: [] };
         case 'checkbox':
             return { columnId: column.id, kind: 'checkbox', value: 'any' };
+        case 'idSet':
+            return { columnId: column.id, kind: 'idSet', operator: 'includesAll', values: [] };
         default:
             return { columnId: column.id, kind: 'text', operator: 'contains', value: '' };
     }
@@ -201,6 +224,34 @@ function getNumberValue(row: CertificateEligibleRow, columnId: string): number |
     return null;
 }
 
+function getIdSetValues(row: CertificateEligibleRow, columnId: string): string[] {
+    if (columnId === 'attendedDays') {
+        return row.attendedDays ?? [];
+    }
+    if (columnId === 'attendedSessionIds') {
+        return (row.attendedSessionIds ?? []).map((id) => String(id));
+    }
+    return [];
+}
+
+function isAttendanceIdentityColumn(columnId: string): boolean {
+    return columnId === 'attendanceDaysCount'
+        || columnId === 'sessionsAttendedCount'
+        || columnId === 'attendedDays'
+        || columnId === 'attendedSessionIds';
+}
+
+function matchesIdSetFilter(
+    values: string[],
+    filter: Extract<CertificateEligibleFilter, { kind: 'idSet' }>,
+): boolean {
+    if (filter.values.length === 0) return true;
+    if (filter.operator === 'includesAny') {
+        return filter.values.some((value) => values.includes(value));
+    }
+    return filter.values.every((value) => values.includes(value));
+}
+
 function getDropdownValue(row: CertificateEligibleRow, columnId: string): string {
     if (columnId === 'category') return row.category || '';
     if (columnId === 'status') return rowStatus(row);
@@ -212,11 +263,8 @@ function matchesFilter(row: CertificateEligibleRow, filter: CertificateEligibleF
         case 'text':
             return matchesTextFilter(getTextValue(row, filter.columnId), filter);
         case 'number': {
-            const isAttendanceColumn =
-                filter.columnId === 'attendanceDaysCount'
-                || filter.columnId === 'sessionsAttendedCount';
             // Staff are not measured by day/session attendance — skip those rules.
-            if (isAttendanceColumn && row.category === 'STAFF') {
+            if (isAttendanceIdentityColumn(filter.columnId) && row.category === 'STAFF') {
                 return true;
             }
             return matchesNumberFilter(getNumberValue(row, filter.columnId), filter);
@@ -229,6 +277,13 @@ function matchesFilter(row: CertificateEligibleRow, filter: CertificateEligibleF
             if (filter.value === 'any') return true;
             if (filter.value === 'yes') return row.alreadyIssued;
             return !row.alreadyIssued;
+        }
+        case 'idSet': {
+            // Staff are not measured by day/session attendance — skip those rules.
+            if (isAttendanceIdentityColumn(filter.columnId) && row.category === 'STAFF') {
+                return true;
+            }
+            return matchesIdSetFilter(getIdSetValues(row, filter.columnId), filter);
         }
         default:
             return true;
@@ -359,6 +414,16 @@ export function describeCertificateEligibleFilter(
             return `${label} = ${filter.values.length > 0 ? filter.values.join(', ') : 'any'}`;
         case 'checkbox':
             return `${label} = ${filter.value === 'any' ? 'Any' : filter.value === 'yes' ? 'Yes' : 'No'}`;
+        case 'idSet': {
+            const displayValues = filter.values.map((value) => (
+                column?.optionLabels?.[value] ?? value
+            ));
+            const joined = displayValues.length > 0 ? displayValues.join(', ') : 'none';
+            if (filter.operator === 'includesAny') {
+                return `${label} includes any of ${joined}`;
+            }
+            return `${label} includes all of ${joined}`;
+        }
         default:
             return label;
     }
@@ -382,6 +447,8 @@ export function isCertificateEligibleFilterComplete(
             return filter.values.length > 0;
         case 'checkbox':
             return filter.value !== 'any';
+        case 'idSet':
+            return filter.values.length > 0;
         default:
             return false;
     }

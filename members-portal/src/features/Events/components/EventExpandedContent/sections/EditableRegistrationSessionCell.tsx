@@ -3,6 +3,7 @@ import { eventsAPI } from '@/services/api';
 import type { EventRegistrationRef, EventSessionRef, Id } from '@/types/backend-contracts';
 import { truncateRegistrationCell } from '../customFieldUtils';
 import { compareSessionsBySchedule } from '../../eventUtils';
+import CollapsibleChipGroup, { type CollapsibleChipItem } from './CollapsibleChipGroup';
 
 interface EditableRegistrationSessionCellProps {
     eventId: Id | string;
@@ -97,24 +98,29 @@ export default function EditableRegistrationSessionCell({
         .filter((selection): selection is NonNullable<typeof selection> => selection != null);
 
     if (!editable) {
+        const chips: CollapsibleChipItem[] = selectedSelections.map((selection) => {
+            const title = getSelectionTitle(selection, sessions);
+            return {
+                key: String(selection.sessionId),
+                label: title,
+                node: (
+                    <span
+                        className="event-attendance-day-chip"
+                        title={title}
+                    >
+                        {title}
+                    </span>
+                ),
+            };
+        });
+
         return (
             <td>
-                {selectedSelections.length > 0 ? (
-                    <span className="event-attendance-days">
-                        {selectedSelections.map((selection) => {
-                            const title = getSelectionTitle(selection, sessions);
-                            return (
-                                <span
-                                    key={String(selection.sessionId)}
-                                    className="event-attendance-day-chip"
-                                    title={title}
-                                >
-                                    {title}
-                                </span>
-                            );
-                        })}
-                    </span>
-                ) : '—'}
+                <CollapsibleChipGroup
+                    chips={chips}
+                    collapsible
+                    collapseTitle="Show fewer session chips"
+                />
             </td>
         );
     }

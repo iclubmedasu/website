@@ -348,6 +348,32 @@ describe('event ticket email routes', () => {
         expect(ticketEmailMocks.sendEventTicketEmail).toHaveBeenCalledWith(101);
     });
 
+    it('sends tickets for all eligible registration IDs concurrently', async () => {
+        prismaMocks.eventRegistrationFindMany.mockResolvedValue([
+            { id: 101, email: 'alice@example.com' },
+            { id: 102, email: 'bob@example.com' },
+            { id: 103, email: 'carol@example.com' },
+        ]);
+        ticketEmailMocks.sendEventTicketEmail.mockResolvedValue(undefined);
+
+        const response = await request(createApp())
+            .post('/events/10/registrations/send-tickets')
+            .set('Authorization', `Bearer ${createManagerToken()}`)
+            .send({ registrationIds: [101, 102, 103] });
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({
+            sent: 3,
+            skipped: 0,
+            failed: 0,
+            errors: [],
+        });
+        expect(ticketEmailMocks.sendEventTicketEmail).toHaveBeenCalledTimes(3);
+        expect(ticketEmailMocks.sendEventTicketEmail.mock.calls.map((call) => call[0]).sort()).toEqual([
+            101, 102, 103,
+        ]);
+    });
+
     it('returns partial failure summary when some ticket sends fail', async () => {
         prismaMocks.eventRegistrationFindMany.mockResolvedValue([
             { id: 201, email: 'good@example.com' },

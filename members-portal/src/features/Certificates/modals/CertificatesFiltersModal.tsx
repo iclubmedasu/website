@@ -32,6 +32,9 @@ const CERTIFICATE_TYPES: CertificateType[] = [
     'ORGANIZATION',
     'CONTRIBUTION',
     'LEADERSHIP',
+    'ADMINISTRATION',
+    'SUPERVISION',
+    'PARTICIPATION',
     'CUSTOM',
 ];
 

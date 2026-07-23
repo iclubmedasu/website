@@ -44,6 +44,11 @@ export const AVAILABLE_FIELDS = [
     { field: 'description', label: 'Description', previewText: 'participated in Cairo Medical Conference 2026' },
     { field: 'issuedDate', label: 'Issue Date', previewText: 'January 15, 2026' },
     { field: 'verificationCode', label: 'Verification Code', previewText: 'ABC12345' },
+    {
+        field: 'verificationUrl',
+        label: 'Verify URL',
+        previewText: 'https://example.com/verify/ABC12345',
+    },
     { field: 'issuerName', label: 'Issuer Name', previewText: 'Faculty of Medicine Ain Shams' },
     { field: '__static', label: 'Static Text', previewText: 'Your custom text here' },
 ] as const;
@@ -55,6 +60,7 @@ const ONCE_ONLY_FIELDS = new Set<string>([
     'description',
     'issuedDate',
     'verificationCode',
+    'verificationUrl',
     'issuerName',
 ]);
 
@@ -437,17 +443,18 @@ export default function TemplateEditor({
         }
 
         const id = crypto.randomUUID();
+        const isVerificationUrl = fieldKey === 'verificationUrl';
         const base: CanvasElement = {
             id,
             type: fieldKey === '__static' ? 'static' : 'field',
             x: 80,
             y: 80 + elements.length * 40,
-            width: 500,
-            height: DEFAULT_ELEMENT_HEIGHT,
-            fontSize: DEFAULT_ELEMENT_FONT_SIZE,
+            width: isVerificationUrl ? 1400 : 500,
+            height: isVerificationUrl ? 100 : DEFAULT_ELEMENT_HEIGHT,
+            fontSize: isVerificationUrl ? 60 : DEFAULT_ELEMENT_FONT_SIZE,
             fontWeight: 'normal',
             align: 'center',
-            color: '#ffffff',
+            color: isVerificationUrl ? '#0563C1' : '#ffffff',
         };
 
         if (fieldKey === '__static') {

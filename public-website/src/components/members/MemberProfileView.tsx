@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { Calendar, Link as LinkIcon, Mail, Phone, Trophy } from "lucide-react";
 import type { PublicMemberProfile } from "@iclub/shared";
 import { ClientFormattedDate } from "@/components/datetime/ClientDateTime";
-import { Badge } from "@/components/ui";
 import { getPublicProfilePhotoUrl, type PublicMemberCertificate } from "@/lib/api";
+import { PublicMemberAchievements } from "./PublicMemberAchievements";
 import { PublicMemberRoleHistory } from "./PublicMemberRoleHistory";
 
 type ProfileTab = "personal" | "history" | "achievements";
@@ -16,14 +15,6 @@ const TABS: { key: ProfileTab; label: string }[] = [
     { key: "history", label: "History" },
     { key: "achievements", label: "Achievements" },
 ];
-
-function formatCertificateType(type: string): string {
-    return type
-        .toLowerCase()
-        .split("_")
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(" ");
-}
 
 interface MemberProfileViewProps {
     profile: PublicMemberProfile;
@@ -152,49 +143,13 @@ export function MemberProfileView({ profile, certificates }: MemberProfileViewPr
                 )}
 
                 {activeTab === "achievements" && (
-                    issuedCertificates.length > 0 ? (
-                        <section className="member-profile-certificates">
-                            <h2 className="member-profile-section-title">
-                                <Trophy className="h-5 w-5 text-purple-700" />
-                                Certificates
-                            </h2>
-                            <div className="member-profile-cert-grid">
-                                {issuedCertificates.map((cert) => {
-                                    const issuedFor = cert.event?.title || cert.project?.title || null;
-                                    return (
-                                        <article key={cert.id} className="member-profile-cert-card">
-                                            <div className="member-profile-cert-card-top">
-                                                <h3 className="member-profile-cert-title">{cert.title}</h3>
-                                                <Badge variant="purple">{formatCertificateType(cert.type)}</Badge>
-                                            </div>
-                                            {issuedFor ? (
-                                                <p className="member-profile-cert-meta">{issuedFor}</p>
-                                            ) : null}
-                                            {cert.issuedAt ? (
-                                                <p className="member-profile-cert-date">
-                                                    <ClientFormattedDate value={cert.issuedAt} />
-                                                </p>
-                                            ) : null}
-                                            <Link
-                                                href={`/verify/${encodeURIComponent(cert.verificationCode)}`}
-                                                className="member-profile-cert-verify"
-                                            >
-                                                Verify
-                                            </Link>
-                                        </article>
-                                    );
-                                })}
-                            </div>
-                        </section>
-                    ) : (
-                        <div className="member-profile-empty">
-                            <Trophy size={40} strokeWidth={1.5} className="text-purple-700" />
-                            <p className="member-profile-empty-title">Achievements</p>
-                            <p className="member-profile-empty-sub">
-                                Milestones, recognitions, and club contributions will appear here. Coming soon.
-                            </p>
-                        </div>
-                    )
+                    <section className="member-profile-certificates">
+                        <h2 className="member-profile-section-title">
+                            <Trophy className="h-5 w-5 text-purple-700" />
+                            Certificates
+                        </h2>
+                        <PublicMemberAchievements certificates={issuedCertificates} />
+                    </section>
                 )}
             </div>
         </div>

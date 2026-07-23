@@ -8,7 +8,24 @@ import {
     normalizeRecipientEmail,
 } from "../lib/certificateRecipientKey";
 import { loadCertificateBackground } from "../lib/certificateBackgroundCache";
+import { certificateEmailResendLimiter } from "../middleware/rateLimit";
+import { queueCertificateEmail, sendCertificateEmail } from "../services/certificateEmailService";
+import { generateCertificatePdfBuffer } from "../services/certificatePdfService";
+import { formatEventDay, getEventDayRange } from "../services/eventDates";
 import type { RequestUser } from "../types/auth";
+
+/** Inclusive YYYY-MM-DD day list between two ISO day strings. */
+function listDaysInclusive(startDay: string, endDay: string): string[] {
+    const days: string[] = [];
+    let current = startDay;
+    while (current <= endDay) {
+        days.push(current);
+        const next = new Date(`${current}T00:00:00.000Z`);
+        next.setUTCDate(next.getUTCDate() + 1);
+        current = next.toISOString().slice(0, 10);
+    }
+    return days;
+}
 
 const router = express.Router();
 
@@ -19,6 +36,9 @@ const VALID_CERTIFICATE_TYPES = new Set<string>([
     "ORGANIZATION",
     "CONTRIBUTION",
     "LEADERSHIP",
+    "ADMINISTRATION",
+    "SUPERVISION",
+    "PARTICIPATION",
     "CUSTOM",
 ]);
 
@@ -43,24 +63,44 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
     return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
-/** Batch issue: description + issuer from template; title is event/project title. */
-async function loadTemplateIssueDefaults(templateId: number | null): Promise<{
-    description: string;
-    fieldValues: Record<string, unknown>;
-}> {
-    if (templateId == null) {
-        return { description: "", fieldValues: {} };
+type ActiveTemplateResult =
+    | {
+        ok: true;
+        templateId: number;
+        description: string;
+        fieldValues: Record<string, unknown>;
     }
+    | { ok: false; status: 400 | 404; error: string };
+
+/** Require a present, active template; return wording defaults for issue paths. */
+async function requireActiveTemplate(rawTemplateId: unknown): Promise<ActiveTemplateResult> {
+    const templateId = parseId(rawTemplateId);
+    if (!templateId) {
+        return { ok: false, status: 400, error: "templateId is required" };
+    }
+
     const template = await prisma.certificateTemplate.findUnique({
         where: { id: templateId },
-        select: { layout: true },
+        select: { id: true, isActive: true, layout: true },
     });
-    const wording = parseTemplateLayoutWording(template?.layout);
+    if (!template) {
+        return { ok: false, status: 404, error: "Template not found" };
+    }
+    if (!template.isActive) {
+        return { ok: false, status: 400, error: "Template is inactive" };
+    }
+
+    const wording = parseTemplateLayoutWording(template.layout);
     const fieldValues: Record<string, unknown> = {};
     if (wording.hasIssuer || wording.issuerName) {
         fieldValues.issuerName = wording.issuerName;
     }
-    return { description: wording.description, fieldValues };
+    return {
+        ok: true,
+        templateId: template.id,
+        description: wording.description,
+        fieldValues,
+    };
 }
 
 function mergeCertificateFieldValues(
@@ -260,6 +300,36 @@ router.get("/verify/:code/background", async (req: Request, res: Response) => {
     }
 });
 
+router.get("/verify/:code/pdf", async (req: Request, res: Response) => {
+    const code = String(req.params.code ?? "").trim();
+    if (!code) return res.status(400).json({ error: "Invalid verification code" });
+
+    try {
+        const certificate = await prisma.certificate.findFirst({
+            where: { verificationCode: code, status: "ISSUED" },
+            select: { id: true, verificationCode: true },
+        });
+
+        if (!certificate) {
+            return res.status(404).json({ error: "Certificate not found or not yet issued" });
+        }
+
+        const pdfBuffer = await generateCertificatePdfBuffer(certificate.verificationCode);
+        const safeCode = certificate.verificationCode.replace(/[^A-Za-z0-9_-]/g, "") || "certificate";
+
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="certificate-${safeCode}.pdf"`,
+        );
+        res.setHeader("Cache-Control", "private, max-age=300");
+        return res.send(pdfBuffer);
+    } catch (error) {
+        console.error("GET /certificates/verify/:code/pdf error:", error);
+        return res.status(500).json({ error: "Failed to generate certificate PDF" });
+    }
+});
+
 router.get("/event/:eventId/eligible", async (req: Request, res: Response) => {
     if (!canManageCertificates(req.user)) {
         return res.status(403).json({ error: "Forbidden" });
@@ -275,13 +345,15 @@ router.get("/event/:eventId/eligible", async (req: Request, res: Response) => {
         });
         if (!event) return res.status(404).json({ error: "Event not found" });
 
-        const [registrations, taskAssignments, existingCerts] = await Promise.all([
+        const timeZone = event.timezone || "Africa/Cairo";
+
+        const [registrations, taskAssignments, existingCerts, eventSessions] = await Promise.all([
             prisma.eventRegistration.findMany({
                 where: { eventId, status: "CHECKED_IN" },
                 include: {
                     member: { select: { id: true, fullName: true, email: true, phoneNumber: true } },
-                    attendanceDays: { select: { id: true } },
-                    _count: { select: { sessionAttendances: true } },
+                    attendanceDays: { select: { eventDay: true } },
+                    sessionAttendances: { select: { sessionId: true } },
                 },
             }),
             prisma.eventTaskAssignment.findMany({
@@ -297,9 +369,32 @@ router.get("/event/:eventId/eligible", async (req: Request, res: Response) => {
                 where: { eventId, status: { not: "REVOKED" } },
                 select: { recipientMemberId: true, type: true, recipientEmail: true },
             }),
+            prisma.eventSession.findMany({
+                where: { eventId },
+                select: { id: true, label: true, sessionDate: true },
+                orderBy: [{ sessionDate: "asc" }, { order: "asc" }, { id: "asc" }],
+            }),
         ]);
 
         const alreadyIssued = buildAlreadyIssuedSet(existingCerts);
+
+        const dayRange = getEventDayRange(event.eventDate, event.eventEndDate, timeZone);
+        const scheduledDays = dayRange
+            ? listDaysInclusive(dayRange.startDay, dayRange.endDay)
+            : [];
+        const attendedDaySet = new Set<string>(scheduledDays);
+        for (const registration of registrations) {
+            for (const day of registration.attendanceDays) {
+                attendedDaySet.add(formatEventDay(day.eventDay, timeZone));
+            }
+        }
+        const attendanceDayOptions = Array.from(attendedDaySet).sort();
+
+        const sessions = eventSessions.map((session) => ({
+            id: session.id,
+            label: session.label,
+            sessionDate: formatEventDay(session.sessionDate, timeZone),
+        }));
 
         const attendees = registrations.map((registration) => {
             const memberId = registration.memberId ?? registration.member?.id ?? null;
@@ -309,6 +404,12 @@ router.get("/event/:eventId/eligible", async (req: Request, res: Response) => {
                 registration.phoneNumber?.trim() ||
                 registration.member?.phoneNumber?.trim() ||
                 null;
+            const attendedDays = registration.attendanceDays.map((day) =>
+                formatEventDay(day.eventDay, timeZone),
+            );
+            const attendedSessionIds = registration.sessionAttendances.map(
+                (attendance) => attendance.sessionId,
+            );
             return {
                 memberId,
                 fullName: registration.member?.fullName ?? registration.fullName,
@@ -316,8 +417,10 @@ router.get("/event/:eventId/eligible", async (req: Request, res: Response) => {
                 phoneNumber,
                 type,
                 category: "ATTENDEE" as const,
-                attendanceDaysCount: registration.attendanceDays.length,
-                sessionsAttendedCount: registration._count.sessionAttendances,
+                attendedDays,
+                attendedSessionIds,
+                attendanceDaysCount: attendedDays.length,
+                sessionsAttendedCount: attendedSessionIds.length,
                 alreadyIssued: alreadyIssued.has(certRecipientKey(memberId, type, email)),
             };
         });
@@ -364,6 +467,8 @@ router.get("/event/:eventId/eligible", async (req: Request, res: Response) => {
             recipients,
             attendees,
             staff,
+            attendanceDayOptions,
+            sessions,
             eventTitle: event.title,
             projectTypeName: event.projectType?.name ?? null,
         });
@@ -386,17 +491,19 @@ router.post("/event/:eventId/issue-bulk", async (req: Request, res: Response) =>
         return res.status(400).json({ error: "recipients must be an array" });
     }
 
-    const templateId = parseId(req.body?.templateId) ?? null;
     const issueImmediately = req.body?.issueImmediately === true;
 
     try {
+        const templateResult = await requireActiveTemplate(req.body?.templateId);
+        if (!templateResult.ok) {
+            return res.status(templateResult.status).json({ error: templateResult.error });
+        }
+
         const event = await prisma.event.findUnique({
             where: { id: eventId },
             select: { id: true, title: true },
         });
         if (!event) return res.status(404).json({ error: "Event not found" });
-
-        const templateDefaults = await loadTemplateIssueDefaults(templateId);
 
         let created = 0;
         let skipped = 0;
@@ -426,20 +533,20 @@ router.post("/event/:eventId/issue-bulk", async (req: Request, res: Response) =>
 
             const verificationCode = await generateUniqueCertificationCode();
             const fieldValues = mergeCertificateFieldValues(
-                templateDefaults.fieldValues,
+                templateResult.fieldValues,
                 recipient?.fieldValues,
             );
             // Batch always keeps template issuer; recipient fieldValues must not wipe it with "".
             if (
-                typeof templateDefaults.fieldValues.issuerName === "string"
+                typeof templateResult.fieldValues.issuerName === "string"
                 && (typeof fieldValues.issuerName !== "string" || !fieldValues.issuerName.trim())
             ) {
-                fieldValues.issuerName = templateDefaults.fieldValues.issuerName;
+                fieldValues.issuerName = templateResult.fieldValues.issuerName;
             }
 
             const certificate = await prisma.certificate.create({
                 data: {
-                    templateId,
+                    templateId: templateResult.templateId,
                     type: type as CertificateType,
                     status: issueImmediately ? "ISSUED" : "DRAFT",
                     eventId,
@@ -447,7 +554,7 @@ router.post("/event/:eventId/issue-bulk", async (req: Request, res: Response) =>
                     recipientName,
                     recipientEmail,
                     title: event.title,
-                    description: templateDefaults.description,
+                    description: templateResult.description,
                     fieldValues: fieldValues as Prisma.InputJsonValue,
                     verificationCode,
                     issuedAt: issueImmediately ? new Date() : null,
@@ -456,6 +563,12 @@ router.post("/event/:eventId/issue-bulk", async (req: Request, res: Response) =>
 
             created += 1;
             certificateIds.push(certificate.id);
+        }
+
+        if (issueImmediately) {
+            for (const certificateId of certificateIds) {
+                queueCertificateEmail(certificateId, "event-bulk-issue");
+            }
         }
 
         return res.json({ created, skipped, certificateIds });
@@ -568,10 +681,14 @@ router.post("/project/:projectId/issue-bulk", async (req: Request, res: Response
         return res.status(400).json({ error: "recipients must be an array" });
     }
 
-    const templateId = parseId(req.body?.templateId) ?? null;
     const issueImmediately = req.body?.issueImmediately === true;
 
     try {
+        const templateResult = await requireActiveTemplate(req.body?.templateId);
+        if (!templateResult.ok) {
+            return res.status(templateResult.status).json({ error: templateResult.error });
+        }
+
         const project = await prisma.project.findUnique({
             where: { id: projectId },
             select: { id: true, title: true, isFinalized: true },
@@ -580,8 +697,6 @@ router.post("/project/:projectId/issue-bulk", async (req: Request, res: Response
         if (project.isFinalized !== true) {
             return res.status(400).json({ error: "Project must be finalized before issuing certificates" });
         }
-
-        const templateDefaults = await loadTemplateIssueDefaults(templateId);
 
         let created = 0;
         let skipped = 0;
@@ -611,20 +726,20 @@ router.post("/project/:projectId/issue-bulk", async (req: Request, res: Response
 
             const verificationCode = await generateUniqueCertificationCode();
             const fieldValues = mergeCertificateFieldValues(
-                templateDefaults.fieldValues,
+                templateResult.fieldValues,
                 recipient?.fieldValues,
             );
             // Batch always keeps template issuer; recipient fieldValues must not wipe it with "".
             if (
-                typeof templateDefaults.fieldValues.issuerName === "string"
+                typeof templateResult.fieldValues.issuerName === "string"
                 && (typeof fieldValues.issuerName !== "string" || !fieldValues.issuerName.trim())
             ) {
-                fieldValues.issuerName = templateDefaults.fieldValues.issuerName;
+                fieldValues.issuerName = templateResult.fieldValues.issuerName;
             }
 
             const certificate = await prisma.certificate.create({
                 data: {
-                    templateId,
+                    templateId: templateResult.templateId,
                     type: type as CertificateType,
                     status: issueImmediately ? "ISSUED" : "DRAFT",
                     projectId,
@@ -632,7 +747,7 @@ router.post("/project/:projectId/issue-bulk", async (req: Request, res: Response
                     recipientName,
                     recipientEmail,
                     title: project.title,
-                    description: templateDefaults.description,
+                    description: templateResult.description,
                     fieldValues: fieldValues as Prisma.InputJsonValue,
                     verificationCode,
                     issuedAt: issueImmediately ? new Date() : null,
@@ -641,6 +756,12 @@ router.post("/project/:projectId/issue-bulk", async (req: Request, res: Response
 
             created += 1;
             certificateIds.push(certificate.id);
+        }
+
+        if (issueImmediately) {
+            for (const certificateId of certificateIds) {
+                queueCertificateEmail(certificateId, "project-bulk-issue");
+            }
         }
 
         return res.json({ created, skipped, certificateIds });
@@ -683,7 +804,7 @@ router.get("/", async (req: Request, res: Response) => {
                     description: true,
                     type: true,
                     issuedAt: true,
-                    // verificationCode omitted from public list — use GET /verify/:code
+                    verificationCode: true,
                     event: { select: { id: true, title: true } },
                     project: { select: { id: true, title: true } },
                 },
@@ -708,6 +829,10 @@ router.get("/", async (req: Request, res: Response) => {
 
         if (canManageCertificates(req.user)) {
             if (recipientMemberId) where.recipientMemberId = recipientMemberId;
+        } else if (recipientMemberId && status === "ISSUED") {
+            // Peer profile Achievements: ISSUED-only for the requested member
+            where.recipientMemberId = recipientMemberId;
+            where.status = "ISSUED";
         } else {
             where.recipientMemberId = req.user?.memberId ?? -1;
         }
@@ -735,9 +860,8 @@ router.post("/", async (req: Request, res: Response) => {
     const recipientName = String(req.body?.recipientName ?? "").trim();
     const recipientEmail = String(req.body?.recipientEmail ?? "").trim();
     const title = String(req.body?.title ?? "").trim();
-    // Description may be empty when the template has no Description element (or no template).
+    // Description may be empty when the template has no Description element.
     const description = String(req.body?.description ?? "").trim();
-    const templateId = parseId(req.body?.templateId) ?? null;
 
     if (!VALID_CERTIFICATE_TYPES.has(type)) {
         return res.status(400).json({ error: "Valid type is required" });
@@ -747,18 +871,22 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     try {
-        const templateDefaults = await loadTemplateIssueDefaults(templateId);
+        const templateResult = await requireActiveTemplate(req.body?.templateId);
+        if (!templateResult.ok) {
+            return res.status(templateResult.status).json({ error: templateResult.error });
+        }
+
         const fieldValues = mergeCertificateFieldValues(
-            templateDefaults.fieldValues,
+            templateResult.fieldValues,
             req.body?.fieldValues,
         );
 
         const verificationCode = await generateUniqueCertificationCode();
         const certificate = await prisma.certificate.create({
             data: {
-                templateId,
+                templateId: templateResult.templateId,
                 type: type as CertificateType,
-                status: "DRAFT",
+                status: "ISSUED",
                 eventId: parseId(req.body?.eventId) ?? null,
                 projectId: parseId(req.body?.projectId) ?? null,
                 recipientMemberId: parseId(req.body?.recipientMemberId) ?? null,
@@ -768,8 +896,10 @@ router.post("/", async (req: Request, res: Response) => {
                 description,
                 fieldValues: fieldValues as Prisma.InputJsonValue,
                 verificationCode,
+                issuedAt: new Date(),
             },
         });
+        queueCertificateEmail(certificate.id, "custom-create");
         return res.status(201).json(certificate);
     } catch (error) {
         console.error("POST /certificates error:", error);
@@ -814,6 +944,11 @@ router.patch("/:id/issue", async (req: Request, res: Response) => {
             return res.status(409).json({ error: "Certificate is not in DRAFT status" });
         }
 
+        const templateResult = await requireActiveTemplate(certificate.templateId);
+        if (!templateResult.ok) {
+            return res.status(templateResult.status).json({ error: templateResult.error });
+        }
+
         const updated = await prisma.certificate.update({
             where: { id },
             data: {
@@ -821,10 +956,51 @@ router.patch("/:id/issue", async (req: Request, res: Response) => {
                 issuedAt: new Date(),
             },
         });
+        queueCertificateEmail(updated.id, "issue");
         return res.json(updated);
     } catch (error) {
         console.error("PATCH /certificates/:id/issue error:", error);
         return res.status(500).json({ error: "Failed to issue certificate" });
+    }
+});
+
+router.post("/:id/resend-email", certificateEmailResendLimiter, async (req: Request, res: Response) => {
+    if (!canManageCertificates(req.user)) {
+        return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const id = parseId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid certificate id" });
+
+    try {
+        const certificate = await prisma.certificate.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                status: true,
+                recipientEmail: true,
+            },
+        });
+        if (!certificate) return res.status(404).json({ error: "Certificate not found" });
+        if (certificate.status !== "ISSUED") {
+            return res.status(409).json({ error: "Certificate is not in ISSUED status" });
+        }
+        if (!certificate.recipientEmail?.trim()) {
+            return res.status(400).json({ error: "Certificate has no recipient email" });
+        }
+
+        await sendCertificateEmail(id);
+        return res.json({ ok: true, message: "Certificate email sent" });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to send certificate email";
+        console.error(`POST /certificates/${req.params.id}/resend-email error:`, error);
+        if (message === "Email service is not configured") {
+            return res.status(503).json({ error: "Email service is not configured" });
+        }
+        if (process.env.NODE_ENV !== "production") {
+            return res.status(502).json({ error: message });
+        }
+        return res.status(502).json({ error: "Failed to send certificate email" });
     }
 });
 
@@ -860,6 +1036,43 @@ router.patch("/:id/revoke", async (req: Request, res: Response) => {
     } catch (error) {
         console.error("PATCH /certificates/:id/revoke error:", error);
         return res.status(500).json({ error: "Failed to revoke certificate" });
+    }
+});
+
+router.patch("/:id/reissue", async (req: Request, res: Response) => {
+    if (!canManageCertificates(req.user)) {
+        return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const id = parseId(req.params.id);
+    if (!id) return res.status(400).json({ error: "Invalid certificate id" });
+
+    try {
+        const certificate = await prisma.certificate.findUnique({ where: { id } });
+        if (!certificate) return res.status(404).json({ error: "Certificate not found" });
+        if (certificate.status !== "REVOKED") {
+            return res.status(409).json({ error: "Certificate is not in REVOKED status" });
+        }
+
+        const templateResult = await requireActiveTemplate(certificate.templateId);
+        if (!templateResult.ok) {
+            return res.status(templateResult.status).json({ error: templateResult.error });
+        }
+
+        const updated = await prisma.certificate.update({
+            where: { id },
+            data: {
+                status: "ISSUED",
+                issuedAt: new Date(),
+                revokedAt: null,
+                revokedReason: null,
+            },
+        });
+        queueCertificateEmail(updated.id, "reissue");
+        return res.json(updated);
+    } catch (error) {
+        console.error("PATCH /certificates/:id/reissue error:", error);
+        return res.status(500).json({ error: "Failed to reissue certificate" });
     }
 });
 

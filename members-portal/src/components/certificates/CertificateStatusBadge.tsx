@@ -5,6 +5,8 @@ interface CertificateStatusBadgeProps {
     label: string;
     canRevoke: boolean;
     onRevoke: () => void;
+    canReissue: boolean;
+    onReissue: () => void;
     recipientName?: string;
 }
 
@@ -19,6 +21,8 @@ export default function CertificateStatusBadge({
     label,
     canRevoke,
     onRevoke,
+    canReissue,
+    onReissue,
     recipientName,
 }: CertificateStatusBadgeProps) {
     const className = statusBadgeClass(status);
@@ -37,6 +41,25 @@ export default function CertificateStatusBadge({
                 {label}
                 <span className="status-badge__remove" aria-hidden="true">
                     ×
+                </span>
+            </button>
+        );
+    }
+
+    if (canReissue) {
+        const title = recipientName
+            ? `Reissue certificate for ${recipientName}`
+            : 'Reissue certificate';
+        return (
+            <button
+                type="button"
+                className={`${className} status-badge--reissuable`}
+                title={title}
+                onClick={onReissue}
+            >
+                {label}
+                <span className="status-badge__redo" aria-hidden="true">
+                    ↻
                 </span>
             </button>
         );

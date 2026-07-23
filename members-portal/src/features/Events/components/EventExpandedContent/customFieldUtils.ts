@@ -167,8 +167,8 @@ export function formatRegistrationStatus(registration: EventRegistrationRef): st
 }
 
 export const REGISTRATION_NAME_DISPLAY_LIMIT = 15;
-export const REGISTRATION_EMAIL_DISPLAY_LIMIT = 15;
-export const REGISTRATION_PHONE_DISPLAY_LIMIT = 15;
+export const REGISTRATION_EMAIL_DISPLAY_LIMIT = 12;
+export const REGISTRATION_PHONE_DISPLAY_LIMIT = 13;
 
 export function truncateRegistrationCell(value: string, maxLength: number): string {
     if (value.length <= maxLength) return value;

@@ -314,15 +314,25 @@
 .sidebar-user-info {
     display: flex;
     align-items: center;
+    width: 100%;
     min-height: 48px;
     padding: 0 0.5rem;
-    gap: 0.75rem;
     min-width: 0;
     border-radius: var(--radius-md);
     transition:
-        transform 0.45s var(--sidebar-ease) 0.1s,
         background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
         color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Inner row mirrors .sidebar-slim-item-content so collapsed centering
+   does not shift the active/hover background on the link itself. */
+.sidebar-user-info-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    min-width: 0;
+    transition: transform 0.45s var(--sidebar-ease) 0.1s;
 }
 
 .sidebar-user-info-link {
@@ -351,13 +361,45 @@
     outline-offset: 2px;
 }
 
-.sidebar-slim.expanded .sidebar-user-info {
+.sidebar-user-info-link--active,
+.sidebar-user-info-link.active {
+    background: var(--gradient-secondary);
+    color: white;
+}
+
+.sidebar-user-info-link--active .sidebar-user-name,
+.sidebar-user-info-link.active .sidebar-user-name {
+    color: white;
+}
+
+.sidebar-user-info-link--active .sidebar-user-avatar,
+.sidebar-user-info-link.active .sidebar-user-avatar {
+    box-shadow: 0 0 0 2px white, 0 0 0 4px var(--purple-700);
+}
+
+.sidebar-user-info-link--active:hover,
+.sidebar-user-info-link.active:hover,
+.sidebar-user-info-link--active:focus-visible,
+.sidebar-user-info-link.active:focus-visible {
+    background: var(--gradient-secondary);
+    color: white;
+}
+
+.sidebar-user-info-link--active:hover .sidebar-user-name,
+.sidebar-user-info-link.active:hover .sidebar-user-name,
+.sidebar-user-info-link--active:focus-visible .sidebar-user-name,
+.sidebar-user-info-link.active:focus-visible .sidebar-user-name {
+    color: white;
+}
+
+.sidebar-slim.expanded .sidebar-user-info-content {
     transform: translateX(0);
     transition-delay: 0.1s;
 }
 
-.sidebar-slim:not(.expanded) .sidebar-user-info {
-    transform: translateX(calc(50% - 18px - 0.5rem));
+/* Same math as nav icons (50% - half icon): avatar is 36px → 18px. */
+.sidebar-slim:not(.expanded) .sidebar-user-info-content {
+    transform: translateX(calc(50% - 18px));
     transition-delay: var(--sidebar-content-collapse-delay);
 }
 
@@ -758,7 +800,7 @@
         transform: translateX(0);
     }
 
-    .sidebar-slim.mobile .sidebar-user-info,
+    .sidebar-slim.mobile .sidebar-user-info-content,
     .sidebar-slim.mobile .sidebar-user-details {
         transform: translateX(0);
         opacity: 1;

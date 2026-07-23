@@ -166,7 +166,7 @@ This prevents future developers (or AI agents) from re-adding the styles.
 4. [Border Radius (Squircle Rule)](#4-border-radius-squircle-rule)
 5. [Shadows](#5-shadows)
 6. [Color System](#6-color-system)
-7. [Animations & Transitions](#7-animations--transitions)
+7. [Animations & Transitions](#7-animations--transitions) — includes [§7.8 Toolbar Icon Buttons](#78-toolbar-icon-buttons--no-layout-shift-on-hover-recurring)
 8. [Responsive Breakpoints](#8-responsive-breakpoints)
 9. [Naming Conventions](#9-naming-conventions)
 10. [File Organization & Architecture](#10-file-organization--architecture)
@@ -509,6 +509,55 @@ transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 --sidebar-ease: cubic-bezier(0.33, 1, 0.68, 1);
 --sidebar-duration: 0.38s;
 ```
+
+### 7.8 Toolbar Icon Buttons — No Layout Shift on Hover (recurring)
+
+**This has recurred.** Compact toolbar icon/utility buttons (Events Tasks, Gantt, similar toolbars) must **not** use `transform` / `translate` (or inset box-shadow tricks that visually shift content) on hover.
+
+| Do | Don't |
+|---|---|
+| Background + color (+ border-color when the control has its own border) | `transform: translateY(...)` / `scale(...)` on hover |
+| Match the Maximize / Today button pattern | `box-shadow: inset …` on hover that makes the control look like it jumps |
+| `transition: background-color, color, border-color` | `transition: all` when it would animate layout-affecting properties |
+
+**Canonical hover (maximize-style):**
+
+```css
+.toolbar-icon-btn:hover:not(:disabled) {
+    background: var(--purple-50);
+    color: var(--purple-700);
+    transform: none; /* guard against inherited .btn lift */
+}
+```
+
+For standalone bordered toolbar controls (e.g. Maximize):
+
+```css
+.toolbar-maximize-btn:hover {
+    border-color: var(--purple-400);
+    color: var(--purple-700);
+    background: var(--purple-50);
+    transform: none;
+}
+```
+
+For **segmented** toolbar groups (shared outer border; buttons have no own border), purple the **group** border on hover via `:has()` so feedback matches Maximize/Today. Still no `transform` / inset shadow.
+
+```css
+.toolbar-group:has(.toolbar-group-btn:hover:not(:disabled):not(.disabled)) {
+    border-color: var(--purple-400);
+}
+```
+
+Apply the same rule anywhere icon toolbars are mirrored (`.event-tasks-utility-btn`, `.event-tasks-export-btn`, `.gantt-utility-btn`, `.gantt-export-btn`, `.gantt-scale-btn`, `.gantt-col-toggle-group`, etc.).
+
+### Ephemeral UI feedback (5s auto-dismiss)
+
+Transient success banners and soft validation hints (e.g. “Select a template first”) **must** auto-dismiss after **5 seconds**.
+
+- Clear earlier on corrective user action (select template, retry).
+- Prefer one shared timer helper (`useAutoDismissMessage`); replace the previous timer when a new message is shown; clear on unmount.
+- Do **not** auto-dismiss permanent UI (form field errors, device-orientation hints).
 
 ## 8. Responsive Breakpoints
 

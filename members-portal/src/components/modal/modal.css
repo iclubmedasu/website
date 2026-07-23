@@ -1699,6 +1699,9 @@
 }
 
 .timeline-date {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
     font-size: 0.813rem;
     color: var(--gray-500);
     font-weight: 500;
@@ -2074,6 +2077,15 @@
     background: rgba(107, 114, 128, 0.05);
     border-left: 3px solid var(--purple-700);
     border-radius: 2px;
+}
+
+.timeline-verify-btn {
+    width: auto;
+    display: inline-flex;
+    margin-top: 0.75rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    text-decoration: none;
 }
 
 /* empty-state: now in shared page.css */

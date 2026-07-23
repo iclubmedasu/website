@@ -1,12 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+    forwardRef,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type CSSProperties,
+} from "react";
 import {
     publicAPI,
     type PublicCertificateBackgroundFocus,
     type PublicCertificateTemplate,
     type PublicCertificateVerify,
 } from "@/lib/api";
+import { getPublicOrigin } from "@/lib/share";
 import "./CertificateCanvas.css";
 
 interface CanvasElement {
@@ -66,11 +74,17 @@ function formatIssuedDate(issuedAt: string | null): string {
     });
 }
 
+function buildVerificationUrl(code: string): string {
+    const base = getPublicOrigin().replace(/\/$/, "");
+    return `${base}/verify/${encodeURIComponent(code)}`;
+}
+
 function fieldValueFor(
     element: CanvasElement,
     certificate: PublicCertificateVerify,
     issuedDate: string,
     issuerName: string,
+    verificationUrl: string,
     staticTextOverrides: Record<string, string>,
 ): string {
     if (element.type === "static") {
@@ -89,6 +103,8 @@ function fieldValueFor(
             return issuedDate;
         case "verificationCode":
             return certificate.verificationCode || "";
+        case "verificationUrl":
+            return verificationUrl;
         case "issuerName":
             return issuerName;
         default:
@@ -139,11 +155,10 @@ export interface CertificateCanvasProps {
     verificationCode: string;
 }
 
-export default function CertificateCanvas({
-    certificate,
-    template,
-    verificationCode,
-}: CertificateCanvasProps) {
+const CertificateCanvas = forwardRef<HTMLDivElement, CertificateCanvasProps>(function CertificateCanvas(
+    { certificate, template, verificationCode },
+    ref,
+) {
     const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
     const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
     const [bgError, setBgError] = useState(false);
@@ -252,6 +267,11 @@ export default function CertificateCanvas({
         [certificate.fieldValues],
     );
 
+    const verificationUrl = useMemo(
+        () => buildVerificationUrl(certificate.verificationCode || verificationCode),
+        [certificate.verificationCode, verificationCode],
+    );
+
     const fitScale = viewportWidth / canvasWidth;
 
     const bgStyle = (): CSSProperties => {
@@ -301,6 +321,7 @@ export default function CertificateCanvas({
                 }}
             >
                 <div
+                    ref={ref}
                     className="certificate-canvas"
                     style={{
                         width: canvasWidth,
@@ -327,32 +348,45 @@ export default function CertificateCanvas({
                             className={`certificate-canvas-bg-placeholder${bgError ? " certificate-canvas-bg-placeholder--error" : ""}`}
                         />
                     )}
-                    {elements.map((element) => (
-                        <div
-                            key={element.id}
-                            className={`certificate-canvas-element certificate-canvas-element--align-${element.align}`}
-                            style={{
-                                left: element.x,
-                                top: element.y,
-                                width: element.width,
-                                height: element.height,
-                                fontSize: element.fontSize,
-                                fontWeight: element.fontWeight,
-                                textAlign: element.align,
-                                color: element.color,
-                            }}
-                        >
-                            {fieldValueFor(
-                                element,
-                                certificate,
-                                issuedDate,
-                                issuerName,
-                                staticTextOverrides,
-                            )}
-                        </div>
-                    ))}
+                    {elements.map((element) => {
+                        const isVerifyLink =
+                            element.type === "field" && element.field === "verificationUrl";
+                        return (
+                            <div
+                                key={element.id}
+                                className={`certificate-canvas-element certificate-canvas-element--align-${element.align}`}
+                                style={{
+                                    left: element.x,
+                                    top: element.y,
+                                    width: element.width,
+                                    height: element.height,
+                                    fontSize: element.fontSize,
+                                    fontWeight: element.fontWeight,
+                                    textAlign: element.align,
+                                    color: element.color,
+                                }}
+                                {...(isVerifyLink
+                                    ? {
+                                          "data-verify-link": "",
+                                          "data-verify-href": verificationUrl,
+                                      }
+                                    : {})}
+                            >
+                                {fieldValueFor(
+                                    element,
+                                    certificate,
+                                    issuedDate,
+                                    issuerName,
+                                    verificationUrl,
+                                    staticTextOverrides,
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </div>
     );
-}
+});
+
+export default CertificateCanvas;

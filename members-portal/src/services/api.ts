@@ -43,6 +43,8 @@ import type {
     NotificationMarkReadResponse,
     NotificationsListResponse,
     NotificationUnreadCountResponse,
+    DashboardMyTasksResponse,
+    DashboardMyActivitiesResponse,
     PhaseSummary,
     Priority,
     ProjectActivityEntry,
@@ -1223,6 +1225,43 @@ export const notificationsAPI = {
         });
 
         return handleResponse<NotificationMarkAllReadResponse>(response);
+    },
+};
+
+// ============================================
+// DASHBOARD API
+// ============================================
+
+export const dashboardAPI = {
+    getMyTasks: async (limit?: number): Promise<DashboardMyTasksResponse> => {
+        const params = new URLSearchParams();
+        if (limit !== undefined) params.append('limit', String(limit));
+
+        const qs = params.toString();
+        const response = await apiFetch(`${API_BASE_URL}/dashboard/my-tasks${qs ? `?${qs}` : ''}`, {
+            headers: getAuthHeaders(),
+        });
+
+        return handleResponse<DashboardMyTasksResponse>(response);
+    },
+
+    getMyActivities: async (options?: {
+        days?: number;
+        limit?: number;
+    }): Promise<DashboardMyActivitiesResponse> => {
+        const params = new URLSearchParams();
+        if (options?.days !== undefined) params.append('days', String(options.days));
+        if (options?.limit !== undefined) params.append('limit', String(options.limit));
+
+        const qs = params.toString();
+        const response = await apiFetch(
+            `${API_BASE_URL}/dashboard/my-activities${qs ? `?${qs}` : ''}`,
+            {
+                headers: getAuthHeaders(),
+            },
+        );
+
+        return handleResponse<DashboardMyActivitiesResponse>(response);
     },
 };
 

@@ -1,7 +1,7 @@
 import { CLUB_TIMEZONE, toEventDayString } from '@iclub/shared/utils';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useResourceChannel } from '@/hooks/useResourceChannel';
-import { FileSpreadsheet, Filter, Plus, Search } from 'lucide-react';
+import { Download, Filter, Plus, Search, Upload } from 'lucide-react';
 import Toggle from '@/components/toggle/Toggle';
 import { fmtDate } from '@/components/cards/LifecycleCardView/LifecycleCardView';
 import { eventsAPI } from '@/services/api';
@@ -652,19 +652,43 @@ export default function EventRegistrationsSection({
             <div className="event-expanded-header event-expanded-header--compact">
                 <h2 className="expanded-section-title">Registrations</h2>
                 <div className="event-expanded-header-actions">
+                    <div className="event-expanded-copy-link">
+                        <button
+                            type="button"
+                            className="event-expanded-copy-link-btn"
+                            onClick={() => setImportModalOpen(true)}
+                            aria-label="Import from Excel"
+                            title="Import from Excel"
+                        >
+                            <Upload size={22} strokeWidth={2} aria-hidden="true" />
+                        </button>
+                        <button
+                            type="button"
+                            className="event-expanded-copy-link-btn"
+                            onClick={() => void handleExportExcel()}
+                            disabled={exporting}
+                            aria-label={exporting ? 'Exporting…' : 'Export Excel'}
+                            title={exporting ? 'Exporting…' : 'Export Excel'}
+                        >
+                            <Download size={22} strokeWidth={2} aria-hidden="true" />
+                        </button>
+                    </div>
+                    <span className="event-expanded-header-divider" aria-hidden="true" />
                     {canPublishEvent ? (
-                        <div className="event-expanded-publish-toggle">
-                            <span className="event-expanded-publish-toggle-label">Accept registrations (publish to public website)</span>
-                            <Toggle
-                                color="purple"
-                                checked={isPublished}
-                                disabled={publishing}
-                                onChange={(next) => void handlePublishToggle(next)}
-                                aria-label="Accept registrations on public website"
-                            />
-                        </div>
+                        <>
+                            <div className="event-expanded-publish-toggle">
+                                <span className="event-expanded-publish-toggle-label">Accept registrations (publish to public website)</span>
+                                <Toggle
+                                    color="purple"
+                                    checked={isPublished}
+                                    disabled={publishing}
+                                    onChange={(next) => void handlePublishToggle(next)}
+                                    aria-label="Accept registrations on public website"
+                                />
+                            </div>
+                            <span className="event-expanded-header-divider" aria-hidden="true" />
+                        </>
                     ) : null}
-                    {canPublishEvent ? <span className="event-expanded-header-divider" aria-hidden="true" /> : null}
                     <CopyPublicEventLinkButton eventSlug={eventSlug || String(eventId)} isPublished={isPublished} />
                 </div>
             </div>
@@ -868,25 +892,6 @@ export default function EventRegistrationsSection({
                                             Enable walk-ins in event settings to add attendees here.
                                         </p>
                                     ) : null}
-                                </div>
-                                <div className="event-registrations-io-bar">
-                                    <button
-                                        type="button"
-                                        className="event-registrations-io-btn"
-                                        onClick={() => setImportModalOpen(true)}
-                                    >
-                                        <FileSpreadsheet size={18} />
-                                        Import from Excel
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="event-registrations-io-btn"
-                                        onClick={() => void handleExportExcel()}
-                                        disabled={exporting}
-                                    >
-                                        <FileSpreadsheet size={18} />
-                                        {exporting ? 'Exporting…' : 'Export Excel'}
-                                    </button>
                                 </div>
                             </>
                         ) : null}

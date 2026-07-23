@@ -1,0 +1,13 @@
+/* Shared stack/grid/side-card layout: FinanceDashboardPage.css multi-selectors */
+
+.dashboard-right-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+@media (max-width: 640px) {
+    .dashboard-bottom-grid {
+        grid-template-columns: 1fr;
+    }
+}

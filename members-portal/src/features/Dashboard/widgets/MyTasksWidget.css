@@ -1,0 +1,19 @@
+.my-tasks-badge--overdue {
+    background: var(--error-bg);
+    color: var(--error-text);
+}
+
+.my-tasks-badge--due-soon {
+    background: var(--status-delayed-bg);
+    color: var(--status-delayed-text);
+}
+
+.my-tasks-badge--due-this-week {
+    background: var(--warning-bg);
+    color: var(--warning-text);
+}
+
+.my-tasks-badge--later {
+    background: var(--gray-100);
+    color: var(--gray-600);
+}

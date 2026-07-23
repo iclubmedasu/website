@@ -49,3 +49,10 @@ export const publicCertificateReadLimiter = createLimiter({
     max: 60,
     message: "Too many certificate requests. Please try again later.",
 });
+
+/** Authenticated certificate email resend. */
+export const certificateEmailResendLimiter = createLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    message: "Too many certificate email resend attempts. Please try again later.",
+});

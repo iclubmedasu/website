@@ -2,7 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Award, Eye, Filter, PauseCircle, Pencil, PlayCircle, Plus, Search, Trash2 } from 'lucide-react';
+import {
+    ArrowLeft,
+    Award,
+    Download,
+    Eye,
+    Filter,
+    Loader2,
+    Mail,
+    PauseCircle,
+    Pencil,
+    PlayCircle,
+    Plus,
+    Search,
+    Trash2,
+} from 'lucide-react';
 import { formatDate } from '@iclub/shared/utils';
 import { useAuth } from '@/context/AuthContext';
 import CertificateStatusBadge from '@/components/certificates/CertificateStatusBadge';
@@ -15,6 +29,7 @@ import {
     type CertificateType,
 } from '@/services/certificatesAPI';
 import { isDateWithinRange } from '@/utils/filterDateRange';
+import { truncateRegistrationCell } from '@/features/Events/components/EventExpandedContent/customFieldUtils';
 import CertificatesFiltersModal, {
     type CertificatesFiltersState,
     type CertificatesNameSort,
@@ -26,6 +41,9 @@ import DeactivateTemplateModal, {
 import DeleteTemplateModal from './modals/DeleteTemplateModal';
 import NewCustomCertificateModal from './modals/NewCustomCertificateModal';
 import ReactivateTemplateModal from './modals/ReactivateTemplateModal';
+import ReissueCertificateModal, {
+    type ReissueCertificateTarget,
+} from './modals/ReissueCertificateModal';
 import RevokeCertificateModal, {
     type RevokeCertificateTarget,
 } from './modals/RevokeCertificateModal';
@@ -41,6 +59,9 @@ type EditorView =
     | { kind: 'template-edit'; templateId: number };
 
 const ROWS_PER_PAGE = 20;
+const CERTIFICATE_TABLE_CELL_DISPLAY_LIMIT = 20;
+const CERTIFICATE_TITLE_DISPLAY_LIMIT = 10;
+const CERTIFICATE_TYPE_DISPLAY_LIMIT = 10;
 
 function getErrorMessage(error: unknown, fallback: string): string {
     if (error instanceof Error && error.message) {
@@ -68,6 +89,27 @@ function formatCertificateType(type: CertificateType): string {
 
 function formatCertificateStatusLabel(status: CertificateStatus): string {
     return status.charAt(0) + status.slice(1).toLowerCase();
+}
+
+function formatCertificateEmailStatus(
+    cert: CertificateListItem,
+): { label: string; sent: boolean; sentAt?: string | null } | null {
+    if (cert.status !== 'ISSUED' && !cert.certificateEmailSentAt) return null;
+    if (cert.certificateEmailSentAt) {
+        return { label: 'Sent', sent: true, sentAt: cert.certificateEmailSentAt };
+    }
+    if (cert.status === 'ISSUED') {
+        return { label: 'Not sent', sent: false };
+    }
+    return null;
+}
+
+function canResendCertificateEmail(cert: CertificateListItem): boolean {
+    return cert.status === 'ISSUED' && Boolean(cert.recipientEmail?.trim());
+}
+
+function canDownloadCertificatePdf(cert: CertificateListItem): boolean {
+    return cert.status === 'ISSUED' && Boolean(cert.verificationCode?.trim());
 }
 
 function getSourceLabel(cert: CertificateListItem): string {
@@ -157,6 +199,8 @@ export default function CertificatesPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [showNewCustomModal, setShowNewCustomModal] = useState(false);
     const [actionBusyId, setActionBusyId] = useState<number | null>(null);
+    const [resendingEmailId, setResendingEmailId] = useState<number | null>(null);
+    const [downloadingPdfCode, setDownloadingPdfCode] = useState<string | null>(null);
     const [deactivatingTemplate, setDeactivatingTemplate] = useState<TemplateModalTarget | null>(
         null,
     );
@@ -168,6 +212,7 @@ export default function CertificatesPage() {
     >(null);
     const [previewingTemplateId, setPreviewingTemplateId] = useState<number | null>(null);
     const [revokeTarget, setRevokeTarget] = useState<RevokeCertificateTarget | null>(null);
+    const [reissueTarget, setReissueTarget] = useState<ReissueCertificateTarget | null>(null);
 
     const isEditorOpen = editorView.kind !== 'list';
 
@@ -416,8 +461,43 @@ export default function CertificatesPage() {
         }
     };
 
+    const handleResendEmail = async (cert: CertificateListItem) => {
+        if (!canResendCertificateEmail(cert)) return;
+        setResendingEmailId(cert.id);
+        setError(null);
+        try {
+            const result = await certificatesAPI.resendEmail(cert.id);
+            window.alert(result.message || 'Certificate email sent.');
+            await loadCertificates();
+        } catch (err: unknown) {
+            window.alert(getErrorMessage(err, 'Failed to send certificate email.'));
+        } finally {
+            setResendingEmailId(null);
+        }
+    };
+
+    const handleDownloadPdf = async (cert: CertificateListItem) => {
+        const code = cert.verificationCode?.trim();
+        if (!canDownloadCertificatePdf(cert) || !code) return;
+        setDownloadingPdfCode(code);
+        try {
+            await certificatesAPI.downloadPdfByVerificationCode(code);
+        } catch (err: unknown) {
+            window.alert(getErrorMessage(err, 'Failed to download certificate PDF.'));
+        } finally {
+            setDownloadingPdfCode(null);
+        }
+    };
+
     const openRevokeModal = (cert: CertificateListItem) => {
         setRevokeTarget({
+            id: cert.id,
+            recipientName: cert.recipientName || cert.recipientMember?.fullName || '—',
+        });
+    };
+
+    const openReissueModal = (cert: CertificateListItem) => {
+        setReissueTarget({
             id: cert.id,
             recipientName: cert.recipientName || cert.recipientMember?.fullName || '—',
         });
@@ -551,15 +631,31 @@ export default function CertificatesPage() {
                                                                     <th>Recipient</th>
                                                                     <th>Type</th>
                                                                     <th>Title</th>
+                                                                    <th>Source</th>
+                                                                    <th>Code</th>
                                                                     <th>Status</th>
                                                                     <th>Issue Date</th>
-                                                                    <th>Source</th>
+                                                                    <th>Sent</th>
                                                                     <th>Actions</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
                                                                 {paginatedCertificates.map(
-                                                                    (cert, index) => (
+                                                                    (cert, index) => {
+                                                                        const emailStatus =
+                                                                            formatCertificateEmailStatus(
+                                                                                cert,
+                                                                            );
+                                                                        const recipientName =
+                                                                            cert.recipientName
+                                                                            || cert.recipientMember
+                                                                                ?.fullName
+                                                                            || '';
+                                                                        const typeLabel =
+                                                                            formatCertificateType(
+                                                                                cert.type,
+                                                                            );
+                                                                        return (
                                                                         <tr
                                                                             key={cert.id}
                                                                             className={
@@ -568,20 +664,61 @@ export default function CertificatesPage() {
                                                                                     : 'odd-row'
                                                                             }
                                                                         >
-                                                                            <td>
-                                                                                {cert.recipientName ||
-                                                                                    cert.recipientMember
-                                                                                        ?.fullName ||
-                                                                                    '—'}
+                                                                            <td
+                                                                                title={
+                                                                                    recipientName.length
+                                                                                    > CERTIFICATE_TABLE_CELL_DISPLAY_LIMIT
+                                                                                        ? recipientName
+                                                                                        : undefined
+                                                                                }
+                                                                            >
+                                                                                {recipientName
+                                                                                    ? truncateRegistrationCell(
+                                                                                        recipientName,
+                                                                                        CERTIFICATE_TABLE_CELL_DISPLAY_LIMIT,
+                                                                                    )
+                                                                                    : '—'}
                                                                             </td>
-                                                                            <td>
+                                                                            <td
+                                                                                title={
+                                                                                    typeLabel.length
+                                                                                    > CERTIFICATE_TYPE_DISPLAY_LIMIT
+                                                                                        ? typeLabel
+                                                                                        : undefined
+                                                                                }
+                                                                            >
                                                                                 <span className="badge">
-                                                                                    {formatCertificateType(
-                                                                                        cert.type,
+                                                                                    {truncateRegistrationCell(
+                                                                                        typeLabel,
+                                                                                        CERTIFICATE_TYPE_DISPLAY_LIMIT,
                                                                                     )}
                                                                                 </span>
                                                                             </td>
-                                                                            <td>{cert.title}</td>
+                                                                            <td
+                                                                                title={
+                                                                                    cert.title.length
+                                                                                    > CERTIFICATE_TITLE_DISPLAY_LIMIT
+                                                                                        ? cert.title
+                                                                                        : undefined
+                                                                                }
+                                                                            >
+                                                                                {cert.title
+                                                                                    ? truncateRegistrationCell(
+                                                                                        cert.title,
+                                                                                        CERTIFICATE_TITLE_DISPLAY_LIMIT,
+                                                                                    )
+                                                                                    : '—'}
+                                                                            </td>
+                                                                            <td>
+                                                                                {getSourceLabel(cert)}
+                                                                            </td>
+                                                                            <td>
+                                                                                {cert.verificationCode ? (
+                                                                                    <code>{cert.verificationCode}</code>
+                                                                                ) : (
+                                                                                    '—'
+                                                                                )}
+                                                                            </td>
                                                                             <td>
                                                                                 <CertificateStatusBadge
                                                                                     status={cert.status}
@@ -595,6 +732,14 @@ export default function CertificatesPage() {
                                                                                     }
                                                                                     onRevoke={() =>
                                                                                         openRevokeModal(cert)
+                                                                                    }
+                                                                                    canReissue={
+                                                                                        canManage
+                                                                                        && cert.status
+                                                                                            === 'REVOKED'
+                                                                                    }
+                                                                                    onReissue={() =>
+                                                                                        openReissueModal(cert)
                                                                                     }
                                                                                     recipientName={
                                                                                         cert.recipientName
@@ -612,7 +757,25 @@ export default function CertificatesPage() {
                                                                                     : '—'}
                                                                             </td>
                                                                             <td>
-                                                                                {getSourceLabel(cert)}
+                                                                                {emailStatus ? (
+                                                                                    <div className="certificate-email-delivery-status">
+                                                                                        <span
+                                                                                            className={`status-badge${emailStatus.sent ? ' active' : ' away'}`}
+                                                                                        >
+                                                                                            {emailStatus.label}
+                                                                                        </span>
+                                                                                        {emailStatus.sent
+                                                                                            && emailStatus.sentAt ? (
+                                                                                            <span className="certificate-email-delivery-status__date">
+                                                                                                {formatDate(
+                                                                                                    emailStatus.sentAt,
+                                                                                                )}
+                                                                                            </span>
+                                                                                        ) : null}
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    '—'
+                                                                                )}
                                                                             </td>
                                                                             <td>
                                                                                 <div className="action-buttons certificates-action-buttons">
@@ -635,6 +798,53 @@ export default function CertificatesPage() {
                                                                                                 Issue
                                                                                             </button>
                                                                                         )}
+                                                                                    {canManage
+                                                                                        && canResendCertificateEmail(
+                                                                                            cert,
+                                                                                        ) && (
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                className="table-action-btn view-btn"
+                                                                                                title="Resend email"
+                                                                                                onClick={() =>
+                                                                                                    void handleResendEmail(
+                                                                                                        cert,
+                                                                                                    )
+                                                                                                }
+                                                                                                disabled={
+                                                                                                    resendingEmailId
+                                                                                                    === cert.id
+                                                                                                }
+                                                                                            >
+                                                                                                {resendingEmailId
+                                                                                                    === cert.id
+                                                                                                    ? <Loader2 className="animate-spin" />
+                                                                                                    : <Mail />}
+                                                                                            </button>
+                                                                                        )}
+                                                                                    {canDownloadCertificatePdf(
+                                                                                        cert,
+                                                                                    ) && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            className="table-action-btn view-btn"
+                                                                                            title="Download PDF"
+                                                                                            onClick={() =>
+                                                                                                void handleDownloadPdf(
+                                                                                                    cert,
+                                                                                                )
+                                                                                            }
+                                                                                            disabled={
+                                                                                                downloadingPdfCode
+                                                                                                === cert.verificationCode
+                                                                                            }
+                                                                                        >
+                                                                                            {downloadingPdfCode
+                                                                                                === cert.verificationCode
+                                                                                                ? <Loader2 className="animate-spin" />
+                                                                                                : <Download />}
+                                                                                        </button>
+                                                                                    )}
                                                                                     {cert.verificationCode && (
                                                                                         <button
                                                                                             type="button"
@@ -656,7 +866,8 @@ export default function CertificatesPage() {
                                                                                 </div>
                                                                             </td>
                                                                         </tr>
-                                                                    ),
+                                                                        );
+                                                                    },
                                                                 )}
                                                             </tbody>
                                                         </table>
@@ -722,7 +933,7 @@ export default function CertificatesPage() {
                                                         onClick={() => setShowNewCustomModal(true)}
                                                     >
                                                         <Plus size={16} />
-                                                        Add Certificate
+                                                        Issue Certificate
                                                     </button>
                                                 </div>
                                             )}
@@ -982,6 +1193,14 @@ export default function CertificatesPage() {
                 target={revokeTarget}
                 onClose={() => setRevokeTarget(null)}
                 onRevoked={async () => {
+                    setError(null);
+                    await loadCertificates();
+                }}
+            />
+            <ReissueCertificateModal
+                target={reissueTarget}
+                onClose={() => setReissueTarget(null)}
+                onReissued={async () => {
                     setError(null);
                     await loadCertificates();
                 }}

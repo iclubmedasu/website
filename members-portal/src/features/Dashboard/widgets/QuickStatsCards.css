@@ -1,0 +1,6 @@
+/* Tile grid + label/value: FinanceDashboardPage.css multi-selectors */
+
+.dashboard-stat-tile--overdue {
+    background: var(--error-bg);
+    border-color: var(--error-border);
+}

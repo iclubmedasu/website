@@ -69,6 +69,8 @@ export function isTitleLayoutField(field: string): boolean {
 
 /**
  * Extract Description / Issuer / Title / Static Text wording from a template layout.
+ * Runtime-bound fields (recipientName, issuedDate, verificationCode, verificationUrl)
+ * are not wording overrides and are intentionally ignored.
  */
 export function parseTemplateLayoutWording(layout: unknown): TemplateLayoutWording {
     const result: TemplateLayoutWording = {

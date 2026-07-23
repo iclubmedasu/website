@@ -2,11 +2,11 @@
    Tabs: shared underline tab styles in page.css
    Page container / header / empty-state: page.css
    Table / revoked badge: table.css
+   .certificates-action-btn / spin: certificates-section.css
 */
 
 .certificates-main-card {
     overflow: hidden;
-    padding: 0;
     display: flex;
     flex-direction: column;
 }
@@ -15,14 +15,25 @@
     min-height: calc(100vh - 10rem);
 }
 
+/* Flush tabs to card edges — matches .card padding: 1.5rem */
 .certificates-main-card .certificates-tabs {
-    margin: 0;
+    margin: -1.5rem -1.5rem 0;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     flex-shrink: 0;
+    /* Override page.css overflow-x:auto — it forces overflow-y clipping of active::after */
+    overflow: visible;
+}
+
+.certificates-main-card .certificates-tab-btn {
+    flex: 1 1 0;
+    flex-shrink: 1; /* override page.css flex-shrink: 0 */
+    text-align: center;
+    min-width: 0;
 }
 
 .certificates-tab-panel {
-    padding: 1.25rem 1.5rem 1.5rem;
+    /* Card provides side/bottom padding; only space under tabs here */
+    padding: 1.25rem 0 0;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -40,21 +51,7 @@
 
 .certificates-action-buttons {
     align-items: center;
-    flex-wrap: wrap;
-}
-
-/* Keep page-local alias in sync with shared .btn.certificates-action-btn */
-.certificates-page .btn.certificates-action-btn {
-    padding: 0.35rem 0.7rem;
-    font-size: 0.8rem;
-    line-height: 1.2;
-    gap: 0.25rem;
-    min-height: 0;
-}
-
-.certificates-page .btn.certificates-action-btn:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
+    flex-wrap: nowrap;
 }
 
 .certificates-page .page-header .btn {
@@ -90,7 +87,7 @@
 
 .certificates-table-pagination {
     flex-shrink: 0;
-    border-top: 1px solid var(--gray-200);
+    border-top: 1px solid var(--border-default);
     margin: 0;
 }
 
@@ -100,7 +97,7 @@
     z-index: 2;
     text-align: center;
     padding: 0.75rem 1rem;
-    border-top: 1px solid var(--border-brand, var(--gray-200));
+    border-top: 1px solid var(--border-brand);
     background: var(--bg-card);
 }
 
@@ -124,18 +121,19 @@
 
 .certificates-add-btn:hover {
     background: var(--gradient-success);
-    color: white;
+    color: var(--bg-card);
 }
 
-/* Nested template editor chrome */
+/* Nested template editor chrome — flush to card edges */
 .certificates-editor-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
     flex-shrink: 0;
+    margin: -1.5rem -1.5rem 0;
     padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--gray-200);
+    border-bottom: 1px solid var(--border-default);
     background: var(--bg-card);
 }
 
@@ -158,6 +156,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    margin: 0 -1.5rem -1.5rem;
 }
 
 @media (max-width: 640px) {

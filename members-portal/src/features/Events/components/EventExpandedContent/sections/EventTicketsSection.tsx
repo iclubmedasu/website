@@ -1,6 +1,6 @@
 import { CLUB_TIMEZONE, toEventDayString } from '@iclub/shared/utils';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Filter, Search } from 'lucide-react';
+import { Bell, Filter, Loader2, Mail, Search } from 'lucide-react';
 import { fmtDate } from '@/components/cards/LifecycleCardView/LifecycleCardView';
 import { useResourceChannel } from '@/hooks/useResourceChannel';
 import { eventsAPI } from '@/services/api';
@@ -132,10 +132,12 @@ export default function EventTicketsSection({
     const [filterModalOpen, setFilterModalOpen] = useState(false);
     const [resendingTicketId, setResendingTicketId] = useState<number | null>(null);
     const [sendingReminderId, setSendingReminderId] = useState<number | null>(null);
-    const [bulkAction, setBulkAction] = useState<'imported' | 'allTickets' | 'reminders' | 'filtered' | null>(null);
+    const [bulkAction, setBulkAction] = useState<
+        'imported' | 'allTickets' | 'reminders' | 'filtered' | 'filteredReminders' | null
+    >(null);
     const [importUnsentCount, setImportUnsentCount] = useState(0);
     const [allTicketsCount, setAllTicketsCount] = useState(0);
-    const [unsentRemindersCount, setUnsentRemindersCount] = useState(0);
+    const [allRemindersCount, setAllRemindersCount] = useState(0);
     const [attendanceRemovalTarget, setAttendanceRemovalTarget] = useState<AttendanceRemovalTarget | null>(null);
     const [removingAttendance, setRemovingAttendance] = useState(false);
 
@@ -197,18 +199,18 @@ export default function EventTicketsSection({
 
     const loadBulkCounts = useCallback(async () => {
         try {
-            const [importUnsent, allSendable, reminderUnsent] = await Promise.all([
+            const [importUnsent, allSendable] = await Promise.all([
                 eventsAPI.getRegistrations(eventId, { sourceGroup: 'IMPORT', ticketStatus: 'NOT_SENT' }),
                 eventsAPI.getRegistrations(eventId),
-                eventsAPI.getRegistrations(eventId, { reminderStatus: 'NOT_SENT' }),
             ]);
+            const sendableCount = getSendableRegistrations(allSendable).length;
             setImportUnsentCount(getSendableRegistrations(importUnsent).length);
-            setAllTicketsCount(getSendableRegistrations(allSendable).length);
-            setUnsentRemindersCount(getSendableRegistrations(reminderUnsent).length);
+            setAllTicketsCount(sendableCount);
+            setAllRemindersCount(sendableCount);
         } catch {
             setImportUnsentCount(0);
             setAllTicketsCount(0);
-            setUnsentRemindersCount(0);
+            setAllRemindersCount(0);
         }
     }, [eventId]);
 
@@ -243,6 +245,11 @@ export default function EventTicketsSection({
     const hasFunnelFiltersActive = isRegistrationFunnelActive(columnFilters, sortSpec, serverFilters);
 
     const filteredSendable = useMemo(
+        () => getSendableRegistrations(filtered),
+        [filtered],
+    );
+
+    const filteredReminderSendable = useMemo(
         () => getSendableRegistrations(filtered),
         [filtered],
     );
@@ -344,7 +351,7 @@ export default function EventTicketsSection({
                 return;
             }
 
-            if (!window.confirm(`Resend ticket emails to ${registrationIds.length} registration(s)?`)) {
+            if (!window.confirm(`Send ticket emails to ${registrationIds.length} registration(s)?`)) {
                 return;
             }
 
@@ -381,18 +388,38 @@ export default function EventTicketsSection({
     const handleSendReminders = async () => {
         setBulkAction('reminders');
         try {
-            const unsent = await eventsAPI.getRegistrations(eventId, { reminderStatus: 'NOT_SENT' });
-            const registrationIds = getSendableRegistrations(unsent).map((registration) => Number(registration.id));
+            const all = await eventsAPI.getRegistrations(eventId);
+            const registrationIds = getSendableRegistrations(all).map((registration) => Number(registration.id));
 
             if (registrationIds.length === 0) {
-                window.alert('No registrations with a real email address need reminders.');
+                window.alert('No registrations with a real email address can receive reminders.');
                 return;
             }
 
-            if (!window.confirm(`Send reminder emails to ${registrationIds.length} registration(s)?`)) {
+            if (!window.confirm(`Send reminders to ${registrationIds.length} registrant(s)?`)) {
                 return;
             }
 
+            const result = await eventsAPI.sendRegistrationReminders(eventId, { registrationIds });
+            window.alert(formatBulkSummary(result, 'Reminders sent'));
+            void refreshAll();
+        } catch (error) {
+            window.alert(error instanceof Error ? error.message : 'Failed to send reminder emails.');
+        } finally {
+            setBulkAction(null);
+        }
+    };
+
+    const handleSendFilteredReminders = async () => {
+        const registrationIds = filteredReminderSendable.map((registration) => Number(registration.id));
+        if (registrationIds.length === 0) return;
+
+        if (!window.confirm(`Send reminders to ${registrationIds.length} filtered registrant(s)?`)) {
+            return;
+        }
+
+        setBulkAction('filteredReminders');
+        try {
             const result = await eventsAPI.sendRegistrationReminders(eventId, { registrationIds });
             window.alert(formatBulkSummary(result, 'Reminders sent'));
             void refreshAll();
@@ -489,10 +516,10 @@ export default function EventTicketsSection({
                                 <th className="event-registrations-name-cell">Name</th>
                                 <th className="event-registrations-email-cell">Email</th>
                                 <th className="event-registrations-phone-cell">Phone</th>
-                                <th className="event-registrations-actions-col">Actions</th>
+                                {multiDayEvent ? <th>Attendance</th> : null}
                                 <th>Ticket</th>
                                 <th>Reminder</th>
-                                {multiDayEvent ? <th>Attendance</th> : null}
+                                <th className="event-registrations-actions-col">Actions</th>
                                 {/* Source and Check-in columns hidden */}
                                 {/* <th>Source</th> */}
                                 {/* <th className="event-registrations-status-cell">Check-in</th> */}
@@ -525,30 +552,6 @@ export default function EventTicketsSection({
                                                 ? truncateRegistrationCell(registration.phoneNumber, REGISTRATION_PHONE_DISPLAY_LIMIT)
                                                 : '—'}
                                         </td>
-                                        <td className="event-registrations-actions-col">
-                                            {sendable ? (
-                                                <div className="event-tickets-actions-col">
-                                                    <button
-                                                        type="button"
-                                                        className="event-tickets-action-btn"
-                                                        disabled={resendingTicketId === Number(registration.id)}
-                                                        onClick={() => void handleResendTicket(registration)}
-                                                    >
-                                                        {resendingTicketId === Number(registration.id) ? 'Sending…' : 'Resend ticket'}
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className="event-tickets-action-btn"
-                                                        disabled={sendingReminderId === Number(registration.id)}
-                                                        onClick={() => void handleSendReminder(registration)}
-                                                    >
-                                                        {sendingReminderId === Number(registration.id) ? 'Sending…' : 'Send reminder'}
-                                                    </button>
-                                                </div>
-                                            ) : '—'}
-                                        </td>
-                                        <td><EmailDeliveryStatusCell status={ticketStatus} /></td>
-                                        <td><EmailDeliveryStatusCell status={reminderStatus} /></td>
                                         {multiDayEvent ? (
                                             <td>
                                                 <CollapsibleAttendanceChips
@@ -560,6 +563,36 @@ export default function EventTicketsSection({
                                                 />
                                             </td>
                                         ) : null}
+                                        <td><EmailDeliveryStatusCell status={ticketStatus} /></td>
+                                        <td><EmailDeliveryStatusCell status={reminderStatus} /></td>
+                                        <td className="event-registrations-actions-col">
+                                            {sendable ? (
+                                                <div className="event-tickets-actions-col">
+                                                    <button
+                                                        type="button"
+                                                        className="table-action-btn view-btn"
+                                                        title="Resend ticket"
+                                                        disabled={resendingTicketId === Number(registration.id)}
+                                                        onClick={() => void handleResendTicket(registration)}
+                                                    >
+                                                        {resendingTicketId === Number(registration.id)
+                                                            ? <Loader2 className="animate-spin" />
+                                                            : <Mail />}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="table-action-btn view-btn"
+                                                        title="Send reminder"
+                                                        disabled={sendingReminderId === Number(registration.id)}
+                                                        onClick={() => void handleSendReminder(registration)}
+                                                    >
+                                                        {sendingReminderId === Number(registration.id)
+                                                            ? <Loader2 className="animate-spin" />
+                                                            : <Bell />}
+                                                    </button>
+                                                </div>
+                                            ) : '—'}
+                                        </td>
                                         {/* Source and Check-in cells hidden */}
                                         {/* <td>{formatRegistrationSource(registration)}</td> */}
                                         {/* <td className="event-registrations-status-cell">{formatRegistrationStatus(registration)}</td> */}
@@ -571,6 +604,7 @@ export default function EventTicketsSection({
                 </div>
 
                 <div className="event-tickets-io-bar">
+                    {/* Send tickets to imported — hidden for now
                     <button
                         type="button"
                         className="btn btn-secondary event-tickets-io-btn"
@@ -583,18 +617,7 @@ export default function EventTicketsSection({
                                 ? `Send tickets to imported (${importUnsentCount})`
                                 : 'Send tickets to imported'}
                     </button>
-                    <button
-                        type="button"
-                        className="btn btn-secondary event-tickets-io-btn"
-                        disabled={bulkAction !== null || allTicketsCount === 0}
-                        onClick={() => void handleResendAllTickets()}
-                    >
-                        {bulkAction === 'allTickets'
-                            ? 'Sending…'
-                            : allTicketsCount > 0
-                                ? `Resend tickets to all (${allTicketsCount})`
-                                : 'Resend tickets to all'}
-                    </button>
+                    */}
                     <button
                         type="button"
                         className="btn btn-secondary event-tickets-io-btn"
@@ -610,14 +633,38 @@ export default function EventTicketsSection({
                     <button
                         type="button"
                         className="btn btn-primary event-tickets-io-btn"
-                        disabled={bulkAction !== null || unsentRemindersCount === 0}
+                        disabled={bulkAction !== null || allTicketsCount === 0}
+                        onClick={() => void handleResendAllTickets()}
+                    >
+                        {bulkAction === 'allTickets'
+                            ? 'Sending…'
+                            : allTicketsCount > 0
+                                ? `Send tickets to all (${allTicketsCount})`
+                                : 'Send tickets to all'}
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-primary event-tickets-io-btn"
+                        disabled={bulkAction !== null || allRemindersCount === 0}
                         onClick={() => void handleSendReminders()}
                     >
                         {bulkAction === 'reminders'
                             ? 'Sending…'
-                            : unsentRemindersCount > 0
-                                ? `Send reminders (${unsentRemindersCount})`
-                                : 'Send reminders'}
+                            : allRemindersCount > 0
+                                ? `Send reminders to all (${allRemindersCount})`
+                                : 'Send reminders to all'}
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-secondary event-tickets-io-btn"
+                        disabled={bulkAction !== null || filteredReminderSendable.length === 0}
+                        onClick={() => void handleSendFilteredReminders()}
+                    >
+                        {bulkAction === 'filteredReminders'
+                            ? 'Sending…'
+                            : filteredReminderSendable.length > 0
+                                ? `Send reminders to filtered (${filteredReminderSendable.length})`
+                                : 'Send reminders to filtered'}
                     </button>
                 </div>
             </div>

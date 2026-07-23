@@ -36,6 +36,7 @@ interface FormState {
 interface FormErrors {
     recipientName?: string;
     recipientEmail?: string;
+    templateId?: string;
     type?: string;
     title?: string;
     submit?: string;
@@ -46,6 +47,9 @@ const CERTIFICATE_TYPES: CertificateType[] = [
     'ORGANIZATION',
     'CONTRIBUTION',
     'LEADERSHIP',
+    'ADMINISTRATION',
+    'SUPERVISION',
+    'PARTICIPATION',
     'CUSTOM',
 ];
 
@@ -296,6 +300,7 @@ export default function NewCustomCertificateModal({
         } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.recipientEmail.trim())) {
             next.recipientEmail = 'Enter a valid email address';
         }
+        if (!formData.templateId.trim()) next.templateId = 'Template is required';
         if (!formData.type) next.type = 'Type is required';
         if (!formData.title.trim()) next.title = 'Title is required';
         setErrors(next);
@@ -332,7 +337,7 @@ export default function NewCustomCertificateModal({
                 type: isLinked ? 'CUSTOM' : formData.type,
                 title: formData.title.trim(),
                 description: showDescription ? formData.description.trim() : '',
-                templateId: formData.templateId ? Number(formData.templateId) : null,
+                templateId: Number(formData.templateId),
                 fieldValues,
             };
             if (eventId != null) payload.eventId = Number(eventId) as Id;
@@ -420,23 +425,26 @@ export default function NewCustomCertificateModal({
 
                         <div className="form-group">
                             <label htmlFor="templateId" className="form-label">
-                                Template
+                                Template *
                             </label>
                             <select
                                 id="templateId"
                                 name="templateId"
-                                className="form-input"
+                                className={`form-input ${errors.templateId ? 'error' : ''}`}
                                 value={formData.templateId}
                                 onChange={handleChange}
                                 disabled={isSubmitting || templatesLoading}
                             >
-                                <option value="">No template</option>
+                                <option value="">Select template…</option>
                                 {templates.map((template) => (
                                     <option key={template.id} value={String(template.id)}>
                                         {template.name}
                                     </option>
                                 ))}
                             </select>
+                            {errors.templateId && (
+                                <span className="field-error">{errors.templateId}</span>
+                            )}
                             {templateLoading ? (
                                 <span className="form-hint">Loading template wording…</span>
                             ) : null}

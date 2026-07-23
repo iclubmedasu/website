@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import type { EventRegistrationRef, Id } from '@/types/backend-contracts';
 import { formatAttendanceDayLabel } from '../../eventDateUtils';
+import CollapsibleChipGroup, { type CollapsibleChipItem } from './CollapsibleChipGroup';
 
 type AttendanceRemovalTarget = {
     registration: EventRegistrationRef;
@@ -87,7 +87,6 @@ function renderChip(
     if (chip.removalTarget) {
         return (
             <button
-                key={chip.key}
                 type="button"
                 className={chip.className}
                 title={`Remove check-in for ${chip.label}`}
@@ -100,7 +99,7 @@ function renderChip(
     }
 
     return (
-        <span key={chip.key} className={chip.className}>
+        <span className={chip.className}>
             {chip.label}
         </span>
     );
@@ -113,49 +112,19 @@ export default function CollapsibleAttendanceChips({
     collapsible,
     onRequestRemoval,
 }: CollapsibleAttendanceChipsProps) {
-    const [expanded, setExpanded] = useState(false);
     const chips = buildAttendanceChips(registration, sessionDateById, canRemoveAttendance);
-
-    if (chips.length === 0) return <>—</>;
-
-    const shouldCollapse = collapsible && chips.length > 1 && !expanded;
-    const hiddenLabels = chips.slice(1).map((chip) => chip.label).join(', ');
+    const collapsibleChips: CollapsibleChipItem[] = chips.map((chip) => ({
+        key: chip.key,
+        label: chip.label,
+        node: renderChip(chip, onRequestRemoval),
+    }));
 
     return (
-        <span className={[
-            'event-attendance-days',
-            shouldCollapse ? 'event-attendance-days--collapsed' : '',
-        ].filter(Boolean).join(' ')}>
-            {shouldCollapse ? (
-                <>
-                    {renderChip(chips[0], onRequestRemoval)}
-                    <button
-                        type="button"
-                        className="event-attendance-day-chip event-attendance-day-chip--more"
-                        aria-expanded={false}
-                        title={hiddenLabels}
-                        onClick={() => setExpanded(true)}
-                    >
-                        …
-                    </button>
-                </>
-            ) : (
-                <>
-                    {chips.map((chip) => renderChip(chip, onRequestRemoval))}
-                    {collapsible && chips.length > 1 ? (
-                        <button
-                            type="button"
-                            className="event-attendance-day-chip event-attendance-day-chip--more"
-                            aria-expanded
-                            title="Show fewer attendance chips"
-                            onClick={() => setExpanded(false)}
-                        >
-                            …
-                        </button>
-                    ) : null}
-                </>
-            )}
-        </span>
+        <CollapsibleChipGroup
+            chips={collapsibleChips}
+            collapsible={collapsible}
+            collapseTitle="Show fewer attendance chips"
+        />
     );
 }
 

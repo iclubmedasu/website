@@ -3,6 +3,7 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { formatDate } from '@iclub/shared/utils';
+import { useAutoDismissMessage } from '@/hooks/useAutoDismissMessage';
 import { teamMembersAPI } from '../../../../services/api';
 import type { Id } from '../../../../types/backend-contracts';
 
@@ -148,7 +149,8 @@ const EditAdminMembersModal = ({
 
     const [errors, setErrors] = useState<EditAdminMembersErrors>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [successMessage, setSuccessMessage] = useState('');
+    const { message: successMessage, show: showSuccessMessage, clear: clearSuccessMessage } =
+        useAutoDismissMessage();
     const [availableRoles, setAvailableRoles] = useState<ModalRole[]>([]);
     const [, setAvailableSubteams] = useState<ModalSubteam[]>([]);
     const [teamMembersForTeam, setTeamMembersForTeam] = useState<TeamMemberSummary[]>([]);
@@ -200,9 +202,9 @@ const EditAdminMembersModal = ({
                 notes: '',
             });
             setErrors({});
-            setSuccessMessage('');
+            clearSuccessMessage();
         }
-    }, [isOpen, member, currentTeamAssignment]);
+    }, [isOpen, member, currentTeamAssignment, clearSuccessMessage]);
 
     const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -286,7 +288,7 @@ const EditAdminMembersModal = ({
         const assignmentRoleId = currentTeamAssignment.roleId;
 
         setIsSubmitting(true);
-        setSuccessMessage('');
+        clearSuccessMessage();
 
         const changeReason = formData.changeReason.trim() || null;
         const notes = formData.notes.trim() || null;
@@ -326,7 +328,7 @@ const EditAdminMembersModal = ({
                 });
             }
 
-            setSuccessMessage('Member updated successfully.');
+            showSuccessMessage('Member updated successfully.');
             try {
                 await onSubmit?.({ member, changes: { editMode, formData } });
             } catch (err) {
@@ -356,7 +358,7 @@ const EditAdminMembersModal = ({
             notes: '',
         });
         setErrors({});
-        setSuccessMessage('');
+        clearSuccessMessage();
         setIsSubmitting(false);
         onClose();
     };

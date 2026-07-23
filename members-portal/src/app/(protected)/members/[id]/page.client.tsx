@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Calendar, Link as LinkIcon, Mail, Phone, Trophy } from 'lucide-react';
+import { ArrowLeft, Calendar, Link as LinkIcon, Mail, Phone, RefreshCw, Trophy } from 'lucide-react';
 import { formatDate } from '@iclub/shared/utils';
 import { useAuth } from '@/context/AuthContext';
 import { membersAPI, getProfilePhotoUrl } from '@/services/api';
+import { certificatesAPI, type CertificateListItem } from '@/services/certificatesAPI';
+import { MemberAchievements } from '@/components/MemberAchievements/MemberAchievements';
 import { MemberRoleHistory } from '@/components/MemberRoleHistory/MemberRoleHistory';
 import { normalizePhoneDisplay } from '@/utils/countryCodes';
 import type { MemberPublicProfile } from '@iclub/shared';
@@ -38,6 +40,29 @@ export default function MemberProfilePage() {
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState<ProfileTab>('personal');
 
+    const [achievements, setAchievements] = useState<CertificateListItem[]>([]);
+    const [achievementsLoading, setAchievementsLoading] = useState(false);
+    const [achievementsError, setAchievementsError] = useState('');
+    const [achievementsFetched, setAchievementsFetched] = useState(false);
+
+    const fetchAchievements = async () => {
+        if (Number.isNaN(memberId)) return;
+        setAchievementsLoading(true);
+        setAchievementsError('');
+        try {
+            const data = await certificatesAPI.getAll({
+                recipientMemberId: memberId,
+                status: 'ISSUED',
+            });
+            setAchievements(Array.isArray(data) ? data : []);
+            setAchievementsFetched(true);
+        } catch {
+            setAchievementsError('Failed to load certificates.');
+        } finally {
+            setAchievementsLoading(false);
+        }
+    };
+
     useEffect(() => {
         if (!user?.id || Number.isNaN(memberId)) return;
         if (user.id === memberId) {
@@ -53,6 +78,9 @@ export default function MemberProfilePage() {
                 const data = await membersAPI.getProfile(memberId);
                 if (!cancelled) {
                     setProfile(data as MemberPublicProfile);
+                    setAchievements([]);
+                    setAchievementsFetched(false);
+                    setAchievementsError('');
                 }
             } catch (err: unknown) {
                 if (!cancelled) {
@@ -68,6 +96,12 @@ export default function MemberProfilePage() {
             cancelled = true;
         };
     }, [memberId, router, user?.id]);
+
+    useEffect(() => {
+        if (activeTab === 'achievements' && !achievementsFetched && profile && !Number.isNaN(memberId)) {
+            void fetchAchievements();
+        }
+    }, [activeTab, achievementsFetched, profile, memberId]);
 
     if (!user || Number.isNaN(memberId)) return null;
 
@@ -207,13 +241,31 @@ export default function MemberProfilePage() {
 
                             {activeTab === 'achievements' && (
                                 <div className="user-page-section-card">
-                                    <div className="user-tab-empty-state">
-                                        <Trophy size={40} strokeWidth={1.5} />
-                                        <h3 className="user-tab-empty-title">Achievements</h3>
-                                        <p className="user-tab-empty-sub">
-                                            Milestones, recognitions, and club contributions will appear here. Coming soon.
-                                        </p>
-                                    </div>
+                                    <h3 className="user-history-section-title">
+                                        <Trophy size={18} aria-hidden />
+                                        Certificates
+                                    </h3>
+
+                                    {achievementsLoading ? (
+                                        <div className="loading-state">
+                                            <div className="spinner" />
+                                            <p>Loading certificates…</p>
+                                        </div>
+                                    ) : achievementsError ? (
+                                        <div className="user-history-error">
+                                            <p className="error-message">{achievementsError}</p>
+                                            <button type="button" className="btn btn-secondary" onClick={fetchAchievements}>
+                                                <RefreshCw size={14} aria-hidden />
+                                                Retry
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <MemberAchievements
+                                            certificates={achievements}
+                                            emptyTitle="No Certificates Yet"
+                                            emptySubtitle="Issued certificates and recognitions will appear here."
+                                        />
+                                    )}
                                 </div>
                             )}
                     </div>

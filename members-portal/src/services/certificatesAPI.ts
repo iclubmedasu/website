@@ -1,11 +1,14 @@
 import type { Id } from '../types/backend-contracts';
-import { API_BASE_URL, apiFetch, getAuthHeaders, handleResponse } from './api';
+import { API_BASE_URL, apiFetch, downloadProtectedFile, getAuthHeaders, handleResponse } from './api';
 
 export type CertificateType =
     | 'ATTENDANCE'
     | 'ORGANIZATION'
     | 'CONTRIBUTION'
     | 'LEADERSHIP'
+    | 'ADMINISTRATION'
+    | 'SUPERVISION'
+    | 'PARTICIPATION'
     | 'CUSTOM';
 
 export type CertificateStatus = 'DRAFT' | 'ISSUED' | 'REVOKED';
@@ -48,6 +51,8 @@ export interface CertificateListItem {
     fieldValues: unknown;
     verificationCode: string;
     issuedAt: string | null;
+    /** When the certificate email was last sent (issue or resend). */
+    certificateEmailSentAt?: string | null;
     revokedAt: string | null;
     revokedReason: string | null;
     createdAt: string;
@@ -101,6 +106,12 @@ export interface BulkIssueResult {
 
 export type EventEligibleCategory = 'ATTENDEE' | 'STAFF';
 
+export interface EventEligibleSessionOption {
+    id: number;
+    label: string | null;
+    sessionDate: string;
+}
+
 export interface EventEligibleRecipient {
     memberId: Id | null;
     fullName: string;
@@ -108,6 +119,8 @@ export interface EventEligibleRecipient {
     phoneNumber?: string | null;
     type: CertificateType;
     category?: EventEligibleCategory;
+    attendedDays?: string[];
+    attendedSessionIds?: number[];
     attendanceDaysCount?: number;
     sessionsAttendedCount?: number;
     alreadyIssued: boolean;
@@ -117,6 +130,8 @@ export interface EventEligibleResponse {
     recipients?: EventEligibleRecipient[];
     attendees: EventEligibleRecipient[];
     staff: EventEligibleRecipient[];
+    attendanceDayOptions?: string[];
+    sessions?: EventEligibleSessionOption[];
     eventTitle: string;
     projectTypeName: string | null;
 }
@@ -209,6 +224,31 @@ export const certificatesAPI = {
             body: JSON.stringify(reason ? { reason } : {}),
         });
         return handleResponse<CertificateListItem>(response);
+    },
+
+    reissue: async (id: Id | string): Promise<CertificateListItem> => {
+        const response = await apiFetch(`${API_BASE_URL}/certificates/${id}/reissue`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<CertificateListItem>(response);
+    },
+
+    resendEmail: async (id: Id | string): Promise<{ ok: boolean; message: string }> => {
+        const response = await apiFetch(`${API_BASE_URL}/certificates/${id}/resend-email`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<{ ok: boolean; message: string }>(response);
+    },
+
+    /** Public PDF endpoint keyed by verification code (same as email Download CTA). */
+    downloadPdfByVerificationCode: async (verificationCode: string): Promise<void> => {
+        const code = verificationCode.trim();
+        if (!code) throw new Error('Missing verification code');
+        const url = `${API_BASE_URL}/certificates/verify/${encodeURIComponent(code)}/pdf`;
+        const safeCode = code.replace(/[^A-Za-z0-9_-]/g, '') || 'certificate';
+        await downloadProtectedFile(url, `certificate-${safeCode}.pdf`);
     },
 
     getEventEligible: async (eventId: Id | string): Promise<EventEligibleResponse> => {

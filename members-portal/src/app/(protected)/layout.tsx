@@ -66,6 +66,7 @@ const NAV_ITEMS = [
         label: 'Certificates',
         href: '/certificates',
         icon: Award,
+        requiresCertificateAccess: true,
     },
     {
         label: 'Finance',
@@ -89,9 +90,16 @@ function getNavItems(user: ReturnType<typeof useAuth>['user']) {
     const canEditSite = !!(user?.isDeveloper || user?.isOfficer || user?.isAdmin)
     const canEditSupport = canEditSite || !!user?.isSupportFormsEditor
     const canViewFinance = canEditSite || !!user?.isFinanceViewer
+    const canAccessCertificates = !!(
+        user?.isDeveloper ||
+        user?.isOfficer ||
+        user?.isAdmin ||
+        user?.isLeadership
+    )
 
     return NAV_ITEMS
         .filter((item) => !item.requiresFinanceAccess || canViewFinance)
+        .filter((item) => !item.requiresCertificateAccess || canAccessCertificates)
         .map((item) => {
         if (item.label !== 'General' || !item.items) return item
         return {
@@ -181,11 +189,12 @@ function PortalLayout({ children }: { children: React.ReactNode }) {
             icon: Bell,
             badge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
         },
-        {
-            label: 'My Profile',
-            href: '/user',
-            icon: UserCircle,
-        },
+        // Profile nav is the sidebar avatar (active highlight on /user)
+        // {
+        //     label: 'My Profile',
+        //     href: '/user',
+        //     icon: UserCircle,
+        // },
     ]
 
     return (

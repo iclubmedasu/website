@@ -1399,6 +1399,9 @@ enum CertificateType {
   ORGANIZATION
   CONTRIBUTION
   LEADERSHIP
+  ADMINISTRATION
+  SUPERVISION
+  PARTICIPATION
   CUSTOM
 }
 
@@ -1432,7 +1435,7 @@ model CertificateTemplate {
 //   x: number, y: number, width: number, height: number,
 //   fontSize: number, fontWeight: "normal"|"bold",
 //   align: "left"|"center"|"right", color: string }
-// Valid field values: recipientName, title, description, issuedDate, verificationCode, issuerName
+// Valid field values: recipientName, title, description, issuedDate, verificationCode, verificationUrl, issuerName
 
 model Certificate {
   id                Int               @id @default(autoincrement())
@@ -1447,12 +1450,13 @@ model Certificate {
   title             String
   description       String
   fieldValues       Json
-  verificationCode  String            @unique
-  issuedAt          DateTime?
-  revokedAt         DateTime?
-  revokedReason     String?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  verificationCode       String            @unique
+  issuedAt               DateTime?
+  certificateEmailSentAt DateTime?
+  revokedAt              DateTime?
+  revokedReason          String?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
   template        CertificateTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   event           Event?               @relation(fields: [eventId], references: [id], onDelete: SetNull)

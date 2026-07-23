@@ -3,6 +3,7 @@
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { formatDate, formatDateTime } from '@iclub/shared/utils';
 import { useAuth } from '@/context/AuthContext';
+import { useAutoDismissMessage } from '@/hooks/useAutoDismissMessage';
 import {
     Users,
     Shield,
@@ -24,9 +25,11 @@ import {
     RefreshCw,
 } from 'lucide-react';
 import { membersAPI, authAPI, roleHistoryAPI, getProfilePhotoUrl, notificationsAPI } from '@/services/api';
+import { certificatesAPI, type CertificateListItem } from '@/services/certificatesAPI';
 import { PhoneInput } from '@/components/PhoneInput/PhoneInput';
 import UploadPhotoModal from '@/components/UploadPhotoModal/UploadPhotoModal';
 import Toggle from '@/components/toggle/Toggle';
+import { MemberAchievements } from '@/components/MemberAchievements/MemberAchievements';
 import { normalizePhoneDisplay, sanitizePhoneForStorage } from '@/utils/countryCodes';
 import '@/components/modal/modal.css';
 import type { Id, NotificationItem, MemberContactVisibility } from '@/types/backend-contracts';
@@ -82,9 +85,9 @@ function getErrorMessage(error: unknown, fallback: string): string {
 const TABS: TabDefinition[] = [
     { key: 'personal', label: 'Personal Details' },
     { key: 'privacy', label: 'Privacy' },
-    { key: 'history', label: 'History' },
     { key: 'security', label: 'Sign-in & Security' },
     { key: 'notifications', label: 'Notifications' },
+    { key: 'history', label: 'History' },
     { key: 'achievements', label: 'Achievements' },
 ];
 
@@ -143,6 +146,11 @@ function UserPage() {
     const [historyError, setHistoryError] = useState('');
     const [historyFetched, setHistoryFetched] = useState(false);
 
+    const [achievements, setAchievements] = useState<CertificateListItem[]>([]);
+    const [achievementsLoading, setAchievementsLoading] = useState(false);
+    const [achievementsError, setAchievementsError] = useState('');
+    const [achievementsFetched, setAchievementsFetched] = useState(false);
+
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const [notificationsLoading, setNotificationsLoading] = useState(false);
     const [notificationsError, setNotificationsError] = useState('');
@@ -154,7 +162,7 @@ function UserPage() {
     const [pwdForm, setPwdForm] = useState<PasswordFormData>({ current: '', newPwd: '', confirm: '' });
     const [pwdSaving, setPwdSaving] = useState(false);
     const [pwdError, setPwdError] = useState('');
-    const [pwdSuccess, setPwdSuccess] = useState('');
+    const { message: pwdSuccess, show: showPwdSuccess, clear: clearPwdSuccess } = useAutoDismissMessage();
     const [showCurrentPwd, setShowCurrentPwd] = useState(false);
     const [showNewPwd, setShowNewPwd] = useState(false);
     const [showConfirmPwd, setShowConfirmPwd] = useState(false);
@@ -173,6 +181,24 @@ function UserPage() {
             setHistoryError('Failed to load history.');
         } finally {
             setHistoryLoading(false);
+        }
+    };
+
+    const fetchAchievements = async () => {
+        if (!user?.id) return;
+        setAchievementsLoading(true);
+        setAchievementsError('');
+        try {
+            const data = await certificatesAPI.getAll({
+                recipientMemberId: user.id,
+                status: 'ISSUED',
+            });
+            setAchievements(Array.isArray(data) ? data : []);
+            setAchievementsFetched(true);
+        } catch {
+            setAchievementsError('Failed to load certificates.');
+        } finally {
+            setAchievementsLoading(false);
         }
     };
 
@@ -237,6 +263,12 @@ function UserPage() {
             void fetchHistory();
         }
     }, [activeTab, historyFetched, user?.id]);
+
+    useEffect(() => {
+        if (activeTab === 'achievements' && !achievementsFetched && user?.id) {
+            void fetchAchievements();
+        }
+    }, [activeTab, achievementsFetched, user?.id]);
 
     useEffect(() => {
         if (typeof window !== 'undefined' && window.location.hash === '#notifications') {
@@ -333,11 +365,11 @@ function UserPage() {
     const handleChangePassword = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setPwdError('');
-        setPwdSuccess('');
+        clearPwdSuccess();
         setPwdSaving(true);
         try {
             await authAPI.changePassword(pwdForm.current, pwdForm.newPwd, pwdForm.confirm);
-            setPwdSuccess('Password updated successfully.');
+            showPwdSuccess('Password updated successfully.');
             setPwdForm({ current: '', newPwd: '', confirm: '' });
         } catch (err: unknown) {
             setPwdError(getErrorMessage(err, 'Failed to change password.'));
@@ -1087,13 +1119,31 @@ function UserPage() {
 
                     {activeTab === 'achievements' && (
                         <div className="user-page-section-card">
-                            <div className="user-tab-empty-state">
-                                <Trophy size={40} strokeWidth={1.5} />
-                                <h3 className="user-tab-empty-title">Achievements</h3>
-                                <p className="user-tab-empty-sub">
-                                    Your milestones, recognitions, and club contributions will appear here. Coming soon.
-                                </p>
-                            </div>
+                            <h3 className="user-history-section-title">
+                                <Trophy size={18} aria-hidden />
+                                Certificates
+                            </h3>
+
+                            {achievementsLoading ? (
+                                <div className="loading-state">
+                                    <div className="spinner" />
+                                    <p>Loading certificates…</p>
+                                </div>
+                            ) : achievementsError ? (
+                                <div className="user-history-error">
+                                    <p className="error-message">{achievementsError}</p>
+                                    <button type="button" className="btn btn-secondary" onClick={fetchAchievements}>
+                                        <RefreshCw size={14} aria-hidden />
+                                        Retry
+                                    </button>
+                                </div>
+                            ) : (
+                                <MemberAchievements
+                                    certificates={achievements}
+                                    emptyTitle="No Certificates Yet"
+                                    emptySubtitle="Your issued certificates and recognitions will appear here."
+                                />
+                            )}
                         </div>
                     )}
                 </div>

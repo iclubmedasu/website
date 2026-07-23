@@ -77,15 +77,102 @@
 /* Equal-width slots — same visual language as .event-tickets-io-btn */
 .event-cert-io-bar > .event-cert-io-btn,
 .event-cert-io-bar > .event-cert-io-template,
+.event-cert-io-bar > .event-cert-io-issue,
 .project-cert-io-bar > .project-cert-io-btn,
-.project-cert-io-bar > .project-cert-io-template {
+.project-cert-io-bar > .project-cert-io-template,
+.project-cert-io-bar > .project-cert-io-issue {
+    flex: 1 1 0;
+    min-width: 0;
+    width: 0;
+}
+
+.event-cert-io-bar > .event-cert-io-btn,
+.event-cert-io-bar > .event-cert-io-issue,
+.project-cert-io-bar > .project-cert-io-btn,
+.project-cert-io-bar > .project-cert-io-issue {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.35rem;
-    flex: 1 1 0;
+}
+
+/* Keep native <select> display — inline-flex on select breaks value sync in some browsers */
+.event-cert-io-bar > .event-cert-io-template,
+.project-cert-io-bar > .project-cert-io-template {
+    display: block;
+}
+
+.event-cert-io-issue,
+.project-cert-io-issue {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.2rem;
+}
+
+.event-cert-io-issue > .event-cert-io-btn,
+.project-cert-io-issue > .project-cert-io-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    width: 100%;
     min-width: 0;
-    width: 0;
+}
+
+.event-cert-io-hint,
+.project-cert-io-hint {
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--error-text);
+    text-align: center;
+}
+
+/*
+ * Soft-disabled look when recipients are selected but no template yet.
+ * Base primary issue button is fully opaque; muted ONLY with --needs-template
+ * / aria-disabled=true (never on plain .event-cert-io-btn).
+ */
+.event-cert-io-issue > .btn-primary.event-cert-io-btn:not(:disabled),
+.project-cert-io-issue > .btn-primary.project-cert-io-btn:not(:disabled) {
+    opacity: 1;
+    filter: none;
+}
+
+.event-cert-io-issue > .btn-primary.event-cert-io-btn:not(:disabled):not(.event-cert-io-btn--needs-template):not([aria-disabled='true']),
+.project-cert-io-issue > .btn-primary.project-cert-io-btn:not(:disabled):not(.project-cert-io-btn--needs-template):not([aria-disabled='true']) {
+    opacity: 1;
+    filter: none;
+    cursor: pointer;
+}
+
+.event-cert-io-issue > .btn-primary.event-cert-io-btn--needs-template:not(:disabled),
+.project-cert-io-issue > .btn-primary.project-cert-io-btn--needs-template:not(:disabled),
+.event-cert-io-issue > .btn-primary.event-cert-io-btn[aria-disabled='true']:not(:disabled),
+.project-cert-io-issue > .btn-primary.project-cert-io-btn[aria-disabled='true']:not(:disabled) {
+    opacity: 0.5;
+    cursor: pointer;
+    pointer-events: auto;
+    transform: none;
+    box-shadow: none;
+}
+
+.event-cert-io-issue > .btn-primary.event-cert-io-btn--needs-template:not(:disabled):hover,
+.project-cert-io-issue > .btn-primary.project-cert-io-btn--needs-template:not(:disabled):hover,
+.event-cert-io-issue > .btn-primary.event-cert-io-btn[aria-disabled='true']:not(:disabled):hover,
+.project-cert-io-issue > .btn-primary.project-cert-io-btn[aria-disabled='true']:not(:disabled):hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* §7.8 — IO toolbar utility buttons: no layout shift from inherited .btn lift */
+.event-cert-io-bar > .btn.event-cert-io-btn:hover:not(:disabled),
+.event-cert-io-issue > .btn.event-cert-io-btn:hover:not(:disabled),
+.project-cert-io-bar > .btn.project-cert-io-btn:hover:not(:disabled),
+.project-cert-io-issue > .btn.project-cert-io-btn:hover:not(:disabled) {
+    transform: none;
 }
 
 .event-cert-io-template,
@@ -156,61 +243,74 @@
 .event-cert-inline-actions,
 .project-cert-inline-actions {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0.35rem;
     align-items: center;
 }
 
-/* Shared with registration “copy public link” control */
-.event-expanded-copy-link {
-    display: inline-flex;
-    align-items: center;
+.certificate-email-delivery-status {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 0.25rem;
+    min-width: 0;
 }
 
-.event-expanded-copy-link-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.5rem;
-    height: 1.375rem;
-    padding: 0;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--gray-500);
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: color 0.15s ease, background-color 0.15s ease;
-}
-
-.event-expanded-copy-link-btn svg {
-    width: 1.125rem;
-    height: 1.125rem;
-}
-
-.event-expanded-copy-link-btn:hover:not(:disabled) {
-    color: var(--purple-600, #7c3aed);
-    background: var(--gray-100);
-}
-
-.event-expanded-copy-link-btn:focus-visible {
-    outline: 2px solid var(--purple-500, #8b5cf6);
-    outline-offset: 2px;
-}
-
-.event-expanded-copy-link-btn:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-}
-
-.event-expanded-copy-link-feedback {
-    font-family: var(--font-body);
+.certificate-email-delivery-status .status-badge {
     font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--gray-600);
+    padding: 0.2rem 0.55rem;
+}
+
+.certificate-email-delivery-status__date {
+    font-size: 0.72rem;
+    color: var(--gray-500);
+    line-height: 1.2;
+}
+
+/* Certificates table: Sessions (events) / Tasks (projects) count column */
+.event-cert-table-scroll .members-table th.event-cert-sessions-cell,
+.event-cert-table-scroll .members-table td.event-cert-sessions-cell,
+.project-cert-table-scroll .members-table th.event-cert-sessions-cell,
+.project-cert-table-scroll .members-table td.event-cert-sessions-cell {
+    min-width: 5rem;
+    width: 5rem;
+    white-space: nowrap;
+    text-align: left;
+}
+
+/* Certificates table: Issue date / Sent column widths */
+.event-cert-table-scroll .members-table th.event-cert-issue-date-cell,
+.event-cert-table-scroll .members-table td.event-cert-issue-date-cell,
+.project-cert-table-scroll .members-table th.event-cert-issue-date-cell,
+.project-cert-table-scroll .members-table td.event-cert-issue-date-cell {
+    min-width: 7rem;
+    width: 7rem;
     white-space: nowrap;
 }
+
+.event-cert-table-scroll .members-table th.event-cert-sent-cell,
+.event-cert-table-scroll .members-table td.event-cert-sent-cell,
+.project-cert-table-scroll .members-table th.event-cert-sent-cell,
+.project-cert-table-scroll .members-table td.event-cert-sent-cell {
+    min-width: 6rem;
+    max-width: 7rem;
+    width: 6.25rem;
+}
+
+/* Scope spin to certificates contexts to avoid colliding with other .animate-spin uses */
+.certificates-page .animate-spin,
+.event-cert-layout .animate-spin,
+.project-cert-layout .animate-spin {
+    animation: certificate-action-spin 0.75s linear infinite;
+}
+
+@keyframes certificate-action-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* .event-expanded-copy-link*: EventExpandedContent.css (shared with registration) */
 
 .project-cert-section .badge,
 .event-expanded-panel .badge {

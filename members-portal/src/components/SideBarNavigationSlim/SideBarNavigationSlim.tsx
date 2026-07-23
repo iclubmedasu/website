@@ -490,16 +490,23 @@ export const SidebarNavigationSlim = ({
 
             {user && (
               <div className="sidebar-user-section">
-                <Link href="/user" className="sidebar-user-info sidebar-user-info-link" onClick={handleSubItemClick}>
-                  <div className="sidebar-user-avatar">
-                    {user.profilePhotoUrl ? (
-                      <img src={getProfilePhotoUrl(user.id) ?? undefined} alt="" className="sidebar-user-avatar-img" />
-                    ) : (
-                      (user.fullName || user.email).charAt(0).toUpperCase()
-                    )}
-                  </div>
-                  <div className="sidebar-user-details">
-                    <span className="sidebar-user-name">{user.fullName || user.email}</span>
+                <Link
+                  href="/user"
+                  className={`sidebar-user-info sidebar-user-info-link${pathname.startsWith("/user") ? " sidebar-user-info-link--active active" : ""}`}
+                  onClick={handleSubItemClick}
+                  title="My Profile"
+                >
+                  <div className="sidebar-user-info-content">
+                    <div className="sidebar-user-avatar">
+                      {user.profilePhotoUrl ? (
+                        <img src={getProfilePhotoUrl(user.id) ?? undefined} alt="" className="sidebar-user-avatar-img" />
+                      ) : (
+                        (user.fullName || user.email).charAt(0).toUpperCase()
+                      )}
+                    </div>
+                    <div className="sidebar-user-details">
+                      <span className="sidebar-user-name">{user.fullName || user.email}</span>
+                    </div>
                   </div>
                 </Link>
                 <button onClick={handleMobileLogout} className="sidebar-logout-btn">

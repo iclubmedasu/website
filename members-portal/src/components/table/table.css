@@ -160,7 +160,8 @@
     color: var(--status-cancelled-text);
 }
 
-.status-badge--revocable {
+.status-badge--revocable,
+.status-badge--reissuable {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
@@ -184,7 +185,16 @@
     outline: none;
 }
 
-.status-badge__remove {
+.status-badge--reissuable:hover,
+.status-badge--reissuable:focus-visible {
+    background: var(--success-bg);
+    border-color: var(--success-border);
+    color: var(--success-text);
+    outline: none;
+}
+
+.status-badge__remove,
+.status-badge__redo {
     font-size: 0.875rem;
     line-height: 1;
     opacity: 0.75;

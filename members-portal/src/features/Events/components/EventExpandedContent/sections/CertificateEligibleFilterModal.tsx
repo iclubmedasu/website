@@ -136,6 +136,44 @@ function renderValueEditor(
                     ))}
                 </div>
             );
+        case 'idSet':
+            return (
+                <>
+                    <select
+                        aria-label="Id set filter operator"
+                        className="form-input"
+                        value={filter.operator}
+                        onChange={(event) => onChange({
+                            ...filter,
+                            operator: event.target.value as typeof filter.operator,
+                        })}
+                    >
+                        <option value="includesAll">All selected</option>
+                        <option value="includesAny">Any selected</option>
+                    </select>
+                    <div className="event-registration-filter-options">
+                        {(column.options ?? []).map((option) => {
+                            const checked = filter.values.includes(option);
+                            const optionLabel = column.optionLabels?.[option] ?? option;
+                            return (
+                                <label key={option} className="event-registration-filter-option">
+                                    <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => {
+                                            const nextValues = checked
+                                                ? filter.values.filter((value) => value !== option)
+                                                : [...filter.values, option];
+                                            onChange({ ...filter, values: nextValues });
+                                        }}
+                                    />
+                                    <span>{optionLabel}</span>
+                                </label>
+                            );
+                        })}
+                    </div>
+                </>
+            );
         default:
             return null;
     }

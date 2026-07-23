@@ -127,4 +127,73 @@ describe('certificateEligibleFilterUtils', () => {
             'Attendee Two',
         ]);
     });
+
+    it('filters idSet includesAll / includesAny for specific days and sessions', () => {
+        const mixed: CertificateEligibleRow[] = [
+            {
+                fullName: 'Day Both',
+                email: 'both@example.com',
+                type: 'ATTENDANCE',
+                category: 'ATTENDEE',
+                attendedDays: ['2026-07-01', '2026-07-02'],
+                attendedSessionIds: [10, 20],
+                alreadyIssued: false,
+            },
+            {
+                fullName: 'Day One',
+                email: 'one@example.com',
+                type: 'ATTENDANCE',
+                category: 'ATTENDEE',
+                attendedDays: ['2026-07-01'],
+                attendedSessionIds: [10],
+                alreadyIssued: false,
+            },
+            {
+                fullName: 'Staff Lead',
+                email: 'lead@example.com',
+                type: 'LEADERSHIP',
+                category: 'STAFF',
+                alreadyIssued: false,
+            },
+        ];
+
+        const allDays: CertificateEligibleFilter[] = [
+            {
+                columnId: 'attendedDays',
+                kind: 'idSet',
+                operator: 'includesAll',
+                values: ['2026-07-01', '2026-07-02'],
+            },
+        ];
+        expect(applyCertificateEligibleFilters(mixed, allDays).map((r) => r.fullName)).toEqual([
+            'Day Both',
+            'Staff Lead',
+        ]);
+
+        const anySession: CertificateEligibleFilter[] = [
+            {
+                columnId: 'attendedSessionIds',
+                kind: 'idSet',
+                operator: 'includesAny',
+                values: ['20', '99'],
+            },
+        ];
+        expect(applyCertificateEligibleFilters(mixed, anySession).map((r) => r.fullName)).toEqual([
+            'Day Both',
+            'Staff Lead',
+        ]);
+
+        const allSessions: CertificateEligibleFilter[] = [
+            {
+                columnId: 'attendedSessionIds',
+                kind: 'idSet',
+                operator: 'includesAll',
+                values: ['10', '20'],
+            },
+        ];
+        expect(applyCertificateEligibleFilters(mixed, allSessions).map((r) => r.fullName)).toEqual([
+            'Day Both',
+            'Staff Lead',
+        ]);
+    });
 });

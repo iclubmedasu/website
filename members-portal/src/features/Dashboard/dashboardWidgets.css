@@ -1,0 +1,67 @@
+/* Shared dashboard list-row / unread / badge overrides.
+   Card chrome (.card-header / .card-title / .card-body) comes from universalcard.css.
+   Stack / grid / side-card / tile / row title+meta: FinanceDashboardPage.css multi-selectors. */
+
+.dashboard-list-row--link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    text-decoration: none;
+    color: inherit;
+    border-radius: var(--radius-lg);
+}
+
+.dashboard-list-row--link:focus-visible {
+    outline: 2px solid var(--purple-500);
+    outline-offset: 1px;
+}
+
+.dashboard-list-row-main {
+    min-width: 0;
+    flex: 1;
+}
+
+.dashboard-list-row-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    flex-shrink: 0;
+    justify-content: flex-end;
+}
+
+.dashboard-notification-row {
+    padding-left: 0.75rem;
+    border-left: 4px solid var(--purple-700);
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+
+.dashboard-notification-row.is-read {
+    border-left-color: var(--gray-300);
+}
+
+.dashboard-notification-time {
+    display: block;
+}
+
+.dashboard-side-card .card-footer {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.dashboard-view-all {
+    font-size: 0.8125rem;
+    color: var(--gray-500);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.dashboard-view-all:hover {
+    color: var(--purple-700);
+}
+
+.dashboard-view-all:focus-visible {
+    outline: 2px solid var(--purple-500);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+}

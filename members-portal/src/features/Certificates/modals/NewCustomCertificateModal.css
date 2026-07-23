@@ -1,7 +1,7 @@
 /* NewCustomCertificateModal — size override only; base styles in modal.css */
 
 .new-custom-certificate-modal .modal-container {
-    max-width: 560px;
-    max-height: min(90vh, 900px);
+    max-width: 35rem;
+    max-height: min(90vh, 56.25rem);
     overflow: auto;
 }

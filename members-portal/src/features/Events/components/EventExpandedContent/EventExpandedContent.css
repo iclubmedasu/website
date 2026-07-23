@@ -464,7 +464,7 @@
 }
 
 .event-expanded-copy-link-btn:focus-visible {
-    outline: 2px solid var(--purple-500, #9063b3);
+    outline: 2px solid var(--purple-500);
     outline-offset: 2px;
 }
 
@@ -1056,44 +1056,6 @@
     font-size: 0.85rem;
 }
 
-.event-registrations-io-bar {
-    display: flex;
-    flex-shrink: 0;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-top: 1px solid var(--border-brand);
-    background: var(--bg-card);
-}
-
-.event-registrations-io-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-    flex: 1 1 0;
-    min-width: 0;
-    padding: 0.65rem 1rem;
-    border: none;
-    border-radius: var(--radius-md);
-    background: transparent;
-    color: var(--purple-700);
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-}
-
-.event-registrations-io-btn:hover:not(:disabled) {
-    background: var(--gradient-secondary);
-    color: white;
-}
-
-.event-registrations-io-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
 .event-registrations-add-field-col {
     width: 8rem;
     min-width: 8rem;
@@ -1185,40 +1147,10 @@
 
 .event-tickets-actions-col {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: 0.35rem;
-    align-items: flex-start;
-}
-
-.event-tickets-action-btn {
-    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: auto;
-    height: auto;
-    min-height: 1.75rem;
-    padding: 0.25rem 0.6rem;
-    border: 1px solid var(--gray-80);
-    border-radius: var(--radius-sm);
-    background: var(--bg-card);
-    color: var(--purple-700);
-    font-size: 0.75rem;
-    font-weight: 500;
-    line-height: 1.2;
-    cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.event-tickets-action-btn:hover:not(:disabled) {
-    background: var(--purple-50);
-    border-color: var(--purple-300);
-    color: var(--purple-700);
-    transform: none;
-}
-
-.event-tickets-action-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
 }
 
 .event-tickets-io-bar {
@@ -1252,17 +1184,17 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.35rem;
+    gap: 0.25rem;
     width: auto;
     margin: 0 auto;
-    min-height: 2.25rem;
-    padding: 0.4rem 0.65rem;
-    border: 2px dashed var(--gray-300);
-    border-radius: var(--radius-md);
+    min-height: 1.6rem;
+    padding: 0.15rem 0.45rem;
+    border: 1.5px dashed var(--gray-300);
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--success-accent);
     font-family: var(--font-body);
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     font-weight: 600;
     cursor: pointer;
     transition: background 0.15s, color 0.15s, border-color 0.15s;

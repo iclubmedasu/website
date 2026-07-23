@@ -13,6 +13,7 @@ import alumniRoutes from "./alumni";
 import administrationRoutes from "./administration";
 import projectsRoutes from "./projects";
 import tasksRoutes from "./tasks";
+import dashboardRoutes from "./dashboard";
 import eventsRoutes from "./events";
 import phasesRoutes from "./phases";
 import scheduleSlotsRoutes from "./scheduleSlots";
@@ -64,6 +65,7 @@ router.use("/alumni", authenticateToken, alumniRoutes);
 router.use("/administration", authenticateToken, administrationRoutes);
 router.use("/projects", authenticateToken, projectsRoutes);
 router.use("/tasks", authenticateToken, tasksRoutes);
+router.use("/dashboard", authenticateToken, dashboardRoutes);
 
 function isPublicEventRequest(req: Request): boolean {
     if (req.method === "POST" && /^\/(?:\d+|[A-Za-z0-9]{12})\/registrations\/?$/.test(req.path)) {
@@ -94,6 +96,7 @@ router.use("/finance", authenticateToken, financeRoutes);
 function isPublicCertificateRequest(req: Request): boolean {
     if (req.method === "GET" && /^\/verify\/[^/]+\/?$/.test(req.path)) return true;
     if (req.method === "GET" && /^\/verify\/[^/]+\/background\/?$/.test(req.path)) return true;
+    if (req.method === "GET" && /^\/verify\/[^/]+\/pdf\/?$/.test(req.path)) return true;
     if (
         req.method === "GET"
         && (req.path === "/" || req.path === "")
@@ -130,6 +133,7 @@ router.get("/", (_req: Request, res: Response) => {
             administration: "/api/administration",
             projects: "/api/projects",
             tasks: "/api/tasks",
+            dashboard: "/api/dashboard",
             events: "/api/events",
             phases: "/api/phases",
             scheduleSlots: "/api/schedule-slots",

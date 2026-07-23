@@ -12,3 +12,4 @@ export * from "./supportContent";
 export * from "./realtime";
 export * from "./concurrency";
 export * from "./finance";
+export * from "./dashboard";

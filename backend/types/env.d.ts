@@ -18,6 +18,9 @@ declare namespace NodeJS {
         RESEND_API_KEY?: string;
         RESEND_FROM_EMAIL?: string;
         RESEND_REPLY_TO?: string;
+        EMAIL_SEND_CONCURRENCY?: string;
         PUBLIC_WEBSITE_URL?: string;
+        API_PUBLIC_URL?: string;
+        PUBLIC_API_URL?: string;
     }
 }

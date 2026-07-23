@@ -1,15 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Eye, Filter, Search } from 'lucide-react';
+import { Download, Eye, Filter, Loader2, Mail, Search } from 'lucide-react';
 import { formatDate } from '@iclub/shared/utils';
 import { Checkbox } from '@/components/checkbox';
 import CertificateStatusBadge from '@/components/certificates/CertificateStatusBadge';
 import NewCustomCertificateModal from '@/features/Certificates/modals/NewCustomCertificateModal';
+import ReissueCertificateModal, {
+    type ReissueCertificateTarget,
+} from '@/features/Certificates/modals/ReissueCertificateModal';
 import RevokeCertificateModal, {
     type RevokeCertificateTarget,
 } from '@/features/Certificates/modals/RevokeCertificateModal';
 import CopyPublicVerifyLinkButton from '@/features/Events/components/CopyPublicVerifyLinkButton';
+import { useAutoDismissMessage } from '@/hooks/useAutoDismissMessage';
 import { buildPublicVerifyUrl } from '@/lib/publicWebsiteUrl';
 import {
     certificatesAPI,
@@ -24,12 +28,14 @@ import {
 } from '@/services/certificatesAPI';
 import type { Id } from '@/types/backend-contracts';
 import { isDateWithinRange } from '@/utils/filterDateRange';
+import { formatAttendanceDayLabel } from '../../eventDateUtils';
 import {
     DEFAULT_CERTIFICATE_ELIGIBLE_SORT,
     EMPTY_CERTIFICATE_ISSUE_DATE_RANGE,
     EVENT_ELIGIBLE_COLUMNS,
     isCertificateEligibleFunnelActive,
     processCertificateEligibleRows,
+    type CertificateEligibleColumn,
     type CertificateEligibleFilter,
     type CertificateEligibleSortSpec,
     type CertificateIssueDateRange,
@@ -38,13 +44,57 @@ import {
 import CertificateEligibleFilterModal, {
     CertificateEligibleFilterChips,
 } from './CertificateEligibleFilterModal';
+import EditableCertificateTypeCell from './EditableCertificateTypeCell';
 import {
     REGISTRATION_EMAIL_DISPLAY_LIMIT,
     REGISTRATION_NAME_DISPLAY_LIMIT,
-    REGISTRATION_PHONE_DISPLAY_LIMIT,
     truncateRegistrationCell,
 } from '../customFieldUtils';
 import type { CertificatesFunnelState } from '../eventExpandedFunnelState';
+
+function buildSessionOptionLabel(label: string | null, sessionDate: string): string {
+    const dateLabel = formatAttendanceDayLabel(sessionDate);
+    if (label?.trim()) return `${label.trim()} (${dateLabel})`;
+    return dateLabel;
+}
+
+function buildEventEligibleFilterColumns(
+    eligible: EventEligibleResponse | null,
+): CertificateEligibleColumn[] {
+    const dayOptions = eligible?.attendanceDayOptions ?? [];
+    const sessions = eligible?.sessions ?? [];
+
+    const specificDays: CertificateEligibleColumn = {
+        id: 'attendedDays',
+        label: 'Specific days',
+        kind: 'idSet',
+        options: dayOptions,
+        optionLabels: Object.fromEntries(
+            dayOptions.map((day) => [day, formatAttendanceDayLabel(day)]),
+        ),
+    };
+    const specificSessions: CertificateEligibleColumn = {
+        id: 'attendedSessionIds',
+        label: 'Specific sessions',
+        kind: 'idSet',
+        options: sessions.map((session) => String(session.id)),
+        optionLabels: Object.fromEntries(
+            sessions.map((session) => [
+                String(session.id),
+                buildSessionOptionLabel(session.label, session.sessionDate),
+            ]),
+        ),
+    };
+
+    const columns = [...EVENT_ELIGIBLE_COLUMNS];
+    const insertAt = columns.findIndex((column) => column.id === 'sessionsAttendedCount');
+    if (insertAt >= 0) {
+        columns.splice(insertAt + 1, 0, specificDays, specificSessions);
+    } else {
+        columns.push(specificDays, specificSessions);
+    }
+    return columns;
+}
 
 interface EventCertificatesSectionProps {
     eventId: Id | string;
@@ -67,12 +117,15 @@ interface UnifiedCertificateRow {
     category?: EventEligibleCategory;
     attendanceDaysCount?: number;
     sessionsAttendedCount?: number;
+    attendedDays?: string[];
+    attendedSessionIds?: number[];
     status: CertificateRowStatus;
     alreadyIssued: boolean;
     issueDate: string | null;
     certificateId: Id | null;
     verificationCode: string | null;
     certStatus: CertificateStatus | null;
+    certificateEmailSentAt: string | null;
     selectable: boolean;
 }
 
@@ -83,13 +136,30 @@ function getErrorMessage(error: unknown, fallback: string): string {
     return fallback;
 }
 
-function formatCertificateType(type: CertificateType | string): string {
-    return type.charAt(0) + type.slice(1).toLowerCase().replace(/_/g, ' ');
-}
-
 function formatStatusLabel(status: CertificateRowStatus): string {
     if (status === 'NOT_ISSUED') return 'Not issued';
     return status.charAt(0) + status.slice(1).toLowerCase();
+}
+
+function formatCertificateEmailStatus(
+    row: Pick<UnifiedCertificateRow, 'certStatus' | 'certificateEmailSentAt'>,
+): { label: string; sent: boolean; sentAt?: string | null } | null {
+    if (row.certStatus !== 'ISSUED' && !row.certificateEmailSentAt) return null;
+    if (row.certificateEmailSentAt) {
+        return { label: 'Sent', sent: true, sentAt: row.certificateEmailSentAt };
+    }
+    if (row.certStatus === 'ISSUED') {
+        return { label: 'Not sent', sent: false };
+    }
+    return null;
+}
+
+function canResendCertificateEmail(row: UnifiedCertificateRow): boolean {
+    return (
+        row.certStatus === 'ISSUED'
+        && row.certificateId != null
+        && Boolean(row.email?.trim())
+    );
 }
 
 function recipientKey(recipient: Pick<EventEligibleRecipient, 'memberId' | 'email' | 'type'>): string {
@@ -161,12 +231,15 @@ function buildUnifiedRows(
             category: recipient.category,
             attendanceDaysCount: recipient.attendanceDaysCount,
             sessionsAttendedCount: recipient.sessionsAttendedCount,
+            attendedDays: recipient.attendedDays,
+            attendedSessionIds: recipient.attendedSessionIds,
             status,
             alreadyIssued,
             issueDate: cert?.issuedAt ?? cert?.createdAt ?? null,
             certificateId: cert?.id ?? null,
             verificationCode: cert?.verificationCode ?? null,
             certStatus: cert?.status ?? null,
+            certificateEmailSentAt: cert?.certificateEmailSentAt ?? null,
             selectable: !alreadyIssued,
         };
     });
@@ -190,6 +263,7 @@ function buildUnifiedRows(
             certificateId: cert.id,
             verificationCode: cert.verificationCode,
             certStatus: cert.status,
+            certificateEmailSentAt: cert.certificateEmailSentAt ?? null,
             selectable: false,
         });
     }
@@ -210,11 +284,19 @@ export default function EventCertificatesSection({
     const [eligible, setEligible] = useState<EventEligibleResponse | null>(null);
     const [issued, setIssued] = useState<CertificateListItem[]>([]);
     const [selection, setSelection] = useState<Set<string>>(new Set());
+    const [typeOverrides, setTypeOverrides] = useState<Map<string, CertificateType>>(new Map());
     const [eligibleLoading, setEligibleLoading] = useState(false);
     const [issuedLoading, setIssuedLoading] = useState(false);
     const [issuing, setIssuing] = useState(false);
-    const [message, setMessage] = useState<string | null>(null);
+    const [resendingEmailId, setResendingEmailId] = useState<number | null>(null);
+    const [downloadingPdfCode, setDownloadingPdfCode] = useState<string | null>(null);
+    const { message, show: showSuccessMessage, clear: clearSuccessMessage } = useAutoDismissMessage();
     const [error, setError] = useState<string | null>(null);
+    const {
+        message: issueTemplateHint,
+        show: showIssueTemplateHint,
+        clear: clearIssueTemplateHint,
+    } = useAutoDismissMessage();
     const search = funnel.search;
     const columnFilters = funnel.columnFilters;
     const sortSpec = funnel.sortSpec;
@@ -244,6 +326,7 @@ export default function EventCertificatesSection({
     const [filterModalOpen, setFilterModalOpen] = useState(false);
     const [customModalOpen, setCustomModalOpen] = useState(false);
     const [revokeTarget, setRevokeTarget] = useState<RevokeCertificateTarget | null>(null);
+    const [reissueTarget, setReissueTarget] = useState<ReissueCertificateTarget | null>(null);
 
     useEffect(() => {
         let active = true;
@@ -306,6 +389,30 @@ export default function EventCertificatesSection({
         [eligible, issued],
     );
 
+    useEffect(() => {
+        setTypeOverrides((prev) => {
+            if (prev.size === 0) return prev;
+            const selectableKeys = new Set(
+                unifiedRows.filter((row) => row.selectable).map((row) => row.key),
+            );
+            let changed = false;
+            const next = new Map<string, CertificateType>();
+            for (const [key, type] of prev) {
+                if (selectableKeys.has(key)) {
+                    next.set(key, type);
+                } else {
+                    changed = true;
+                }
+            }
+            return changed ? next : prev;
+        });
+    }, [unifiedRows]);
+
+    const filterColumns = useMemo(
+        () => buildEventEligibleFilterColumns(eligible),
+        [eligible],
+    );
+
     const filteredRows = useMemo(
         () => processCertificateEligibleRows(
             unifiedRows,
@@ -355,10 +462,16 @@ export default function EventCertificatesSection({
 
     const clearSelection = () => {
         setSelection(new Set());
+        clearIssueTemplateHint();
     };
 
     const issueSelected = async () => {
-        if (!canManage || !selectedTemplateId || selection.size === 0) return;
+        if (!canManage || selection.size === 0 || issuing) return;
+
+        if (!selectedTemplateId.trim()) {
+            showIssueTemplateHint('Select a template first');
+            return;
+        }
 
         const filteredKeys = new Set(filteredSelectableKeys);
         const recipients: BulkCertificateRecipient[] = unifiedRows
@@ -367,21 +480,23 @@ export default function EventCertificatesSection({
                 memberId: r.memberId,
                 recipientName: r.fullName,
                 recipientEmail: r.email,
-                type: r.type,
+                type: typeOverrides.get(r.key) ?? r.type,
             }));
 
         if (recipients.length === 0) return;
 
+        clearIssueTemplateHint();
         setIssuing(true);
         setError(null);
-        setMessage(null);
+        clearSuccessMessage();
         try {
             const result = await certificatesAPI.issueBulkForEvent(eventId, {
                 templateId: Number(selectedTemplateId) as Id,
                 issueImmediately: true,
                 recipients,
             });
-            setMessage(`${result.created} certificates issued, ${result.skipped} skipped`);
+            showSuccessMessage(`${result.created} certificates issued, ${result.skipped} skipped`);
+            setTypeOverrides(new Map());
             await Promise.all([loadEligible(), loadIssued()]);
         } catch (err: unknown) {
             setError(getErrorMessage(err, 'Failed to issue certificates'));
@@ -396,6 +511,41 @@ export default function EventCertificatesSection({
             id: row.certificateId,
             recipientName: row.fullName,
         });
+    };
+
+    const openReissueModal = (row: UnifiedCertificateRow) => {
+        if (!canManage || !row.certificateId) return;
+        setReissueTarget({
+            id: row.certificateId,
+            recipientName: row.fullName,
+        });
+    };
+
+    const handleResendEmail = async (row: UnifiedCertificateRow) => {
+        if (!canManage || !canResendCertificateEmail(row) || row.certificateId == null) return;
+        setResendingEmailId(Number(row.certificateId));
+        try {
+            const result = await certificatesAPI.resendEmail(row.certificateId);
+            window.alert(result.message || 'Certificate email sent.');
+            await loadIssued();
+        } catch (err: unknown) {
+            window.alert(getErrorMessage(err, 'Failed to send certificate email.'));
+        } finally {
+            setResendingEmailId(null);
+        }
+    };
+
+    const handleDownloadPdf = async (row: UnifiedCertificateRow) => {
+        const code = row.verificationCode?.trim();
+        if (!code || row.certStatus !== 'ISSUED') return;
+        setDownloadingPdfCode(code);
+        try {
+            await certificatesAPI.downloadPdfByVerificationCode(code);
+        } catch (err: unknown) {
+            window.alert(getErrorMessage(err, 'Failed to download certificate PDF.'));
+        } finally {
+            setDownloadingPdfCode(null);
+        }
     };
 
     if (!isCertifiable) {
@@ -413,6 +563,8 @@ export default function EventCertificatesSection({
 
     const eventTitle = eligible?.eventTitle ?? '';
     const loading = (eligibleLoading && canManage && !eligible) || (issuedLoading && issued.length === 0);
+    const hasTemplateSelected = selectedTemplateId.trim().length > 0;
+    const needsTemplate = selectedVisibleCount > 0 && !hasTemplateSelected;
 
     return (
         <section className="event-expanded-panel">
@@ -448,7 +600,7 @@ export default function EventCertificatesSection({
 
             <CertificateEligibleFilterChips
                 filters={columnFilters}
-                columns={EVENT_ELIGIBLE_COLUMNS}
+                columns={filterColumns}
                 issueDateRange={issueDateRange}
                 onRemove={(index) => setColumnFilters((current) => (
                     current.filter((_, filterIndex) => filterIndex !== index)
@@ -459,7 +611,7 @@ export default function EventCertificatesSection({
 
             <CertificateEligibleFilterModal
                 open={filterModalOpen}
-                columns={EVENT_ELIGIBLE_COLUMNS}
+                columns={filterColumns}
                 activeFilters={columnFilters}
                 sortSpec={sortSpec}
                 issueDateRange={issueDateRange}
@@ -494,18 +646,21 @@ export default function EventCertificatesSection({
                                         {canManage ? <th aria-label="Select" /> : null}
                                         <th className="event-registrations-name-cell">Name</th>
                                         <th className="event-registrations-email-cell">Email</th>
-                                        <th className="event-registrations-phone-cell">Phone</th>
+                                        {/* <th className="event-registrations-phone-cell">Phone</th> */}
                                         <th>Type</th>
-                                        <th>Days attended</th>
-                                        <th>Sessions attended</th>
+                                        <th>Days</th>
+                                        <th className="event-cert-sessions-cell">Sessions</th>
                                         <th>Status</th>
-                                        <th>Issue date</th>
+                                        <th className="event-cert-issue-date-cell">Issue date</th>
+                                        <th className="event-cert-sent-cell">Sent</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {filteredRows.map((row, index) => {
                                         const checked = selection.has(row.key);
+                                        const emailStatus = formatCertificateEmailStatus(row);
+                                        const canResend = canManage && canResendCertificateEmail(row);
                                         return (
                                             <tr
                                                 key={row.key}
@@ -544,7 +699,7 @@ export default function EventCertificatesSection({
                                                         )
                                                         : '—'}
                                                 </td>
-                                                <td
+                                                {/* <td
                                                     className="event-registrations-phone-cell"
                                                     title={row.phoneNumber || undefined}
                                                 >
@@ -554,18 +709,29 @@ export default function EventCertificatesSection({
                                                             REGISTRATION_PHONE_DISPLAY_LIMIT,
                                                         )
                                                         : '—'}
-                                                </td>
-                                                <td>
-                                                    <span className="badge">
-                                                        {formatCertificateType(row.type)}
-                                                    </span>
-                                                </td>
+                                                </td> */}
+                                                <EditableCertificateTypeCell
+                                                    value={typeOverrides.get(row.key) ?? row.type}
+                                                    disabled={!canManage || !row.selectable}
+                                                    recipientName={row.fullName}
+                                                    onChange={(next) => {
+                                                        setTypeOverrides((prev) => {
+                                                            const nextMap = new Map(prev);
+                                                            if (next === row.type) {
+                                                                nextMap.delete(row.key);
+                                                            } else {
+                                                                nextMap.set(row.key, next);
+                                                            }
+                                                            return nextMap;
+                                                        });
+                                                    }}
+                                                />
                                                 <td>
                                                     {row.attendanceDaysCount !== undefined
                                                         ? row.attendanceDaysCount
                                                         : '—'}
                                                 </td>
-                                                <td>
+                                                <td className="event-cert-sessions-cell">
                                                     {row.sessionsAttendedCount !== undefined
                                                         ? row.sessionsAttendedCount
                                                         : '—'}
@@ -582,12 +748,74 @@ export default function EventCertificatesSection({
                                                             )
                                                         }
                                                         onRevoke={() => openRevokeModal(row)}
+                                                        canReissue={
+                                                            Boolean(
+                                                                canManage
+                                                                    && row.certStatus === 'REVOKED'
+                                                                    && row.certificateId,
+                                                            )
+                                                        }
+                                                        onReissue={() => openReissueModal(row)}
                                                         recipientName={row.fullName}
                                                     />
                                                 </td>
-                                                <td>{row.issueDate ? formatDate(row.issueDate) : '—'}</td>
+                                                <td className="event-cert-issue-date-cell">
+                                                    {row.issueDate ? formatDate(row.issueDate) : '—'}
+                                                </td>
+                                                <td className="event-cert-sent-cell">
+                                                    {emailStatus ? (
+                                                        <div className="certificate-email-delivery-status">
+                                                            <span
+                                                                className={`status-badge${emailStatus.sent ? ' active' : ' away'}`}
+                                                            >
+                                                                {emailStatus.label}
+                                                            </span>
+                                                            {emailStatus.sent && emailStatus.sentAt ? (
+                                                                <span className="certificate-email-delivery-status__date">
+                                                                    {formatDate(emailStatus.sentAt)}
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                    ) : (
+                                                        '—'
+                                                    )}
+                                                </td>
                                                 <td>
                                                     <div className="action-buttons event-cert-inline-actions">
+                                                        {canResend ? (
+                                                            <button
+                                                                type="button"
+                                                                className="table-action-btn view-btn"
+                                                                title="Resend email"
+                                                                disabled={
+                                                                    resendingEmailId
+                                                                    === Number(row.certificateId)
+                                                                }
+                                                                onClick={() => void handleResendEmail(row)}
+                                                            >
+                                                                {resendingEmailId
+                                                                    === Number(row.certificateId)
+                                                                    ? <Loader2 className="animate-spin" />
+                                                                    : <Mail />}
+                                                            </button>
+                                                        ) : null}
+                                                        {row.verificationCode && row.certStatus === 'ISSUED' ? (
+                                                            <button
+                                                                type="button"
+                                                                className="table-action-btn view-btn"
+                                                                title="Download PDF"
+                                                                disabled={
+                                                                    downloadingPdfCode
+                                                                    === row.verificationCode
+                                                                }
+                                                                onClick={() => void handleDownloadPdf(row)}
+                                                            >
+                                                                {downloadingPdfCode
+                                                                    === row.verificationCode
+                                                                    ? <Loader2 className="animate-spin" />
+                                                                    : <Download />}
+                                                            </button>
+                                                        ) : null}
                                                         {row.verificationCode ? (
                                                             <button
                                                                 type="button"
@@ -615,7 +843,7 @@ export default function EventCertificatesSection({
                                                             />
                                                         ) : null}
                                                         */}
-                                                        {!row.verificationCode && row.selectable ? (
+                                                        {!row.verificationCode && !canResend && row.selectable ? (
                                                             <span className="event-expanded-muted">—</span>
                                                         ) : null}
                                                     </div>
@@ -646,23 +874,55 @@ export default function EventCertificatesSection({
                             >
                                 Clear
                             </button>
-                            <button
-                                type="button"
-                                className="btn btn-primary event-cert-io-btn"
-                                disabled={!selectedTemplateId || selectedVisibleCount === 0 || issuing}
-                                onClick={() => void issueSelected()}
-                            >
-                                {issuing
-                                    ? 'Issuing…'
-                                    : selectedVisibleCount > 0
-                                        ? `Issue selected (${selectedVisibleCount})`
-                                        : 'Issue selected'}
-                            </button>
+                            <div className="event-cert-io-issue">
+                                <button
+                                    type="button"
+                                    className={
+                                        needsTemplate
+                                            ? 'btn btn-primary event-cert-io-btn event-cert-io-btn--needs-template'
+                                            : 'btn btn-primary event-cert-io-btn'
+                                    }
+                                    disabled={selectedVisibleCount === 0 || issuing}
+                                    aria-disabled={needsTemplate ? true : undefined}
+                                    title={
+                                        selectedVisibleCount === 0
+                                            ? 'Select at least one recipient'
+                                            : needsTemplate
+                                              ? 'Select a template first'
+                                              : undefined
+                                    }
+                                    aria-describedby={
+                                        issueTemplateHint && selectedVisibleCount > 0
+                                            ? 'event-cert-issue-template-hint'
+                                            : undefined
+                                    }
+                                    onClick={() => void issueSelected()}
+                                >
+                                    {issuing
+                                        ? 'Issuing…'
+                                        : selectedVisibleCount > 0
+                                          ? `Issue selected (${selectedVisibleCount})`
+                                          : 'Issue selected'}
+                                </button>
+                                {issueTemplateHint && selectedVisibleCount > 0 ? (
+                                    <span
+                                        id="event-cert-issue-template-hint"
+                                        className="event-cert-io-hint"
+                                        role="status"
+                                    >
+                                        {issueTemplateHint}
+                                    </span>
+                                ) : null}
+                            </div>
                             <select
                                 className="form-input event-cert-io-template"
                                 aria-label="Certificate template"
                                 value={selectedTemplateId}
-                                onChange={(e) => setSelectedTemplateId(e.target.value)}
+                                onChange={(e) => {
+                                    const next = e.target.value.trim();
+                                    setSelectedTemplateId(next);
+                                    if (next) clearIssueTemplateHint();
+                                }}
                             >
                                 <option value="">Select template…</option>
                                 {templates.map((template) => (
@@ -687,7 +947,7 @@ export default function EventCertificatesSection({
                 isOpen={customModalOpen}
                 onClose={() => setCustomModalOpen(false)}
                 onSuccess={async () => {
-                    setMessage('Custom certificate created');
+                    showSuccessMessage('Custom certificate created');
                     await Promise.all([loadEligible(), loadIssued()]);
                 }}
                 eventId={eventId}
@@ -698,6 +958,14 @@ export default function EventCertificatesSection({
                 target={revokeTarget}
                 onClose={() => setRevokeTarget(null)}
                 onRevoked={async () => {
+                    setError(null);
+                    await Promise.all([loadEligible(), loadIssued()]);
+                }}
+            />
+            <ReissueCertificateModal
+                target={reissueTarget}
+                onClose={() => setReissueTarget(null)}
+                onReissued={async () => {
                     setError(null);
                     await Promise.all([loadEligible(), loadIssued()]);
                 }}

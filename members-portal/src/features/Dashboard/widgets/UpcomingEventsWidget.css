@@ -1,0 +1,19 @@
+.upcoming-events-badge--registered {
+    background: var(--purple-50);
+    color: var(--purple-700);
+}
+
+.upcoming-events-badge--assigned {
+    background: var(--gray-100);
+    color: var(--gray-600);
+}
+
+.upcoming-events-badge--created {
+    background: var(--status-completed-bg, var(--gray-100));
+    color: var(--status-completed-text, var(--gray-700));
+}
+
+.upcoming-events-badge--team {
+    background: var(--purple-50);
+    color: var(--purple-900);
+}
