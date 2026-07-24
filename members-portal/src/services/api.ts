@@ -27,6 +27,7 @@ import type {
     EventFileHistoryEntry,
     EventFileRef,
     EventFolderRef,
+    EventPhotoRef,
     EventQueryParams,
     EventRegistrationQueryParams,
     EventRegistrationLookupResult,
@@ -1764,6 +1765,93 @@ export const eventFilesAPI = {
             headers: getAuthHeaders(),
         });
         return handleResponse<EventFileRef>(response);
+    },
+};
+
+// ============================================
+// EVENT PHOTOS API
+// ============================================
+
+export type UpdateEventPhotoPayload = {
+    caption?: string | null;
+    eventDay?: string | null;
+    order?: number;
+    showOnPublic?: boolean;
+};
+
+export const eventPhotosAPI = {
+    list: async (eventId: Id | string): Promise<EventPhotoRef[]> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-photos?eventId=${eventId}`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<EventPhotoRef[]>(response);
+    },
+
+    upload: (
+        formData: FormData,
+        onProgress?: (progress: number) => void,
+    ): Promise<EventPhotoRef> => {
+        return new Promise<EventPhotoRef>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable && onProgress) {
+                    onProgress(Math.round((e.loaded / e.total) * 100));
+                }
+            };
+
+            xhr.onload = () => {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve(data as EventPhotoRef);
+                    } else {
+                        reject(new Error(data.error || `Upload failed (${xhr.status})`));
+                    }
+                } catch {
+                    reject(new Error('Failed to parse upload response'));
+                }
+            };
+
+            xhr.onerror = () => reject(new Error('Network error during upload'));
+
+            xhr.open('POST', `${API_BASE_URL}/event-photos/upload`);
+            const token = getAuthToken();
+            if (token) {
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            }
+            xhr.withCredentials = shouldSendCredentials();
+            xhr.send(formData);
+        });
+    },
+
+    update: async (id: Id | string, patch: UpdateEventPhotoPayload): Promise<EventPhotoRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-photos/${id}`, {
+            method: 'PATCH',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch),
+        });
+        return handleResponse<EventPhotoRef>(response);
+    },
+
+    remove: async (id: Id | string): Promise<{ success?: boolean }> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-photos/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<{ success?: boolean }>(response);
+    },
+
+    restore: async (id: Id | string): Promise<EventPhotoRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/event-photos/${id}/restore`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<EventPhotoRef>(response);
+    },
+
+    getDownloadUrl: (id: Id | string): string => {
+        return `${API_BASE_URL}/event-photos/${id}/download`;
     },
 };
 

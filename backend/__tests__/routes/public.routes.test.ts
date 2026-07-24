@@ -8,6 +8,7 @@ const prismaMocks = vi.hoisted(() => ({
     eventRegistrationCount: vi.fn(),
     eventRegistrationGroupBy: vi.fn(),
     eventRegistrationFindFirst: vi.fn(),
+    eventRegistrationSessionFindMany: vi.fn(),
     eventSessionFindMany: vi.fn(),
     eventTierFindMany: vi.fn(),
     eventCustomFieldFindMany: vi.fn(),
@@ -45,6 +46,9 @@ vi.mock("../../db", () => ({
         },
         eventSession: {
             findMany: prismaMocks.eventSessionFindMany,
+        },
+        eventRegistrationSession: {
+            findMany: prismaMocks.eventRegistrationSessionFindMany,
         },
         eventTier: {
             findMany: prismaMocks.eventTierFindMany,
@@ -112,6 +116,7 @@ const baseEvent = {
     status: "PUBLISHED",
     isActive: true,
     isArchived: false,
+    isFinalized: false,
     isPublished: true,
     isDisclosed: false,
     projectType: { name: "Workshop" },
@@ -124,6 +129,8 @@ describe("public routes", () => {
         prismaMocks.eventRegistrationCount.mockResolvedValue(0);
         prismaMocks.eventRegistrationGroupBy.mockResolvedValue([]);
         prismaMocks.eventRegistrationFindFirst.mockResolvedValue(null);
+        prismaMocks.eventRegistrationSessionFindMany.mockResolvedValue([]);
+        prismaMocks.eventSessionFindMany.mockResolvedValue([]);
         prismaMocks.eventTierFindMany.mockResolvedValue([]);
         prismaMocks.eventCustomFieldFindMany.mockResolvedValue([]);
         prismaMocks.projectFindMany.mockResolvedValue([]);
@@ -161,6 +168,7 @@ describe("public routes", () => {
         expect(prismaMocks.eventFindMany).toHaveBeenCalledWith(expect.objectContaining({
             where: expect.objectContaining({
                 isArchived: false,
+                isFinalized: false,
                 isPublished: true,
             }),
         }));
@@ -248,11 +256,43 @@ describe("public routes", () => {
         expect(response.status).toBe(404);
     });
 
+    it("GET /public/events/:id returns disclosed finalized events", async () => {
+        prismaMocks.eventFindUnique.mockResolvedValue({
+            ...baseEvent,
+            isFinalized: true,
+            isDisclosed: true,
+            isPublished: true,
+        });
+        prismaMocks.eventRegistrationCount.mockResolvedValue(40);
+
+        const response = await request(createApp()).get("/public/events/1");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+            id: 1,
+            slug: "abcdefghjkmn",
+        });
+    });
+
+    it("GET /public/events/:id returns 404 for finalized events that are not disclosed", async () => {
+        prismaMocks.eventFindUnique.mockResolvedValue({
+            ...baseEvent,
+            isFinalized: true,
+            isDisclosed: false,
+            isPublished: true,
+        });
+
+        const response = await request(createApp()).get("/public/events/1");
+
+        expect(response.status).toBe(404);
+    });
+
     it("GET /public/events/:id/tiers returns active tiers with capacity", async () => {
         prismaMocks.eventFindUnique.mockResolvedValue({
             id: 1,
             isActive: true,
             isArchived: false,
+            isFinalized: false,
             isPublished: true,
         });
         prismaMocks.eventTierFindMany.mockResolvedValue([
@@ -293,6 +333,7 @@ describe("public routes", () => {
             id: 1,
             isActive: true,
             isArchived: false,
+            isFinalized: false,
             isPublished: true,
         });
         prismaMocks.eventCustomFieldFindMany.mockResolvedValue([
@@ -330,12 +371,17 @@ describe("public routes", () => {
                 venue: "ASU Downtown",
                 isActive: true,
                 isArchived: false,
+                isFinalized: false,
                 isPublished: true,
             },
             tier: { name: "General" },
         });
         sessionTokenMocks.generateTokensForRegistration.mockResolvedValue(1);
         sessionTokenMocks.getSessionTokensForRegistration.mockResolvedValue(new Map([[7, "tok-online-1"]]));
+        prismaMocks.eventRegistrationSessionFindMany.mockResolvedValue([
+            { sessionId: 6 },
+            { sessionId: 7 },
+        ]);
         prismaMocks.eventSessionFindMany.mockResolvedValue([
             {
                 id: 6,
@@ -429,8 +475,10 @@ describe("public routes", () => {
         expect(response.body[0].slug).toBe("abcdefghjkmn");
         expect(prismaMocks.eventFindMany).toHaveBeenCalledWith(expect.objectContaining({
             where: {
-                isArchived: true,
-                isDisclosed: true,
+                OR: [
+                    { isArchived: true, isDisclosed: true },
+                    { isFinalized: true, isArchived: false, isDisclosed: true },
+                ],
             },
             orderBy: { eventEndDate: "desc" },
         }));

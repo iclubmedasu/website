@@ -66,6 +66,7 @@ export default function LifecycleCardActions({
     const btnClass = isExpanded ? 'icon-btn icon-btn--text' : 'icon-btn';
 
     const stop = (handler?: (t: LifecycleItemTarget) => void) => (e: React.MouseEvent) => {
+        e.preventDefault();
         e.stopPropagation();
         handler?.(target);
     };
@@ -118,9 +119,22 @@ export default function LifecycleCardActions({
         );
     }
 
+    const discloseButton = canManage && item.isFinalized && !item.isArchived && onToggleDisclose ? (
+        <button
+            className={`${btnClass} publish-website-btn`}
+            title={item.isDisclosed ? 'Hide from website' : 'Disclose on website'}
+            type="button"
+            onClick={stop(onToggleDisclose)}
+        >
+            <Globe size={size} />
+            {label(item.isDisclosed ? 'Hide from website' : 'Disclose on website')}
+        </button>
+    ) : null;
+
     if (isExpanded && detail) {
         return (
             <>
+                {discloseButton}
                 {detail.isFinalized ? (
                     canManage && (
                         <button className={`${btnClass} archive-btn`} title="Archive" aria-label="Archive" type="button" onClick={stop(onArchive)}>
@@ -184,6 +198,7 @@ export default function LifecycleCardActions({
 
     return (
         <>
+            {discloseButton}
             {item.isFinalized && canManage && (
                 <button className={`${btnClass} archive-btn`} title={getEntityTitle(entityLabel, 'Archive')} type="button" onClick={stop(onArchive)}>
                     <Archive size={size} />

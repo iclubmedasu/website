@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Archive, Calendar, Paperclip, Users } from 'lucide-react';
+import { Archive, Calendar, Image, Paperclip, Users } from 'lucide-react';
 import LifecycleCardView, {
     getArchiveOutcomeBadge,
     getLifecycleBadge,
@@ -14,6 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { eventFilesAPI } from '@/services/api';
 import type { EventDetail, EventFileRef, EventFolderRef, EventSummary, Id } from '@/types/backend-contracts';
 import { eventToCardViewModel } from './eventCardAdapter';
+import EventPhotosSection from './EventPhotosSection';
 import EventExpandedContent from '../EventExpandedContent/EventExpandedContent';
 import { formatEventDuration } from '../eventDateUtils';
 import type { EventTabKey } from '../eventUtils';
@@ -97,7 +98,7 @@ export default function EventCard({
     const lifecycleBadge = getLifecycleBadge(cardItem);
     const LifecycleIcon = lifecycleBadge.icon;
     const archiveOutcomeBadge = archivedView ? getArchiveOutcomeBadge(cardItem) : null;
-    const websiteDisclosedBadge = archivedView ? getWebsiteDisclosedBadge(cardItem) : null;
+    const websiteDisclosedBadge = getWebsiteDisclosedBadge(cardItem);
     const ArchiveOutcomeIcon = archiveOutcomeBadge?.icon ?? Archive;
     const WebsiteDisclosedIcon = websiteDisclosedBadge?.icon ?? Archive;
 
@@ -118,6 +119,7 @@ export default function EventCard({
         onArchive: () => onArchive(event),
         onReactivate: () => onReactivate(event),
         onAbort: () => onAbort(event),
+        onToggleDisclose: onToggleDisclose ? () => onToggleDisclose(event) : undefined,
         onViewActivity: () => onViewActivity(event),
     };
 
@@ -135,6 +137,7 @@ export default function EventCard({
         onArchive: () => onArchive(detailTarget),
         onReactivate: () => onReactivate(detailTarget),
         onAbort: () => onAbort(detailTarget),
+        onToggleDisclose: onToggleDisclose ? () => onToggleDisclose(detailTarget) : undefined,
         onViewActivity: () => onViewActivity(detailTarget),
     };
 
@@ -304,6 +307,20 @@ export default function EventCard({
                             onFileRenamed={archivedView ? () => { } : (updated) => setEventFiles((prev) =>
                                 prev.map((f) => f.id === updated.id ? { ...f, fileName: updated.fileName } : f)
                             )}
+                            disabled={archivedView || !canUpload}
+                        />
+                    </div>
+                    <div className="exp-card-section">
+                        <div className="exp-card-section-header">
+                            <Image size={14} className="exp-card-section-icon" />
+                            Event Photos
+                        </div>
+                        <EventPhotosSection
+                            eventId={fullDetail.id}
+                            eventDate={fullDetail.eventDate}
+                            eventEndDate={fullDetail.eventEndDate}
+                            timezone={fullDetail.timezone}
+                            memberId={user?.id}
                             disabled={archivedView || !canUpload}
                         />
                     </div>

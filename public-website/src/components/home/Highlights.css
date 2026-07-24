@@ -1,0 +1,20 @@
+.home-highlights-gallery {
+  position: relative;
+  /* Break out of .section-inner max-width/padding to full viewport width */
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  height: 480px;
+  overflow: hidden;
+}
+
+.home-highlights-gallery-fallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(86, 23, 137, 0.06), rgba(144, 99, 179, 0.1));
+}
+
+@media (max-width: 639px) {
+  .home-highlights-gallery {
+    height: 420px;
+  }
+}

@@ -1393,8 +1393,10 @@ router.patch('/:id/disclose', authenticateToken, async (req, res) => {
         if (!current) {
             return res.status(404).json({ error: 'Event not found' });
         }
-        if (!current.isArchived) {
-            return res.status(400).json({ error: 'Only archived events can be disclosed on the public website' });
+        if (!current.isArchived && !current.isFinalized) {
+            return res.status(400).json({
+                error: 'Only archived or finalized events can be disclosed on the public website',
+            });
         }
 
         const updated = await prisma.event.update({

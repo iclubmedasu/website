@@ -8,10 +8,10 @@ interface RecentProjectsPreviewProps {
 
 export function RecentProjectsPreview({ projects }: RecentProjectsPreviewProps) {
     return (
-        <Section variant="plain">
+        <Section variant="tint">
             <SectionHeading
                 title="Projects"
-                description="Explore completed initiatives led by iClub members — scroll sideways to see more."
+                description="Explore completed initiatives led by iClub members."
                 action={{ label: "View all projects", href: "/projects" }}
             />
             <ProjectsList projects={projects} />

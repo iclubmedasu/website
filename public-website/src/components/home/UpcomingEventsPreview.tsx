@@ -7,10 +7,10 @@ interface UpcomingEventsPreviewProps {
 }
 export function UpcomingEventsPreview({ events }: UpcomingEventsPreviewProps) {
     return (
-        <Section variant="subtle">
+        <Section variant="tint">
             <SectionHeading
                 title="Events"
-                description="Browse our published workshops, community events, and student-led activities — scroll sideways to see more."
+                description="Browse our available workshops, community events, and student-led activities."
                 action={{ label: "View all events", href: "/events" }}
             />
             <EventsList events={events} />

@@ -42,17 +42,19 @@ export function ProjectCard({ project }: ProjectCardProps) {
     return (
         <article className="project-card">
             <div className="event-card-header">
+                <div className="event-card-header-top">
+                    <div className="event-card-header-type">
+                        {project.projectType?.name ? (
+                            <Badge variant="purple" className="shrink-0">
+                                {project.projectType.name}
+                            </Badge>
+                        ) : null}
+                    </div>
+                    <ProjectShareMenu projectSlug={project.slug} projectTitle={project.title} />
+                </div>
                 <Link href={href} className="event-card-title-link">
                     <h3 className="project-card-title">{project.title}</h3>
                 </Link>
-                <div className="event-card-header-type">
-                    {project.projectType?.name ? (
-                        <Badge variant="purple" className="shrink-0">
-                            {project.projectType.name}
-                        </Badge>
-                    ) : null}
-                </div>
-                <ProjectShareMenu projectSlug={project.slug} projectTitle={project.title} />
             </div>
             <Link href={href} className="event-card-body">
                 <ProjectCardContent project={project} />

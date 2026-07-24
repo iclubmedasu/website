@@ -20,11 +20,13 @@ export function EventDetailHeader({
         <div className="space-y-4">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-purple-700">Event</p>
             <div className="event-detail-title-row">
-                <h1 className="event-detail-title">{eventTitle}</h1>
-                <div className="event-card-header-type">
-                    {projectTypeName ? <Badge variant="purple">{projectTypeName}</Badge> : null}
+                <div className="event-card-header-top">
+                    <div className="event-card-header-type">
+                        {projectTypeName ? <Badge variant="purple">{projectTypeName}</Badge> : null}
+                    </div>
+                    <EventShareMenu eventSlug={eventSlug} eventTitle={eventTitle} />
                 </div>
-                <EventShareMenu eventSlug={eventSlug} eventTitle={eventTitle} />
+                <h1 className="event-detail-title">{eventTitle}</h1>
             </div>
             {description ? (
                 <p className="text-lg leading-8 text-slate-600">{description}</p>

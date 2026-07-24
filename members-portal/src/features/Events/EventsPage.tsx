@@ -50,6 +50,7 @@ export default function EventsPage() {
     const [filterPriority, setFilterPriority] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [actionError, setActionError] = useState('');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showFiltersModal, setShowFiltersModal] = useState(false);
     const [editingEvent, setEditingEvent] = useState<EventDetail | null>(null);
@@ -225,6 +226,29 @@ export default function EventsPage() {
         }
     }, [expandedEventId, loadEvents]);
 
+    const handleToggleDisclose = useCallback(async (event: EventSummary | EventDetail) => {
+        try {
+            setActionError('');
+            const updated = await eventsAPI.setDisclosed(event.id, !event.isDisclosed);
+            setEvents((current) => current.map((item) => (
+                String(item.id) === String(updated.id)
+                    ? { ...item, isDisclosed: updated.isDisclosed }
+                    : item
+            )));
+            if (expandedEventId != null && String(expandedEventId) === String(updated.id)) {
+                setExpandedEventDetail((current) => (
+                    current && String(current.id) === String(updated.id)
+                        ? { ...current, isDisclosed: updated.isDisclosed }
+                        : updated
+                ));
+            }
+        } catch (discloseError) {
+            setActionError(
+                discloseError instanceof Error ? discloseError.message : 'Failed to update website visibility',
+            );
+        }
+    }, [expandedEventId]);
+
     const expandEventById = useCallback(async (eventId: string, tab: EventTabKey | null) => {
         const index = filteredEvents.findIndex((item) => String(item.id) === String(eventId));
         if (index >= 0) {
@@ -367,6 +391,10 @@ export default function EventsPage() {
                 </div>
             </div>
 
+            {actionError ? (
+                <div className="projects-error" role="alert">{actionError}</div>
+            ) : null}
+
             {loading ? (
                 <div className="empty-message">Loading events…</div>
             ) : error ? (
@@ -417,6 +445,7 @@ export default function EventsPage() {
                                 onReactivate={setReactivatingEvent}
                                 onAbort={setAbortingEvent}
                                 onViewActivity={setActivityEvent}
+                                onToggleDisclose={eventPermissions.canManageEvent() ? handleToggleDisclose : undefined}
                                 onReloadDetail={() => void handleRefreshDetail()}
                             />
                         ))}
@@ -504,6 +533,7 @@ export default function EventsPage() {
                     onReactivate={setReactivatingEvent}
                     onAbort={setAbortingEvent}
                     onViewActivity={setActivityEvent}
+                    onToggleDisclose={eventPermissions.canManageEvent() ? handleToggleDisclose : undefined}
                     onReloadDetail={() => void handleRefreshDetail()}
                 />
             ) : null}

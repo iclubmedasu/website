@@ -1,4 +1,5 @@
 import express, { Request, Response } from "express";
+import { Readable } from "stream";
 import { prisma } from "../db";
 import { isSessionEndedAt, serializeEventSession } from "../lib/eventSessionTime";
 import {
@@ -9,6 +10,7 @@ import {
 import { sendEmail } from "../services/emailService";
 import { buildRegistrationJoinUrl } from "../services/eventTicketEmailService";
 import { generateTokensForRegistration, getSessionTokensForRegistration } from "../services/sessionTokenService";
+import * as githubStorage from "../services/githubStorageService";
 import { buildMemberTimeline, toMemberProfileView } from "../lib/memberProfileVisibility";
 import { buildPublicMemberDirectory } from "../lib/publicMemberDirectory";
 import { getPublicWebsiteUrl } from "../lib/publicWebsiteUrl";
@@ -57,6 +59,7 @@ const publicEventSelect = {
     isArchived: true,
     isPublished: true,
     isDisclosed: true,
+    isFinalized: true,
     projectType: { select: { name: true } },
 } as const;
 
@@ -115,21 +118,30 @@ function isUpcomingQuery(value: unknown): boolean {
 }
 
 /** Live published events (registration-capable). */
-function canPublicViewEvent(event: { isPublished: boolean; isActive: boolean; isArchived: boolean }): boolean {
-    return event.isActive && !event.isArchived && event.isPublished;
+function canPublicViewEvent(event: {
+    isPublished: boolean;
+    isActive: boolean;
+    isArchived: boolean;
+    isFinalized: boolean;
+}): boolean {
+    return event.isActive && !event.isArchived && !event.isFinalized && event.isPublished;
 }
 
-/** Live published OR archived+disclosed (past public detail). */
+/** Live published OR archived/finalized+disclosed (past public detail). */
 function canPublicViewEventDetail(event: {
     isPublished: boolean;
     isActive: boolean;
     isArchived: boolean;
     isDisclosed: boolean;
+    isFinalized?: boolean;
 }): boolean {
     if (event.isArchived) {
         return event.isDisclosed;
     }
-    return canPublicViewEvent(event);
+    if (event.isFinalized) {
+        return event.isDisclosed;
+    }
+    return canPublicViewEvent({ ...event, isFinalized: false });
 }
 
 function computeSpotsRemaining(capacity: number | null | undefined, registeredCount: number): number | null {
@@ -220,6 +232,65 @@ function serializePublicEventListItem(
     };
 }
 
+function shuffleInPlace<T>(items: T[]): T[] {
+    for (let i = items.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = items[i]!;
+        items[i] = items[j]!;
+        items[j] = tmp;
+    }
+    return items;
+}
+
+router.get("/highlights/photos", async (_req: Request, res: Response) => {
+    try {
+        const events = await prisma.event.findMany({
+            where: {
+                OR: [
+                    { isArchived: true, isDisclosed: true },
+                    { isFinalized: true, isDisclosed: true },
+                ],
+                photos: {
+                    some: {
+                        isActive: true,
+                        showOnPublic: true,
+                    },
+                },
+            },
+            select: {
+                id: true,
+                title: true,
+                slug: true,
+                photos: {
+                    where: {
+                        isActive: true,
+                        showOnPublic: true,
+                    },
+                    select: {
+                        id: true,
+                    },
+                },
+            },
+        });
+
+        const selectedEvents = shuffleInPlace([...events]).slice(0, 5);
+        const highlights = selectedEvents.flatMap((event) => {
+            const photos = shuffleInPlace([...event.photos]).slice(0, 10);
+            return photos.map((photo) => ({
+                id: photo.id,
+                downloadUrl: `/api/public/event-photos/${photo.id}/download`,
+                eventTitle: event.title,
+                eventSlug: event.slug,
+            }));
+        });
+
+        return res.json(highlights);
+    } catch (error) {
+        console.error("GET /public/highlights/photos error:", error);
+        return res.status(500).json({ error: "Failed to load highlight photos" });
+    }
+});
+
 router.get("/events", async (req: Request, res: Response) => {
     try {
         const limit = parseLimit(req.query.limit, 50);
@@ -231,8 +302,10 @@ router.get("/events", async (req: Request, res: Response) => {
         if (past) {
             const events = await prisma.event.findMany({
                 where: {
-                    isArchived: true,
-                    isDisclosed: true,
+                    OR: [
+                        { isArchived: true, isDisclosed: true },
+                        { isFinalized: true, isArchived: false, isDisclosed: true },
+                    ],
                 },
                 select: publicEventSelect,
                 orderBy: { eventEndDate: "desc" },
@@ -250,6 +323,7 @@ router.get("/events", async (req: Request, res: Response) => {
         const where: Record<string, unknown> = {
             isActive: true,
             isArchived: false,
+            isFinalized: false,
             isPublished: true,
         };
 
@@ -325,6 +399,105 @@ router.get("/events/:id", async (req: Request, res: Response) => {
     }
 });
 
+router.get("/events/:id/photos", async (req: Request, res: Response) => {
+    try {
+        const resolved = await resolveEventByIdOrSlug(String(req.params.id));
+        if (!resolved) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+
+        const event = await prisma.event.findUnique({
+            where: { id: resolved.id },
+            select: {
+                isPublished: true,
+                isActive: true,
+                isArchived: true,
+                isDisclosed: true,
+                isFinalized: true,
+            },
+        });
+
+        if (!event || !canPublicViewEventDetail(event)) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+
+        const photos = await prisma.eventPhoto.findMany({
+            where: {
+                eventId: resolved.id,
+                isActive: true,
+                showOnPublic: true,
+            },
+            orderBy: [{ eventDay: "asc" }, { order: "asc" }],
+            select: {
+                id: true,
+                fileName: true,
+                eventDay: true,
+                caption: true,
+            },
+        });
+
+        return res.json(
+            photos.map((photo) => ({
+                id: photo.id,
+                fileName: photo.fileName,
+                eventDay: photo.eventDay,
+                caption: photo.caption,
+                downloadUrl: `/api/public/event-photos/${photo.id}/download`,
+            })),
+        );
+    } catch (error) {
+        console.error("GET /public/events/:id/photos error:", error);
+        return res.status(500).json({ error: "Failed to load event photos" });
+    }
+});
+
+router.get("/event-photos/:id/download", async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(String(req.params.id), 10);
+        if (Number.isNaN(id)) {
+            return res.status(404).json({ error: "Photo not found" });
+        }
+
+        const photo = await prisma.eventPhoto.findUnique({
+            where: { id },
+            include: {
+                event: {
+                    select: {
+                        isPublished: true,
+                        isActive: true,
+                        isArchived: true,
+                        isDisclosed: true,
+                        isFinalized: true,
+                    },
+                },
+            },
+        });
+
+        if (
+            !photo
+            || !photo.isActive
+            || !photo.showOnPublic
+            || !canPublicViewEventDetail(photo.event)
+        ) {
+            return res.status(404).json({ error: "Photo not found" });
+        }
+
+        const ghResponse = await githubStorage.downloadFile(photo.githubPath);
+
+        res.setHeader("Content-Type", photo.mimeType);
+        res.setHeader("Content-Disposition", `inline; filename="${photo.fileName}"`);
+        if (photo.fileSize) {
+            res.setHeader("Content-Length", photo.fileSize);
+        }
+        res.setHeader("Cache-Control", "public, max-age=300");
+
+        Readable.fromWeb(ghResponse.body as import("stream/web").ReadableStream).pipe(res);
+    } catch (error) {
+        console.error("GET /public/event-photos/:id/download error:", error);
+        return res.status(500).json({ error: "Failed to download photo" });
+    }
+});
+
 router.get("/events/:id/tiers", async (req: Request, res: Response) => {
     try {
         const resolved = await resolveEventByIdOrSlug(String(req.params.id));
@@ -335,7 +508,7 @@ router.get("/events/:id/tiers", async (req: Request, res: Response) => {
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
-            select: { id: true, isActive: true, isArchived: true, isPublished: true },
+            select: { id: true, isActive: true, isArchived: true, isFinalized: true, isPublished: true },
         });
 
         if (!event || event.isArchived || !canPublicViewEvent(event)) {
@@ -388,7 +561,7 @@ router.get("/events/:id/custom-fields", async (req: Request, res: Response) => {
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
-            select: { id: true, isActive: true, isArchived: true, isPublished: true },
+            select: { id: true, isActive: true, isArchived: true, isFinalized: true, isPublished: true },
         });
 
         if (!event || event.isArchived || !canPublicViewEvent(event)) {
@@ -429,7 +602,14 @@ router.get("/events/:id/sessions", async (req: Request, res: Response) => {
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
-            select: { id: true, isActive: true, isArchived: true, isPublished: true, timezone: true },
+            select: {
+                id: true,
+                isActive: true,
+                isArchived: true,
+                isFinalized: true,
+                isPublished: true,
+                timezone: true,
+            },
         });
 
         if (!event || event.isArchived || !canPublicViewEvent(event)) {
@@ -471,6 +651,7 @@ router.get("/events/:id/registration-form", async (req: Request, res: Response) 
                 id: true,
                 isActive: true,
                 isArchived: true,
+                isFinalized: true,
                 isPublished: true,
                 tierFieldShowOnPublic: true,
                 tierFieldRequired: true,
@@ -533,6 +714,7 @@ router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
                         timezone: true,
                         isActive: true,
                         isArchived: true,
+                        isFinalized: true,
                         isPublished: true,
                     },
                 },

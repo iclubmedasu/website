@@ -1,4 +1,5 @@
 export type Id = number;
+export type ISODate = string;
 export type ISODateTime = string;
 
 export type MemberAssignmentStatus = "UNASSIGNED" | "ASSIGNED" | "ALUMNI";

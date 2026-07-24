@@ -9,9 +9,15 @@ interface EventDetailActionsProps {
     eventId: number;
     eventSlug: string;
     registrationOpen: boolean;
+    isPastEvent?: boolean;
 }
 
-export function EventDetailActions({ eventId, eventSlug, registrationOpen }: EventDetailActionsProps) {
+export function EventDetailActions({
+    eventId,
+    eventSlug,
+    registrationOpen,
+    isPastEvent = false,
+}: EventDetailActionsProps) {
     const [ticketHref, setTicketHref] = useState<string | null>(null);
 
     useEffect(() => {
@@ -22,6 +28,10 @@ export function EventDetailActions({ eventId, eventSlug, registrationOpen }: Eve
             );
         }
     }, [eventId, eventSlug]);
+
+    if (isPastEvent && !ticketHref) {
+        return null;
+    }
 
     return (
         <div className="flex flex-wrap items-center gap-3 pt-2">

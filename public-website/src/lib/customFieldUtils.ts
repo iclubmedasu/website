@@ -118,10 +118,10 @@ export function parseCustomFieldInputValue(
 
 export function formatCapacityLabel(spotsRemaining: number | null | undefined, capacity: number | null | undefined): string {
     if (capacity == null) {
-        return "Open registration";
+        return "Unlimited";
     }
     if (spotsRemaining == null) {
-        return "Open registration";
+        return "Unlimited";
     }
     if (spotsRemaining <= 0) {
         return "Registration full";

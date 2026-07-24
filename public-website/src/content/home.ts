@@ -4,14 +4,8 @@ export const homeContent = {
         secondaryCta: { label: "Get Involved", href: "/contact" },
     },
     highlights: {
-        title: "By the numbers",
-        items: [
-            // Update these figures with verified club stats when available.
-            { value: "10+", label: "Events per year" },
-            { value: "5+", label: "Active projects" },
-            { value: "100+", label: "Student members" },
-            { value: "1", label: "Innovation community" },
-        ],
+        title: "Highlights",
+        description: "Moments from our events — a glimpse of the community in action.",
     },
     whyIclub: {
         title: "Why join iClub?",

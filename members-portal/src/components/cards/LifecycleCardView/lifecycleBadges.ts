@@ -52,7 +52,8 @@ export function getWebsiteDisclosedBadge(item: CardViewModel | null | undefined)
     icon: typeof Globe;
     title: string;
 } | null {
-    if (!item?.isArchived || !item?.isDisclosed) return null;
+    if (!item?.isDisclosed) return null;
+    if (!item.isArchived && !item.isFinalized) return null;
     return {
         className: 'badge-website-disclosed',
         label: 'On website',

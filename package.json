@@ -67,7 +67,8 @@
     "pnpm": {
         "overrides": {
             "serialize-javascript": "7.0.5",
-            "esbuild": "0.25.0"
+            "esbuild": "0.25.0",
+            "pg": "8.18.0"
         },
         "onlyBuiltDependencies": [
             "@prisma/client",

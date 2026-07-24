@@ -56,16 +56,18 @@ export function ProjectDetailContent({ idOrSlug }: { idOrSlug: string }) {
             <BackLink href="/projects" label="Back to Projects" />
             <section className="max-w-3xl space-y-4">
                 <div className="event-detail-title-row">
-                    <div className="space-y-2 min-w-0 flex-1">
+                    <div className="event-card-header-top">
+                        <div className="event-card-header-type">
+                            {project.projectType?.name ? (
+                                <Badge variant="purple">{project.projectType.name}</Badge>
+                            ) : null}
+                        </div>
+                        <ProjectShareMenu projectSlug={project.slug} projectTitle={project.title} />
+                    </div>
+                    <div className="space-y-2 min-w-0">
                         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-purple-700">Project</p>
                         <h1 className="text-4xl font-bold text-purple-900">{project.title}</h1>
                     </div>
-                    <div className="event-card-header-type">
-                        {project.projectType?.name ? (
-                            <Badge variant="purple">{project.projectType.name}</Badge>
-                        ) : null}
-                    </div>
-                    <ProjectShareMenu projectSlug={project.slug} projectTitle={project.title} />
                 </div>
                 {project.description ? (
                     <p className="text-lg leading-8 text-slate-600">{project.description}</p>

@@ -1,4 +1,4 @@
-import type { Id, ISODateTime, MemberSummary } from "./member";
+import type { Id, ISODate, ISODateTime, MemberSummary } from "./member";
 import type { ProjectStatus, ProjectTypeRef } from "./project";
 import type { Priority } from "./task";
 import type { TeamRef } from "./team";
@@ -520,6 +520,25 @@ export interface EventFileRef {
     updatedAt?: ISODateTime;
     uploadedBy?: MemberSummary;
     folder?: EventFolderRef;
+}
+
+export interface EventPhotoRef {
+    id: Id;
+    eventId: Id;
+    uploadedByMemberId: Id;
+    fileName: string;
+    githubPath: string;
+    githubSha: string;
+    fileSize: number;
+    mimeType: string;
+    eventDay: ISODate | null;
+    caption: string | null;
+    order: number;
+    showOnPublic: boolean;
+    isActive?: boolean;
+    createdAt?: ISODateTime;
+    updatedAt?: ISODateTime;
+    uploadedBy?: MemberSummary;
 }
 
 export interface EventFileCommentRef {

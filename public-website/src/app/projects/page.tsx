@@ -17,7 +17,7 @@ export default function ProjectsPage() {
                 <PageHeader
                     eyebrow="Projects"
                     title="Student-led initiatives"
-                    description={`Discover projects completed and led by ${siteConfig.shortName} members — scroll sideways to see more.`}
+                    description={`Discover projects completed and led by ${siteConfig.shortName} members.`}
                 />
             </Section>
             <ProjectsPageContent />

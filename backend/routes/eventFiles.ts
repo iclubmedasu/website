@@ -2,6 +2,7 @@ const express: any = require('express');
 const router: any = express.Router();
 const multer = require('multer');
 const { Readable } = require('stream');
+const { v4: uuidv4 } = require('uuid') as { v4: () => string };
 const { prisma }: { prisma: any } = require('../db');
 const githubStorage = require('../services/githubStorageService');
 const { logEventActivity } = require('../services/activityLogService');
@@ -33,7 +34,7 @@ function buildFolderGithubPath(eventId, folderName) {
 
 function buildFileGithubPath(eventId, folderGithubPath, originalFileName) {
     const safeName = originalFileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const uniqueName = `${Date.now()}-${safeName}`;
+    const uniqueName = `${uuidv4()}-${safeName}`;
     if (folderGithubPath) {
         return `${folderGithubPath}/${uniqueName}`;
     }

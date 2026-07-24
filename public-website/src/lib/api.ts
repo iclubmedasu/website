@@ -7,6 +7,8 @@ import type {
     PublicEventCustomField,
     PublicEventDetail,
     PublicEventListItem,
+    PublicEventPhoto,
+    PublicHighlightPhoto,
     PublicEventRegistrationFormConfig,
     PublicEventSession,
     PublicEventTier,
@@ -58,6 +60,20 @@ export const resolveApiBaseUrl = getApiBaseUrl;
 export function getPublicProfilePhotoUrl(memberId: number | string | null | undefined): string | null {
     if (!memberId) return null;
     return `${getApiBaseUrl()}/members/${memberId}/profile-photo`;
+}
+
+/**
+ * Resolve a public event photo download URL against the API base.
+ * `downloadUrl` from the API is `/api/public/...`; `getApiBaseUrl()` already ends with `/api`.
+ */
+export function getPublicEventPhotoUrl(downloadUrl: string | null | undefined): string | null {
+    if (!downloadUrl) return null;
+    const path = downloadUrl.startsWith("/api/")
+        ? downloadUrl.slice(4)
+        : downloadUrl.startsWith("/")
+          ? downloadUrl
+          : `/${downloadUrl}`;
+    return `${getApiBaseUrl()}${path}`;
 }
 
 export class ApiRequestError extends Error {
@@ -199,6 +215,14 @@ export const publicAPI = {
 
     async getEvent(idOrSlug: number | string): Promise<PublicEventDetail | null> {
         return fetchPublicOrThrow<PublicEventDetail>(`/public/events/${idOrSlug}`);
+    },
+
+    async getEventPhotos(idOrSlug: number | string): Promise<PublicEventPhoto[]> {
+        return fetchPublic<PublicEventPhoto[]>(`/public/events/${idOrSlug}/photos`, []);
+    },
+
+    async getHighlightPhotos(): Promise<PublicHighlightPhoto[]> {
+        return fetchPublic<PublicHighlightPhoto[]>("/public/highlights/photos", []);
     },
 
     async getEventTiers(idOrSlug: number | string): Promise<PublicEventTier[]> {

@@ -67,28 +67,26 @@ function EventCardBody({
 
 function EventCardHeader({
     event,
-    variant,
 }: {
     event: PublicEventListItem;
-    variant: "default" | "past";
 }) {
-    const isPast = variant === "past";
     const eventHref = publicEventPath(event.slug);
 
     return (
         <div className="event-card-header">
+            <div className="event-card-header-top">
+                <div className="event-card-header-type">
+                    {event.projectType?.name ? (
+                        <Badge variant="purple" className="shrink-0">
+                            {event.projectType.name}
+                        </Badge>
+                    ) : null}
+                </div>
+                <EventShareMenu eventSlug={event.slug} eventTitle={event.title} />
+            </div>
             <Link href={eventHref} className="event-card-title-link">
                 <h3 className="event-card-title">{event.title}</h3>
             </Link>
-            <div className="event-card-header-type">
-                {event.projectType?.name ? (
-                    <Badge variant="purple" className="shrink-0">
-                        {event.projectType.name}
-                    </Badge>
-                ) : null}
-                {isPast ? <Badge variant="neutral">Completed</Badge> : null}
-            </div>
-            <EventShareMenu eventSlug={event.slug} eventTitle={event.title} />
         </div>
     );
 }
@@ -99,7 +97,7 @@ export function EventCard({ event, variant = "default" }: EventCardProps) {
 
     return (
         <article className={cardClass}>
-            <EventCardHeader event={event} variant={variant} />
+            <EventCardHeader event={event} />
             <Link href={eventHref} className="event-card-body">
                 <EventCardBody event={event} variant={variant} />
             </Link>

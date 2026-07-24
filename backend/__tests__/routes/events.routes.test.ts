@@ -987,13 +987,48 @@ describe('events routes auth wiring', () => {
         }))
     })
 
-    it('rejects disclose on a non-archived event', async () => {
+    it('discloses a finalized non-archived event for the public website', async () => {
+        prismaMocks.eventFindUnique.mockResolvedValueOnce({
+            id: 104,
+            title: 'Finalized Summit',
+            isArchived: false,
+            isFinalized: true,
+            isDisclosed: false,
+        })
+        prismaMocks.eventUpdate.mockResolvedValueOnce({
+            id: 104,
+            title: 'Finalized Summit',
+            isArchived: false,
+            isFinalized: true,
+            isDisclosed: true,
+            eventTeams: [],
+            tiers: [],
+            customFields: [],
+            _count: { registrations: 0 },
+        })
+
+        const token = createToken({ memberId: 12, isDeveloper: true })
+
+        const response = await request(createApp())
+            .patch('/events/104/disclose')
+            .set('Authorization', `Bearer ${token}`)
+            .send({ disclosed: true })
+
+        expect(response.status).toBe(200)
+        expect(prismaMocks.eventUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            where: { id: 104 },
+            data: { isDisclosed: true },
+        }))
+    })
+
+    it('rejects disclose on a non-archived, non-finalized event', async () => {
         prismaMocks.eventFindUnique.mockReset()
         prismaMocks.eventUpdate.mockReset()
         prismaMocks.eventFindUnique.mockResolvedValue({
             id: 102,
             title: 'Active Summit',
             isArchived: false,
+            isFinalized: false,
             isDisclosed: false,
         })
 
@@ -1005,7 +1040,9 @@ describe('events routes auth wiring', () => {
             .send({ disclosed: true })
 
         expect(response.status).toBe(400)
-        expect(response.body).toEqual({ error: 'Only archived events can be disclosed on the public website' })
+        expect(response.body).toEqual({
+            error: 'Only archived or finalized events can be disclosed on the public website',
+        })
         expect(prismaMocks.eventUpdate).not.toHaveBeenCalled()
     })
 

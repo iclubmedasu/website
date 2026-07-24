@@ -17,7 +17,7 @@ export default function EventsPage() {
                 <PageHeader
                     eyebrow="Events"
                     title="Published events"
-                    description={`Browse all published ${siteConfig.shortName} events — scroll sideways to see more.`}
+                    description={`Browse all published ${siteConfig.shortName} events.`}
                 />
             </Section>
             <EventsPageContent />

@@ -19,6 +19,7 @@ import phasesRoutes from "./phases";
 import scheduleSlotsRoutes from "./scheduleSlots";
 import projectFilesRoutes from "./projectFiles";
 import eventFilesRoutes from "./eventFiles";
+import eventPhotosRoutes from "./eventPhotos";
 import notificationsRoutes from "./notifications";
 import publicRoutes from "./public";
 import siteContentRoutes from "./siteContent";
@@ -88,6 +89,7 @@ router.use("/phases", authenticateToken, phasesRoutes);
 router.use("/schedule-slots", authenticateToken, scheduleSlotsRoutes);
 router.use("/project-files", authenticateToken, projectFilesRoutes);
 router.use("/event-files", authenticateToken, eventFilesRoutes);
+router.use("/event-photos", authenticateToken, eventPhotosRoutes);
 router.use("/notifications", authenticateToken, notificationsRoutes);
 router.use("/site-content", authenticateToken, siteContentRoutes);
 router.use("/site-content/support", authenticateToken, supportContentRoutes);
@@ -139,6 +141,7 @@ router.get("/", (_req: Request, res: Response) => {
             scheduleSlots: "/api/schedule-slots",
             projectFiles: "/api/project-files",
             eventFiles: "/api/event-files",
+            eventPhotos: "/api/event-photos",
             notifications: "/api/notifications",
             siteContent: "/api/site-content",
             finance: "/api/finance",

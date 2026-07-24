@@ -1,4 +1,4 @@
-import type { Id, ISODateTime, MemberPublicProfile } from "./member";
+import type { Id, ISODate, ISODateTime, MemberPublicProfile } from "./member";
 import type { EventCustomFieldType } from "./event";
 
 export interface PublicEventTypeRef {
@@ -28,6 +28,21 @@ export interface PublicEventCapacityFields {
 export interface PublicEventListItem extends PublicEventSummary, PublicEventCapacityFields {}
 
 export interface PublicEventDetail extends PublicEventListItem {}
+
+export interface PublicEventPhoto {
+    id: Id;
+    fileName: string;
+    eventDay: ISODate | null;
+    caption: string | null;
+    downloadUrl: string;
+}
+
+export interface PublicHighlightPhoto {
+    id: Id;
+    downloadUrl: string;
+    eventTitle: string;
+    eventSlug: string;
+}
 
 export interface PublicEventTier {
     id: Id;

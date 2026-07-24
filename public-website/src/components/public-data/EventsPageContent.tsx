@@ -44,7 +44,7 @@ export function EventsPageContent() {
             <Section variant="subtle">
                 <SectionHeading
                     title="Past Events"
-                    description="Events the club has already run and disclosed publicly — scroll sideways to see more."
+                    description="Our recent events and activities."
                 />
                 <EventsList
                     events={past}

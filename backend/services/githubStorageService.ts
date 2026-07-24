@@ -54,37 +54,100 @@ function headers(extraAccept = "application/vnd.github+json"): Record<string, st
     };
 }
 
+/** Map GitHub HTTP status to a short message safe to return to API clients. */
+function safeGithubErrorMessage(status: number, fallback: string): string {
+    if (status === 409) return "Upload conflict. Please try again.";
+    if (status === 401 || status === 403) return "Storage authentication failed.";
+    if (status === 404) return "File not found in storage.";
+    return fallback;
+}
+
+function throwSafeGithubError(label: string, status: number, rawBody: string, fallback: string): never {
+    console.error(`${label} (${status}): ${rawBody}`);
+    throw new Error(safeGithubErrorMessage(status, fallback));
+}
+
+const MAX_UPLOAD_ATTEMPTS = 4;
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Fetch the current blob SHA for a path (for refreshing stale update SHAs). */
+async function getCurrentFileSha(githubPath: string): Promise<string | undefined> {
+    const res = await fetch(`${BASE}/${githubPath}`, { headers: headers() });
+    if (!res.ok) {
+        return undefined;
+    }
+    const data = (await res.json()) as { sha?: string };
+    return typeof data.sha === "string" ? data.sha : undefined;
+}
+
 async function uploadContentAtPath(
     contentBuffer: Buffer,
     githubPath: string,
     message: string,
     existingSha?: string,
 ): Promise<UploadResult> {
-    const bodyObj: { content: string; message: string; sha?: string } = {
-        content: contentBuffer.toString("base64"),
-        message,
-    };
+    const contentBase64 = contentBuffer.toString("base64");
+    const isUpdate = Boolean(existingSha);
+    let sha = existingSha;
 
-    if (existingSha) {
-        bodyObj.sha = existingSha;
+    let lastStatus = 0;
+    let lastBody = "";
+
+    for (let attempt = 0; attempt < MAX_UPLOAD_ATTEMPTS; attempt++) {
+        if (attempt > 0) {
+            await sleep(100 * attempt);
+            if (isUpdate) {
+                const refreshedSha = await getCurrentFileSha(githubPath);
+                if (refreshedSha) {
+                    sha = refreshedSha;
+                }
+            }
+        }
+
+        const bodyObj: { content: string; message: string; sha?: string } = {
+            content: contentBase64,
+            message,
+        };
+        if (sha) {
+            bodyObj.sha = sha;
+        }
+
+        const res = await fetch(`${BASE}/${githubPath}`, {
+            method: "PUT",
+            headers: { ...headers(), "Content-Type": "application/json" },
+            body: JSON.stringify(bodyObj),
+        });
+
+        if (res.ok) {
+            const data = (await res.json()) as GithubContentResponse;
+            return {
+                githubPath,
+                githubSha: data.content.sha,
+            };
+        }
+
+        lastStatus = res.status;
+        lastBody = await res.text();
+
+        if (res.status !== 409) {
+            throwSafeGithubError(
+                "GitHub upload failed",
+                lastStatus,
+                lastBody,
+                "Storage upload failed. Please try again.",
+            );
+        }
     }
 
-    const res = await fetch(`${BASE}/${githubPath}`, {
-        method: "PUT",
-        headers: { ...headers(), "Content-Type": "application/json" },
-        body: JSON.stringify(bodyObj),
-    });
-
-    if (!res.ok) {
-        const err = await res.text();
-        throw new Error(`GitHub upload failed (${res.status}): ${err}`);
-    }
-
-    const data = (await res.json()) as GithubContentResponse;
-    return {
-        githubPath,
-        githubSha: data.content.sha,
-    };
+    throwSafeGithubError(
+        "GitHub upload failed",
+        lastStatus,
+        lastBody,
+        "Storage upload failed. Please try again.",
+    );
 }
 
 /**
@@ -174,7 +237,12 @@ async function moveFile(
 
     if (!downloadRes.ok) {
         const err = await downloadRes.text();
-        throw new Error(`GitHub move source fetch failed (${downloadRes.status}): ${err}`);
+        throwSafeGithubError(
+            "GitHub move source fetch failed",
+            downloadRes.status,
+            err,
+            "Storage download failed. Please try again.",
+        );
     }
 
     const contentBuffer = Buffer.from(await downloadRes.arrayBuffer());
@@ -189,7 +257,12 @@ async function moveFile(
 
     if (!uploadRes.ok) {
         const err = await uploadRes.text();
-        throw new Error(`GitHub move upload failed (${uploadRes.status}): ${err}`);
+        throwSafeGithubError(
+            "GitHub move upload failed",
+            uploadRes.status,
+            err,
+            "Storage upload failed. Please try again.",
+        );
     }
 
     const uploadData = (await uploadRes.json()) as GithubContentResponse;
@@ -222,7 +295,12 @@ async function moveFile(
         } catch {
             // ignore rollback errors; original delete failure will be reported below
         }
-        throw new Error(`GitHub move delete failed (${deleteRes.status}): ${err}`);
+        throwSafeGithubError(
+            "GitHub move delete failed",
+            deleteRes.status,
+            err,
+            "Storage delete failed. Please try again.",
+        );
     }
 
     return {
@@ -267,7 +345,12 @@ async function downloadFile(githubPath: string): Promise<Response> {
 
     if (!res.ok) {
         const err = await res.text();
-        throw new Error(`GitHub download failed (${res.status}): ${err}`);
+        throwSafeGithubError(
+            "GitHub download failed",
+            res.status,
+            err,
+            "Storage download failed. Please try again.",
+        );
     }
 
     return res;
@@ -285,7 +368,12 @@ async function getFileHistory(githubPath: string): Promise<GithubHistoryEntry[]>
 
     if (!res.ok) {
         const err = await res.text();
-        throw new Error(`GitHub history failed (${res.status}): ${err}`);
+        throwSafeGithubError(
+            "GitHub history failed",
+            res.status,
+            err,
+            "Storage history failed. Please try again.",
+        );
     }
 
     const commits = (await res.json()) as GithubCommitApi[];
@@ -312,7 +400,12 @@ async function downloadFileAtVersion(githubPath: string, commitSha: string): Pro
 
     if (!res.ok) {
         const err = await res.text();
-        throw new Error(`GitHub version download failed (${res.status}): ${err}`);
+        throwSafeGithubError(
+            "GitHub version download failed",
+            res.status,
+            err,
+            "Storage download failed. Please try again.",
+        );
     }
 
     return res;
@@ -340,7 +433,12 @@ async function restoreDeletedFile(githubPath: string): Promise<{ githubSha: stri
     const contentRes = await fetch(contentUrl, { headers: headers() });
     if (!contentRes.ok) {
         const err = await contentRes.text();
-        throw new Error(`Failed to fetch file at commit ${restoreCommit.sha}: ${err}`);
+        throwSafeGithubError(
+            `GitHub restore fetch failed (commit ${restoreCommit.sha})`,
+            contentRes.status,
+            err,
+            "Storage download failed. Please try again.",
+        );
     }
     const contentData = (await contentRes.json()) as { content: string };
 
@@ -356,7 +454,12 @@ async function restoreDeletedFile(githubPath: string): Promise<{ githubSha: stri
 
     if (!createRes.ok) {
         const err = await createRes.text();
-        throw new Error(`GitHub restore failed (${createRes.status}): ${err}`);
+        throwSafeGithubError(
+            "GitHub restore failed",
+            createRes.status,
+            err,
+            "Storage upload failed. Please try again.",
+        );
     }
 
     const result = (await createRes.json()) as GithubContentResponse;
