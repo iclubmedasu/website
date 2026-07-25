@@ -249,6 +249,28 @@ function shuffleInPlace<T>(items: T[]): T[] {
     return items;
 }
 
+const HIGHLIGHTS_MAX_EVENTS = 5;
+const HIGHLIGHTS_MAX_PHOTOS_PER_EVENT = 10;
+
+type HighlightCandidatePhoto = {
+    id: number;
+    isCore: boolean;
+    showOnPublic: boolean;
+};
+
+/** Prefer core photos, then randomly fill from public photos up to the per-event cap. */
+function selectHighlightPhotosForEvent(
+    photos: HighlightCandidatePhoto[],
+    maxPhotos = HIGHLIGHTS_MAX_PHOTOS_PER_EVENT,
+): HighlightCandidatePhoto[] {
+    const core = shuffleInPlace(photos.filter((photo) => photo.isCore)).slice(0, maxPhotos);
+    const coreIds = new Set(core.map((photo) => photo.id));
+    const fillers = shuffleInPlace(
+        photos.filter((photo) => photo.showOnPublic && !coreIds.has(photo.id)),
+    ).slice(0, Math.max(0, maxPhotos - core.length));
+    return [...core, ...fillers];
+}
+
 router.get("/highlights/photos", async (_req: Request, res: Response) => {
     try {
         const events = await prisma.event.findMany({
@@ -257,7 +279,7 @@ router.get("/highlights/photos", async (_req: Request, res: Response) => {
                 photos: {
                     some: {
                         isActive: true,
-                        isCore: true,
+                        OR: [{ isCore: true }, { showOnPublic: true }],
                     },
                 },
             },
@@ -268,23 +290,25 @@ router.get("/highlights/photos", async (_req: Request, res: Response) => {
                 photos: {
                     where: {
                         isActive: true,
-                        isCore: true,
+                        OR: [{ isCore: true }, { showOnPublic: true }],
                     },
                     select: {
                         id: true,
+                        isCore: true,
+                        showOnPublic: true,
                     },
                 },
             },
         });
 
-        // Hide Highlights unless there is at least one disclosed event with core photos
+        // Hide Highlights unless there is at least one disclosed event with core or public photos
         if (events.length === 0) {
             return res.json([]);
         }
 
-        const selectedEvents = shuffleInPlace([...events]).slice(0, 5);
+        const selectedEvents = shuffleInPlace([...events]).slice(0, HIGHLIGHTS_MAX_EVENTS);
         const highlights = selectedEvents.flatMap((event) => {
-            const photos = shuffleInPlace([...event.photos]).slice(0, 10);
+            const photos = selectHighlightPhotosForEvent(event.photos);
             return photos.map((photo) => ({
                 id: photo.id,
                 downloadUrl: `/api/public/event-photos/${photo.id}/download`,

@@ -329,7 +329,10 @@ function EventPhotosDayGroup({
                                     aria-label={`Show ${photo.fileName} on public event page`}
                                 />
                             </div>
-                            <div className="event-photo-public-toggle" title="Show on home Highlights">
+                            <div
+                                className="event-photo-public-toggle"
+                                title="Prefer on home Highlights (fills randomly if fewer than 10)"
+                            >
                                 <span className="event-photo-public-toggle-label">Core</span>
                                 <Toggle
                                     color="purple"
@@ -340,7 +343,7 @@ function EventPhotosDayGroup({
                                         || (!photo.isCore && coreCount >= 10)
                                     }
                                     onChange={(next) => void onToggleCore(photo, next)}
-                                    aria-label={`Show ${photo.fileName} on home Highlights`}
+                                    aria-label={`Prefer ${photo.fileName} on home Highlights`}
                                 />
                             </div>
                         </div>
@@ -562,7 +565,11 @@ export default function EventPhotosSection({
         }
     };
 
-    const coreCount = photos.filter((photo) => photo.isCore && photo.isActive !== false).length;
+    const coreCount = photos.reduce(
+        (count, group) =>
+            count + group.photos.filter((p) => p.isCore && p.isActive !== false).length,
+        0,
+    );
 
     const closeDeleteModal = () => {
         setConfirmDelete(null);

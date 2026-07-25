@@ -367,13 +367,68 @@ describe("public routes", () => {
         ]);
     });
 
-    it("GET /public/highlights/photos returns core photos from disclosed events", async () => {
+    it("GET /public/highlights/photos prefers core then fills from public photos", async () => {
         prismaMocks.eventFindMany.mockResolvedValue([
             {
                 id: 1,
                 title: "Health Fair",
                 slug: "abcdefghjkmn",
-                photos: [{ id: 9 }, { id: 10 }],
+                photos: [
+                    { id: 1, isCore: true, showOnPublic: true },
+                    { id: 2, isCore: true, showOnPublic: false },
+                    { id: 3, isCore: true, showOnPublic: true },
+                    { id: 11, isCore: false, showOnPublic: true },
+                    { id: 12, isCore: false, showOnPublic: true },
+                    { id: 13, isCore: false, showOnPublic: true },
+                    { id: 14, isCore: false, showOnPublic: true },
+                    { id: 15, isCore: false, showOnPublic: true },
+                    { id: 16, isCore: false, showOnPublic: true },
+                    { id: 17, isCore: false, showOnPublic: true },
+                    { id: 18, isCore: false, showOnPublic: true },
+                ],
+            },
+        ]);
+
+        const response = await request(createApp()).get("/public/highlights/photos");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toHaveLength(10);
+        const ids = response.body.map((photo: { id: number }) => photo.id);
+        expect(ids).toEqual(expect.arrayContaining([1, 2, 3]));
+        expect(ids.filter((id: number) => id === 1 || id === 2 || id === 3)).toHaveLength(3);
+        expect(prismaMocks.eventFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    isDisclosed: true,
+                    photos: {
+                        some: {
+                            isActive: true,
+                            OR: [{ isCore: true }, { showOnPublic: true }],
+                        },
+                    },
+                }),
+                select: expect.objectContaining({
+                    photos: expect.objectContaining({
+                        where: {
+                            isActive: true,
+                            OR: [{ isCore: true }, { showOnPublic: true }],
+                        },
+                    }),
+                }),
+            }),
+        );
+    });
+
+    it("GET /public/highlights/photos uses random public photos when no core", async () => {
+        prismaMocks.eventFindMany.mockResolvedValue([
+            {
+                id: 1,
+                title: "Health Fair",
+                slug: "abcdefghjkmn",
+                photos: [
+                    { id: 9, isCore: false, showOnPublic: true },
+                    { id: 10, isCore: false, showOnPublic: true },
+                ],
             },
         ]);
 
@@ -396,30 +451,10 @@ describe("public routes", () => {
                 },
             ]),
         );
-        expect(prismaMocks.eventFindMany).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: expect.objectContaining({
-                    isDisclosed: true,
-                    photos: {
-                        some: {
-                            isActive: true,
-                            isCore: true,
-                        },
-                    },
-                }),
-                select: expect.objectContaining({
-                    photos: expect.objectContaining({
-                        where: {
-                            isActive: true,
-                            isCore: true,
-                        },
-                    }),
-                }),
-            }),
-        );
+        expect(response.body).toHaveLength(2);
     });
 
-    it("GET /public/highlights/photos returns empty when no core photos", async () => {
+    it("GET /public/highlights/photos returns empty when no eligible photos", async () => {
         prismaMocks.eventFindMany.mockResolvedValue([]);
 
         const response = await request(createApp()).get("/public/highlights/photos");
