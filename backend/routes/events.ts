@@ -153,6 +153,30 @@ function normalizeDescription(value: unknown): string | null {
     return text;
 }
 
+/** Title-case event titles; preserves brand casing for iCamp. */
+function toTitleCase(str: string): string {
+    if (!str || typeof str !== 'string') return str;
+    const SMALL = new Set(['a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'yet', 'so', 'at', 'by', 'in', 'of', 'on', 'to', 'up', 'as', 'is', 'it']);
+    const PRESERVED: Record<string, string> = { icamp: 'iCamp' };
+    const capitalisePart = (part: string) => {
+        const preserved = PRESERVED[part.toLowerCase()];
+        if (preserved) return preserved;
+        if (part.length > 1 && part === part.toUpperCase()) return part;
+        return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    };
+    const words = str.trim().split(/\s+/);
+    return words.map((word, i) => {
+        if (word.includes('-')) {
+            return word.split('-').map(capitalisePart).join('-');
+        }
+        const lower = word.toLowerCase();
+        if (PRESERVED[lower]) return PRESERVED[lower];
+        if (word.length > 1 && word === word.toUpperCase()) return word;
+        if (i !== 0 && i !== words.length - 1 && SMALL.has(lower)) return lower;
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+    }).join(' ');
+}
+
 function parseId(value: unknown): number | null {
     const parsed = Number.parseInt(String(value), 10);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
@@ -901,7 +925,7 @@ router.post('/', authenticateToken, async (req, res) => {
             return res.status(403).json({ error: 'Event management access required' });
         }
 
-        const title = String(req.body?.title || '').trim();
+        const title = toTitleCase(String(req.body?.title || '').trim());
         const eventDate = new Date(String(req.body?.eventDate || ''));
         if (!title || Number.isNaN(eventDate.getTime())) {
             return res.status(400).json({ error: 'title and valid eventDate are required' });
@@ -1032,7 +1056,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         const projectTypeId = req.body?.projectTypeId !== undefined ? parseId(req.body?.projectTypeId) : undefined;
 
         const data: Record<string, unknown> = {
-            title: req.body?.title !== undefined ? String(req.body.title).trim() : existing.title,
+            title: req.body?.title !== undefined ? toTitleCase(String(req.body.title).trim()) : existing.title,
             description: req.body?.description !== undefined ? normalizeDescription(req.body.description) : existing.description,
             venue: req.body?.venue !== undefined ? String(req.body.venue).trim() || null : existing.venue,
             eventDate: nextEventDate,

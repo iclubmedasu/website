@@ -22,16 +22,21 @@ const router: any = express.Router();
 function toTitleCase(str) {
     if (!str || typeof str !== 'string') return str;
     const SMALL = new Set(['a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'yet', 'so', 'at', 'by', 'in', 'of', 'on', 'to', 'up', 'as', 'is', 'it']);
+    const PRESERVED = { icamp: 'iCamp' };
+    const capitalisePart = (part) => {
+        const preserved = PRESERVED[part.toLowerCase()];
+        if (preserved) return preserved;
+        if (part.length > 1 && part === part.toUpperCase()) return part;
+        return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    };
     const words = str.trim().split(/\s+/);
     return words.map((word, i) => {
         if (word.includes('-')) {
-            return word.split('-').map(p => {
-                if (p.length > 1 && p === p.toUpperCase()) return p;
-                return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
-            }).join('-');
+            return word.split('-').map(capitalisePart).join('-');
         }
-        if (word.length > 1 && word === word.toUpperCase()) return word;
         const lower = word.toLowerCase();
+        if (PRESERVED[lower]) return PRESERVED[lower];
+        if (word.length > 1 && word === word.toUpperCase()) return word;
         if (i !== 0 && i !== words.length - 1 && SMALL.has(lower)) return lower;
         return lower.charAt(0).toUpperCase() + lower.slice(1);
     }).join(' ');

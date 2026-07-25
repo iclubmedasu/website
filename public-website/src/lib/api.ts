@@ -115,6 +115,24 @@ async function fetchPublic<T>(path: string, fallback: T): Promise<T> {
     }
 }
 
+/** Soft-fail fetch with no console noise (used for optional home Highlights). */
+async function fetchPublicSilent<T>(path: string, fallback: T, retries = 1): Promise<T> {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const response = await apiFetch(path);
+            if (!response.ok) {
+                if (attempt < retries) continue;
+                return fallback;
+            }
+            return (await response.json()) as T;
+        } catch {
+            if (attempt < retries) continue;
+            return fallback;
+        }
+    }
+    return fallback;
+}
+
 async function fetchPublicOrThrow<T>(path: string): Promise<T | null> {
     try {
         const response = await apiFetch(path);
@@ -222,7 +240,7 @@ export const publicAPI = {
     },
 
     async getHighlightPhotos(): Promise<PublicHighlightPhoto[]> {
-        return fetchPublic<PublicHighlightPhoto[]>("/public/highlights/photos", []);
+        return fetchPublicSilent<PublicHighlightPhoto[]>("/public/highlights/photos", [], 1);
     },
 
     async getEventTiers(idOrSlug: number | string): Promise<PublicEventTier[]> {

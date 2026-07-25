@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { PublicHighlightPhoto } from "@iclub/shared";
 import { Section, SectionHeading } from "@/components/ui";
 import { homeContent } from "@/content/home";
-import { getPublicEventPhotoUrl } from "@/lib/api";
+import { getPublicEventPhotoUrl, publicAPI } from "@/lib/api";
 import "@/components/events/circular-gallery/CircularGallery.css";
 import "./Highlights.css";
 
@@ -19,12 +19,19 @@ const CircularGallery = dynamic(
 
 const PRELOAD_COUNT = 4;
 
-type HighlightsProps = {
-    photos: PublicHighlightPhoto[];
-};
-
-export function Highlights({ photos }: HighlightsProps) {
+export function Highlights() {
+    const [photos, setPhotos] = useState<PublicHighlightPhoto[] | null>(null);
     const [isDesktop, setIsDesktop] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        void publicAPI.getHighlightPhotos().then((next) => {
+            if (!cancelled) setPhotos(next);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
         const media = window.matchMedia("(min-width: 1024px)");
@@ -34,7 +41,7 @@ export function Highlights({ photos }: HighlightsProps) {
         return () => media.removeEventListener("change", sync);
     }, []);
 
-    if (photos.length === 0) {
+    if (photos === null || photos.length === 0) {
         return null;
     }
 

@@ -9,6 +9,18 @@ const SMALL_WORDS = new Set<string>([
     'is',
 ]);
 
+/** Whole-word tokens that keep a fixed brand casing (matched case-insensitively). */
+const PRESERVED_WORDS: Record<string, string> = {
+    icamp: 'iCamp',
+};
+
+function preserveOrCapitalisePart(part: string): string {
+    const preserved = PRESERVED_WORDS[part.toLowerCase()];
+    if (preserved) return preserved;
+    if (part.length > 1 && part === part.toUpperCase()) return part; // abbreviation
+    return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+}
+
 /**
  * Convert a string to title case.
  *
@@ -17,6 +29,7 @@ const SMALL_WORDS = new Set<string>([
  *  - Small words (a, an, the, and, …) stay lowercase in the middle.
  *  - Words that are all-uppercase and > 1 character are left as-is (abbreviations like AI, UI, MENA).
  *  - Hyphenated parts are capitalised individually (follow-up → Follow-Up).
+ *  - Preserved brand words (e.g. iCamp) keep their exact casing.
  *
  * @param {string} str
  * @returns {string}
@@ -33,15 +46,10 @@ export function toTitleCase(str: unknown) {
         if (word.includes('-')) {
             return word
                 .split('-')
-                .map((part: string) => {
-                    if (part.length > 1 && part === part.toUpperCase()) return part; // abbreviation
-                    return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
-                })
+                .map((part: string) => preserveOrCapitalisePart(part))
                 .join('-');
         }
-        // Preserve all-caps abbreviations (AI, UI, etc.)
-        if (word.length > 1 && word === word.toUpperCase()) return word;
-        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        return preserveOrCapitalisePart(word);
     };
 
     return words
