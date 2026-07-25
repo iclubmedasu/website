@@ -110,6 +110,6 @@
 @media (max-width: 639px) {
     .event-circular-gallery,
     .event-circular-gallery--horizontal {
-        height: 420px;
+        height: 330px;
     }
 }

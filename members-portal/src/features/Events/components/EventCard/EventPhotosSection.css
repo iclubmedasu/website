@@ -173,6 +173,12 @@
     text-overflow: ellipsis;
 }
 
+.event-photo-toggles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
 .event-photo-public-toggle {
     display: inline-flex;
     align-items: center;

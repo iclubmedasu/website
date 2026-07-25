@@ -7,6 +7,11 @@ import {
     splitSessionsForTicket,
     withSessionCapacityFields,
 } from "../lib/eventSessionCapacity";
+import {
+    EVENT_PHOTO_PREVIEW_CONTENT_TYPE,
+    eventPhotoPreviewGithubPath,
+    optimizeEventPhoto,
+} from "../lib/optimizeEventPhoto";
 import { sendEmail } from "../services/emailService";
 import { buildRegistrationJoinUrl } from "../services/eventTicketEmailService";
 import { generateTokensForRegistration, getSessionTokensForRegistration } from "../services/sessionTokenService";
@@ -19,6 +24,8 @@ import { createIncidentReportSubmission, getSupportPageData } from "../lib/suppo
 import { resolveEventByIdOrSlug, resolveProjectByIdOrSlug } from "../lib/publicEntitySlug";
 import { contactPostLimiter, incidentReportPostLimiter } from "../middleware/rateLimit";
 
+const PUBLIC_EVENT_PHOTO_CACHE_CONTROL =
+    "public, max-age=86400, stale-while-revalidate=604800";
 const router = express.Router();
 
 const DEFAULT_CONTACT_INBOX = "asu.medicine.iclub@gmail.com";
@@ -250,7 +257,7 @@ router.get("/highlights/photos", async (_req: Request, res: Response) => {
                 photos: {
                     some: {
                         isActive: true,
-                        showOnPublic: true,
+                        isCore: true,
                     },
                 },
             },
@@ -261,7 +268,7 @@ router.get("/highlights/photos", async (_req: Request, res: Response) => {
                 photos: {
                     where: {
                         isActive: true,
-                        showOnPublic: true,
+                        isCore: true,
                     },
                     select: {
                         id: true,
@@ -270,7 +277,7 @@ router.get("/highlights/photos", async (_req: Request, res: Response) => {
             },
         });
 
-        // Hide Highlights unless there is at least one disclosed event with public photos
+        // Hide Highlights unless there is at least one disclosed event with core photos
         if (events.length === 0) {
             return res.json([]);
         }
@@ -475,23 +482,66 @@ router.get("/event-photos/:id/download", async (req: Request, res: Response) => 
         if (
             !photo
             || !photo.isActive
-            || !photo.showOnPublic
+            || (!photo.showOnPublic && !photo.isCore)
             || !canPublicViewEventDetail(photo.event)
         ) {
             return res.status(404).json({ error: "Photo not found" });
         }
 
-        const ghResponse = await githubStorage.downloadFile(photo.githubPath);
+        res.setHeader("Cache-Control", PUBLIC_EVENT_PHOTO_CACHE_CONTROL);
 
-        res.setHeader("Content-Type", photo.mimeType);
-        res.setHeader("Content-Disposition", `inline; filename="${photo.fileName}"`);
-        if (photo.fileSize) {
-            res.setHeader("Content-Length", photo.fileSize);
+        if (photo.previewGithubPath) {
+            const ghResponse = await githubStorage.downloadFile(photo.previewGithubPath);
+            res.setHeader("Content-Type", EVENT_PHOTO_PREVIEW_CONTENT_TYPE);
+            res.setHeader(
+                "Content-Disposition",
+                `inline; filename="${photo.fileName.replace(/\.[^.]+$/, "") || "photo"}-preview.webp"`,
+            );
+            if (photo.previewFileSize) {
+                res.setHeader("Content-Length", photo.previewFileSize);
+            }
+            Readable.fromWeb(ghResponse.body as import("stream/web").ReadableStream).pipe(res);
+            return;
         }
-        res.setHeader("Cache-Control", "public, max-age=300");
 
-        Readable.fromWeb(ghResponse.body as import("stream/web").ReadableStream).pipe(res);
-        return;
+        const ghResponse = await githubStorage.downloadFile(photo.githubPath);
+        const originalBuffer = Buffer.from(await ghResponse.arrayBuffer());
+
+        try {
+            const optimized = await optimizeEventPhoto(originalBuffer);
+            const previewPath = eventPhotoPreviewGithubPath(photo.githubPath);
+            const previewResult = await githubStorage.uploadContent(
+                optimized.buffer,
+                previewPath,
+                `Backfill preview for event photo ${photo.id}`,
+            );
+
+            await prisma.eventPhoto.update({
+                where: { id: photo.id },
+                data: {
+                    previewGithubPath: previewResult.githubPath,
+                    previewGithubSha: previewResult.githubSha,
+                    previewFileSize: optimized.buffer.length,
+                },
+            });
+
+            res.setHeader("Content-Type", EVENT_PHOTO_PREVIEW_CONTENT_TYPE);
+            res.setHeader(
+                "Content-Disposition",
+                `inline; filename="${photo.fileName.replace(/\.[^.]+$/, "") || "photo"}-preview.webp"`,
+            );
+            res.setHeader("Content-Length", optimized.buffer.length);
+            return res.send(optimized.buffer);
+        } catch (previewErr) {
+            console.error(
+                "GET /public/event-photos/:id/download preview backfill failed (serving original):",
+                previewErr,
+            );
+            res.setHeader("Content-Type", photo.mimeType);
+            res.setHeader("Content-Disposition", `inline; filename="${photo.fileName}"`);
+            res.setHeader("Content-Length", originalBuffer.length);
+            return res.send(originalBuffer);
+        }
     } catch (error) {
         console.error("GET /public/event-photos/:id/download error:", error);
         return res.status(500).json({ error: "Failed to download photo" });

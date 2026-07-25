@@ -127,13 +127,21 @@ function getFontSize(font) {
 function createTextTexture(gl, text, font = 'bold 30px monospace', color = 'black') {
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
-  context.font = font;
+  const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 3);
+  const logicalFontSize = getFontSize(font);
+  // Larger base (48–64px) × DPR so canvas text stays sharp when stretched in GL.
+  const baseDrawSize = Math.min(Math.max(logicalFontSize, 48), 64);
+  const drawFontSize = Math.round(baseDrawSize * dpr);
+  const scale = drawFontSize / logicalFontSize;
+  const drawFont = font.replace(/(\d+)px/, `${drawFontSize}px`);
+  context.font = drawFont;
   const metrics = context.measureText(text);
   const textWidth = Math.ceil(metrics.width);
-  const textHeight = Math.ceil(getFontSize(font) * 1.2);
-  canvas.width = textWidth + 20;
-  canvas.height = textHeight + 20;
-  context.font = font;
+  const textHeight = Math.ceil(drawFontSize * 1.2);
+  const pad = Math.ceil(10 * scale);
+  canvas.width = textWidth + pad * 2;
+  canvas.height = textHeight + pad * 2;
+  context.font = drawFont;
   context.fillStyle = color;
   context.textBaseline = 'middle';
   context.textAlign = 'center';
@@ -141,7 +149,8 @@ function createTextTexture(gl, text, font = 'bold 30px monospace', color = 'blac
   context.fillText(text, canvas.width / 2, canvas.height / 2);
   const texture = new Texture(gl, { generateMipmaps: false });
   texture.image = canvas;
-  return { texture, width: canvas.width, height: canvas.height };
+  // Logical (CSS) size for mesh scale so on-screen text size stays the same.
+  return { texture, width: canvas.width / scale, height: canvas.height / scale };
 }
 
 class Title {
@@ -209,7 +218,8 @@ class Media {
     textColor,
     borderRadius = 0,
     font,
-    orientation = 'horizontal'
+    orientation = 'horizontal',
+    planeHeightRatio = 0.72
   }) {
     this.extra = 0;
     this.geometry = geometry;
@@ -227,6 +237,7 @@ class Media {
     this.borderRadius = borderRadius;
     this.font = font;
     this.orientation = orientation;
+    this.planeHeightRatio = planeHeightRatio;
     this.isVertical = orientation === 'vertical';
     this.createShader();
     this.createMesh();
@@ -246,13 +257,11 @@ class Media {
         attribute vec2 uv;
         uniform mat4 modelViewMatrix;
         uniform mat4 projectionMatrix;
-        uniform float uTime;
-        uniform float uSpeed;
         varying vec2 vUv;
         void main() {
           vUv = uv;
           vec3 p = position;
-          p.z = (sin(p.x * 4.0 + uTime) * 1.5 + cos(p.y * 2.0 + uTime) * 1.5) * (0.1 + uSpeed * 0.5);
+          p.z = 0.0;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
         }
       `,
@@ -293,8 +302,6 @@ class Media {
         tMap: { value: texture },
         uPlaneSizes: { value: [0, 0] },
         uImageSizes: { value: [0, 0] },
-        uSpeed: { value: 0 },
-        uTime: { value: 100 * Math.random() },
         uBorderRadius: { value: this.borderRadius }
       },
       transparent: true
@@ -361,10 +368,6 @@ class Media {
       }
     }
 
-    this.speed = scroll.current - scroll.last;
-    this.program.uniforms.uTime.value += 0.04;
-    this.program.uniforms.uSpeed.value = this.speed;
-
     if (this.isVertical) {
       const planeOffset = this.plane.scale.y / 2;
       const viewportOffset = this.viewport.height / 2;
@@ -415,7 +418,7 @@ class Media {
       this.y = this.height * this.index;
     } else {
       // Landscape 16:9 cards for horizontal galleries (home Highlights, mobile event gallery)
-      const h = this.viewport.height * 0.72;
+      const h = this.viewport.height * this.planeHeightRatio;
       const w = h * (16 / 9);
       this.plane.scale.y = h;
       this.plane.scale.x = w;
@@ -440,6 +443,7 @@ class App {
       scrollSpeed = 2,
       scrollEase = 0.05,
       orientation = 'horizontal',
+      planeHeightRatio = 0.72,
       autoplayIntervalMs,
       continuousScrollSpeed
     } = {}
@@ -448,6 +452,7 @@ class App {
     this.container = container;
     this.scrollSpeed = scrollSpeed;
     this.orientation = orientation;
+    this.planeHeightRatio = planeHeightRatio;
     this.isVertical = orientation === 'vertical';
     this.autoplayIntervalMs = autoplayIntervalMs;
     this.continuousScrollSpeed = continuousScrollSpeed || 0;
@@ -522,7 +527,8 @@ class App {
         textColor,
         borderRadius,
         font,
-        orientation: this.orientation
+        orientation: this.orientation,
+        planeHeightRatio: this.planeHeightRatio
       });
     });
   }
@@ -745,6 +751,7 @@ export default function CircularGallery({
   scrollSpeed = 2,
   scrollEase = 0.05,
   orientation = 'horizontal',
+  planeHeightRatio = 0.72,
   autoplayIntervalMs,
   continuousScrollSpeed
 }) {
@@ -764,6 +771,7 @@ export default function CircularGallery({
         scrollSpeed,
         scrollEase,
         orientation,
+        planeHeightRatio,
         autoplayIntervalMs,
         continuousScrollSpeed
       });
@@ -783,6 +791,7 @@ export default function CircularGallery({
     scrollSpeed,
     scrollEase,
     orientation,
+    planeHeightRatio,
     autoplayIntervalMs,
     continuousScrollSpeed
   ]);

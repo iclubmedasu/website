@@ -1,15 +1,20 @@
-const express: any = require('express');
-const router: any = express.Router();
-const multer = require('multer');
-const { Readable } = require('stream');
-const { v4: uuidv4 } = require('uuid') as { v4: () => string };
-const { prisma }: { prisma: any } = require('../db');
-const githubStorage = require('../services/githubStorageService');
-const { extractAuthToken, JWT_SECRET } = require('../middleware/auth');
-const {
+import express from 'express';
+import multer from 'multer';
+import { Readable } from 'stream';
+import { prisma } from '../db';
+import * as githubStorage from '../services/githubStorageService';
+import { extractAuthToken, JWT_SECRET } from '../middleware/auth';
+import {
     canUserViewEvent,
     canUserAccessEventOperations,
-} = require('../lib/eventPermissions');
+} from '../lib/eventPermissions';
+import {
+    eventPhotoPreviewGithubPath,
+    optimizeEventPhoto,
+} from '../lib/optimizeEventPhoto';
+
+const { v4: uuidv4 } = require('uuid') as { v4: () => string };
+const router: any = express.Router();
 
 const ALLOWED_IMAGE_TYPES = new Set([
     'image/jpeg', 'image/png', 'image/webp', 'image/heic',
@@ -160,6 +165,28 @@ router.post('/upload', upload.single('photo'), async (req, res) => {
             `Upload ${req.file.originalname}`,
         );
 
+        let previewFields: {
+            previewGithubPath?: string;
+            previewGithubSha?: string;
+            previewFileSize?: number;
+        } = {};
+        try {
+            const optimized = await optimizeEventPhoto(req.file.buffer);
+            const previewPath = eventPhotoPreviewGithubPath(ghResult.githubPath);
+            const previewResult = await githubStorage.uploadContent(
+                optimized.buffer,
+                previewPath,
+                `Upload preview ${req.file.originalname}`,
+            );
+            previewFields = {
+                previewGithubPath: previewResult.githubPath,
+                previewGithubSha: previewResult.githubSha,
+                previewFileSize: optimized.buffer.length,
+            };
+        } catch (previewErr) {
+            console.error('POST /event-photos/upload preview failed (saving original only):', previewErr);
+        }
+
         const photo = await prisma.eventPhoto.create({
             data: {
                 eventId: parsedEventId,
@@ -169,6 +196,7 @@ router.post('/upload', upload.single('photo'), async (req, res) => {
                 mimeType: req.file.mimetype,
                 githubPath: ghResult.githubPath,
                 githubSha: ghResult.githubSha,
+                ...previewFields,
                 ...(eventDay ? { eventDay: new Date(String(eventDay)) } : {}),
                 ...(caption !== undefined && caption !== null ? { caption: String(caption) } : {}),
             },
@@ -217,16 +245,22 @@ router.get('/:id/download', async (req, res) => {
         res.setHeader('Content-Disposition', `inline; filename="${photo.fileName}"`);
         if (photo.fileSize) res.setHeader('Content-Length', photo.fileSize);
 
-        Readable.fromWeb(ghResponse.body).pipe(res);
+        Readable.fromWeb(ghResponse.body as import('stream/web').ReadableStream).pipe(res);
     } catch (error) {
         console.error('GET /event-photos/:id/download', error);
         res.status(500).json({ error: 'Failed to download photo' });
     }
 });
 
+const MAX_CORE_PHOTOS_PER_EVENT = 10;
+
+function coerceBoolean(value) {
+    return value === true || value === 'true';
+}
+
 // ============================================
 // PATCH /api/event-photos/:id
-// Update caption, eventDay, order, and/or showOnPublic
+// Update caption, eventDay, order, showOnPublic, and/or isCore
 // ============================================
 router.patch('/:id', async (req, res) => {
     try {
@@ -246,7 +280,26 @@ router.patch('/:id', async (req, res) => {
         }
         if (req.body.order !== undefined) data.order = parseInt(req.body.order);
         if (req.body.showOnPublic !== undefined) {
-            data.showOnPublic = req.body.showOnPublic === true || req.body.showOnPublic === 'true';
+            data.showOnPublic = coerceBoolean(req.body.showOnPublic);
+        }
+        if (req.body.isCore !== undefined) {
+            data.isCore = coerceBoolean(req.body.isCore);
+        }
+
+        if (data.isCore === true && !photo.isCore) {
+            const coreCount = await prisma.eventPhoto.count({
+                where: {
+                    eventId: photo.eventId,
+                    isActive: true,
+                    isCore: true,
+                    id: { not: id },
+                },
+            });
+            if (coreCount >= MAX_CORE_PHOTOS_PER_EVENT) {
+                return res.status(400).json({
+                    error: 'Maximum of 10 core photos per event',
+                });
+            }
         }
 
         const updated = await prisma.eventPhoto.update({

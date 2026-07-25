@@ -5,12 +5,15 @@ import { Highlights } from "@/components/home/Highlights";
 import { WhyIclub } from "@/components/home/WhyIclub";
 import { HomeEventsSection } from "@/components/public-data/HomeEventsSection";
 import { HomeProjectsSection } from "@/components/public-data/HomeProjectsSection";
+import { publicAPI } from "@/lib/api";
 
-export default function HomePage() {
+export default async function HomePage() {
+    const highlightPhotos = await publicAPI.getHighlightPhotos();
+
     return (
         <>
             <HeroSection />
-            <Highlights />
+            <Highlights photos={highlightPhotos} />
             <HomeEventsSection />
             <HomeProjectsSection />
             <WhyIclub />

@@ -2,6 +2,8 @@ import express from "express";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { Readable } from "stream";
+
 const prismaMocks = vi.hoisted(() => ({
     eventFindMany: vi.fn(),
     eventFindUnique: vi.fn(),
@@ -13,6 +15,8 @@ const prismaMocks = vi.hoisted(() => ({
     eventTierFindMany: vi.fn(),
     eventCustomFieldFindMany: vi.fn(),
     eventPhotoFindMany: vi.fn(),
+    eventPhotoFindUnique: vi.fn(),
+    eventPhotoUpdate: vi.fn(),
     projectFindMany: vi.fn(),
     projectFindUnique: vi.fn(),
     sitePageFindUnique: vi.fn(),
@@ -32,6 +36,11 @@ const sessionTokenMocks = vi.hoisted(() => ({
 
 const emailMocks = vi.hoisted(() => ({
     sendEmail: vi.fn(),
+}));
+
+const githubStorageMocks = vi.hoisted(() => ({
+    downloadFile: vi.fn(),
+    uploadContent: vi.fn(),
 }));
 
 vi.mock("../../db", () => ({
@@ -59,6 +68,8 @@ vi.mock("../../db", () => ({
         },
         eventPhoto: {
             findMany: prismaMocks.eventPhotoFindMany,
+            findUnique: prismaMocks.eventPhotoFindUnique,
+            update: prismaMocks.eventPhotoUpdate,
         },
         project: {
             findMany: prismaMocks.projectFindMany,
@@ -98,7 +109,18 @@ vi.mock("../../services/eventTicketEmailService", () => ({
         `https://public.example/events/${eventSlugOrId}/join?token=${token}`,
 }));
 
+vi.mock("../../services/githubStorageService", () => githubStorageMocks);
+
 import publicRouter from "../../routes/public";
+
+function mockGithubDownload(buffer: Buffer) {
+    const nodeStream = Readable.from(buffer);
+    return {
+        body: Readable.toWeb(nodeStream),
+        arrayBuffer: async () =>
+            buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
+    };
+}
 
 function createApp() {
     const app = express();
@@ -343,6 +365,170 @@ describe("public routes", () => {
                 downloadUrl: "/api/public/event-photos/9/download",
             },
         ]);
+    });
+
+    it("GET /public/highlights/photos returns core photos from disclosed events", async () => {
+        prismaMocks.eventFindMany.mockResolvedValue([
+            {
+                id: 1,
+                title: "Health Fair",
+                slug: "abcdefghjkmn",
+                photos: [{ id: 9 }, { id: 10 }],
+            },
+        ]);
+
+        const response = await request(createApp()).get("/public/highlights/photos");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(
+            expect.arrayContaining([
+                {
+                    id: 9,
+                    downloadUrl: "/api/public/event-photos/9/download",
+                    eventTitle: "Health Fair",
+                    eventSlug: "abcdefghjkmn",
+                },
+                {
+                    id: 10,
+                    downloadUrl: "/api/public/event-photos/10/download",
+                    eventTitle: "Health Fair",
+                    eventSlug: "abcdefghjkmn",
+                },
+            ]),
+        );
+        expect(prismaMocks.eventFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    isDisclosed: true,
+                    photos: {
+                        some: {
+                            isActive: true,
+                            isCore: true,
+                        },
+                    },
+                }),
+                select: expect.objectContaining({
+                    photos: expect.objectContaining({
+                        where: {
+                            isActive: true,
+                            isCore: true,
+                        },
+                    }),
+                }),
+            }),
+        );
+    });
+
+    it("GET /public/highlights/photos returns empty when no core photos", async () => {
+        prismaMocks.eventFindMany.mockResolvedValue([]);
+
+        const response = await request(createApp()).get("/public/highlights/photos");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual([]);
+    });
+
+    it("GET /public/event-photos/:id/download serves preview when present", async () => {
+        const previewBytes = Buffer.from("webp-preview-bytes");
+        prismaMocks.eventPhotoFindUnique.mockResolvedValue({
+            id: 9,
+            isActive: true,
+            showOnPublic: true,
+            isCore: false,
+            fileName: "crowd.jpg",
+            mimeType: "image/jpeg",
+            fileSize: 5000,
+            githubPath: "events/1/photos/undated/a1b2c3d4-e5f6-7890-abcd-ef1234567890-crowd.jpg",
+            previewGithubPath:
+                "events/1/photos/undated/a1b2c3d4-e5f6-7890-abcd-ef1234567890-preview.webp",
+            previewFileSize: previewBytes.length,
+            event: {
+                isPublished: true,
+                isActive: true,
+                isArchived: false,
+                isDisclosed: true,
+                isFinalized: false,
+            },
+        });
+        githubStorageMocks.downloadFile.mockResolvedValue(mockGithubDownload(previewBytes));
+
+        const response = await request(createApp()).get("/public/event-photos/9/download");
+
+        expect(response.status).toBe(200);
+        expect(response.headers["content-type"]).toMatch(/image\/webp/);
+        expect(response.headers["cache-control"]).toBe(
+            "public, max-age=86400, stale-while-revalidate=604800",
+        );
+        expect(Buffer.from(response.body)).toEqual(previewBytes);
+        expect(githubStorageMocks.downloadFile).toHaveBeenCalledWith(
+            "events/1/photos/undated/a1b2c3d4-e5f6-7890-abcd-ef1234567890-preview.webp",
+        );
+        expect(githubStorageMocks.uploadContent).not.toHaveBeenCalled();
+    });
+
+    it("GET /public/event-photos/:id/download lazy-backfills preview when missing", async () => {
+        const originalBytes = await (await import("sharp"))
+            .default({
+                create: {
+                    width: 1600,
+                    height: 1200,
+                    channels: 3,
+                    background: { r: 1, g: 2, b: 3 },
+                },
+            })
+            .jpeg()
+            .toBuffer();
+
+        prismaMocks.eventPhotoFindUnique.mockResolvedValue({
+            id: 11,
+            isActive: true,
+            showOnPublic: true,
+            isCore: true,
+            fileName: "stage.jpg",
+            mimeType: "image/jpeg",
+            fileSize: originalBytes.length,
+            githubPath: "events/1/photos/undated/a1b2c3d4-e5f6-7890-abcd-ef1234567890-stage.jpg",
+            previewGithubPath: null,
+            previewFileSize: null,
+            event: {
+                isPublished: true,
+                isActive: true,
+                isArchived: false,
+                isDisclosed: true,
+                isFinalized: false,
+            },
+        });
+        githubStorageMocks.downloadFile.mockResolvedValue(mockGithubDownload(originalBytes));
+        githubStorageMocks.uploadContent.mockResolvedValue({
+            githubPath:
+                "events/1/photos/undated/a1b2c3d4-e5f6-7890-abcd-ef1234567890-preview.webp",
+            githubSha: "preview-sha",
+        });
+        prismaMocks.eventPhotoUpdate.mockResolvedValue({});
+
+        const response = await request(createApp()).get("/public/event-photos/11/download");
+
+        expect(response.status).toBe(200);
+        expect(response.headers["content-type"]).toMatch(/image\/webp/);
+        expect(response.headers["cache-control"]).toBe(
+            "public, max-age=86400, stale-while-revalidate=604800",
+        );
+        expect(githubStorageMocks.uploadContent).toHaveBeenCalledWith(
+            expect.any(Buffer),
+            "events/1/photos/undated/a1b2c3d4-e5f6-7890-abcd-ef1234567890-preview.webp",
+            expect.stringContaining("Backfill"),
+        );
+        expect(prismaMocks.eventPhotoUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: 11 },
+                data: expect.objectContaining({
+                    previewGithubPath:
+                        "events/1/photos/undated/a1b2c3d4-e5f6-7890-abcd-ef1234567890-preview.webp",
+                    previewGithubSha: "preview-sha",
+                    previewFileSize: expect.any(Number),
+                }),
+            }),
+        );
     });
 
     it("GET /public/events/:id/tiers returns active tiers with capacity", async () => {

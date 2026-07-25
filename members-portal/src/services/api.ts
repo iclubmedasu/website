@@ -1777,6 +1777,7 @@ export type UpdateEventPhotoPayload = {
     eventDay?: string | null;
     order?: number;
     showOnPublic?: boolean;
+    isCore?: boolean;
 };
 
 export const eventPhotosAPI = {

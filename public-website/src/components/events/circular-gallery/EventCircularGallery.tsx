@@ -47,8 +47,9 @@ export function EventCircularGallery({ photos }: EventCircularGalleryProps) {
                 bend={isDesktop ? 2 : 1.2}
                 borderRadius={0.08}
                 orientation={isDesktop ? "vertical" : "horizontal"}
-                scrollEase={0.025}
-                scrollSpeed={isDesktop ? 1.0 : 3.0}
+                planeHeightRatio={isDesktop ? 0.72 : 0.5}
+                scrollEase={0.08}
+                scrollSpeed={isDesktop ? 1.4 : 2.0}
                 autoplayIntervalMs={3000}
                 textColor="#4c1d95"
                 font="bold 28px Poppins, ui-sans-serif, system-ui, sans-serif"

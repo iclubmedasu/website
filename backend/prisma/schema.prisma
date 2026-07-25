@@ -1118,10 +1118,14 @@ model EventPhoto {
   githubSha          String
   fileSize           Int
   mimeType           String
+  previewGithubPath  String?
+  previewGithubSha   String?
+  previewFileSize    Int?
   eventDay           DateTime? @db.Date
   caption            String?
   order              Int       @default(0)
   showOnPublic       Boolean   @default(true)
+  isCore             Boolean   @default(false)
   isActive           Boolean   @default(true)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt

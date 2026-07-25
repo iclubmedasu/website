@@ -201,6 +201,8 @@ interface EventPhotosDayGroupProps {
     onRemoveUpload: (id: string) => void;
     onDeletePhoto: (photo: EventPhotoRef) => void;
     onTogglePublic: (photo: EventPhotoRef, next: boolean) => void;
+    onToggleCore: (photo: EventPhotoRef, next: boolean) => void;
+    coreCount: number;
 }
 
 function EventPhotosDayGroup({
@@ -214,6 +216,8 @@ function EventPhotosDayGroup({
     onRemoveUpload,
     onDeletePhoto,
     onTogglePublic,
+    onToggleCore,
+    coreCount,
 }: EventPhotosDayGroupProps) {
     const gridRef = useRef<HTMLDivElement>(null);
     const columns = useCssGridColumnCount(gridRef);
@@ -314,15 +318,31 @@ function EventPhotosDayGroup({
                         ) : (
                             <p className="event-photo-filename" title={photo.fileName}>{photo.fileName}</p>
                         )}
-                        <div className="event-photo-public-toggle" title="Show on public event page">
-                            <span className="event-photo-public-toggle-label">Public</span>
-                            <Toggle
-                                color="purple"
-                                checked={Boolean(photo.showOnPublic)}
-                                disabled={disabled || togglingId === photo.id}
-                                onChange={(next) => void onTogglePublic(photo, next)}
-                                aria-label={`Show ${photo.fileName} on public event page`}
-                            />
+                        <div className="event-photo-toggles">
+                            <div className="event-photo-public-toggle" title="Show on public event page">
+                                <span className="event-photo-public-toggle-label">Public</span>
+                                <Toggle
+                                    color="purple"
+                                    checked={Boolean(photo.showOnPublic)}
+                                    disabled={disabled || togglingId === photo.id}
+                                    onChange={(next) => void onTogglePublic(photo, next)}
+                                    aria-label={`Show ${photo.fileName} on public event page`}
+                                />
+                            </div>
+                            <div className="event-photo-public-toggle" title="Show on home Highlights">
+                                <span className="event-photo-public-toggle-label">Core</span>
+                                <Toggle
+                                    color="purple"
+                                    checked={Boolean(photo.isCore)}
+                                    disabled={
+                                        disabled
+                                        || togglingId === photo.id
+                                        || (!photo.isCore && coreCount >= 10)
+                                    }
+                                    onChange={(next) => void onToggleCore(photo, next)}
+                                    aria-label={`Show ${photo.fileName} on home Highlights`}
+                                />
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -530,6 +550,20 @@ export default function EventPhotosSection({
         }
     };
 
+    const handleToggleCore = async (photo: EventPhotoRef, next: boolean) => {
+        if (disabled) return;
+        setTogglingId(photo.id);
+        try {
+            await updatePhoto(photo.id, { isCore: next });
+        } catch (err: unknown) {
+            setUploadError(getErrorMessage(err, 'Failed to update core photo.'));
+        } finally {
+            setTogglingId(null);
+        }
+    };
+
+    const coreCount = photos.filter((photo) => photo.isCore && photo.isActive !== false).length;
+
     const closeDeleteModal = () => {
         setConfirmDelete(null);
         setDeleteLoading(false);
@@ -634,6 +668,8 @@ export default function EventPhotosSection({
                     onRemoveUpload={removeUpload}
                     onDeletePhoto={setConfirmDelete}
                     onTogglePublic={handleTogglePublic}
+                    onToggleCore={handleToggleCore}
+                    coreCount={coreCount}
                 />
             ))}
 

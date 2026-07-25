@@ -15,6 +15,8 @@ export interface CircularGalleryProps {
     scrollSpeed?: number;
     scrollEase?: number;
     orientation?: "horizontal" | "vertical";
+    /** Horizontal card height as a fraction of viewport height (default 0.72). */
+    planeHeightRatio?: number;
     /** When set, advances one card every N ms (pauses while dragging). */
     autoplayIntervalMs?: number;
     /** Steady marquee speed in world units/sec (0/omit = off). Pauses while dragging; no card snap. */

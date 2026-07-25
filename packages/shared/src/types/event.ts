@@ -535,6 +535,7 @@ export interface EventPhotoRef {
     caption: string | null;
     order: number;
     showOnPublic: boolean;
+    isCore: boolean;
     isActive?: boolean;
     createdAt?: ISODateTime;
     updatedAt?: ISODateTime;

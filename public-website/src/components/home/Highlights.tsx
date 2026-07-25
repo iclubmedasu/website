@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { PublicHighlightPhoto } from "@iclub/shared";
 import { Section, SectionHeading } from "@/components/ui";
 import { homeContent } from "@/content/home";
-import { getPublicEventPhotoUrl, publicAPI } from "@/lib/api";
+import { getPublicEventPhotoUrl } from "@/lib/api";
 import "@/components/events/circular-gallery/CircularGallery.css";
 import "./Highlights.css";
 
@@ -17,16 +17,14 @@ const CircularGallery = dynamic(
     },
 );
 
-export function Highlights() {
-    const [photos, setPhotos] = useState<PublicHighlightPhoto[] | null>(null);
-    const [isDesktop, setIsDesktop] = useState(false);
+const PRELOAD_COUNT = 4;
 
-    useEffect(() => {
-        void publicAPI
-            .getHighlightPhotos()
-            .then(setPhotos)
-            .catch(() => setPhotos([]));
-    }, []);
+type HighlightsProps = {
+    photos: PublicHighlightPhoto[];
+};
+
+export function Highlights({ photos }: HighlightsProps) {
+    const [isDesktop, setIsDesktop] = useState(false);
 
     useEffect(() => {
         const media = window.matchMedia("(min-width: 1024px)");
@@ -36,7 +34,7 @@ export function Highlights() {
         return () => media.removeEventListener("change", sync);
     }, []);
 
-    if (photos === null || photos.length === 0) {
+    if (photos.length === 0) {
         return null;
     }
 
@@ -52,6 +50,7 @@ export function Highlights() {
         return null;
     }
 
+    const preloadUrls = items.slice(0, PRELOAD_COUNT).map((item) => item.image);
     const { title, description } = homeContent.highlights;
 
     // Horizontal card width in CircularGallery world units (fov 45, z 20, h*0.72, 16:9, 6% pad).
@@ -61,14 +60,18 @@ export function Highlights() {
 
     return (
         <Section variant="plain">
+            {preloadUrls.map((url) => (
+                <link key={url} rel="preload" as="image" href={url} />
+            ))}
             <SectionHeading title={title} description={description} />
             <div className="home-highlights-gallery" aria-label="Event photo highlights">
                 <CircularGallery
                     items={items}
                     bend={1.2}
                     borderRadius={0.08}
-                    scrollEase={0.05}
-                    scrollSpeed={isDesktop ? 1.5 : 3.0}
+                    planeHeightRatio={isDesktop ? 0.72 : 0.5}
+                    scrollEase={0.1}
+                    scrollSpeed={isDesktop ? 1.8 : 2.0}
                     continuousScrollSpeed={continuousScrollSpeed}
                     textColor="#4c1d95"
                     font="bold 24px Poppins, ui-sans-serif, system-ui, sans-serif"
