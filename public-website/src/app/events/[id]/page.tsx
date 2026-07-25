@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { EventDetailContent } from "@/components/public-data/EventDetailContent";
 import { publicAPI } from "@/lib/api";
-import { redirectNumericParamToSlug } from "@/lib/publicSlug";
+import { isNumericPublicParam, redirectNumericParamToSlug } from "@/lib/publicSlug";
 
 interface EventDetailPageProps {
     params: Promise<{ id: string }>;
@@ -14,16 +13,21 @@ export const metadata: Metadata = {
 
 export default async function EventDetailPage({ params }: EventDetailPageProps) {
     const { id } = await params;
-    const event = await publicAPI.getEvent(id);
-    if (!event) {
-        notFound();
+
+    if (!isNumericPublicParam(id)) {
+        return <EventDetailContent idOrSlug={id} />;
     }
 
-    redirectNumericParamToSlug({
-        param: id,
-        slug: event.slug,
-        basePath: "events",
-    });
+    const event = await publicAPI.getEvent(id);
+    if (event) {
+        redirectNumericParamToSlug({
+            param: id,
+            slug: event.slug,
+            basePath: "events",
+        });
+        return <EventDetailContent idOrSlug={event.slug} />;
+    }
 
-    return <EventDetailContent idOrSlug={event.slug} />;
+    // SSR miss (real 404 or HF 503): client component resolves
+    return <EventDetailContent idOrSlug={id} />;
 }

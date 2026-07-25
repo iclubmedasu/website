@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { JoinSessionStatus } from "@/components/events/JoinSessionStatus";
 import { publicAPI } from "@/lib/api";
-import { redirectNumericParamToSlug } from "@/lib/publicSlug";
+import { isNumericPublicParam, redirectNumericParamToSlug } from "@/lib/publicSlug";
 import type { PublicEventJoinResponse } from "@iclub/shared";
 
 interface JoinPageProps {
@@ -22,19 +22,25 @@ export default async function JoinPage({ params, searchParams }: JoinPageProps) 
         return <JoinSessionStatus result={invalid} />;
     }
 
-    // Best-effort canonical redirect when the event is publicly resolvable.
-    const event = await publicAPI.getEvent(id);
-    if (event) {
-        redirectNumericParamToSlug({
-            param: id,
-            slug: event.slug,
-            basePath: "events",
-            suffix: "/join",
-            searchParams: { token: trimmedToken },
-        });
+    // Best-effort canonical redirect only for numeric ids (skip Space→Space getEvent for slugs).
+    let eventSlug: string | undefined;
+    let eventId: number | undefined;
+    if (isNumericPublicParam(id)) {
+        const event = await publicAPI.getEvent(id);
+        if (event) {
+            redirectNumericParamToSlug({
+                param: id,
+                slug: event.slug,
+                basePath: "events",
+                suffix: "/join",
+                searchParams: { token: trimmedToken },
+            });
+            eventSlug = event.slug;
+            eventId = event.id;
+        }
     }
 
-    const result = await publicAPI.joinEventSession(event?.slug ?? id, trimmedToken);
+    const result = await publicAPI.joinEventSession(eventSlug ?? id, trimmedToken);
 
     if (result.status === "ready" && result.redirectUrl) {
         redirect(result.redirectUrl);
@@ -44,9 +50,9 @@ export default async function JoinPage({ params, searchParams }: JoinPageProps) 
         <JoinSessionStatus
             result={{
                 ...result,
-                eventId: result.eventId ?? event?.id,
+                eventId: result.eventId ?? eventId,
             }}
-            eventSlug={event?.slug}
+            eventSlug={eventSlug ?? (isNumericPublicParam(id) ? undefined : id)}
         />
     );
 }
