@@ -12,7 +12,6 @@ import ReissueCertificateModal, {
 import RevokeCertificateModal, {
     type RevokeCertificateTarget,
 } from '@/features/Certificates/modals/RevokeCertificateModal';
-import CopyPublicVerifyLinkButton from '@/features/Events/components/CopyPublicVerifyLinkButton';
 import { useAutoDismissMessage } from '@/hooks/useAutoDismissMessage';
 import { buildPublicVerifyUrl } from '@/lib/publicWebsiteUrl';
 import {

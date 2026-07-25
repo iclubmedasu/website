@@ -1,4 +1,7 @@
 import nextPlugin from '@next/eslint-plugin-next'
+import tsParser from '@typescript-eslint/parser'
+import tsPlugin from '@typescript-eslint/eslint-plugin'
+import reactHooks from 'eslint-plugin-react-hooks'
 
 export default [
     nextPlugin.flatConfig.coreWebVitals,
@@ -12,6 +15,23 @@ export default [
             'public/workbox-*.js',
             'public/fallback-*.js',
         ],
+    },
+    {
+        files: ['**/*.{ts,tsx}'],
+        languageOptions: {
+            parser: tsParser,
+            parserOptions: {
+                ecmaFeatures: { jsx: true },
+            },
+        },
+        plugins: {
+            '@typescript-eslint': tsPlugin,
+            'react-hooks': reactHooks,
+        },
+        rules: {
+            'react-hooks/rules-of-hooks': 'error',
+            'react-hooks/exhaustive-deps': 'warn',
+        },
     },
     {
         files: ['src/**/*.{ts,tsx}'],

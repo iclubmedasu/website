@@ -5,7 +5,6 @@ const { Readable } = require('stream');
 const { v4: uuidv4 } = require('uuid') as { v4: () => string };
 const { prisma }: { prisma: any } = require('../db');
 const githubStorage = require('../services/githubStorageService');
-const { logEventActivity } = require('../services/activityLogService');
 const { extractAuthToken, JWT_SECRET } = require('../middleware/auth');
 const {
     canUserViewEvent,

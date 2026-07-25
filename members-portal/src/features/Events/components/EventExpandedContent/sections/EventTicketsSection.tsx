@@ -135,7 +135,6 @@ export default function EventTicketsSection({
     const [bulkAction, setBulkAction] = useState<
         'imported' | 'allTickets' | 'reminders' | 'filtered' | 'filteredReminders' | null
     >(null);
-    const [importUnsentCount, setImportUnsentCount] = useState(0);
     const [allTicketsCount, setAllTicketsCount] = useState(0);
     const [allRemindersCount, setAllRemindersCount] = useState(0);
     const [attendanceRemovalTarget, setAttendanceRemovalTarget] = useState<AttendanceRemovalTarget | null>(null);
@@ -199,16 +198,11 @@ export default function EventTicketsSection({
 
     const loadBulkCounts = useCallback(async () => {
         try {
-            const [importUnsent, allSendable] = await Promise.all([
-                eventsAPI.getRegistrations(eventId, { sourceGroup: 'IMPORT', ticketStatus: 'NOT_SENT' }),
-                eventsAPI.getRegistrations(eventId),
-            ]);
+            const allSendable = await eventsAPI.getRegistrations(eventId);
             const sendableCount = getSendableRegistrations(allSendable).length;
-            setImportUnsentCount(getSendableRegistrations(importUnsent).length);
             setAllTicketsCount(sendableCount);
             setAllRemindersCount(sendableCount);
         } catch {
-            setImportUnsentCount(0);
             setAllTicketsCount(0);
             setAllRemindersCount(0);
         }
@@ -313,30 +307,6 @@ export default function EventTicketsSection({
             window.alert(error instanceof Error ? error.message : 'Failed to send reminder email.');
         } finally {
             setSendingReminderId(null);
-        }
-    };
-
-    const handleSendImportedTickets = async () => {
-        setBulkAction('imported');
-        try {
-            const importUnsent = await eventsAPI.getRegistrations(eventId, {
-                sourceGroup: 'IMPORT',
-                ticketStatus: 'NOT_SENT',
-            });
-            const registrationIds = getSendableRegistrations(importUnsent).map((registration) => Number(registration.id));
-
-            if (registrationIds.length === 0) {
-                window.alert('No imported registrations with a real email address need tickets.');
-                return;
-            }
-
-            const result = await eventsAPI.sendRegistrationTickets(eventId, { registrationIds });
-            window.alert(formatBulkSummary(result, 'Tickets sent'));
-            void refreshAll();
-        } catch (error) {
-            window.alert(error instanceof Error ? error.message : 'Failed to send ticket emails.');
-        } finally {
-            setBulkAction(null);
         }
     };
 

@@ -497,6 +497,7 @@ router.get("/event-photos/:id/download", async (req: Request, res: Response) => 
         res.setHeader("Cache-Control", "public, max-age=300");
 
         Readable.fromWeb(ghResponse.body as import("stream/web").ReadableStream).pipe(res);
+        return;
     } catch (error) {
         console.error("GET /public/event-photos/:id/download error:", error);
         return res.status(500).json({ error: "Failed to download photo" });
