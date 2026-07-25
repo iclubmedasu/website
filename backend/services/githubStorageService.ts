@@ -90,7 +90,6 @@ async function uploadContentAtPath(
     existingSha?: string,
 ): Promise<UploadResult> {
     const contentBase64 = contentBuffer.toString("base64");
-    const isUpdate = Boolean(existingSha);
     let sha = existingSha;
 
     let lastStatus = 0;
@@ -99,12 +98,10 @@ async function uploadContentAtPath(
     for (let attempt = 0; attempt < MAX_UPLOAD_ATTEMPTS; attempt++) {
         if (attempt > 0) {
             await sleep(100 * attempt);
-            if (isUpdate) {
-                const refreshedSha = await getCurrentFileSha(githubPath);
-                if (refreshedSha) {
-                    sha = refreshedSha;
-                }
-            }
+            // On 409 (tip race or file already exists), always refresh file SHA.
+            // If the blob exists, retry as an update; otherwise retry create.
+            const refreshedSha = await getCurrentFileSha(githubPath);
+            sha = refreshedSha;
         }
 
         const bodyObj: { content: string; message: string; sha?: string } = {

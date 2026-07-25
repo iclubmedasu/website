@@ -28,6 +28,45 @@ const PUBLIC_EVENT_PHOTO_CACHE_CONTROL =
     "public, max-age=86400, stale-while-revalidate=604800";
 const router = express.Router();
 
+/** Coalesce concurrent preview backfills for the same photo id. */
+const previewBackfillInFlight = new Map<number, Promise<void>>();
+
+function scheduleEventPhotoPreviewPersist(
+    photoId: number,
+    originalGithubPath: string,
+    optimizedBuffer: Buffer,
+): void {
+    if (previewBackfillInFlight.has(photoId)) return;
+
+    const work = (async () => {
+        const previewPath = eventPhotoPreviewGithubPath(originalGithubPath);
+        const previewResult = await githubStorage.uploadContent(
+            optimizedBuffer,
+            previewPath,
+            `Backfill preview for event photo ${photoId}`,
+        );
+        await prisma.eventPhoto.update({
+            where: { id: photoId },
+            data: {
+                previewGithubPath: previewResult.githubPath,
+                previewGithubSha: previewResult.githubSha,
+                previewFileSize: optimizedBuffer.length,
+            },
+        });
+    })()
+        .catch((previewErr) => {
+            console.error(
+                "GET /public/event-photos/:id/download preview backfill failed (serving optimized in-memory):",
+                previewErr,
+            );
+        })
+        .finally(() => {
+            previewBackfillInFlight.delete(photoId);
+        });
+
+    previewBackfillInFlight.set(photoId, work);
+}
+
 const DEFAULT_CONTACT_INBOX = "asu.medicine.iclub@gmail.com";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -533,21 +572,8 @@ router.get("/event-photos/:id/download", async (req: Request, res: Response) => 
 
         try {
             const optimized = await optimizeEventPhoto(originalBuffer);
-            const previewPath = eventPhotoPreviewGithubPath(photo.githubPath);
-            const previewResult = await githubStorage.uploadContent(
-                optimized.buffer,
-                previewPath,
-                `Backfill preview for event photo ${photo.id}`,
-            );
-
-            await prisma.eventPhoto.update({
-                where: { id: photo.id },
-                data: {
-                    previewGithubPath: previewResult.githubPath,
-                    previewGithubSha: previewResult.githubSha,
-                    previewFileSize: optimized.buffer.length,
-                },
-            });
+            // Serve immediately; persist to GitHub+DB in the background (coalesced).
+            scheduleEventPhotoPreviewPersist(photo.id, photo.githubPath, optimized.buffer);
 
             res.setHeader("Content-Type", EVENT_PHOTO_PREVIEW_CONTENT_TYPE);
             res.setHeader(
@@ -558,7 +584,7 @@ router.get("/event-photos/:id/download", async (req: Request, res: Response) => 
             return res.send(optimized.buffer);
         } catch (previewErr) {
             console.error(
-                "GET /public/event-photos/:id/download preview backfill failed (serving original):",
+                "GET /public/event-photos/:id/download optimize failed (serving original):",
                 previewErr,
             );
             res.setHeader("Content-Type", photo.mimeType);

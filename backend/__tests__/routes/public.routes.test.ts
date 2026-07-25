@@ -548,22 +548,25 @@ describe("public routes", () => {
         expect(response.headers["cache-control"]).toBe(
             "public, max-age=86400, stale-while-revalidate=604800",
         );
-        expect(githubStorageMocks.uploadContent).toHaveBeenCalledWith(
-            expect.any(Buffer),
-            "events/1/photos/undated/a1b2c3d4-e5f6-7890-abcd-ef1234567890-preview.webp",
-            expect.stringContaining("Backfill"),
-        );
-        expect(prismaMocks.eventPhotoUpdate).toHaveBeenCalledWith(
-            expect.objectContaining({
-                where: { id: 11 },
-                data: expect.objectContaining({
-                    previewGithubPath:
-                        "events/1/photos/undated/a1b2c3d4-e5f6-7890-abcd-ef1234567890-preview.webp",
-                    previewGithubSha: "preview-sha",
-                    previewFileSize: expect.any(Number),
+        // Persist runs in the background after the response is sent.
+        await vi.waitFor(() => {
+            expect(githubStorageMocks.uploadContent).toHaveBeenCalledWith(
+                expect.any(Buffer),
+                "events/1/photos/undated/a1b2c3d4-e5f6-7890-abcd-ef1234567890-preview.webp",
+                expect.stringContaining("Backfill"),
+            );
+            expect(prismaMocks.eventPhotoUpdate).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: 11 },
+                    data: expect.objectContaining({
+                        previewGithubPath:
+                            "events/1/photos/undated/a1b2c3d4-e5f6-7890-abcd-ef1234567890-preview.webp",
+                        previewGithubSha: "preview-sha",
+                        previewFileSize: expect.any(Number),
+                    }),
                 }),
-            }),
-        );
+            );
+        });
     });
 
     it("GET /public/events/:id/tiers returns active tiers with capacity", async () => {
