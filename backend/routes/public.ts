@@ -55,9 +55,9 @@ function scheduleEventPhotoPreviewPersist(
         });
     })()
         .catch((previewErr) => {
-            console.error(
-                "GET /public/event-photos/:id/download preview backfill failed (serving optimized in-memory):",
-                previewErr,
+            console.warn(
+                "GET /public/event-photos/:id/download preview backfill failed (non-fatal; served optimized in-memory):",
+                previewErr instanceof Error ? previewErr.message : previewErr,
             );
         })
         .finally(() => {

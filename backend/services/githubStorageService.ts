@@ -73,6 +73,18 @@ function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Serialize Contents API writes so concurrent creates do not race the branch tip. */
+let contentsWriteChain: Promise<unknown> = Promise.resolve();
+
+function withContentsWriteLock<T>(fn: () => Promise<T>): Promise<T> {
+    const run = contentsWriteChain.then(fn, fn);
+    contentsWriteChain = run.then(
+        () => undefined,
+        () => undefined,
+    );
+    return run;
+}
+
 /** Fetch the current blob SHA for a path (for refreshing stale update SHAs). */
 async function getCurrentFileSha(githubPath: string): Promise<string | undefined> {
     const res = await fetch(`${BASE}/${githubPath}`, { headers: headers() });
@@ -83,7 +95,7 @@ async function getCurrentFileSha(githubPath: string): Promise<string | undefined
     return typeof data.sha === "string" ? data.sha : undefined;
 }
 
-async function uploadContentAtPath(
+async function uploadContentAtPathUnlocked(
     contentBuffer: Buffer,
     githubPath: string,
     message: string,
@@ -144,6 +156,17 @@ async function uploadContentAtPath(
         lastStatus,
         lastBody,
         "Storage upload failed. Please try again.",
+    );
+}
+
+async function uploadContentAtPath(
+    contentBuffer: Buffer,
+    githubPath: string,
+    message: string,
+    existingSha?: string,
+): Promise<UploadResult> {
+    return withContentsWriteLock(() =>
+        uploadContentAtPathUnlocked(contentBuffer, githubPath, message, existingSha),
     );
 }
 
