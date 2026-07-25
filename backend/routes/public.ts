@@ -127,7 +127,7 @@ function canPublicViewEvent(event: {
     return event.isActive && !event.isArchived && !event.isFinalized && event.isPublished;
 }
 
-/** Live published OR archived/finalized+disclosed (past public detail). */
+/** Live published OR any disclosed event (past public detail/photos). */
 function canPublicViewEventDetail(event: {
     isPublished: boolean;
     isActive: boolean;
@@ -135,13 +135,13 @@ function canPublicViewEventDetail(event: {
     isDisclosed: boolean;
     isFinalized?: boolean;
 }): boolean {
-    if (event.isArchived) {
-        return event.isDisclosed;
+    if (event.isDisclosed) {
+        return true;
     }
-    if (event.isFinalized) {
-        return event.isDisclosed;
-    }
-    return canPublicViewEvent({ ...event, isFinalized: false });
+    return canPublicViewEvent({
+        ...event,
+        isFinalized: event.isFinalized ?? false,
+    });
 }
 
 function computeSpotsRemaining(capacity: number | null | undefined, registeredCount: number): number | null {
@@ -246,10 +246,7 @@ router.get("/highlights/photos", async (_req: Request, res: Response) => {
     try {
         const events = await prisma.event.findMany({
             where: {
-                OR: [
-                    { isArchived: true, isDisclosed: true },
-                    { isFinalized: true, isDisclosed: true },
-                ],
+                isDisclosed: true,
                 photos: {
                     some: {
                         isActive: true,
@@ -307,10 +304,7 @@ router.get("/events", async (req: Request, res: Response) => {
         if (past) {
             const events = await prisma.event.findMany({
                 where: {
-                    OR: [
-                        { isArchived: true, isDisclosed: true },
-                        { isFinalized: true, isArchived: false, isDisclosed: true },
-                    ],
+                    isDisclosed: true,
                 },
                 select: publicEventSelect,
                 orderBy: { eventEndDate: "desc" },

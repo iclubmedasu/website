@@ -76,7 +76,7 @@ export default function LifecycleCardActions({
     if (mode === 'archived') {
         return (
             <>
-                {canManage && item.isArchived && onToggleDisclose && (
+                {canManage && onToggleDisclose && (
                     <button
                         className={`${btnClass} publish-website-btn`}
                         title={item.isDisclosed ? 'Hide from website' : 'Disclose on website'}
@@ -119,7 +119,7 @@ export default function LifecycleCardActions({
         );
     }
 
-    const discloseButton = canManage && item.isFinalized && !item.isArchived && onToggleDisclose ? (
+    const discloseButton = canManage && onToggleDisclose ? (
         <button
             className={`${btnClass} publish-website-btn`}
             title={item.isDisclosed ? 'Hide from website' : 'Disclose on website'}

@@ -53,7 +53,6 @@ export function getWebsiteDisclosedBadge(item: CardViewModel | null | undefined)
     title: string;
 } | null {
     if (!item?.isDisclosed) return null;
-    if (!item.isArchived && !item.isFinalized) return null;
     return {
         className: 'badge-website-disclosed',
         label: 'On website',

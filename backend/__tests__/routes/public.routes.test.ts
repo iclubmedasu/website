@@ -12,6 +12,7 @@ const prismaMocks = vi.hoisted(() => ({
     eventSessionFindMany: vi.fn(),
     eventTierFindMany: vi.fn(),
     eventCustomFieldFindMany: vi.fn(),
+    eventPhotoFindMany: vi.fn(),
     projectFindMany: vi.fn(),
     projectFindUnique: vi.fn(),
     sitePageFindUnique: vi.fn(),
@@ -55,6 +56,9 @@ vi.mock("../../db", () => ({
         },
         eventCustomField: {
             findMany: prismaMocks.eventCustomFieldFindMany,
+        },
+        eventPhoto: {
+            findMany: prismaMocks.eventPhotoFindMany,
         },
         project: {
             findMany: prismaMocks.projectFindMany,
@@ -133,6 +137,7 @@ describe("public routes", () => {
         prismaMocks.eventSessionFindMany.mockResolvedValue([]);
         prismaMocks.eventTierFindMany.mockResolvedValue([]);
         prismaMocks.eventCustomFieldFindMany.mockResolvedValue([]);
+        prismaMocks.eventPhotoFindMany.mockResolvedValue([]);
         prismaMocks.projectFindMany.mockResolvedValue([]);
         prismaMocks.projectFindUnique.mockResolvedValue(null);
         prismaMocks.sitePageFindUnique.mockResolvedValue(null);
@@ -285,6 +290,59 @@ describe("public routes", () => {
         const response = await request(createApp()).get("/public/events/1");
 
         expect(response.status).toBe(404);
+    });
+
+    it("GET /public/events/:id returns disclosed non-finalized events", async () => {
+        prismaMocks.eventFindUnique.mockResolvedValue({
+            ...baseEvent,
+            isFinalized: false,
+            isArchived: false,
+            isDisclosed: true,
+            isPublished: false,
+            isActive: true,
+        });
+        prismaMocks.eventRegistrationCount.mockResolvedValue(8);
+
+        const response = await request(createApp()).get("/public/events/1");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+            id: 1,
+            slug: "abcdefghjkmn",
+        });
+    });
+
+    it("GET /public/events/:id/photos returns photos for disclosed non-finalized events", async () => {
+        prismaMocks.eventFindUnique.mockResolvedValue({
+            id: 1,
+            slug: "abcdefghjkmn",
+            isPublished: false,
+            isActive: true,
+            isArchived: false,
+            isDisclosed: true,
+            isFinalized: false,
+        });
+        prismaMocks.eventPhotoFindMany.mockResolvedValue([
+            {
+                id: 9,
+                fileName: "crowd.jpg",
+                eventDay: 1,
+                caption: "Opening",
+            },
+        ]);
+
+        const response = await request(createApp()).get("/public/events/1/photos");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual([
+            {
+                id: 9,
+                fileName: "crowd.jpg",
+                eventDay: 1,
+                caption: "Opening",
+                downloadUrl: "/api/public/event-photos/9/download",
+            },
+        ]);
     });
 
     it("GET /public/events/:id/tiers returns active tiers with capacity", async () => {
@@ -475,12 +533,36 @@ describe("public routes", () => {
         expect(response.body[0].slug).toBe("abcdefghjkmn");
         expect(prismaMocks.eventFindMany).toHaveBeenCalledWith(expect.objectContaining({
             where: {
-                OR: [
-                    { isArchived: true, isDisclosed: true },
-                    { isFinalized: true, isArchived: false, isDisclosed: true },
-                ],
+                isDisclosed: true,
             },
             orderBy: { eventEndDate: "desc" },
+        }));
+    });
+
+    it("GET /public/events?past=true returns disclosed non-finalized events", async () => {
+        prismaMocks.eventFindMany.mockResolvedValue([
+            {
+                ...baseEvent,
+                id: 4,
+                title: "Disclosed Active Fair",
+                isArchived: false,
+                isFinalized: false,
+                isDisclosed: true,
+                isPublished: true,
+                isActive: true,
+            },
+        ]);
+        prismaMocks.eventRegistrationGroupBy.mockResolvedValue([]);
+
+        const response = await request(createApp()).get("/public/events?past=true&limit=5");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toHaveLength(1);
+        expect(response.body[0].title).toBe("Disclosed Active Fair");
+        expect(prismaMocks.eventFindMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: {
+                isDisclosed: true,
+            },
         }));
     });
 

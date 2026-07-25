@@ -1021,7 +1021,7 @@ describe('events routes auth wiring', () => {
         }))
     })
 
-    it('rejects disclose on a non-archived, non-finalized event', async () => {
+    it('discloses a non-archived, non-finalized event for the public website', async () => {
         prismaMocks.eventFindUnique.mockReset()
         prismaMocks.eventUpdate.mockReset()
         prismaMocks.eventFindUnique.mockResolvedValue({
@@ -1031,6 +1031,17 @@ describe('events routes auth wiring', () => {
             isFinalized: false,
             isDisclosed: false,
         })
+        prismaMocks.eventUpdate.mockResolvedValueOnce({
+            id: 102,
+            title: 'Active Summit',
+            isArchived: false,
+            isFinalized: false,
+            isDisclosed: true,
+            eventTeams: [],
+            tiers: [],
+            customFields: [],
+            _count: { registrations: 0 },
+        })
 
         const token = createToken({ memberId: 12, isDeveloper: true })
 
@@ -1039,11 +1050,11 @@ describe('events routes auth wiring', () => {
             .set('Authorization', `Bearer ${token}`)
             .send({ disclosed: true })
 
-        expect(response.status).toBe(400)
-        expect(response.body).toEqual({
-            error: 'Only archived or finalized events can be disclosed on the public website',
-        })
-        expect(prismaMocks.eventUpdate).not.toHaveBeenCalled()
+        expect(response.status).toBe(200)
+        expect(prismaMocks.eventUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            where: { id: 102 },
+            data: { isDisclosed: true },
+        }))
     })
 
     it('publishes an active event for public registration', async () => {

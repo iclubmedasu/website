@@ -15,7 +15,7 @@ import {
 import { AlertTriangle, Loader, RotateCcw, Trash2, Upload, X } from 'lucide-react';
 import { CLUB_TIMEZONE } from '@iclub/shared/utils';
 import Toggle from '@/components/toggle/Toggle';
-import { eventPhotosAPI, getAuthToken } from '@/services/api';
+import { apiFetch, eventPhotosAPI } from '@/services/api';
 import type { EventPhotoRef, Id } from '@/types/backend-contracts';
 import { useEventPhotos } from '../../hooks/useEventPhotos';
 import { formatAttendanceDayLabel, getEventDayRange } from '../eventDateUtils';
@@ -95,10 +95,51 @@ function dayHeading(eventDay: string | null, dayIndexByKey: Map<string, number>)
     return `Day ${index} — ${label}`;
 }
 
-function photoThumbUrl(photoId: Id | string): string {
-    const token = getAuthToken();
-    const base = eventPhotosAPI.getDownloadUrl(photoId);
-    return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+/** Fetch photo with Authorization and expose a blob object URL (revoked on change/unmount). */
+function useAuthorizedPhotoThumb(photoId: Id | string): string | null {
+    const [objectUrl, setObjectUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        let createdUrl: string | null = null;
+        setObjectUrl(null);
+
+        void (async () => {
+            try {
+                const response = await apiFetch(eventPhotosAPI.getDownloadUrl(photoId));
+                if (!response.ok || cancelled) return;
+                const blob = await response.blob();
+                if (cancelled) return;
+                createdUrl = URL.createObjectURL(blob);
+                setObjectUrl(createdUrl);
+            } catch {
+                // Leave thumb empty on fetch failure (avoids broken-image icon).
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+            if (createdUrl) URL.revokeObjectURL(createdUrl);
+        };
+    }, [photoId]);
+
+    return objectUrl;
+}
+
+function AuthorizedEventPhotoThumb({
+    photoId,
+    alt,
+}: {
+    photoId: Id | string;
+    alt: string;
+}) {
+    const thumbUrl = useAuthorizedPhotoThumb(photoId);
+    if (!thumbUrl) {
+        return <div className="event-photo-thumb event-photo-thumb--dimmed" aria-hidden />;
+    }
+    /* Auth via apiFetch Authorization header → blob URL. */
+    /* eslint-disable-next-line @next/next/no-img-element */
+    return <img className="event-photo-thumb" src={thumbUrl} alt={alt} loading="lazy" />;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -252,13 +293,9 @@ function EventPhotosDayGroup({
                 {visiblePhotos.map((photo) => (
                     <div key={photo.id} className="event-photo-card">
                         <div className="event-photo-thumb-wrap">
-                            {/* Auth download via query token (same pattern as file downloads). */}
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                                className="event-photo-thumb"
-                                src={photoThumbUrl(photo.id)}
+                            <AuthorizedEventPhotoThumb
+                                photoId={photo.id}
                                 alt={photo.caption?.trim() || photo.fileName}
-                                loading="lazy"
                             />
                             {!disabled && (
                                 <button
