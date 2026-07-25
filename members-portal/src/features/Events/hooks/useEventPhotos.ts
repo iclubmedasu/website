@@ -74,19 +74,26 @@ export function useEventPhotos(eventId: Id | string | null | undefined) {
 
     const updatePhoto = useCallback(async (id: Id | string, patch: UpdateEventPhotoPayload) => {
         const result = await eventPhotosAPI.update(id, patch);
-        await refresh();
+        setPhotos((prev) =>
+            prev.map((group) => ({
+                ...group,
+                photos: group.photos.map((photo) =>
+                    String(photo.id) === String(id) ? { ...photo, ...result } : photo,
+                ),
+            })),
+        );
         return result;
-    }, [refresh]);
+    }, []);
 
     const deletePhoto = useCallback(async (id: Id | string) => {
         const result = await eventPhotosAPI.remove(id);
-        await refresh();
+        await refresh({ silent: true });
         return result;
     }, [refresh]);
 
     const restorePhoto = useCallback(async (id: Id | string) => {
         const result = await eventPhotosAPI.restore(id);
-        await refresh();
+        await refresh({ silent: true });
         return result;
     }, [refresh]);
 

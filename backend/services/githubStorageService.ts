@@ -110,7 +110,7 @@ async function uploadContentAtPathUnlocked(
     for (let attempt = 0; attempt < MAX_UPLOAD_ATTEMPTS; attempt++) {
         if (attempt > 0) {
             await sleep(100 * attempt);
-            // On 409 (tip race or file already exists), always refresh file SHA.
+            // On conflict / missing-sha, refresh file SHA.
             // If the blob exists, retry as an update; otherwise retry create.
             const refreshedSha = await getCurrentFileSha(githubPath);
             sha = refreshedSha;
@@ -141,7 +141,12 @@ async function uploadContentAtPathUnlocked(
         lastStatus = res.status;
         lastBody = await res.text();
 
-        if (res.status !== 409) {
+        const missingSha422 =
+            res.status === 422
+            && /sha/i.test(lastBody)
+            && /wasn'?t supplied|not supplied|required/i.test(lastBody);
+
+        if (res.status !== 409 && !missingSha422) {
             throwSafeGithubError(
                 "GitHub upload failed",
                 lastStatus,
