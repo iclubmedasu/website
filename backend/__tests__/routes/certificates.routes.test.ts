@@ -5,11 +5,16 @@ import { buildRouteApp } from './testHarness'
 const prismaMocks = vi.hoisted(() => ({
     certificateFindFirst: vi.fn(),
     certificateFindUnique: vi.fn(),
+    certificateFindMany: vi.fn(),
     certificateCreate: vi.fn(),
     certificateUpdate: vi.fn(),
     certificateTemplateFindUnique: vi.fn(),
     eventFindUnique: vi.fn(),
+    eventRegistrationFindMany: vi.fn(),
+    eventTaskAssignmentFindMany: vi.fn(),
+    eventSessionFindMany: vi.fn(),
     projectFindUnique: vi.fn(),
+    taskAssignmentFindMany: vi.fn(),
 }))
 
 const emailMocks = vi.hoisted(() => ({
@@ -22,6 +27,7 @@ vi.mock('../../db', () => ({
         certificate: {
             findFirst: prismaMocks.certificateFindFirst,
             findUnique: prismaMocks.certificateFindUnique,
+            findMany: prismaMocks.certificateFindMany,
             create: prismaMocks.certificateCreate,
             update: prismaMocks.certificateUpdate,
         },
@@ -31,8 +37,20 @@ vi.mock('../../db', () => ({
         event: {
             findUnique: prismaMocks.eventFindUnique,
         },
+        eventRegistration: {
+            findMany: prismaMocks.eventRegistrationFindMany,
+        },
+        eventTaskAssignment: {
+            findMany: prismaMocks.eventTaskAssignmentFindMany,
+        },
+        eventSession: {
+            findMany: prismaMocks.eventSessionFindMany,
+        },
         project: {
             findUnique: prismaMocks.projectFindUnique,
+        },
+        taskAssignment: {
+            findMany: prismaMocks.taskAssignmentFindMany,
         },
     },
 }))
@@ -354,5 +372,143 @@ describe('certificates routes — template requirement & auto-issue', () => {
             expect(prismaMocks.certificateUpdate).not.toHaveBeenCalled()
             expect(emailMocks.queueCertificateEmail).not.toHaveBeenCalled()
         })
+    })
+})
+
+describe('certificates routes — special vs event/project permissions', () => {
+    const special = { isSpecial: true, memberId: 99 }
+    const member = { memberId: 50 }
+    const officer = { isOfficer: true, memberId: 1 }
+
+    beforeEach(() => {
+        prismaMocks.certificateFindFirst.mockResolvedValue(null)
+        prismaMocks.certificateFindMany.mockResolvedValue([])
+        prismaMocks.certificateTemplateFindUnique.mockResolvedValue(activeTemplate)
+        prismaMocks.taskAssignmentFindMany.mockResolvedValue([])
+        prismaMocks.eventRegistrationFindMany.mockResolvedValue([])
+        prismaMocks.eventTaskAssignmentFindMany.mockResolvedValue([])
+        prismaMocks.eventSessionFindMany.mockResolvedValue([])
+        emailMocks.queueCertificateEmail.mockReset()
+    })
+
+    afterEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('allows special on project eligible', async () => {
+        prismaMocks.projectFindUnique.mockResolvedValueOnce({
+            id: 20,
+            title: 'Portal',
+            isFinalized: true,
+            projectType: { name: 'Software' },
+        })
+
+        const response = await request(buildRouteApp(certificatesRouter, special))
+            .get('/project/20/eligible')
+
+        expect(response.status).toBe(200)
+        expect(response.body.projectTitle).toBe('Portal')
+    })
+
+    it('allows special on project issue-bulk', async () => {
+        prismaMocks.projectFindUnique.mockResolvedValueOnce({
+            id: 20,
+            title: 'Portal',
+            isFinalized: true,
+        })
+        prismaMocks.certificateCreate.mockResolvedValueOnce({ id: 200 })
+
+        const response = await request(buildRouteApp(certificatesRouter, special))
+            .post('/project/20/issue-bulk')
+            .send({
+                templateId: 5,
+                recipients: [
+                    {
+                        type: 'CONTRIBUTION',
+                        recipientName: 'Carol',
+                        recipientEmail: 'carol@example.com',
+                    },
+                ],
+            })
+
+        expect(response.status).toBe(200)
+        expect(response.body.created).toBe(1)
+    })
+
+    it('allows special to list certificates by projectId', async () => {
+        prismaMocks.certificateFindMany.mockResolvedValueOnce([
+            { id: 1, projectId: 20, title: 'Portal cert' },
+        ])
+
+        const response = await request(buildRouteApp(certificatesRouter, special))
+            .get('/?projectId=20')
+
+        expect(response.status).toBe(200)
+        expect(response.body).toHaveLength(1)
+        expect(prismaMocks.certificateFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ projectId: 20 }),
+            }),
+        )
+        expect(prismaMocks.certificateFindMany.mock.calls[0][0].where.recipientMemberId).toBeUndefined()
+    })
+
+    it('denies special on event eligible', async () => {
+        const response = await request(buildRouteApp(certificatesRouter, special))
+            .get('/event/10/eligible')
+
+        expect(response.status).toBe(403)
+        expect(prismaMocks.eventFindUnique).not.toHaveBeenCalled()
+    })
+
+    it('denies special on event issue-bulk', async () => {
+        const response = await request(buildRouteApp(certificatesRouter, special))
+            .post('/event/10/issue-bulk')
+            .send({
+                templateId: 5,
+                recipients: [
+                    {
+                        type: 'ATTENDANCE',
+                        recipientName: 'Bob',
+                        recipientEmail: 'bob@example.com',
+                    },
+                ],
+            })
+
+        expect(response.status).toBe(403)
+        expect(prismaMocks.eventFindUnique).not.toHaveBeenCalled()
+    })
+
+    it('denies non-elevated member on project eligible', async () => {
+        const response = await request(buildRouteApp(certificatesRouter, member))
+            .get('/project/20/eligible')
+
+        expect(response.status).toBe(403)
+        expect(prismaMocks.projectFindUnique).not.toHaveBeenCalled()
+    })
+
+    it('allows officer on both event and project manage', async () => {
+        prismaMocks.eventFindUnique.mockResolvedValueOnce({
+            id: 10,
+            title: 'Summit',
+            timezone: 'Africa/Cairo',
+            eventDate: new Date('2026-07-01T00:00:00.000Z'),
+            eventEndDate: null,
+            projectType: null,
+        })
+        prismaMocks.projectFindUnique.mockResolvedValueOnce({
+            id: 20,
+            title: 'Portal',
+            isFinalized: true,
+            projectType: { name: 'Software' },
+        })
+
+        const eventResponse = await request(buildRouteApp(certificatesRouter, officer))
+            .get('/event/10/eligible')
+        const projectResponse = await request(buildRouteApp(certificatesRouter, officer))
+            .get('/project/20/eligible')
+
+        expect(eventResponse.status).toBe(200)
+        expect(projectResponse.status).toBe(200)
     })
 })

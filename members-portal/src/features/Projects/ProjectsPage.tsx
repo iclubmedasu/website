@@ -471,7 +471,10 @@ export default function ProjectsPage() {
     // canManageProject: finalize, archive, hold, abort, publish, reactivate (NOT blocked by finalized)
     const canManageProject = () => isPrivileged;
 
-    const canManageCertificates = !!(user?.isAdmin || user?.isOfficer || user?.isDeveloper || user?.isLeadership);
+    const canManageCertificates = !!(
+        user?.isAdmin || user?.isOfficer || user?.isDeveloper ||
+        user?.isLeadership || user?.isSpecial
+    );
 
     // Upload follows backend visibility scope: if a project is visible to the user, upload is allowed.
     const canUploadToProject = () => !!user?.id;

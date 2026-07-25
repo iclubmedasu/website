@@ -414,12 +414,14 @@ class Media {
       this.heightTotal = this.height * this.length;
       this.y = this.height * this.index;
     } else {
-      this.scale = this.screen.height / 1500;
-      this.plane.scale.y = (this.viewport.height * (900 * this.scale)) / this.screen.height;
-      this.plane.scale.x = (this.viewport.width * (700 * this.scale)) / this.screen.width;
+      // Landscape 16:9 cards for horizontal galleries (home Highlights, mobile event gallery)
+      const h = this.viewport.height * 0.72;
+      const w = h * (16 / 9);
+      this.plane.scale.y = h;
+      this.plane.scale.x = w;
       this.plane.program.uniforms.uPlaneSizes.value = [this.plane.scale.x, this.plane.scale.y];
-      this.padding = 2;
-      this.width = this.plane.scale.x + this.padding;
+      this.padding = w * 0.06;
+      this.width = w + this.padding;
       this.widthTotal = this.width * this.length;
       this.x = this.width * this.index;
     }
@@ -438,7 +440,8 @@ class App {
       scrollSpeed = 2,
       scrollEase = 0.05,
       orientation = 'horizontal',
-      autoplayIntervalMs
+      autoplayIntervalMs,
+      continuousScrollSpeed
     } = {}
   ) {
     document.documentElement.classList.remove('no-js');
@@ -447,6 +450,8 @@ class App {
     this.orientation = orientation;
     this.isVertical = orientation === 'vertical';
     this.autoplayIntervalMs = autoplayIntervalMs;
+    this.continuousScrollSpeed = continuousScrollSpeed || 0;
+    this.lastTs = performance.now();
     this.autoplayTimer = null;
     this.scroll = { ease: scrollEase, current: 0, target: 0, last: 0 };
     this.onCheckDebounce = debounce(this.onCheck, 200);
@@ -634,6 +639,8 @@ class App {
   }
 
   onCheck() {
+    // Continuous marquee mode must not snap to card centers.
+    if (this.continuousScrollSpeed) return;
     if (!this.medias || !this.medias[0]) return;
     const size = this.isVertical ? this.medias[0].height : this.medias[0].width;
     const itemIndex = Math.round(Math.abs(this.scroll.target) / size);
@@ -658,6 +665,12 @@ class App {
     }
   }
   update() {
+    const now = performance.now();
+    const dt = Math.min(0.05, (now - this.lastTs) / 1000);
+    this.lastTs = now;
+    if (this.continuousScrollSpeed && !this.isDown) {
+      this.scroll.target += this.continuousScrollSpeed * dt;
+    }
     this.scroll.current = lerp(this.scroll.current, this.scroll.target, this.scroll.ease);
     const direction = this.isVertical
       ? this.scroll.current > this.scroll.last
@@ -732,7 +745,8 @@ export default function CircularGallery({
   scrollSpeed = 2,
   scrollEase = 0.05,
   orientation = 'horizontal',
-  autoplayIntervalMs
+  autoplayIntervalMs,
+  continuousScrollSpeed
 }) {
   const containerRef = useRef(null);
   useEffect(() => {
@@ -750,7 +764,8 @@ export default function CircularGallery({
         scrollSpeed,
         scrollEase,
         orientation,
-        autoplayIntervalMs
+        autoplayIntervalMs,
+        continuousScrollSpeed
       });
     });
 
@@ -758,7 +773,19 @@ export default function CircularGallery({
       isMounted = false;
       if (app) app.destroy();
     };
-  }, [items, bend, textColor, borderRadius, font, fontUrl, scrollSpeed, scrollEase, orientation, autoplayIntervalMs]);
+  }, [
+    items,
+    bend,
+    textColor,
+    borderRadius,
+    font,
+    fontUrl,
+    scrollSpeed,
+    scrollEase,
+    orientation,
+    autoplayIntervalMs,
+    continuousScrollSpeed
+  ]);
   const ariaLabel =
     orientation === 'vertical'
       ? 'Circular image gallery. Use up and down arrow keys to navigate.'

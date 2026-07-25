@@ -17,6 +17,8 @@ export interface CircularGalleryProps {
     orientation?: "horizontal" | "vertical";
     /** When set, advances one card every N ms (pauses while dragging). */
     autoplayIntervalMs?: number;
+    /** Steady marquee speed in world units/sec (0/omit = off). Pauses while dragging; no card snap. */
+    continuousScrollSpeed?: number;
 }
 
 declare const CircularGallery: ComponentType<CircularGalleryProps>;

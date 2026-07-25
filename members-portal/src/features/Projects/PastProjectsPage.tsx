@@ -81,7 +81,10 @@ export default function PastProjectsPage() {
     const [detailLoading, setDetailLoading] = useState(false);
     const [actionProject, setActionProject] = useState<{ type: ProjectActionType; project: ProjectActionPayload } | null>(null);
     const canManageProjectLifecycle = !!(user?.isDeveloper || user?.isOfficer || user?.isAdmin || user?.isLeadership);
-    const canManageCertificates = !!(user?.isAdmin || user?.isOfficer || user?.isDeveloper || user?.isLeadership);
+    const canManageCertificates = !!(
+        user?.isAdmin || user?.isOfficer || user?.isDeveloper ||
+        user?.isLeadership || user?.isSpecial
+    );
     const hasActiveFilters = filterTeam !== '' || filterCategory !== '' || filterPriority !== ''
         || filterStatus !== '' || dateFrom !== '' || dateTo !== '';
 

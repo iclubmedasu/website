@@ -273,6 +273,11 @@ router.get("/highlights/photos", async (_req: Request, res: Response) => {
             },
         });
 
+        // Hide Highlights unless there is at least one disclosed event with public photos
+        if (events.length === 0) {
+            return res.json([]);
+        }
+
         const selectedEvents = shuffleInPlace([...events]).slice(0, 5);
         const highlights = selectedEvents.flatMap((event) => {
             const photos = shuffleInPlace([...event.photos]).slice(0, 10);

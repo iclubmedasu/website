@@ -54,6 +54,11 @@ export function Highlights() {
 
     const { title, description } = homeContent.highlights;
 
+    // Horizontal card width in CircularGallery world units (fov 45, z 20, h*0.72, 16:9, 6% pad).
+    // ~one card every 5s → moderate continuous drift.
+    const continuousScrollSpeed =
+        (2 * Math.tan((45 * Math.PI) / 360) * 20 * 0.72 * (16 / 9) * 1.06) / 5;
+
     return (
         <Section variant="plain">
             <SectionHeading title={title} description={description} />
@@ -64,6 +69,7 @@ export function Highlights() {
                     borderRadius={0.08}
                     scrollEase={0.05}
                     scrollSpeed={isDesktop ? 1.5 : 3.0}
+                    continuousScrollSpeed={continuousScrollSpeed}
                     textColor="#4c1d95"
                     font="bold 24px Poppins, ui-sans-serif, system-ui, sans-serif"
                 />
