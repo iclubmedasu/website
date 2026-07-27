@@ -43,7 +43,7 @@
         "@typescript-eslint/parser": "^8.0.0",
         "babel-loader": "^10.1.1",
         "eslint": "^9",
-        "eslint-plugin-react-hooks": "^5.0.0",
+        "eslint-plugin-react-hooks": "^7.1.1",
         "typescript": "^5.0.0"
     }
 }
