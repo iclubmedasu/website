@@ -29,14 +29,15 @@ const PUBLIC_EVENT_PHOTO_CACHE_CONTROL =
 const router = express.Router();
 
 /** Coalesce concurrent preview backfills for the same photo id. */
-const previewBackfillInFlight = new Map<number, Promise<void>>();
+const previewBackfillInFlight = new Map<string, Promise<void>>();
 
 function scheduleEventPhotoPreviewPersist(
     photoId: number,
     originalGithubPath: string,
     optimizedBuffer: Buffer,
 ): void {
-    if (previewBackfillInFlight.has(photoId)) return;
+    const key = `event:${photoId}`;
+    if (previewBackfillInFlight.has(key)) return;
 
     const work = (async () => {
         const previewPath = eventPhotoPreviewGithubPath(originalGithubPath);
@@ -61,10 +62,47 @@ function scheduleEventPhotoPreviewPersist(
             );
         })
         .finally(() => {
-            previewBackfillInFlight.delete(photoId);
+            previewBackfillInFlight.delete(key);
         });
 
-    previewBackfillInFlight.set(photoId, work);
+    previewBackfillInFlight.set(key, work);
+}
+
+function scheduleProjectPhotoPreviewPersist(
+    photoId: number,
+    originalGithubPath: string,
+    optimizedBuffer: Buffer,
+): void {
+    const key = `project:${photoId}`;
+    if (previewBackfillInFlight.has(key)) return;
+
+    const work = (async () => {
+        const previewPath = eventPhotoPreviewGithubPath(originalGithubPath);
+        const previewResult = await githubStorage.uploadContent(
+            optimizedBuffer,
+            previewPath,
+            `Backfill preview for project photo ${photoId}`,
+        );
+        await prisma.projectPhoto.update({
+            where: { id: photoId },
+            data: {
+                previewGithubPath: previewResult.githubPath,
+                previewGithubSha: previewResult.githubSha,
+                previewFileSize: optimizedBuffer.length,
+            },
+        });
+    })()
+        .catch((previewErr) => {
+            console.warn(
+                "GET /public/project-photos/:id/download preview backfill failed (non-fatal; served optimized in-memory):",
+                previewErr instanceof Error ? previewErr.message : previewErr,
+            );
+        })
+        .finally(() => {
+            previewBackfillInFlight.delete(key);
+        });
+
+    previewBackfillInFlight.set(key, work);
 }
 
 const DEFAULT_CONTACT_INBOX = "asu.medicine.iclub@gmail.com";
@@ -190,6 +228,11 @@ function canPublicViewEventDetail(event: {
     });
 }
 
+/** Disclosed projects are publicly visible (parity with event disclose). */
+function canPublicViewProject(project: { isDisclosed: boolean }): boolean {
+    return project.isDisclosed;
+}
+
 function computeSpotsRemaining(capacity: number | null | undefined, registeredCount: number): number | null {
     if (capacity == null) return null;
     return Math.max(capacity - registeredCount, 0);
@@ -288,8 +331,8 @@ function shuffleInPlace<T>(items: T[]): T[] {
     return items;
 }
 
-const HIGHLIGHTS_MAX_EVENTS = 5;
-const HIGHLIGHTS_MAX_PHOTOS_PER_EVENT = 10;
+const HIGHLIGHTS_MAX_SOURCES = 5;
+const HIGHLIGHTS_MAX_PHOTOS_PER_SOURCE = 10;
 
 type HighlightCandidatePhoto = {
     id: number;
@@ -297,10 +340,18 @@ type HighlightCandidatePhoto = {
     showOnPublic: boolean;
 };
 
-/** Prefer core photos, then randomly fill from public photos up to the per-event cap. */
-function selectHighlightPhotosForEvent(
+type HighlightSource = {
+    source: "event" | "project";
+    title: string;
+    slug: string;
+    recency: Date;
+    photos: HighlightCandidatePhoto[];
+};
+
+/** Prefer core photos, then randomly fill from public photos up to the per-source cap. */
+function selectHighlightPhotosForSource(
     photos: HighlightCandidatePhoto[],
-    maxPhotos = HIGHLIGHTS_MAX_PHOTOS_PER_EVENT,
+    maxPhotos = HIGHLIGHTS_MAX_PHOTOS_PER_SOURCE,
 ): HighlightCandidatePhoto[] {
     const core = shuffleInPlace(photos.filter((photo) => photo.isCore)).slice(0, maxPhotos);
     const coreIds = new Set(core.map((photo) => photo.id));
@@ -312,47 +363,89 @@ function selectHighlightPhotosForEvent(
 
 router.get("/highlights/photos", async (_req: Request, res: Response) => {
     try {
-        const events = await prisma.event.findMany({
-            where: {
-                isDisclosed: true,
-                photos: {
-                    some: {
-                        isActive: true,
-                        OR: [{ isCore: true }, { showOnPublic: true }],
-                    },
-                },
-            },
-            select: {
-                id: true,
-                title: true,
-                slug: true,
-                photos: {
-                    where: {
-                        isActive: true,
-                        OR: [{ isCore: true }, { showOnPublic: true }],
-                    },
-                    select: {
-                        id: true,
-                        isCore: true,
-                        showOnPublic: true,
-                    },
-                },
-            },
-        });
+        const photoWhere = {
+            isActive: true,
+            OR: [{ isCore: true }, { showOnPublic: true }],
+        };
+        const photoSelect = {
+            id: true,
+            isCore: true,
+            showOnPublic: true,
+        };
 
-        // Hide Highlights unless there is at least one disclosed event with core or public photos
-        if (events.length === 0) {
+        const [events, projects] = await Promise.all([
+            prisma.event.findMany({
+                where: {
+                    isDisclosed: true,
+                    photos: { some: photoWhere },
+                },
+                select: {
+                    id: true,
+                    title: true,
+                    slug: true,
+                    eventDate: true,
+                    eventEndDate: true,
+                    photos: {
+                        where: photoWhere,
+                        select: photoSelect,
+                    },
+                },
+            }),
+            prisma.project.findMany({
+                where: {
+                    isDisclosed: true,
+                    photos: { some: photoWhere },
+                },
+                select: {
+                    id: true,
+                    title: true,
+                    slug: true,
+                    completedDate: true,
+                    updatedAt: true,
+                    photos: {
+                        where: photoWhere,
+                        select: photoSelect,
+                    },
+                },
+            }),
+        ]);
+
+        const sources: HighlightSource[] = [
+            ...events.map((event) => ({
+                source: "event" as const,
+                title: event.title,
+                slug: event.slug,
+                recency: event.eventEndDate ?? event.eventDate,
+                photos: event.photos,
+            })),
+            ...projects.map((project) => ({
+                source: "project" as const,
+                title: project.title,
+                slug: project.slug,
+                recency: project.completedDate ?? project.updatedAt,
+                photos: project.photos,
+            })),
+        ];
+
+        // Hide Highlights unless there is at least one disclosed event/project with eligible photos
+        if (sources.length === 0) {
             return res.json([]);
         }
 
-        const selectedEvents = shuffleInPlace([...events]).slice(0, HIGHLIGHTS_MAX_EVENTS);
-        const highlights = selectedEvents.flatMap((event) => {
-            const photos = selectHighlightPhotosForEvent(event.photos);
+        sources.sort((a, b) => b.recency.getTime() - a.recency.getTime());
+        const selectedSources = sources.slice(0, HIGHLIGHTS_MAX_SOURCES);
+        const highlights = selectedSources.flatMap((item) => {
+            const photos = selectHighlightPhotosForSource(item.photos);
+            const downloadBase =
+                item.source === "event"
+                    ? "/api/public/event-photos"
+                    : "/api/public/project-photos";
             return photos.map((photo) => ({
                 id: photo.id,
-                downloadUrl: `/api/public/event-photos/${photo.id}/download`,
-                eventTitle: event.title,
-                eventSlug: event.slug,
+                downloadUrl: `${downloadBase}/${photo.id}/download`,
+                source: item.source,
+                title: item.title,
+                slug: item.slug,
             }));
         });
 
@@ -906,7 +999,6 @@ router.get("/projects", async (req: Request, res: Response) => {
 
         const projects = await prisma.project.findMany({
             where: {
-                isArchived: true,
                 isDisclosed: true,
             },
             select: publicProjectSelect,
@@ -935,20 +1027,138 @@ router.get("/projects/:id", async (req: Request, res: Response) => {
             where: { id: resolved.id },
             select: {
                 ...publicProjectSelect,
-                isArchived: true,
                 isDisclosed: true,
             },
         });
 
-        if (!project || !project.isArchived || !project.isDisclosed) {
+        if (!project || !canPublicViewProject(project)) {
             return res.status(404).json({ error: "Project not found" });
         }
 
-        const { isArchived: _isArchived, isDisclosed: _isDisclosed, ...payload } = project;
+        const { isDisclosed: _isDisclosed, ...payload } = project;
         return res.json(payload);
     } catch (error) {
         console.error("GET /public/projects/:id error:", error);
         return res.status(500).json({ error: "Failed to load project" });
+    }
+});
+
+router.get("/projects/:id/photos", async (req: Request, res: Response) => {
+    try {
+        const resolved = await resolveProjectByIdOrSlug(String(req.params.id));
+        if (!resolved) {
+            return res.status(404).json({ error: "Project not found" });
+        }
+
+        const project = await prisma.project.findUnique({
+            where: { id: resolved.id },
+            select: {
+                isDisclosed: true,
+            },
+        });
+
+        if (!project || !canPublicViewProject(project)) {
+            return res.status(404).json({ error: "Project not found" });
+        }
+
+        const photos = await prisma.projectPhoto.findMany({
+            where: {
+                projectId: resolved.id,
+                isActive: true,
+                showOnPublic: true,
+            },
+            orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+            select: {
+                id: true,
+                fileName: true,
+                caption: true,
+            },
+        });
+
+        return res.json(
+            photos.map((photo) => ({
+                id: photo.id,
+                fileName: photo.fileName,
+                caption: photo.caption,
+                downloadUrl: `/api/public/project-photos/${photo.id}/download`,
+            })),
+        );
+    } catch (error) {
+        console.error("GET /public/projects/:id/photos error:", error);
+        return res.status(500).json({ error: "Failed to load project photos" });
+    }
+});
+
+router.get("/project-photos/:id/download", async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(String(req.params.id), 10);
+        if (Number.isNaN(id)) {
+            return res.status(404).json({ error: "Photo not found" });
+        }
+
+        const photo = await prisma.projectPhoto.findUnique({
+            where: { id },
+            include: {
+                project: {
+                    select: {
+                        isDisclosed: true,
+                    },
+                },
+            },
+        });
+
+        if (
+            !photo
+            || !photo.isActive
+            || (!photo.showOnPublic && !photo.isCore)
+            || !canPublicViewProject(photo.project)
+        ) {
+            return res.status(404).json({ error: "Photo not found" });
+        }
+
+        res.setHeader("Cache-Control", PUBLIC_EVENT_PHOTO_CACHE_CONTROL);
+
+        if (photo.previewGithubPath) {
+            const ghResponse = await githubStorage.downloadFile(photo.previewGithubPath);
+            res.setHeader("Content-Type", EVENT_PHOTO_PREVIEW_CONTENT_TYPE);
+            res.setHeader(
+                "Content-Disposition",
+                `inline; filename="${photo.fileName.replace(/\.[^.]+$/, "") || "photo"}-preview.webp"`,
+            );
+            if (photo.previewFileSize) {
+                res.setHeader("Content-Length", photo.previewFileSize);
+            }
+            Readable.fromWeb(ghResponse.body as import("stream/web").ReadableStream).pipe(res);
+            return;
+        }
+
+        const ghResponse = await githubStorage.downloadFile(photo.githubPath);
+        const originalBuffer = Buffer.from(await ghResponse.arrayBuffer());
+
+        try {
+            const optimized = await optimizeEventPhoto(originalBuffer);
+            scheduleProjectPhotoPreviewPersist(photo.id, photo.githubPath, optimized.buffer);
+
+            res.setHeader("Content-Type", EVENT_PHOTO_PREVIEW_CONTENT_TYPE);
+            res.setHeader(
+                "Content-Disposition",
+                `inline; filename="${photo.fileName.replace(/\.[^.]+$/, "") || "photo"}-preview.webp"`,
+            );
+            res.setHeader("Content-Length", optimized.buffer.length);
+            return res.send(optimized.buffer);
+        } catch (previewErr) {
+            console.error(
+                "GET /public/project-photos/:id/download optimize failed (serving original):",
+                previewErr,
+            );
+            res.setHeader("Content-Type", photo.mimeType);
+            res.setHeader("Content-Disposition", `inline; filename="${photo.fileName}"`);
+            res.setHeader("Content-Length", originalBuffer.length);
+            return res.send(originalBuffer);
+        }
+    } catch (error) {
+        console.error("GET /public/project-photos/:id/download error:", error);
+        return res.status(500).json({ error: "Failed to download photo" });
     }
 });
 

@@ -19,6 +19,9 @@ const prismaMocks = vi.hoisted(() => ({
     eventPhotoUpdate: vi.fn(),
     projectFindMany: vi.fn(),
     projectFindUnique: vi.fn(),
+    projectPhotoFindMany: vi.fn(),
+    projectPhotoFindUnique: vi.fn(),
+    projectPhotoUpdate: vi.fn(),
     sitePageFindUnique: vi.fn(),
     aboutSectionFindMany: vi.fn(),
     contactMethodFindMany: vi.fn(),
@@ -74,6 +77,11 @@ vi.mock("../../db", () => ({
         project: {
             findMany: prismaMocks.projectFindMany,
             findUnique: prismaMocks.projectFindUnique,
+        },
+        projectPhoto: {
+            findMany: prismaMocks.projectPhotoFindMany,
+            findUnique: prismaMocks.projectPhotoFindUnique,
+            update: prismaMocks.projectPhotoUpdate,
         },
         sitePage: {
             findUnique: prismaMocks.sitePageFindUnique,
@@ -373,6 +381,8 @@ describe("public routes", () => {
                 id: 1,
                 title: "Health Fair",
                 slug: "abcdefghjkmn",
+                eventDate: new Date("2026-08-01T10:00:00.000Z"),
+                eventEndDate: new Date("2026-08-01T18:00:00.000Z"),
                 photos: [
                     { id: 1, isCore: true, showOnPublic: true },
                     { id: 2, isCore: true, showOnPublic: false },
@@ -388,6 +398,7 @@ describe("public routes", () => {
                 ],
             },
         ]);
+        prismaMocks.projectFindMany.mockResolvedValue([]);
 
         const response = await request(createApp()).get("/public/highlights/photos");
 
@@ -396,6 +407,9 @@ describe("public routes", () => {
         const ids = response.body.map((photo: { id: number }) => photo.id);
         expect(ids).toEqual(expect.arrayContaining([1, 2, 3]));
         expect(ids.filter((id: number) => id === 1 || id === 2 || id === 3)).toHaveLength(3);
+        expect(response.body.every((photo: { source: string }) => photo.source === "event")).toBe(
+            true,
+        );
         expect(prismaMocks.eventFindMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: expect.objectContaining({
@@ -417,6 +431,19 @@ describe("public routes", () => {
                 }),
             }),
         );
+        expect(prismaMocks.projectFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    isDisclosed: true,
+                    photos: {
+                        some: {
+                            isActive: true,
+                            OR: [{ isCore: true }, { showOnPublic: true }],
+                        },
+                    },
+                }),
+            }),
+        );
     });
 
     it("GET /public/highlights/photos uses random public photos when no core", async () => {
@@ -425,12 +452,15 @@ describe("public routes", () => {
                 id: 1,
                 title: "Health Fair",
                 slug: "abcdefghjkmn",
+                eventDate: new Date("2026-08-01T10:00:00.000Z"),
+                eventEndDate: new Date("2026-08-01T18:00:00.000Z"),
                 photos: [
                     { id: 9, isCore: false, showOnPublic: true },
                     { id: 10, isCore: false, showOnPublic: true },
                 ],
             },
         ]);
+        prismaMocks.projectFindMany.mockResolvedValue([]);
 
         const response = await request(createApp()).get("/public/highlights/photos");
 
@@ -440,22 +470,135 @@ describe("public routes", () => {
                 {
                     id: 9,
                     downloadUrl: "/api/public/event-photos/9/download",
-                    eventTitle: "Health Fair",
-                    eventSlug: "abcdefghjkmn",
+                    source: "event",
+                    title: "Health Fair",
+                    slug: "abcdefghjkmn",
                 },
                 {
                     id: 10,
                     downloadUrl: "/api/public/event-photos/10/download",
-                    eventTitle: "Health Fair",
-                    eventSlug: "abcdefghjkmn",
+                    source: "event",
+                    title: "Health Fair",
+                    slug: "abcdefghjkmn",
                 },
             ]),
         );
         expect(response.body).toHaveLength(2);
     });
 
+    it("GET /public/highlights/photos mixes latest disclosed events and projects by recency", async () => {
+        prismaMocks.eventFindMany.mockResolvedValue([
+            {
+                id: 1,
+                title: "Older Event",
+                slug: "olderevent123",
+                eventDate: new Date("2026-01-01T10:00:00.000Z"),
+                eventEndDate: new Date("2026-01-02T18:00:00.000Z"),
+                photos: [{ id: 101, isCore: true, showOnPublic: true }],
+            },
+            {
+                id: 2,
+                title: "Newer Event",
+                slug: "newerevent123",
+                eventDate: new Date("2026-06-01T10:00:00.000Z"),
+                eventEndDate: new Date("2026-06-03T18:00:00.000Z"),
+                photos: [{ id: 102, isCore: false, showOnPublic: true }],
+            },
+            {
+                id: 3,
+                title: "Mid Event",
+                slug: "midevent12345",
+                eventDate: new Date("2026-03-01T10:00:00.000Z"),
+                eventEndDate: new Date("2026-03-02T18:00:00.000Z"),
+                photos: [{ id: 103, isCore: true, showOnPublic: false }],
+            },
+            {
+                id: 4,
+                title: "Excluded Event",
+                slug: "excludedevent",
+                eventDate: new Date("2025-01-01T10:00:00.000Z"),
+                eventEndDate: new Date("2025-01-02T18:00:00.000Z"),
+                photos: [{ id: 104, isCore: true, showOnPublic: true }],
+            },
+        ]);
+        prismaMocks.projectFindMany.mockResolvedValue([
+            {
+                id: 10,
+                title: "Latest Project",
+                slug: "latestproject",
+                completedDate: new Date("2026-07-01T12:00:00.000Z"),
+                updatedAt: new Date("2026-05-01T12:00:00.000Z"),
+                photos: [{ id: 201, isCore: true, showOnPublic: true }],
+            },
+            {
+                id: 11,
+                title: "Updated Project",
+                slug: "updatedproject",
+                completedDate: null,
+                updatedAt: new Date("2026-05-15T12:00:00.000Z"),
+                photos: [{ id: 202, isCore: false, showOnPublic: true }],
+            },
+            {
+                id: 12,
+                title: "Too Old Project",
+                slug: "toooldproject",
+                completedDate: new Date("2024-12-01T12:00:00.000Z"),
+                updatedAt: new Date("2024-12-02T12:00:00.000Z"),
+                photos: [{ id: 203, isCore: true, showOnPublic: true }],
+            },
+        ]);
+
+        const response = await request(createApp()).get("/public/highlights/photos");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual([
+            {
+                id: 201,
+                downloadUrl: "/api/public/project-photos/201/download",
+                source: "project",
+                title: "Latest Project",
+                slug: "latestproject",
+            },
+            {
+                id: 102,
+                downloadUrl: "/api/public/event-photos/102/download",
+                source: "event",
+                title: "Newer Event",
+                slug: "newerevent123",
+            },
+            {
+                id: 202,
+                downloadUrl: "/api/public/project-photos/202/download",
+                source: "project",
+                title: "Updated Project",
+                slug: "updatedproject",
+            },
+            {
+                id: 103,
+                downloadUrl: "/api/public/event-photos/103/download",
+                source: "event",
+                title: "Mid Event",
+                slug: "midevent12345",
+            },
+            {
+                id: 101,
+                downloadUrl: "/api/public/event-photos/101/download",
+                source: "event",
+                title: "Older Event",
+                slug: "olderevent123",
+            },
+        ]);
+        expect(response.body).not.toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ id: 104 }),
+                expect.objectContaining({ id: 203 }),
+            ]),
+        );
+    });
+
     it("GET /public/highlights/photos returns empty when no eligible photos", async () => {
         prismaMocks.eventFindMany.mockResolvedValue([]);
+        prismaMocks.projectFindMany.mockResolvedValue([]);
 
         const response = await request(createApp()).get("/public/highlights/photos");
 
@@ -708,7 +851,7 @@ describe("public routes", () => {
         });
     });
 
-    it("GET /public/projects returns disclosed archived projects", async () => {
+    it("GET /public/projects returns disclosed projects", async () => {
         prismaMocks.projectFindMany.mockResolvedValue([
             {
                 id: 2,
@@ -730,7 +873,6 @@ describe("public routes", () => {
         });
         expect(prismaMocks.projectFindMany).toHaveBeenCalledWith(expect.objectContaining({
             where: {
-                isArchived: true,
                 isDisclosed: true,
             },
         }));
@@ -790,7 +932,7 @@ describe("public routes", () => {
         }));
     });
 
-    it("GET /public/projects/:id returns disclosed archived project detail", async () => {
+    it("GET /public/projects/:id returns disclosed project detail", async () => {
         prismaMocks.projectFindUnique.mockResolvedValue({
             id: 2,
             slug: "projslug0001",
@@ -799,7 +941,6 @@ describe("public routes", () => {
             completedDate: "2026-05-01T00:00:00.000Z",
             projectType: { name: "Technology", category: "Technology" },
             tags: [{ tagName: "innovation" }],
-            isArchived: true,
             isDisclosed: true,
         });
 
@@ -812,7 +953,28 @@ describe("public routes", () => {
             title: "Telehealth Pilot",
             projectType: { name: "Technology", category: "Technology" },
         });
-        expect(response.body.isArchived).toBeUndefined();
+        expect(response.body.isDisclosed).toBeUndefined();
+    });
+
+    it("GET /public/projects/:id returns disclosed non-archived project detail", async () => {
+        prismaMocks.projectFindUnique.mockResolvedValue({
+            id: 4,
+            slug: "projslug0003",
+            title: "Active Disclosed",
+            description: null,
+            completedDate: null,
+            projectType: null,
+            tags: [],
+            isDisclosed: true,
+        });
+
+        const response = await request(createApp()).get("/public/projects/4");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+            id: 4,
+            title: "Active Disclosed",
+        });
     });
 
     it("GET /public/projects/:id returns 404 for undisclosed project", async () => {
@@ -824,13 +986,52 @@ describe("public routes", () => {
             completedDate: null,
             projectType: null,
             tags: [],
-            isArchived: true,
             isDisclosed: false,
         });
 
         const response = await request(createApp()).get("/public/projects/3");
 
         expect(response.status).toBe(404);
+    });
+
+    it("GET /public/projects/:id/photos returns photos for disclosed projects", async () => {
+        prismaMocks.projectFindUnique.mockResolvedValue({
+            id: 2,
+            slug: "projslug0001",
+            isDisclosed: true,
+        });
+        prismaMocks.projectPhotoFindMany.mockResolvedValue([
+            {
+                id: 11,
+                fileName: "demo.jpg",
+                caption: "Launch",
+            },
+        ]);
+
+        const response = await request(createApp()).get("/public/projects/2/photos");
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual([
+            {
+                id: 11,
+                fileName: "demo.jpg",
+                caption: "Launch",
+                downloadUrl: "/api/public/project-photos/11/download",
+            },
+        ]);
+    });
+
+    it("GET /public/projects/:id/photos returns 404 for undisclosed projects", async () => {
+        prismaMocks.projectFindUnique.mockResolvedValue({
+            id: 3,
+            slug: "projslug0002",
+            isDisclosed: false,
+        });
+
+        const response = await request(createApp()).get("/public/projects/3/photos");
+
+        expect(response.status).toBe(404);
+        expect(prismaMocks.projectPhotoFindMany).not.toHaveBeenCalled();
     });
 
     it("POST /public/contact validates required fields", async () => {

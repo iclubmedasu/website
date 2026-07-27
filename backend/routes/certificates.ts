@@ -8,6 +8,10 @@ import {
     normalizeRecipientEmail,
 } from "../lib/certificateRecipientKey";
 import { loadCertificateBackground } from "../lib/certificateBackgroundCache";
+import {
+    canUserManageProjectCertificates,
+    canUserViewProject,
+} from "../lib/projectPermissions";
 import { certificateEmailResendLimiter } from "../middleware/rateLimit";
 import { queueCertificateEmail, sendCertificateEmail } from "../services/certificateEmailService";
 import { generateCertificatePdfBuffer } from "../services/certificatePdfService";
@@ -122,17 +126,15 @@ function canManageCertificates(user: RequestUser | undefined): boolean {
     return !!(user?.isDeveloper || user?.isAdmin || user?.isOfficer || user?.isLeadership);
 }
 
-function canManageProjectCertificates(user: RequestUser | undefined): boolean {
-    return canManageCertificates(user) || !!user?.isSpecial;
-}
-
-function canManageCertificateScope(
+/** Event certs: privileged roles. Project certs: anyone who can view the project. */
+async function canManageCertificateScope(
     user: RequestUser | undefined,
     projectId: number | null | undefined,
-): boolean {
-    return projectId != null
-        ? canManageProjectCertificates(user)
-        : canManageCertificates(user);
+): Promise<boolean> {
+    if (projectId != null) {
+        return canUserManageProjectCertificates(user, projectId);
+    }
+    return canManageCertificates(user);
 }
 
 function parseId(value: unknown): number | null {
@@ -592,10 +594,6 @@ router.post("/event/:eventId/issue-bulk", async (req: Request, res: Response) =>
 });
 
 router.get("/project/:projectId/eligible", async (req: Request, res: Response) => {
-    if (!canManageProjectCertificates(req.user)) {
-        return res.status(403).json({ error: "Forbidden" });
-    }
-
     const projectId = parseId(req.params.projectId);
     if (!projectId) return res.status(400).json({ error: "Invalid project id" });
 
@@ -605,8 +603,8 @@ router.get("/project/:projectId/eligible", async (req: Request, res: Response) =
             include: { projectType: { select: { name: true } } },
         });
         if (!project) return res.status(404).json({ error: "Project not found" });
-        if (project.isFinalized !== true) {
-            return res.status(400).json({ error: "Project must be finalized before issuing certificates" });
+        if (!(await canUserViewProject(req.user, projectId, project.isArchived))) {
+            return res.status(403).json({ error: "Forbidden" });
         }
 
         const [assignments, existingCerts] = await Promise.all([
@@ -682,10 +680,6 @@ router.get("/project/:projectId/eligible", async (req: Request, res: Response) =
 });
 
 router.post("/project/:projectId/issue-bulk", async (req: Request, res: Response) => {
-    if (!canManageProjectCertificates(req.user)) {
-        return res.status(403).json({ error: "Forbidden" });
-    }
-
     const projectId = parseId(req.params.projectId);
     if (!projectId) return res.status(400).json({ error: "Invalid project id" });
 
@@ -704,11 +698,11 @@ router.post("/project/:projectId/issue-bulk", async (req: Request, res: Response
 
         const project = await prisma.project.findUnique({
             where: { id: projectId },
-            select: { id: true, title: true, isFinalized: true },
+            select: { id: true, title: true, isArchived: true },
         });
         if (!project) return res.status(404).json({ error: "Project not found" });
-        if (project.isFinalized !== true) {
-            return res.status(400).json({ error: "Project must be finalized before issuing certificates" });
+        if (!(await canUserViewProject(req.user, projectId, project.isArchived))) {
+            return res.status(403).json({ error: "Forbidden" });
         }
 
         let created = 0;
@@ -840,10 +834,10 @@ router.get("/", async (req: Request, res: Response) => {
             where.type = type as CertificateType;
         }
 
-        if (
-            canManageCertificates(req.user)
-            || (projectId != null && canManageProjectCertificates(req.user))
-        ) {
+        const canListProjectCerts =
+            projectId != null && await canUserManageProjectCertificates(req.user, projectId);
+
+        if (canManageCertificates(req.user) || canListProjectCerts) {
             if (recipientMemberId) where.recipientMemberId = recipientMemberId;
         } else if (recipientMemberId && status === "ISSUED") {
             // Peer profile Achievements: ISSUED-only for the requested member
@@ -869,7 +863,7 @@ router.get("/", async (req: Request, res: Response) => {
 
 router.post("/", async (req: Request, res: Response) => {
     const projectId = parseId(req.body?.projectId);
-    if (!canManageCertificateScope(req.user, projectId)) {
+    if (!(await canManageCertificateScope(req.user, projectId))) {
         return res.status(403).json({ error: "Forbidden" });
     }
 
@@ -933,7 +927,7 @@ router.get("/:id", async (req: Request, res: Response) => {
         if (!certificate) return res.status(404).json({ error: "Certificate not found" });
 
         if (
-            !canManageCertificateScope(req.user, certificate.projectId) &&
+            !(await canManageCertificateScope(req.user, certificate.projectId)) &&
             certificate.recipientMemberId !== req.user?.memberId
         ) {
             return res.status(403).json({ error: "Forbidden" });
@@ -953,7 +947,7 @@ router.patch("/:id/issue", async (req: Request, res: Response) => {
     try {
         const certificate = await prisma.certificate.findUnique({ where: { id } });
         if (!certificate) return res.status(404).json({ error: "Certificate not found" });
-        if (!canManageCertificateScope(req.user, certificate.projectId)) {
+        if (!(await canManageCertificateScope(req.user, certificate.projectId))) {
             return res.status(403).json({ error: "Forbidden" });
         }
         if (certificate.status !== "DRAFT") {
@@ -995,7 +989,7 @@ router.post("/:id/resend-email", certificateEmailResendLimiter, async (req: Requ
             },
         });
         if (!certificate) return res.status(404).json({ error: "Certificate not found" });
-        if (!canManageCertificateScope(req.user, certificate.projectId)) {
+        if (!(await canManageCertificateScope(req.user, certificate.projectId))) {
             return res.status(403).json({ error: "Forbidden" });
         }
         if (certificate.status !== "ISSUED") {
@@ -1027,7 +1021,7 @@ router.patch("/:id/revoke", async (req: Request, res: Response) => {
     try {
         const certificate = await prisma.certificate.findUnique({ where: { id } });
         if (!certificate) return res.status(404).json({ error: "Certificate not found" });
-        if (!canManageCertificateScope(req.user, certificate.projectId)) {
+        if (!(await canManageCertificateScope(req.user, certificate.projectId))) {
             return res.status(403).json({ error: "Forbidden" });
         }
         if (certificate.status !== "ISSUED") {
@@ -1061,7 +1055,7 @@ router.patch("/:id/reissue", async (req: Request, res: Response) => {
     try {
         const certificate = await prisma.certificate.findUnique({ where: { id } });
         if (!certificate) return res.status(404).json({ error: "Certificate not found" });
-        if (!canManageCertificateScope(req.user, certificate.projectId)) {
+        if (!(await canManageCertificateScope(req.user, certificate.projectId))) {
             return res.status(403).json({ error: "Forbidden" });
         }
         if (certificate.status !== "REVOKED") {

@@ -99,7 +99,7 @@ export function EventDetailContent({ idOrSlug }: { idOrSlug: string }) {
                         {capacityLabel}
                     </p>
                 ) : null}
-                {!isPastEvent && event.registrationOpen ? (
+                {!isPastEvent && event.registrationDeadline ? (
                     <ClientRegistrationDeadline value={event.registrationDeadline} />
                 ) : null}
             </div>

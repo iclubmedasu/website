@@ -149,7 +149,8 @@
     color: #c2410c;
 }
 
-.badge-priority-URGENT {
+.badge-priority-URGENT,
+.badge-priority-CRITICAL {
     background: #fef2f2;
     color: #b91c1c;
 }

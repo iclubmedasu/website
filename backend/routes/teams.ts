@@ -192,15 +192,10 @@ router.put('/:id', adminOnly, async (req, res) => {
         const { id } = req.params;
         const { name, establishedDate, isActive } = req.body;
 
-        console.log('Updating team:', id);
-        console.log('Request body:', req.body);
-
         const updateData: any = {};
         if (name !== undefined) updateData.name = name;
         if (establishedDate !== undefined) updateData.establishedDate = new Date(establishedDate);
         if (isActive !== undefined) updateData.isActive = isActive;
-
-        console.log('Update data:', updateData);
 
         const updatedTeam = await prisma.team.update({
             where: { id: parseInt(id) },
@@ -209,9 +204,7 @@ router.put('/:id', adminOnly, async (req, res) => {
 
         res.json(updatedTeam);
     } catch (error) {
-        console.error('Full error:', error);
-        console.error('Error message:', error.message);
-        console.error('Error code:', error.code);
+        console.error('Team update failed');
 
         if (error.code === 'P2025') {
             return res.status(404).json({ error: 'Team not found' });

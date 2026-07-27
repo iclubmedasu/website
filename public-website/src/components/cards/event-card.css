@@ -177,11 +177,6 @@
     box-shadow: var(--shadow-md);
 }
 
-.project-card:focus-within {
-    outline: 2px solid var(--purple-600);
-    outline-offset: 2px;
-}
-
 .project-card-title {
     font-family: var(--font-heading);
     font-size: 1.25rem;

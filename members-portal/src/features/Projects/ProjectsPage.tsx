@@ -28,13 +28,12 @@ import ReactivateProjectModal from './modals/ReactivateProjectModal';
 import ProjectActivityModal from './modals/ProjectActivityModal';
 import ProjectFiltersModal, { type ProjectFiltersState } from './modals/ProjectFiltersModal';
 import { isDateWithinRange } from '../../utils/filterDateRange';
+import { compareByPriorityThenDate, matchesPriorityFilter } from '../../utils/priorityOrder';
 import type { Id } from '../../types/backend-contracts';
 
 // ─────────────────────────────────────────────────────────
 //  Small helpers
 // ─────────────────────────────────────────────────────────
-const PRIORITY_ORDER = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-
 const STATUS_LABELS: Record<string, string> = {
     NOT_STARTED: 'Not Started',
     IN_PROGRESS: 'In Progress',
@@ -300,13 +299,11 @@ export default function ProjectsPage() {
             const [activeData, inactiveData] = await Promise.all([
                 projectsAPI.getAll({
                     teamId: filterTeam ? Number(filterTeam) : undefined,
-                    priority: (filterPriority || undefined) as any,
                     status: (filterStatus || undefined) as any,
                 }),
                 projectsAPI.getAll({
                     isActive: false,
                     teamId: filterTeam ? Number(filterTeam) : undefined,
-                    priority: (filterPriority || undefined) as any,
                     status: (filterStatus || undefined) as any,
                 }),
             ]);
@@ -320,13 +317,11 @@ export default function ProjectsPage() {
             if (filterCategory) {
                 filtered = data.filter((p) => p.projectType?.category === filterCategory);
             }
-            // Sort by priority then createdAt
-            filtered.sort((a, b) => {
-                const priorityA = PRIORITY_ORDER[(String(a.priority) as keyof typeof PRIORITY_ORDER)] ?? 99;
-                const priorityB = PRIORITY_ORDER[(String(b.priority) as keyof typeof PRIORITY_ORDER)] ?? 99;
-                if (priorityA !== priorityB) return priorityA - priorityB;
-                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-            });
+            // Sort by priority then createdAt (CRITICAL/URGENT share top rank)
+            filtered.sort((a, b) => compareByPriorityThenDate(
+                { priority: a.priority, date: a.createdAt },
+                { priority: b.priority, date: b.createdAt },
+            ));
             setProjects(filtered);
         } catch (err: any) {
             if (!options?.silent) {
@@ -337,7 +332,7 @@ export default function ProjectsPage() {
                 setLoading(false);
             }
         }
-    }, [filterTeam, filterCategory, filterPriority, filterStatus]);
+    }, [filterTeam, filterCategory, filterStatus]);
 
     useEffect(() => { loadProjects(); }, [loadProjects]);
 
@@ -346,13 +341,14 @@ export default function ProjectsPage() {
 
     const filteredProjects = useMemo(() => {
         return projects.filter((project) => {
+            if (!matchesPriorityFilter(project.priority, filterPriority)) return false;
             if (!isDateWithinRange(project.dueDate, dateFrom, dateTo)) return false;
             return matchesSearchQuery(
                 buildSearchText(project.title, project.description, project.status, project.priority, project.projectType?.name, project.projectType?.category),
                 searchQuery,
             );
         });
-    }, [projects, searchQuery, dateFrom, dateTo]);
+    }, [projects, searchQuery, dateFrom, dateTo, filterPriority]);
 
     // Pagination derived values
     const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PROJECTS_PER_PAGE));
@@ -436,6 +432,29 @@ export default function ProjectsPage() {
         }
     };
 
+    const handleToggleDisclose = useCallback(async (project: { id: Id; isDisclosed?: boolean }) => {
+        try {
+            setError('');
+            const updated = await projectsAPI.setDisclosed(project.id, !project.isDisclosed);
+            setProjects((current) => current.map((item) => (
+                String(item.id) === String(updated.id)
+                    ? { ...item, isDisclosed: updated.isDisclosed }
+                    : item
+            )));
+            if (expandedProjectId != null && String(expandedProjectId) === String(updated.id)) {
+                setExpandedProjectDetail((current: any) => (
+                    current && String(current.id) === String(updated.id)
+                        ? { ...current, isDisclosed: updated.isDisclosed }
+                        : updated
+                ));
+            }
+        } catch (discloseError) {
+            setError(
+                discloseError instanceof Error ? discloseError.message : 'Failed to update website visibility',
+            );
+        }
+    }, [expandedProjectId]);
+
     // ── Refresh expanded detail (after phase/task changes) ──
     // Preserves task order within each phase to fix the bug where
     // editing a task causes it to jump to the top of the list.
@@ -470,11 +489,6 @@ export default function ProjectsPage() {
 
     // canManageProject: finalize, archive, hold, abort, publish, reactivate (NOT blocked by finalized)
     const canManageProject = () => isPrivileged;
-
-    const canManageCertificates = !!(
-        user?.isAdmin || user?.isOfficer || user?.isDeveloper ||
-        user?.isLeadership || user?.isSpecial
-    );
 
     // Upload follows backend visibility scope: if a project is visible to the user, upload is allowed.
     const canUploadToProject = () => !!user?.id;
@@ -579,13 +593,14 @@ export default function ProjectsPage() {
                                 allMembers={getProjectMembers(p)}
                                 canEdit={!!canEditProject(p)}
                                 canManage={!!canManageProject()}
-                                canManageCertificates={canManageCertificates}
+                                canManageCertificates
                                 canUpload={canUploadToProject()}
                                 canEditStructure={isElevatedWorkItemRole && p.isActive && !p.isFinalized && p.status !== 'CANCELLED'}
                                 canEditStatus={p.isActive && !p.isFinalized && p.status !== 'CANCELLED'}
                                 onReactivate={(proj: any) => setReactivatingProject(proj)}
                                 onAbort={(proj: any) => setAbortingProject(proj)}
                                 onViewActivity={(proj: any) => setActivityProject(proj)}
+                                onToggleDisclose={canManageProject() ? handleToggleDisclose : undefined}
                             />
                         ))}
                         {canCreateProject && currentPage === 1 && (

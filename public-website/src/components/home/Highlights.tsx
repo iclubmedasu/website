@@ -49,7 +49,7 @@ export function Highlights() {
         .map((photo) => {
             const image = getPublicEventPhotoUrl(photo.downloadUrl);
             if (!image) return null;
-            return { image, text: photo.eventTitle };
+            return { image, text: photo.title };
         })
         .filter((item): item is { image: string; text: string } => item != null);
 
@@ -71,7 +71,7 @@ export function Highlights() {
                 <link key={url} rel="preload" as="image" href={url} />
             ))}
             <SectionHeading title={title} description={description} />
-            <div className="home-highlights-gallery" aria-label="Event photo highlights">
+            <div className="home-highlights-gallery" aria-label="Event and project photo highlights">
                 <CircularGallery
                     items={items}
                     bend={1.2}

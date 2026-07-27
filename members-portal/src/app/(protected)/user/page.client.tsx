@@ -38,6 +38,27 @@ import './UserPage.css';
 
 type TabKey = 'personal' | 'history' | 'security' | 'settings' | 'notifications' | 'achievements' | 'privacy';
 
+function passwordContainsEmail(pwd: string, emails: Array<string | null | undefined>): string | null {
+    const pwdLower = pwd.toLowerCase();
+    const related = [
+        ...new Set(
+            emails
+                .filter((e): e is string => typeof e === 'string' && !!e.trim())
+                .map((e) => e.trim().toLowerCase()),
+        ),
+    ];
+    for (const email of related) {
+        if (pwdLower.includes(email)) {
+            return 'Password must not contain your email address';
+        }
+        const localPart = email.split('@')[0];
+        if (localPart && localPart.length >= 3 && pwdLower.includes(localPart)) {
+            return 'Password must not contain your email address';
+        }
+    }
+    return null;
+}
+
 interface TabDefinition {
     key: TabKey;
     label: string;
@@ -366,6 +387,17 @@ function UserPage() {
         e.preventDefault();
         setPwdError('');
         clearPwdSuccess();
+
+        const emailErr = passwordContainsEmail(pwdForm.newPwd, [
+            user?.email,
+            user?.email2,
+            user?.email3,
+        ]);
+        if (emailErr) {
+            setPwdError(emailErr);
+            return;
+        }
+
         setPwdSaving(true);
         try {
             await authAPI.changePassword(pwdForm.current, pwdForm.newPwd, pwdForm.confirm);
@@ -927,7 +959,7 @@ function UserPage() {
                                         </div>
                                         <span className="form-hint-inline">
                                             At least 8 characters, one uppercase, one lowercase, one number, one
-                                            symbol.
+                                            symbol. Do not include your email.
                                         </span>
                                     </div>
 

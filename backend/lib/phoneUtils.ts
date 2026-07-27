@@ -66,6 +66,57 @@ export function sanitizePhoneForStorage(raw: unknown): string {
     return normalizePhone(dedupeRepeatedPhoneDigits(trimmed));
 }
 
+/**
+ * Build alternate phone forms for DB lookup so typed input can match
+ * canonical (+20…), legacy national (01…), bare national (1…), etc.
+ */
+export function phoneLookupCandidates(raw: string): string[] {
+    if (!raw || typeof raw !== 'string') return [];
+
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith('pending-')) return [];
+
+    const cleaned = trimmed.replace(/[^\d+]/g, '');
+    const cleanedPlus = cleaned.startsWith('+')
+        ? '+' + cleaned.slice(1).replace(/\+/g, '')
+        : cleaned.replace(/\+/g, '');
+    const digits = cleanedPlus.replace(/\+/g, '');
+    const canonical = sanitizePhoneForStorage(trimmed);
+
+    const candidates = new Set<string>();
+    const add = (value: string | null | undefined) => {
+        if (value && typeof value === 'string' && value.trim()) {
+            candidates.add(value.trim());
+        }
+    };
+
+    add(trimmed);
+    add(cleanedPlus);
+    add(digits);
+    add(canonical);
+
+    // Egyptian mobile: derive +20 / 0 / bare-1 forms from any recognized shape.
+    let national10: string | null = null;
+    if (canonical.startsWith('+20') && canonical.length === 13) {
+        national10 = canonical.slice(3);
+    } else if (digits.startsWith('20') && digits.length === 12) {
+        national10 = digits.slice(2);
+    } else if (digits.startsWith('0') && digits.length === 11) {
+        national10 = digits.slice(1);
+    } else if (digits.startsWith('1') && digits.length === 10) {
+        national10 = digits;
+    }
+
+    if (national10 && national10.length === 10 && national10.startsWith('1')) {
+        add(`+20${national10}`);
+        add(`20${national10}`);
+        add(`0${national10}`);
+        add(national10);
+    }
+
+    return [...candidates];
+}
+
 export function sanitizeOptionalPhoneForStorage(raw: unknown): string | null {
     if (!raw || typeof raw !== 'string' || !raw.trim()) return null;
     const sanitized = sanitizePhoneForStorage(raw);

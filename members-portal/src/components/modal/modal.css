@@ -2170,6 +2170,48 @@
     margin-bottom: 1.25rem;
 }
 
+.activity-history-modal .timeline-title:has(+ .timeline-filters) {
+    margin-bottom: 0.75rem;
+}
+
+.timeline-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-default);
+}
+
+.timeline-filters-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+    align-items: end;
+}
+
+.timeline-filter-field {
+    min-width: 0;
+}
+
+.timeline-filters .btn.btn-secondary {
+    align-self: flex-start;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+}
+
+@media (max-width: 768px) {
+    .timeline-filters-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .timeline-filters-row {
+        grid-template-columns: 1fr;
+    }
+}
+
 .activity-history-modal .timeline-item {
     gap: 0.875rem;
     margin-bottom: 1.25rem;

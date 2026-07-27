@@ -1,5 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../db';
 import { computeIsSupportFormsEditor } from '../lib/supportPermissions';
@@ -9,13 +10,22 @@ import { authPostLimiter } from '../middleware/rateLimit';
 import { resolveDeveloperCredentials } from '../lib/securityEnv';
 import type { RequestUser } from '../types/auth';
 import {
-    normalizePhone,
     looksLikePhone,
+    phoneLookupCandidates,
     sanitizePhoneForStorage,
     sanitizeOptionalPhoneForStorage,
     validateStoredPhone,
 } from '../lib/phoneUtils';
 import { computeAuthorityFlags } from '../lib/authorityFlags';
+import { sendPasswordResetEmail } from '../services/passwordResetEmailService';
+
+const RESET_TOKEN_EXPIRY_MS = 60 * 60 * 1000;
+const FORGOT_PASSWORD_SUCCESS_MESSAGE =
+    'If an account exists for that email, we sent password reset instructions.';
+
+function hashResetToken(rawToken: string): string {
+    return crypto.createHash('sha256').update(rawToken).digest('hex');
+}
 
 const router: any = express.Router();
 
@@ -75,15 +85,44 @@ const isPlaceholderMember = (member) => member.fullName === PLACEHOLDER_FULLNAME
 // Placeholder phone when member created with only studentId (members.js uses pending-{studentId})
 const isPlaceholderPhone = (value) => typeof value === 'string' && value.startsWith('pending-');
 
-// Password: at least 8 chars, one upper, one lower, one number, one symbol
-function validatePassword(password) {
+// Password: at least 8 chars, one upper, one lower, one number, one symbol;
+// must not contain any related email (full address or local-part length >= 3).
+function validatePassword(password, emails = []) {
     if (!password || typeof password !== 'string') return { valid: false, error: 'Password is required' };
     if (password.length < 8) return { valid: false, error: 'Password must be at least 8 characters' };
     if (!/[A-Z]/.test(password)) return { valid: false, error: 'Password must contain at least one uppercase letter' };
     if (!/[a-z]/.test(password)) return { valid: false, error: 'Password must contain at least one lowercase letter' };
     if (!/\d/.test(password)) return { valid: false, error: 'Password must contain at least one number' };
     if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) return { valid: false, error: 'Password must contain at least one symbol (e.g. !@#$%^&*)' };
+
+    const pwdLower = password.toLowerCase();
+    const related = [
+        ...new Set(
+            (Array.isArray(emails) ? emails : [])
+                .filter((e) => typeof e === 'string' && e.trim())
+                .map((e) => e.trim().toLowerCase())
+        ),
+    ];
+    for (const email of related) {
+        if (pwdLower.includes(email)) {
+            return { valid: false, error: 'Password must not contain your email address' };
+        }
+        const localPart = email.split('@')[0];
+        if (localPart && localPart.length >= 3 && pwdLower.includes(localPart)) {
+            return { valid: false, error: 'Password must not contain your email address' };
+        }
+    }
     return { valid: true };
+}
+
+function collectMemberEmails(...values) {
+    return [
+        ...new Set(
+            values
+                .filter((e) => typeof e === 'string' && e.trim())
+                .map((e) => e.trim())
+        ),
+    ];
 }
 
 // Standard email format: local@domain.tld
@@ -95,18 +134,19 @@ function isValidEmail(value) {
 // Official @med.asu.edu.eg email regex
 const OFFICIAL_EMAIL_REGEX = /^[^\s@]+@med\.asu\.edu\.eg$/i;
 
-// Find member by phone number (normalized). Searches phoneNumber and phoneNumber2.
+// Find member by phone number. Matches canonical and legacy stored forms.
 async function findMemberByPhone(phone) {
     if (!phone) return null;
-    const normalized = normalizePhone(phone);
+    const candidates = phoneLookupCandidates(phone);
+    if (candidates.length === 0) return null;
     return prisma.member.findFirst({
         where: {
             OR: [
-                { phoneNumber: normalized },
-                { phoneNumber2: normalized }
-            ]
+                { phoneNumber: { in: candidates } },
+                { phoneNumber2: { in: candidates } },
+            ],
         },
-        include: { user: true }
+        include: { user: true },
     });
 }
 
@@ -186,7 +226,10 @@ router.post('/setup-password', authPostLimiter, async (req, res) => {
             return res.status(400).json({ error: 'Password already set. Please login instead.' });
         }
 
-        const pwdCheck = validatePassword(password);
+        const pwdCheck = validatePassword(
+            password,
+            collectMemberEmails(email, member.email, member.email2, member.email3),
+        );
         if (!pwdCheck.valid) {
             return res.status(400).json({ error: pwdCheck.error });
         }
@@ -479,10 +522,6 @@ router.post('/complete-profile', authPostLimiter, async (req, res) => {
         if (!phoneNumber || !phoneNumber.trim()) {
             return res.status(400).json({ error: 'Phone number is required' });
         }
-        const pwdCheck = validatePassword(password);
-        if (!pwdCheck.valid) {
-            return res.status(400).json({ error: pwdCheck.error });
-        }
 
         const member = await prisma.member.findUnique({
             where: { studentId: sid },
@@ -499,6 +538,22 @@ router.post('/complete-profile', authPostLimiter, async (req, res) => {
 
         if (!isPlaceholderMember(member)) {
             return res.status(400).json({ error: 'Use the email flow to set your password.' });
+        }
+
+        const officialEmail = `${sid}@med.asu.edu.eg`;
+        const pwdCheck = validatePassword(
+            password,
+            collectMemberEmails(
+                officialEmail,
+                member.email,
+                email2,
+                email3,
+                member.email2,
+                member.email3,
+            ),
+        );
+        if (!pwdCheck.valid) {
+            return res.status(400).json({ error: pwdCheck.error });
         }
 
         const trimmedPhone = sanitizePhoneForStorage(phoneNumber);
@@ -690,10 +745,6 @@ router.post('/complete-officer-profile', authPostLimiter, async (req, res) => {
             return res.status(400).json({ error: 'Phone number is required' });
         }
 
-        const pwdCheck = validatePassword(password);
-        if (!pwdCheck.valid) {
-            return res.status(400).json({ error: pwdCheck.error });
-        }
         if (password !== confirmPassword) {
             return res.status(400).json({ error: 'Passwords do not match' });
         }
@@ -718,6 +769,21 @@ router.post('/complete-officer-profile', authPostLimiter, async (req, res) => {
 
         if (!isPlaceholderMember(member)) {
             return res.status(400).json({ error: 'Profile already completed. Use the email flow to set your password.' });
+        }
+
+        const pwdCheck = validatePassword(
+            password,
+            collectMemberEmails(
+                officerEmail,
+                email2,
+                email3,
+                member.email,
+                member.email2,
+                member.email3,
+            ),
+        );
+        if (!pwdCheck.valid) {
+            return res.status(400).json({ error: pwdCheck.error });
         }
 
         const trimmedName = toTitleCase(fullName.trim());
@@ -1095,6 +1161,134 @@ router.post('/logout', (_req, res) => {
 });
 
 // ============================================
+// FORGOT / RESET PASSWORD
+// ============================================
+router.post('/forgot-password', authPostLimiter, async (req, res) => {
+    try {
+        const email = (req.body.email ?? '').toString().trim();
+        if (!email || !isValidEmail(email)) {
+            return res.status(400).json({ error: 'A valid email is required.' });
+        }
+
+        const member = await findMemberByEmail(email);
+        const user = member?.user ?? null;
+        const canReset =
+            !!member &&
+            !!user &&
+            user.isActive !== false &&
+            member.isActive !== false;
+
+        if (!canReset) {
+            return res.json({
+                success: true,
+                message: FORGOT_PASSWORD_SUCCESS_MESSAGE,
+            });
+        }
+
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        const resetToken = hashResetToken(rawToken);
+        const resetTokenExpiry = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS);
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { resetToken, resetTokenExpiry },
+        });
+
+        try {
+            await sendPasswordResetEmail({
+                to: email,
+                recipientName: member.fullName || 'Member',
+                rawToken,
+            });
+        } catch (emailError) {
+            console.error('Forgot password email error:', emailError);
+            return res.status(500).json({
+                error: 'Failed to send password reset email. Please try again later.',
+            });
+        }
+
+        return res.json({
+            success: true,
+            message: FORGOT_PASSWORD_SUCCESS_MESSAGE,
+        });
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({ error: 'Failed to process password reset request.' });
+    }
+});
+
+router.post('/reset-password', authPostLimiter, async (req, res) => {
+    try {
+        const { token, password, confirmPassword } = req.body;
+
+        if (!token || typeof token !== 'string' || !token.trim()) {
+            return res.status(400).json({ error: 'Reset token is required.' });
+        }
+        if (!password || !confirmPassword) {
+            return res.status(400).json({ error: 'Password and confirmation are required.' });
+        }
+        if (password !== confirmPassword) {
+            return res.status(400).json({ error: 'Password and confirmation do not match.' });
+        }
+
+        const hashedToken = hashResetToken(token.trim());
+        const userRecord = await prisma.user.findFirst({
+            where: {
+                resetToken: hashedToken,
+                resetTokenExpiry: { gt: new Date() },
+                isActive: true,
+            },
+            include: {
+                member: {
+                    select: {
+                        isActive: true,
+                        email: true,
+                        email2: true,
+                        email3: true,
+                    },
+                },
+            },
+        });
+
+        if (!userRecord || userRecord.member?.isActive === false) {
+            return res.status(400).json({
+                error: 'This reset link is invalid or has expired. Please request a new one.',
+            });
+        }
+
+        const pwdCheck = validatePassword(
+            password,
+            collectMemberEmails(
+                userRecord.member?.email,
+                userRecord.member?.email2,
+                userRecord.member?.email3,
+            ),
+        );
+        if (!pwdCheck.valid) {
+            return res.status(400).json({ error: pwdCheck.error });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 10);
+        await prisma.user.update({
+            where: { id: userRecord.id },
+            data: {
+                passwordHash,
+                resetToken: null,
+                resetTokenExpiry: null,
+            },
+        });
+
+        return res.json({
+            success: true,
+            message: 'Password updated. You can sign in with your new password.',
+        });
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({ error: 'Failed to reset password.' });
+    }
+});
+
+// ============================================
 // CHANGE PASSWORD
 // ============================================
 router.post('/change-password', authenticateToken, async (req, res) => {
@@ -1113,17 +1307,29 @@ router.post('/change-password', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'New password and confirmation do not match.' });
         }
 
-        const pwdCheck = validatePassword(newPassword);
-        if (!pwdCheck.valid) {
-            return res.status(400).json({ error: pwdCheck.error });
-        }
-
         const userRecord = await prisma.user.findFirst({
             where: { memberId: req.user.memberId },
+            include: {
+                member: {
+                    select: { email: true, email2: true, email3: true },
+                },
+            },
         });
 
         if (!userRecord) {
             return res.status(404).json({ error: 'User account not found.' });
+        }
+
+        const pwdCheck = validatePassword(
+            newPassword,
+            collectMemberEmails(
+                userRecord.member?.email,
+                userRecord.member?.email2,
+                userRecord.member?.email3,
+            ),
+        );
+        if (!pwdCheck.valid) {
+            return res.status(400).json({ error: pwdCheck.error });
         }
 
         const isMatch = await bcrypt.compare(currentPassword, userRecord.passwordHash);

@@ -20,6 +20,7 @@ import scheduleSlotsRoutes from "./scheduleSlots";
 import projectFilesRoutes from "./projectFiles";
 import eventFilesRoutes from "./eventFiles";
 import eventPhotosRoutes from "./eventPhotos";
+import projectPhotosRoutes from "./projectPhotos";
 import notificationsRoutes from "./notifications";
 import publicRoutes from "./public";
 import siteContentRoutes from "./siteContent";
@@ -95,12 +96,23 @@ function isEventPhotoDownloadRequest(req: Request): boolean {
     return req.method === "GET" && /^\/\d+\/download\/?$/.test(req.path);
 }
 
+function isProjectPhotoDownloadRequest(req: Request): boolean {
+    return req.method === "GET" && /^\/\d+\/download\/?$/.test(req.path);
+}
+
 router.use("/event-photos", (req, res, next) => {
     if (isEventPhotoDownloadRequest(req)) {
         return next();
     }
     return authenticateToken(req, res, next);
 }, eventPhotosRoutes);
+
+router.use("/project-photos", (req, res, next) => {
+    if (isProjectPhotoDownloadRequest(req)) {
+        return next();
+    }
+    return authenticateToken(req, res, next);
+}, projectPhotosRoutes);
 
 router.use("/notifications", authenticateToken, notificationsRoutes);
 router.use("/site-content", authenticateToken, siteContentRoutes);
@@ -154,6 +166,7 @@ router.get("/", (_req: Request, res: Response) => {
             projectFiles: "/api/project-files",
             eventFiles: "/api/event-files",
             eventPhotos: "/api/event-photos",
+            projectPhotos: "/api/project-photos",
             notifications: "/api/notifications",
             siteContent: "/api/site-content",
             finance: "/api/finance",

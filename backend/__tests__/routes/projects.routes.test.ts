@@ -350,20 +350,31 @@ describe('projects routes integration', () => {
         }))
     })
 
-    it('rejects disclose on a non-archived project', async () => {
+    it('discloses a non-archived project for the public website', async () => {
         prismaMocks.projectFindUnique.mockResolvedValueOnce({
             id: 21,
             title: 'Active Pilot',
             isArchived: false,
             isDisclosed: false,
         })
+        prismaMocks.projectUpdate.mockResolvedValueOnce({
+            id: 21,
+            title: 'Active Pilot',
+            isArchived: false,
+            isDisclosed: true,
+        })
 
         const response = await request(buildRouteApp(projectsRouter, { memberId: 3, isLeadership: true }))
             .patch('/21/disclose')
             .send({ disclosed: true })
 
-        expect(response.status).toBe(400)
-        expect(response.body).toEqual({ error: 'Only archived projects can be disclosed on the public website' })
-        expect(prismaMocks.projectUpdate).not.toHaveBeenCalled()
+        expect(response.status).toBe(200)
+        expect(prismaMocks.projectUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            where: { id: 21 },
+            data: { isDisclosed: true },
+        }))
+        expect(activityMocks.logProjectActivity).toHaveBeenCalledWith(expect.objectContaining({
+            actionType: 'DISCLOSED',
+        }))
     })
 })

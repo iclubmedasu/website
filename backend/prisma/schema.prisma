@@ -53,6 +53,7 @@ model Member {
   createdFolders      ProjectFolder[]         // Folders created by this member
   uploadedEventFiles  EventFile[]             // Event files uploaded by this member
   uploadedEventPhotos EventPhoto[]            // Event photos uploaded by this member
+  uploadedProjectPhotos ProjectPhoto[]        // Project photos uploaded by this member
   createdEventFolders EventFolder[]           // Event folders created by this member
   createdEvents       Event[]                 @relation("EventCreatedBy")
   eventRegistrations  EventRegistration[]
@@ -326,6 +327,7 @@ model Project {
   scheduleSlots   ProjectScheduleSlot[] // People/time allocations for this project
   folders         ProjectFolder[]  // Folder containers for attached files
   files           ProjectFile[]    // Files attached to this project
+  photos          ProjectPhoto[]   // Photos attached to this project
   events          Event[]          // Events linked to this project
   certificates    Certificate[]
   projectType     ProjectType      @relation(fields: [projectTypeId], references: [id], onDelete: Restrict)
@@ -1135,6 +1137,33 @@ model EventPhoto {
 
   @@index([eventId])
   @@index([eventId, eventDay])
+  @@index([uploadedByMemberId])
+}
+
+model ProjectPhoto {
+  id                 Int       @id @default(autoincrement())
+  projectId          Int
+  uploadedByMemberId Int
+  fileName           String
+  githubPath         String
+  githubSha          String
+  fileSize           Int
+  mimeType           String
+  previewGithubPath  String?
+  previewGithubSha   String?
+  previewFileSize    Int?
+  caption            String?
+  order              Int       @default(0)
+  showOnPublic       Boolean   @default(true)
+  isCore             Boolean   @default(false)
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy Member  @relation(fields: [uploadedByMemberId], references: [id])
+
+  @@index([projectId])
   @@index([uploadedByMemberId])
 }
 

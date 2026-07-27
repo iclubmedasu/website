@@ -30,13 +30,34 @@ function resolveSignupPhonePrefill(
     return storedPhone;
 }
 
-// Password: at least 8 chars, one upper, one lower, one number, one symbol
-function validatePassword(pwd: string): string | null {
+const PASSWORD_REQUIREMENTS_HINT =
+    'Use at least one uppercase letter, one lowercase letter, one number, and one symbol (e.g. !@#$%^&*). Do not include your email.';
+
+// Password: at least 8 chars, one upper, one lower, one number, one symbol; must not contain email
+function validatePassword(pwd: string, emails: Array<string | null | undefined> = []): string | null {
     if (!pwd || pwd.length < 8) return 'Password must be at least 8 characters';
     if (!/[A-Z]/.test(pwd)) return 'Password must contain at least one uppercase letter';
     if (!/[a-z]/.test(pwd)) return 'Password must contain at least one lowercase letter';
     if (!/\d/.test(pwd)) return 'Password must contain at least one number';
     if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pwd)) return 'Password must contain at least one symbol (e.g. !@#$%^&*)';
+
+    const pwdLower = pwd.toLowerCase();
+    const related = [
+        ...new Set(
+            emails
+                .filter((e): e is string => typeof e === 'string' && !!e.trim())
+                .map((e) => e.trim().toLowerCase()),
+        ),
+    ];
+    for (const email of related) {
+        if (pwdLower.includes(email)) {
+            return 'Password must not contain your email address';
+        }
+        const localPart = email.split('@')[0];
+        if (localPart && localPart.length >= 3 && pwdLower.includes(localPart)) {
+            return 'Password must not contain your email address';
+        }
+    }
     return null;
 }
 
@@ -113,7 +134,11 @@ function LoginPage() {
 
         const input = identifierMode === 'phone' ? phoneIdentifier.trim() : identifierInput.trim();
         if (!input) {
-            setError(identifierMode === 'phone' ? 'Please enter your phone number.' : 'Please enter your email or Student ID.');
+            setError(
+                identifierMode === 'phone'
+                    ? 'Please enter your phone number.'
+                    : 'Please enter your email or Student ID.',
+            );
             setLoading(false);
             return;
         }
@@ -210,7 +235,7 @@ function LoginPage() {
     const handleSetupPassword = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setError('');
-        const pwdErr = validatePassword(password);
+        const pwdErr = validatePassword(password, [email, setupEmail2, setupEmail3]);
         if (pwdErr) {
             setError(pwdErr);
             return;
@@ -293,7 +318,8 @@ function LoginPage() {
     const handleCompleteProfileSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setError('');
-        const pwdErr = validatePassword(password);
+        const officialEmail = `${String(studentId).trim()}@med.asu.edu.eg`;
+        const pwdErr = validatePassword(password, [officialEmail, profileEmail2, profileEmail3]);
         if (pwdErr) {
             setError(pwdErr);
             return;
@@ -338,7 +364,7 @@ function LoginPage() {
     const handleOfficerProfileSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setError('');
-        const pwdErr = validatePassword(password);
+        const pwdErr = validatePassword(password, [officerEmail, officerEmail2, officerEmail3]);
         if (pwdErr) {
             setError(pwdErr);
             return;
@@ -402,9 +428,25 @@ function LoginPage() {
                                 {error && <div className="error-message">{error}</div>}
 
                                 <form onSubmit={handleEmailSubmit}>
-                                    {identifierMode === 'text' ? (
-                                        <div className="form-group">
-                                            <label className="form-label">Email or Student ID</label>
+                                    <div className="form-group">
+                                        <div className="identifier-label-row">
+                                            <label className="form-label">
+                                                {identifierMode === 'text' ? 'Email or Student ID' : 'Phone Number'}
+                                            </label>
+                                            <button
+                                                type="button"
+                                                className="identifier-mode-link"
+                                                onClick={() => {
+                                                    setIdentifierMode(identifierMode === 'text' ? 'phone' : 'text');
+                                                    setError('');
+                                                }}
+                                            >
+                                                {identifierMode === 'text'
+                                                    ? 'Use phone number instead'
+                                                    : 'Use email or Student ID instead'}
+                                            </button>
+                                        </div>
+                                        {identifierMode === 'text' ? (
                                             <input
                                                 type="text"
                                                 inputMode="text"
@@ -414,27 +456,21 @@ function LoginPage() {
                                                 placeholder="e.g. 213256 or name@med.asu.edu.eg"
                                                 autoFocus
                                             />
-                                        </div>
-                                    ) : (
-                                        <div className="form-group">
+                                        ) : (
                                             <PhoneInput
-                                                label="Phone Number"
                                                 value={phoneIdentifier}
                                                 onChange={setPhoneIdentifier}
                                                 placeholder="Phone number"
                                             />
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
 
                                     <div className="identifier-mode-toggle">
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                setIdentifierMode(identifierMode === 'text' ? 'phone' : 'text');
-                                                setError('');
-                                            }}
+                                            onClick={() => router.push('/forgot-password')}
                                         >
-                                            {identifierMode === 'text' ? 'Use phone number instead' : 'Use email or Student ID instead'}
+                                            Did you forget your password?
                                         </button>
                                     </div>
 
@@ -593,7 +629,7 @@ function LoginPage() {
                                             autoFocus
                                         />
                                         <p className="password-requirements">
-                                            Use at least one uppercase letter, one lowercase letter, one number, and one symbol (e.g. !@#$%^&*).
+                                            {PASSWORD_REQUIREMENTS_HINT}
                                         </p>
                                     </div>
                                     <div className="form-group">
@@ -725,7 +761,7 @@ function LoginPage() {
                                             autoFocus
                                         />
                                         <p className="password-requirements">
-                                            Use at least one uppercase letter, one lowercase letter, one number, and one symbol (e.g. !@#$%^&*).
+                                            {PASSWORD_REQUIREMENTS_HINT}
                                         </p>
                                     </div>
                                     <div className="form-group">
@@ -770,6 +806,19 @@ function LoginPage() {
                                             title="Email"
                                             disabled
                                         />
+                                    </div>
+
+                                    <div className="identifier-mode-toggle">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                router.push(
+                                                    `/forgot-password?email=${encodeURIComponent(email)}`,
+                                                )
+                                            }
+                                        >
+                                            Did you forget your password?
+                                        </button>
                                     </div>
 
                                     <div className="form-group">
@@ -848,7 +897,7 @@ function LoginPage() {
                                     </div>
                                     <div className="form-group">
                                         <PhoneInput
-                                            label="Phone Number *"
+                                            label="Phone Number"
                                             value={setupPhone}
                                             onChange={setSetupPhone}
                                             placeholder="Phone number"
@@ -901,7 +950,7 @@ function LoginPage() {
                                             autoFocus
                                         />
                                         <p className="password-requirements">
-                                            Use at least one uppercase letter, one lowercase letter, one number, and one symbol (e.g. !@#$%^&*).
+                                            {PASSWORD_REQUIREMENTS_HINT}
                                         </p>
                                     </div>
                                     <div className="form-group">

@@ -54,6 +54,7 @@ import type {
     ProjectFileHistoryEntry,
     ProjectFileRef,
     ProjectFolderRef,
+    ProjectPhotoRef,
     ProjectQueryParams,
     ProjectSummary,
     ProjectTeamRef,
@@ -79,6 +80,10 @@ import type {
     UpdateScheduleSlotPayload,
     UpdateTaskPayload,
     ReorderEventCustomFieldsPayload,
+    ForgotPasswordInput,
+    ForgotPasswordResponse,
+    ResetPasswordInput,
+    ResetPasswordResponse,
 } from "../types/backend-contracts";
 import { ConflictError } from './conflictError';
 
@@ -753,6 +758,26 @@ export const authAPI: ApiNamespace = {
             body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
         });
         return handleResponse(response);
+    },
+
+    forgotPassword: async (email: string) => {
+        const body: ForgotPasswordInput = { email };
+        const response = await apiFetch(`${API_BASE_URL}/auth/forgot-password`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(body),
+        });
+        return handleResponse<ForgotPasswordResponse>(response);
+    },
+
+    resetPassword: async (token: string, password: string, confirmPassword: string) => {
+        const body: ResetPasswordInput = { token, password, confirmPassword };
+        const response = await apiFetch(`${API_BASE_URL}/auth/reset-password`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(body),
+        });
+        return handleResponse<ResetPasswordResponse>(response);
     },
 };
 
@@ -1561,6 +1586,93 @@ export const projectFilesAPI = {
             headers: getAuthHeaders(),
         });
         return handleResponse<ProjectFileRef>(response);
+    },
+};
+
+// ============================================
+// PROJECT PHOTOS API
+// ============================================
+
+export type UpdateProjectPhotoPayload = {
+    caption?: string | null;
+    order?: number;
+    showOnPublic?: boolean;
+    isCore?: boolean;
+};
+
+export const projectPhotosAPI = {
+    list: async (projectId: Id | string): Promise<ProjectPhotoRef[]> => {
+        const response = await apiFetch(`${API_BASE_URL}/project-photos?projectId=${projectId}`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<ProjectPhotoRef[]>(response);
+    },
+
+    upload: (
+        formData: FormData,
+        onProgress?: (progress: number) => void,
+    ): Promise<ProjectPhotoRef> => {
+        return new Promise<ProjectPhotoRef>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable && onProgress) {
+                    onProgress(Math.round((e.loaded / e.total) * 100));
+                }
+            };
+
+            xhr.onload = () => {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve(data as ProjectPhotoRef);
+                    } else {
+                        reject(new Error(data.error || `Upload failed (${xhr.status})`));
+                    }
+                } catch {
+                    reject(new Error('Failed to parse upload response'));
+                }
+            };
+
+            xhr.onerror = () => reject(new Error('Network error during upload'));
+
+            xhr.open('POST', `${API_BASE_URL}/project-photos/upload`);
+            const token = getAuthToken();
+            if (token) {
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            }
+            xhr.withCredentials = shouldSendCredentials();
+            xhr.send(formData);
+        });
+    },
+
+    update: async (id: Id | string, patch: UpdateProjectPhotoPayload): Promise<ProjectPhotoRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/project-photos/${id}`, {
+            method: 'PATCH',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch),
+        });
+        return handleResponse<ProjectPhotoRef>(response);
+    },
+
+    remove: async (id: Id | string): Promise<{ success?: boolean }> => {
+        const response = await apiFetch(`${API_BASE_URL}/project-photos/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<{ success?: boolean }>(response);
+    },
+
+    restore: async (id: Id | string): Promise<ProjectPhotoRef> => {
+        const response = await apiFetch(`${API_BASE_URL}/project-photos/${id}/restore`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<ProjectPhotoRef>(response);
+    },
+
+    getDownloadUrl: (id: Id | string): string => {
+        return `${API_BASE_URL}/project-photos/${id}/download`;
     },
 };
 

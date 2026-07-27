@@ -59,6 +59,7 @@ export default function TemplateEditorHost({
         initialCanvasHeight: 794,
         initialBackgroundImageUrl: null as string | null,
         initialBackgroundFocus: null as BackgroundFocus | null,
+        hasIssuedCertificates: false,
     });
 
     useEffect(() => {
@@ -74,6 +75,7 @@ export default function TemplateEditorHost({
                 initialCanvasHeight: 794,
                 initialBackgroundImageUrl: null,
                 initialBackgroundFocus: null,
+                hasIssuedCertificates: false,
             });
             return;
         }
@@ -118,6 +120,9 @@ export default function TemplateEditorHost({
                     initialCanvasHeight: template.canvasHeight || 794,
                     initialBackgroundImageUrl: backgroundImageUrl,
                     initialBackgroundFocus: parseBackgroundFocus(template.backgroundFocus),
+                    hasIssuedCertificates:
+                        Boolean(template.hasIssuedCertificates) ||
+                        (template.issuedCertificateCount ?? 0) > 0,
                 });
                 // Include bg token so remount picks up a fresh blob after Strict Mode / reload
                 setReadyKey(

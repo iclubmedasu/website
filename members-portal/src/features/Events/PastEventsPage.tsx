@@ -11,6 +11,7 @@ import EventActivityModal from './modals/EventActivityModal';
 import EventFiltersModal from './modals/EventFiltersModal';
 import FinalizeEventModal from './modals/FinalizeEventModal';
 import ReactivateEventModal from './modals/ReactivateEventModal';
+import { compareByPriorityThenDate, matchesPriorityFilter } from '@/utils/priorityOrder';
 import type { EventDetail, EventQueryParams, EventSummary, Id, TeamRef } from '@/types/backend-contracts';
 import './EventsPage.css';
 
@@ -120,14 +121,19 @@ export default function PastEventsPage() {
 
     const filteredEvents = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
-        return events.filter((event) => {
-            if (status && event.status !== status) return false;
-            if (filterTeam && !event.eventTeams?.some((entry) => String(entry.teamId) === filterTeam)) return false;
-            if (filterCategory && event.projectType?.category !== filterCategory) return false;
-            if (filterPriority && event.priority !== filterPriority) return false;
-            if (!query) return true;
-            return [event.title, event.venue, event.description].some((value) => String(value || '').toLowerCase().includes(query));
-        });
+        return events
+            .filter((event) => {
+                if (status && event.status !== status) return false;
+                if (filterTeam && !event.eventTeams?.some((entry) => String(entry.teamId) === filterTeam)) return false;
+                if (filterCategory && event.projectType?.category !== filterCategory) return false;
+                if (!matchesPriorityFilter(event.priority, filterPriority)) return false;
+                if (!query) return true;
+                return [event.title, event.venue, event.description].some((value) => String(value || '').toLowerCase().includes(query));
+            })
+            .sort((a, b) => compareByPriorityThenDate(
+                { priority: a.priority, date: a.eventDate },
+                { priority: b.priority, date: b.eventDate },
+            ));
     }, [events, searchQuery, status, filterTeam, filterCategory, filterPriority]);
 
     const totalPages = Math.max(1, Math.ceil(filteredEvents.length / EVENTS_PER_PAGE));

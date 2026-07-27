@@ -161,6 +161,25 @@ export interface ProjectFileRef {
     folder?: ProjectFolderRef;
 }
 
+export interface ProjectPhotoRef {
+    id: Id;
+    projectId: Id;
+    uploadedByMemberId: Id;
+    fileName: string;
+    githubPath: string;
+    githubSha: string;
+    fileSize: number;
+    mimeType: string;
+    caption: string | null;
+    order: number;
+    showOnPublic: boolean;
+    isCore: boolean;
+    isActive?: boolean;
+    createdAt?: ISODateTime;
+    updatedAt?: ISODateTime;
+    uploadedBy?: MemberSummary;
+}
+
 export interface ProjectFileCommentRef {
     id: Id;
     fileId: Id;

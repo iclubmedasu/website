@@ -46,6 +46,18 @@ const PRIORITY_LABELS: Record<LegacyPriority, string> = {
     URGENT: 'Urgent',
 };
 
+function toLegacyPriority(priority?: Priority | string | null): LegacyPriority {
+    if (priority === 'CRITICAL') return 'URGENT';
+    if (priority === 'LOW' || priority === 'MEDIUM' || priority === 'HIGH' || priority === 'URGENT') {
+        return priority;
+    }
+    return 'MEDIUM';
+}
+
+function resolveProjectTypeId(initial?: EventDetail | null): Id | undefined | null {
+    return initial?.projectTypeId ?? initial?.projectType?.id;
+}
+
 interface TeamSelection {
     teamId: Id;
     canEdit: boolean;
@@ -92,17 +104,19 @@ export default function CreateEventModal({
         return userTeamIds.map((teamId) => ({ teamId, canEdit: true, isOwner: false }));
     };
 
+    const resolvedProjectTypeId = resolveProjectTypeId(initial);
+
     const [projects, setProjects] = useState<ProjectSummary[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(true);
     const [projectTypes, setProjectTypes] = useState<ProjectTypeRef[]>([]);
-    const [selectedCategory, setSelectedCategory] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState(initial?.projectType?.category ?? '');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [form, setForm] = useState({
         title: initial?.title ?? '',
         description: initial?.description ?? '',
-        projectTypeId: initial?.projectTypeId != null ? String(initial.projectTypeId) : '',
-        priority: (initial?.priority as LegacyPriority | undefined) ?? 'MEDIUM',
+        projectTypeId: resolvedProjectTypeId != null ? String(resolvedProjectTypeId) : '',
+        priority: toLegacyPriority(initial?.priority),
         status: (initial?.status as ProjectStatus | undefined) ?? 'NOT_STARTED',
         venue: initial?.venue ?? '',
         timezone: initial?.timezone ?? CLUB_TIMEZONE,
@@ -133,9 +147,11 @@ export default function CreateEventModal({
                 if (!active) return;
                 setProjects(projectsResult);
                 setProjectTypes(typesResult);
-                if (initial?.projectTypeId) {
-                    const match = typesResult.find((typeItem) => typeItem.id === initial.projectTypeId);
+                const typeId = resolveProjectTypeId(initial);
+                if (typeId != null) {
+                    const match = typesResult.find((typeItem) => String(typeItem.id) === String(typeId));
                     if (match?.category) setSelectedCategory(match.category);
+                    else if (initial?.projectType?.category) setSelectedCategory(initial.projectType.category);
                 }
             } catch {
                 if (!active) return;
@@ -148,7 +164,7 @@ export default function CreateEventModal({
 
         void load();
         return () => { active = false; };
-    }, [initial?.projectTypeId]);
+    }, [initial?.projectTypeId, initial?.projectType?.id, initial?.projectType?.category]);
 
     const categories = [...new Set(
         projectTypes
@@ -376,7 +392,7 @@ export default function CreateEventModal({
                                     >
                                         <option value="">Select type...</option>
                                         {filteredTypes.map((typeItem) => (
-                                            <option key={typeItem.id} value={typeItem.id}>{typeItem.name}</option>
+                                            <option key={typeItem.id} value={String(typeItem.id)}>{typeItem.name}</option>
                                         ))}
                                     </select>
                                 </div>

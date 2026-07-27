@@ -5,7 +5,7 @@ export const homeContent = {
     },
     highlights: {
         title: "Highlights",
-        description: "Moments from our events — a glimpse of the community in action.",
+        description: "Moments from our events and projects — a glimpse of the community in action.",
     },
     whyIclub: {
         title: "Why join iClub?",

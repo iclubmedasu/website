@@ -37,6 +37,14 @@ const PRIORITY_LABELS: Record<LegacyPriority, string> = {
     URGENT: 'Urgent',
 };
 
+function toLegacyPriority(priority?: Priority | string | null): LegacyPriority {
+    if (priority === 'CRITICAL') return 'URGENT';
+    if (priority === 'LOW' || priority === 'MEDIUM' || priority === 'HIGH' || priority === 'URGENT') {
+        return priority;
+    }
+    return 'MEDIUM';
+}
+
 interface TeamSelection {
     teamId: Id;
     canEdit: boolean;
@@ -72,6 +80,10 @@ interface ProjectModalProps {
     onSaved: (saved: ProjectDetail) => void;
 }
 
+function resolveProjectTypeId(initial?: ProjectModalProps['initial']): Id | undefined {
+    return initial?.projectTypeId ?? initial?.projectType?.id;
+}
+
 function getErrorMessage(error: unknown, fallback: string): string {
     if (error instanceof Error && error.message) {
         return error.message;
@@ -102,11 +114,13 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
         return userTeamIds.map((teamId) => ({ teamId, canEdit: true, isOwner: false }));
     };
 
+    const resolvedProjectTypeId = resolveProjectTypeId(initial);
+
     const [form, setForm] = useState<ProjectFormState>({
         title: initial?.title ?? '',
         description: initial?.description ?? '',
-        projectTypeId: initial?.projectTypeId != null ? String(initial.projectTypeId) : '',
-        priority: (initial?.priority as LegacyPriority | undefined) ?? 'MEDIUM',
+        projectTypeId: resolvedProjectTypeId != null ? String(resolvedProjectTypeId) : '',
+        priority: toLegacyPriority(initial?.priority),
         status: initial?.status ?? 'NOT_STARTED',
         startDate: initial?.startDate ? toDateInputValue(initial.startDate) : '',
         dueDate: initial?.dueDate ? toDateInputValue(initial.dueDate) : '',
@@ -117,7 +131,7 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
 
     // Project types cascade
     const [projectTypes, setProjectTypes] = useState<ProjectTypeRef[]>([]);
-    const [selectedCategory, setSelectedCategory] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState(initial?.projectType?.category ?? '');
 
     useEffect(() => {
         projectTypesAPI.getAll()
@@ -125,15 +139,17 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                 setProjectTypes(types);
 
                 // Pre-select category when editing an existing project
-                if (initial?.projectTypeId) {
-                    const match = types.find((typeItem) => typeItem.id === initial.projectTypeId);
+                const typeId = resolveProjectTypeId(initial);
+                if (typeId != null) {
+                    const match = types.find((typeItem) => String(typeItem.id) === String(typeId));
                     if (match?.category) setSelectedCategory(match.category);
+                    else if (initial?.projectType?.category) setSelectedCategory(initial.projectType.category);
                 }
             })
             .catch(() => {
                 setProjectTypes([]);
             });
-    }, [initial?.projectTypeId]);
+    }, [initial?.projectTypeId, initial?.projectType?.id, initial?.projectType?.category]);
 
     // Derived: unique ordered categories
     const categories = [...new Set(
@@ -299,7 +315,7 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                                 >
                                     <option value="">Select type...</option>
                                     {filteredTypes.map((typeItem) => (
-                                        <option key={typeItem.id} value={typeItem.id}>{typeItem.name}</option>
+                                        <option key={typeItem.id} value={String(typeItem.id)}>{typeItem.name}</option>
                                     ))}
                                 </select>
                             </div>

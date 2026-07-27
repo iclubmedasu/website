@@ -18,6 +18,7 @@ import AbortProjectModal from './modals/AbortProjectModal';
 import ProjectActivityModal from './modals/ProjectActivityModal';
 import ProjectFiltersModal, { type ProjectFiltersState } from './modals/ProjectFiltersModal';
 import { isDateWithinRange } from '../../utils/filterDateRange';
+import { compareByPriorityThenDate, matchesPriorityFilter } from '../../utils/priorityOrder';
 import type {
     Id,
     MemberSummary,
@@ -29,11 +30,7 @@ import type {
 // ─────────────────────────────────────────────────────────
 //  Small helpers
 // ─────────────────────────────────────────────────────────
-type PriorityKey = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-
 type ProjectActionType = 'reactivate' | 'abort' | 'finalize' | 'publish' | 'archive' | 'activity';
-
-const PRIORITY_ORDER: Record<PriorityKey, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 
 function getPageNumbers(current: number, total: number): Array<number | '...'> {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -81,10 +78,6 @@ export default function PastProjectsPage() {
     const [detailLoading, setDetailLoading] = useState(false);
     const [actionProject, setActionProject] = useState<{ type: ProjectActionType; project: ProjectActionPayload } | null>(null);
     const canManageProjectLifecycle = !!(user?.isDeveloper || user?.isOfficer || user?.isAdmin || user?.isLeadership);
-    const canManageCertificates = !!(
-        user?.isAdmin || user?.isOfficer || user?.isDeveloper ||
-        user?.isLeadership || user?.isSpecial
-    );
     const hasActiveFilters = filterTeam !== '' || filterCategory !== '' || filterPriority !== ''
         || filterStatus !== '' || dateFrom !== '' || dateTo !== '';
 
@@ -131,7 +124,6 @@ export default function PastProjectsPage() {
             const data = await projectsAPI.getAll({
                 archived: true,
                 teamId: filterTeam ? Number(filterTeam) : undefined,
-                priority: (filterPriority || undefined) as any,
                 status: (filterStatus || undefined) as any,
             }) as PastProjectSummary[];
 
@@ -139,21 +131,17 @@ export default function PastProjectsPage() {
             if (filterCategory) {
                 filtered = data.filter((p: PastProjectSummary) => p.projectType?.category === filterCategory);
             }
-            filtered.sort((a: PastProjectSummary, b: PastProjectSummary) => {
-                const priorityA = PRIORITY_ORDER[(a.priority as PriorityKey) || 'LOW'] ?? 99;
-                const priorityB = PRIORITY_ORDER[(b.priority as PriorityKey) || 'LOW'] ?? 99;
-                if (priorityA !== priorityB) return priorityA - priorityB;
-                const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                return createdB - createdA;
-            });
+            filtered.sort((a: PastProjectSummary, b: PastProjectSummary) => compareByPriorityThenDate(
+                { priority: a.priority, date: a.createdAt },
+                { priority: b.priority, date: b.createdAt },
+            ));
             setProjects(filtered);
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Failed to load past projects');
         } finally {
             setLoading(false);
         }
-    }, [filterTeam, filterCategory, filterPriority, filterStatus]);
+    }, [filterTeam, filterCategory, filterStatus]);
 
     const handleLifecycleRefresh = useCallback(() => {
         loadProjects();
@@ -176,13 +164,14 @@ export default function PastProjectsPage() {
 
     const filteredProjects = useMemo(() => {
         return projects.filter((project) => {
+            if (!matchesPriorityFilter(project.priority, filterPriority)) return false;
             if (!isDateWithinRange(project.dueDate, dateFrom, dateTo)) return false;
             return matchesSearchQuery(
                 buildSearchText(project.title, project.description, project.status, project.priority, project.projectType?.name, project.projectType?.category),
                 searchQuery,
             );
         });
-    }, [projects, searchQuery, dateFrom, dateTo]);
+    }, [projects, searchQuery, dateFrom, dateTo, filterPriority]);
 
     const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PROJECTS_PER_PAGE));
     const paginatedProjects = useMemo(() => {
@@ -269,7 +258,7 @@ export default function PastProjectsPage() {
                                 fullDetail={expandedProjectId === p.id ? expandedProjectDetail : null}
                                 detailLoading={expandedProjectId === p.id && detailLoading}
                                 canManage={canManageProjectLifecycle}
-                                canManageCertificates={canManageCertificates}
+                                canManageCertificates
                                 onToggle={handleToggleExpand}
                                 onReactivate={(proj) => setActionProject({ type: 'reactivate', project: proj })}
                                 onAbort={(proj) => setActionProject({ type: 'abort', project: proj })}

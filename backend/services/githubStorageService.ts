@@ -62,8 +62,9 @@ function safeGithubErrorMessage(status: number, fallback: string): string {
     return fallback;
 }
 
-function throwSafeGithubError(label: string, status: number, rawBody: string, fallback: string): never {
-    console.error(`${label} (${status}): ${rawBody}`);
+function throwSafeGithubError(label: string, status: number, fallback: string): never {
+    // Status + label only — never log raw API bodies, repo, or paths.
+    console.error(`${label} (${status})`);
     throw new Error(safeGithubErrorMessage(status, fallback));
 }
 
@@ -148,18 +149,16 @@ async function uploadContentAtPathUnlocked(
 
         if (res.status !== 409 && !missingSha422) {
             throwSafeGithubError(
-                "GitHub upload failed",
+                "storage upload failed",
                 lastStatus,
-                lastBody,
                 "Storage upload failed. Please try again.",
             );
         }
     }
 
     throwSafeGithubError(
-        "GitHub upload failed",
+        "storage upload failed",
         lastStatus,
-        lastBody,
         "Storage upload failed. Please try again.",
     );
 }
@@ -261,11 +260,10 @@ async function moveFile(
     });
 
     if (!downloadRes.ok) {
-        const err = await downloadRes.text();
+        await downloadRes.text();
         throwSafeGithubError(
-            "GitHub move source fetch failed",
+            "storage move source fetch failed",
             downloadRes.status,
-            err,
             "Storage download failed. Please try again.",
         );
     }
@@ -281,11 +279,10 @@ async function moveFile(
     });
 
     if (!uploadRes.ok) {
-        const err = await uploadRes.text();
+        await uploadRes.text();
         throwSafeGithubError(
-            "GitHub move upload failed",
+            "storage move upload failed",
             uploadRes.status,
-            err,
             "Storage upload failed. Please try again.",
         );
     }
@@ -306,7 +303,7 @@ async function moveFile(
     });
 
     if (!deleteRes.ok) {
-        const err = await deleteRes.text();
+        await deleteRes.text();
         // Best-effort rollback to avoid leaving duplicate files in the repo.
         try {
             await fetch(`${BASE}/${toGithubPath}`, {
@@ -321,9 +318,8 @@ async function moveFile(
             // ignore rollback errors; original delete failure will be reported below
         }
         throwSafeGithubError(
-            "GitHub move delete failed",
+            "storage move delete failed",
             deleteRes.status,
-            err,
             "Storage delete failed. Please try again.",
         );
     }
@@ -352,8 +348,8 @@ async function deleteFile(githubPath: string, githubSha: string): Promise<void> 
     });
 
     if (!res.ok) {
-        const err = await res.text();
-        console.error(`GitHub delete failed (${res.status}): ${err}`);
+        await res.text();
+        console.error(`storage delete failed (${res.status})`);
     }
 }
 
@@ -369,11 +365,10 @@ async function downloadFile(githubPath: string): Promise<Response> {
     });
 
     if (!res.ok) {
-        const err = await res.text();
+        await res.text();
         throwSafeGithubError(
-            "GitHub download failed",
+            "storage download failed",
             res.status,
-            err,
             "Storage download failed. Please try again.",
         );
     }
@@ -392,11 +387,10 @@ async function getFileHistory(githubPath: string): Promise<GithubHistoryEntry[]>
     const res = await fetch(url, { headers: headers() });
 
     if (!res.ok) {
-        const err = await res.text();
+        await res.text();
         throwSafeGithubError(
-            "GitHub history failed",
+            "storage history failed",
             res.status,
-            err,
             "Storage history failed. Please try again.",
         );
     }
@@ -424,11 +418,10 @@ async function downloadFileAtVersion(githubPath: string, commitSha: string): Pro
     });
 
     if (!res.ok) {
-        const err = await res.text();
+        await res.text();
         throwSafeGithubError(
-            "GitHub version download failed",
+            "storage version download failed",
             res.status,
-            err,
             "Storage download failed. Please try again.",
         );
     }
@@ -457,11 +450,10 @@ async function restoreDeletedFile(githubPath: string): Promise<{ githubSha: stri
     const contentUrl = `${BASE}/${githubPath}?ref=${restoreCommit.sha}`;
     const contentRes = await fetch(contentUrl, { headers: headers() });
     if (!contentRes.ok) {
-        const err = await contentRes.text();
+        await contentRes.text();
         throwSafeGithubError(
-            `GitHub restore fetch failed (commit ${restoreCommit.sha})`,
+            "storage restore fetch failed",
             contentRes.status,
-            err,
             "Storage download failed. Please try again.",
         );
     }
@@ -478,11 +470,10 @@ async function restoreDeletedFile(githubPath: string): Promise<{ githubSha: stri
     });
 
     if (!createRes.ok) {
-        const err = await createRes.text();
+        await createRes.text();
         throwSafeGithubError(
-            "GitHub restore failed",
+            "storage restore failed",
             createRes.status,
-            err,
             "Storage upload failed. Please try again.",
         );
     }

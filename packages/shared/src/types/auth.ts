@@ -100,3 +100,23 @@ export interface ChangePasswordInput {
     newPassword: string;
     confirmPassword: string;
 }
+
+export interface ForgotPasswordInput {
+    email: string;
+}
+
+export interface ForgotPasswordResponse {
+    success: true;
+    message: string;
+}
+
+export interface ResetPasswordInput {
+    token: string;
+    password: string;
+    confirmPassword: string;
+}
+
+export interface ResetPasswordResponse {
+    success: true;
+    message: string;
+}

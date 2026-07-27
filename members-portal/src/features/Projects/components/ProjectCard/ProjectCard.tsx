@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Archive, Award, Calendar, Paperclip, SquareCheckBig } from 'lucide-react';
+import { Archive, Award, Calendar, Image, Paperclip, SquareCheckBig } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { phasesAPI, projectFilesAPI } from '@/services/api';
 import FileUploadZone from '@/components/FileUpload/FileUploadZone';
@@ -15,6 +15,7 @@ import LifecycleCardView, {
 import LifecycleCardActions from '@/components/cards/LifecycleCardView/LifecycleCardActions';
 import GanttChart from '../GanttChart/GanttChart';
 import ProjectCertificatesSection from '../ProjectCertificatesSection';
+import ProjectPhotosSection from './ProjectPhotosSection';
 import AddPhaseModal from '../../modals/AddPhaseModal';
 import AddTaskModal from '../../modals/AddTaskModal';
 import EditTaskModal from '../../modals/EditTaskModal';
@@ -154,7 +155,7 @@ export default function ProjectCard({
     const lifecycleBadge = getLifecycleBadge(cardItem);
     const LifecycleIcon = lifecycleBadge.icon;
     const archiveOutcomeBadge = archivedView ? getArchiveOutcomeBadge(cardItem) : null;
-    const websiteDisclosedBadge = archivedView ? getWebsiteDisclosedBadge(cardItem) : null;
+    const websiteDisclosedBadge = getWebsiteDisclosedBadge(cardItem);
     const ArchiveOutcomeIcon = archiveOutcomeBadge?.icon ?? Archive;
     const WebsiteDisclosedIcon = websiteDisclosedBadge?.icon ?? Archive;
     const lifecycleMode = archivedView ? 'archived' as const : 'active' as const;
@@ -171,12 +172,13 @@ export default function ProjectCard({
         onToggleDisclose: onToggleDisclose ? () => onToggleDisclose({ id: project.id, title: project.title, isDisclosed: project.isDisclosed }) : undefined,
         onViewActivity: () => onViewActivity(project),
     } : {
-        onEdit,
+        onEdit: onEdit ? () => onEdit(project) : undefined,
         onDeactivate,
         onFinalize,
         onArchive,
         onReactivate,
         onAbort,
+        onToggleDisclose: onToggleDisclose ? () => onToggleDisclose({ id: project.id, title: project.title, isDisclosed: project.isDisclosed }) : undefined,
         onViewActivity,
     };
 
@@ -187,7 +189,12 @@ export default function ProjectCard({
         onArchive: () => onArchive?.(detailTarget),
         onToggleDisclose: onToggleDisclose ? () => onToggleDisclose(detail || project) : undefined,
         onViewActivity: () => onViewActivity(detail || project),
-    } : collapsedLifecycleHandlers;
+    } : {
+        ...collapsedLifecycleHandlers,
+        onEdit: onEdit ? () => onEdit(detail || project) : undefined,
+        onToggleDisclose: onToggleDisclose ? () => onToggleDisclose(detail || project) : undefined,
+        onViewActivity: () => onViewActivity(detail || project),
+    };
 
     const effectiveCanEdit = archivedView ? false : canEdit;
     const effectiveCanManage = canManage;
@@ -335,7 +342,6 @@ export default function ProjectCard({
                             <ProjectCertificatesSection
                                 projectId={detail.id}
                                 projectTitle={detail.title}
-                                isFinalized={!!detail.isFinalized}
                                 canManage={canManageCertificates}
                             />
                         </div>
@@ -361,6 +367,17 @@ export default function ProjectCard({
                                 prev.map((f) => f.id === updated.id ? { ...f, fileName: updated.fileName } : f)
                             )}
                             disabled={archivedView || !canUpload}
+                        />
+                    </div>
+                    <div className="exp-card-section">
+                        <div className="exp-card-section-header">
+                            <Image size={14} className="exp-card-section-icon" />
+                            Project Photos
+                        </div>
+                        <ProjectPhotosSection
+                            projectId={detail.id}
+                            memberId={user?.id}
+                            disabled={!user?.id}
                         />
                     </div>
                     {!archivedView && editPhaseTarget && (

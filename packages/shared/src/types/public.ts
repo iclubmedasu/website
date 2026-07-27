@@ -40,8 +40,9 @@ export interface PublicEventPhoto {
 export interface PublicHighlightPhoto {
     id: Id;
     downloadUrl: string;
-    eventTitle: string;
-    eventSlug: string;
+    source: "event" | "project";
+    title: string;
+    slug: string;
 }
 
 export interface PublicEventTier {
@@ -163,6 +164,13 @@ export interface PublicProjectSummary {
 }
 
 export interface PublicProjectDetail extends PublicProjectSummary {}
+
+export interface PublicProjectPhoto {
+    id: Id;
+    fileName: string;
+    caption: string | null;
+    downloadUrl: string;
+}
 
 export interface PublicContactRequest {
     name: string;

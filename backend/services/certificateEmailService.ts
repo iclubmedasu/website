@@ -245,10 +245,6 @@ export async function sendCertificateEmail(certificateId: number): Promise<void>
     }
 
     const pdfBuffer = await generateCertificatePdfBuffer(certificateId);
-    console.log(
-        `certificateEmailService: certificate ${certificateId} PDF size ${pdfBuffer.length} bytes`
-        + ` (${(pdfBuffer.length / (1024 * 1024)).toFixed(2)} MB)`,
-    );
     const safeCode = certificate.verificationCode.replace(/[^A-Za-z0-9_-]/g, '') || 'certificate';
     const pdfAttachment: EmailAttachment = {
         filename: `certificate-${safeCode}.pdf`,

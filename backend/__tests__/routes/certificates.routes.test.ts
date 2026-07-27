@@ -14,7 +14,10 @@ const prismaMocks = vi.hoisted(() => ({
     eventTaskAssignmentFindMany: vi.fn(),
     eventSessionFindMany: vi.fn(),
     projectFindUnique: vi.fn(),
+    projectTeamFindFirst: vi.fn(),
     taskAssignmentFindMany: vi.fn(),
+    taskAssignmentFindFirst: vi.fn(),
+    teamMemberFindMany: vi.fn(),
 }))
 
 const emailMocks = vi.hoisted(() => ({
@@ -49,8 +52,15 @@ vi.mock('../../db', () => ({
         project: {
             findUnique: prismaMocks.projectFindUnique,
         },
+        projectTeam: {
+            findFirst: prismaMocks.projectTeamFindFirst,
+        },
         taskAssignment: {
             findMany: prismaMocks.taskAssignmentFindMany,
+            findFirst: prismaMocks.taskAssignmentFindFirst,
+        },
+        teamMember: {
+            findMany: prismaMocks.teamMemberFindMany,
         },
     },
 }))
@@ -375,7 +385,7 @@ describe('certificates routes — template requirement & auto-issue', () => {
     })
 })
 
-describe('certificates routes — special vs event/project permissions', () => {
+describe('certificates routes — project view access & event permissions', () => {
     const special = { isSpecial: true, memberId: 99 }
     const member = { memberId: 50 }
     const officer = { isOfficer: true, memberId: 1 }
@@ -385,6 +395,9 @@ describe('certificates routes — special vs event/project permissions', () => {
         prismaMocks.certificateFindMany.mockResolvedValue([])
         prismaMocks.certificateTemplateFindUnique.mockResolvedValue(activeTemplate)
         prismaMocks.taskAssignmentFindMany.mockResolvedValue([])
+        prismaMocks.taskAssignmentFindFirst.mockResolvedValue(null)
+        prismaMocks.teamMemberFindMany.mockResolvedValue([])
+        prismaMocks.projectTeamFindFirst.mockResolvedValue(null)
         prismaMocks.eventRegistrationFindMany.mockResolvedValue([])
         prismaMocks.eventTaskAssignmentFindMany.mockResolvedValue([])
         prismaMocks.eventSessionFindMany.mockResolvedValue([])
@@ -395,11 +408,12 @@ describe('certificates routes — special vs event/project permissions', () => {
         vi.clearAllMocks()
     })
 
-    it('allows special on project eligible', async () => {
+    it('allows special on project eligible without finalize', async () => {
         prismaMocks.projectFindUnique.mockResolvedValueOnce({
             id: 20,
             title: 'Portal',
-            isFinalized: true,
+            isArchived: false,
+            isFinalized: false,
             projectType: { name: 'Software' },
         })
 
@@ -410,11 +424,12 @@ describe('certificates routes — special vs event/project permissions', () => {
         expect(response.body.projectTitle).toBe('Portal')
     })
 
-    it('allows special on project issue-bulk', async () => {
+    it('allows special on project issue-bulk without finalize', async () => {
         prismaMocks.projectFindUnique.mockResolvedValueOnce({
             id: 20,
             title: 'Portal',
-            isFinalized: true,
+            isArchived: false,
+            isFinalized: false,
         })
         prismaMocks.certificateCreate.mockResolvedValueOnce({ id: 200 })
 
@@ -435,7 +450,28 @@ describe('certificates routes — special vs event/project permissions', () => {
         expect(response.body.created).toBe(1)
     })
 
+    it('allows assigned member on project eligible', async () => {
+        prismaMocks.projectFindUnique.mockResolvedValueOnce({
+            id: 20,
+            title: 'Portal',
+            isArchived: false,
+            isFinalized: false,
+            projectType: { name: 'Software' },
+        })
+        prismaMocks.taskAssignmentFindFirst.mockResolvedValueOnce({ id: 1 })
+
+        const response = await request(buildRouteApp(certificatesRouter, member))
+            .get('/project/20/eligible')
+
+        expect(response.status).toBe(200)
+        expect(response.body.projectTitle).toBe('Portal')
+    })
+
     it('allows special to list certificates by projectId', async () => {
+        prismaMocks.projectFindUnique.mockResolvedValueOnce({
+            id: 20,
+            isArchived: false,
+        })
         prismaMocks.certificateFindMany.mockResolvedValueOnce([
             { id: 1, projectId: 20, title: 'Portal cert' },
         ])
@@ -479,12 +515,20 @@ describe('certificates routes — special vs event/project permissions', () => {
         expect(prismaMocks.eventFindUnique).not.toHaveBeenCalled()
     })
 
-    it('denies non-elevated member on project eligible', async () => {
+    it('denies member without project access on project eligible', async () => {
+        prismaMocks.projectFindUnique.mockResolvedValueOnce({
+            id: 20,
+            title: 'Portal',
+            isArchived: false,
+            isFinalized: false,
+            projectType: { name: 'Software' },
+        })
+        prismaMocks.taskAssignmentFindFirst.mockResolvedValueOnce(null)
+
         const response = await request(buildRouteApp(certificatesRouter, member))
             .get('/project/20/eligible')
 
         expect(response.status).toBe(403)
-        expect(prismaMocks.projectFindUnique).not.toHaveBeenCalled()
     })
 
     it('allows officer on both event and project manage', async () => {
@@ -499,7 +543,8 @@ describe('certificates routes — special vs event/project permissions', () => {
         prismaMocks.projectFindUnique.mockResolvedValueOnce({
             id: 20,
             title: 'Portal',
-            isFinalized: true,
+            isArchived: false,
+            isFinalized: false,
             projectType: { name: 'Software' },
         })
 

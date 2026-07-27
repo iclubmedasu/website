@@ -105,6 +105,7 @@ export interface TemplateEditorProps {
     initialCanvasHeight: number;
     initialBackgroundImageUrl: string | null;
     initialBackgroundFocus?: BackgroundFocus | null;
+    hasIssuedCertificates?: boolean;
     nested?: boolean;
     onSaved?: () => void;
 }
@@ -174,6 +175,7 @@ export default function TemplateEditor({
     initialCanvasHeight,
     initialBackgroundImageUrl,
     initialBackgroundFocus = null,
+    hasIssuedCertificates = false,
     nested = false,
     onSaved,
 }: TemplateEditorProps) {
@@ -200,6 +202,9 @@ export default function TemplateEditor({
     const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
     const [dirty, setDirty] = useState(false);
     const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+    const [issuedSaveConfirmOpen, setIssuedSaveConfirmOpen] = useState(false);
+
+    const showIssuedWarning = mode === 'edit' && hasIssuedCertificates;
 
     const viewportRef = useRef<HTMLDivElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -632,7 +637,7 @@ export default function TemplateEditor({
         setDiscardConfirmOpen(true);
     };
 
-    const handleSave = async () => {
+    const persistSave = async () => {
         const name = templateName.trim();
         if (!name) {
             setError('Template name is required');
@@ -698,9 +703,38 @@ export default function TemplateEditor({
         }
     };
 
+    const handleSave = () => {
+        const name = templateName.trim();
+        if (!name) {
+            setError('Template name is required');
+            return;
+        }
+
+        if (showIssuedWarning) {
+            setIssuedSaveConfirmOpen(true);
+            return;
+        }
+
+        void persistSave();
+    };
+
     return (
         <div className={`template-editor${nested ? ' template-editor--nested' : ''}`}>
             {error ? <div className="template-editor-error">{error}</div> : null}
+
+            {showIssuedWarning ? (
+                <div className="template-editor-issued-warning" role="status">
+                    <p>
+                        Changes save to the live template and immediately affect all issued
+                        certificates that use it (custom, event, and project).
+                    </p>
+                    <p>
+                        If this template was reused for different contexts (e.g. attendance
+                        wording vs contribution), new static text or layout may look wrong or
+                        confusing on some certificates when verified.
+                    </p>
+                </div>
+            ) : null}
 
             <div className="template-editor-body">
                 <aside className="template-editor-panel">
@@ -865,7 +899,7 @@ export default function TemplateEditor({
                             type="button"
                             className="btn btn-primary"
                             disabled={saving}
-                            onClick={() => void handleSave()}
+                            onClick={handleSave}
                         >
                             {saving ? 'Saving…' : 'Save'}
                         </button>
@@ -1186,6 +1220,69 @@ export default function TemplateEditor({
                                 onClick={leaveEditor}
                             >
                                 Discard
+                            </button>
+                        </div>
+                    </div>
+                </>
+            ) : null}
+
+            {issuedSaveConfirmOpen ? (
+                <>
+                    <div
+                        className="modal-backdrop"
+                        onClick={() => setIssuedSaveConfirmOpen(false)}
+                    />
+                    <div
+                        className="modal-container modal-warning"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="te-issued-save-title"
+                    >
+                        <div className="modal-header">
+                            <div className="modal-header-content">
+                                <h2 className="modal-title" id="te-issued-save-title">
+                                    Update template used by issued certificates?
+                                </h2>
+                            </div>
+                            <button
+                                type="button"
+                                className="modal-close-btn"
+                                onClick={() => setIssuedSaveConfirmOpen(false)}
+                                aria-label="Close"
+                            >
+                                <X />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <p>
+                                Changes save to the live template and immediately affect all
+                                issued certificates that use it (custom, event, and project).
+                            </p>
+                            <p>
+                                If this template was reused for different contexts (e.g.
+                                attendance wording vs contribution), new static text or layout
+                                may look wrong or confusing on some certificates when verified.
+                            </p>
+                        </div>
+                        <div className="modal-footer">
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                disabled={saving}
+                                onClick={() => setIssuedSaveConfirmOpen(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-warning"
+                                disabled={saving}
+                                onClick={() => {
+                                    setIssuedSaveConfirmOpen(false);
+                                    void persistSave();
+                                }}
+                            >
+                                {saving ? 'Saving…' : 'Save anyway'}
                             </button>
                         </div>
                     </div>

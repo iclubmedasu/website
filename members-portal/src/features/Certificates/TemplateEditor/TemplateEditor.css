@@ -338,6 +338,23 @@
     border-bottom: 1px solid var(--error-border);
 }
 
+.template-editor-issued-warning {
+    padding: 0.65rem 1rem;
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    font-size: 0.875rem;
+    font-family: var(--font-body);
+    border-bottom: 1px solid var(--warning-border);
+}
+
+.template-editor-issued-warning p {
+    margin: 0;
+}
+
+.template-editor-issued-warning p + p {
+    margin-top: 0.35rem;
+}
+
 .template-editor-file-input {
     display: none;
 }

@@ -16,6 +16,7 @@ import type {
     PublicMemberProfile,
     PublicProjectSummary,
     PublicProjectDetail,
+    PublicProjectPhoto,
     PublicEventJoinResponse,
     PublicRegistrationConfirmation,
     PublicSocialLink,
@@ -63,7 +64,7 @@ export function getPublicProfilePhotoUrl(memberId: number | string | null | unde
 }
 
 /**
- * Resolve a public event photo download URL against the API base.
+ * Resolve a public event/project photo download URL against the API base.
  * `downloadUrl` from the API is `/api/public/...`; `getApiBaseUrl()` already ends with `/api`.
  */
 export function getPublicEventPhotoUrl(downloadUrl: string | null | undefined): string | null {
@@ -75,6 +76,9 @@ export function getPublicEventPhotoUrl(downloadUrl: string | null | undefined): 
           : `/${downloadUrl}`;
     return `${getApiBaseUrl()}${path}`;
 }
+
+/** Alias for project photo downloads (same `/api/public/...` path shape as event photos). */
+export const getPublicProjectPhotoUrl = getPublicEventPhotoUrl;
 
 export class ApiRequestError extends Error {
     fieldErrors?: Record<string, string>;
@@ -309,6 +313,10 @@ export const publicAPI = {
 
     async getProject(idOrSlug: number | string): Promise<PublicProjectDetail | null> {
         return fetchPublicOrThrow<PublicProjectDetail>(`/public/projects/${idOrSlug}`);
+    },
+
+    async getProjectPhotos(idOrSlug: number | string): Promise<PublicProjectPhoto[]> {
+        return fetchPublic<PublicProjectPhoto[]>(`/public/projects/${idOrSlug}/photos`, []);
     },
 
     async getMembersDirectory(): Promise<PublicMemberDirectory> {

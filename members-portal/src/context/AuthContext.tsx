@@ -8,6 +8,10 @@ import type {
     AuthUser,
     CheckEmailResponse,
     CheckStudentIdResponse,
+    ForgotPasswordInput,
+    ForgotPasswordResponse,
+    ResetPasswordInput,
+    ResetPasswordResponse,
 } from "../types/backend-contracts";
 import { sanitizePhoneForStorage } from "@/utils/countryCodes";
 
@@ -58,6 +62,12 @@ interface AuthContextValue {
         email3?: string,
     ) => Promise<Result>;
     setupPassword: (email: string, password: string) => Promise<Result>;
+    forgotPassword: (email: string) => Promise<Result<Pick<ForgotPasswordResponse, "message">>>;
+    resetPassword: (
+        token: string,
+        password: string,
+        confirmPassword: string,
+    ) => Promise<Result<Pick<ResetPasswordResponse, "message">>>;
     login: (email: string, password: string) => Promise<Result>;
     refreshUser: () => Promise<void>;
     logout: () => void;
@@ -403,6 +413,72 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
     };
 
+    const forgotPassword = async (
+        email: string,
+    ): Promise<Result<Pick<ForgotPasswordResponse, "message">>> => {
+        try {
+            const body: ForgotPasswordInput = { email: email.trim() };
+            const response = await fetch(`${API_URL}/auth/forgot-password`, {
+                method: "POST",
+                credentials: shouldSendCredentials() ? "include" : "omit",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(body),
+            });
+
+            const data = (await response.json()) as ForgotPasswordResponse & ApiErrorResponse;
+            if (!response.ok) {
+                throw new Error(readApiError(data, "Failed to send reset email"));
+            }
+
+            return {
+                success: true,
+                data: { message: data.message },
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: toErrorMessage(error, "Failed to send reset email"),
+                data: { message: "" },
+            };
+        }
+    };
+
+    const resetPassword = async (
+        token: string,
+        password: string,
+        confirmPassword: string,
+    ): Promise<Result<Pick<ResetPasswordResponse, "message">>> => {
+        try {
+            const body: ResetPasswordInput = { token, password, confirmPassword };
+            const response = await fetch(`${API_URL}/auth/reset-password`, {
+                method: "POST",
+                credentials: shouldSendCredentials() ? "include" : "omit",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(body),
+            });
+
+            const data = (await response.json()) as ResetPasswordResponse & ApiErrorResponse;
+            if (!response.ok) {
+                throw new Error(readApiError(data, "Failed to reset password"));
+            }
+
+            return {
+                success: true,
+                data: { message: data.message },
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: toErrorMessage(error, "Failed to reset password"),
+                data: { message: "" },
+            };
+        }
+    };
+
     const login = async (email: string, password: string): Promise<Result> => {
         try {
             const response = await fetch(`${API_URL}/auth/login`, {
@@ -458,6 +534,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isAlumni,
         login,
         setupPassword,
+        forgotPassword,
+        resetPassword,
         updateInvitedProfile,
         checkEmail,
         checkStudentId,

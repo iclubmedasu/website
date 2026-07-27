@@ -42,7 +42,11 @@ function parseRetryAfterMs(response) {
     return null;
 }
 
-async function fetchWithRetry(url, init, label) {
+function fileNameFromRelPath(relPath) {
+    return path.basename(relPath);
+}
+
+async function fetchWithRetry(url, init, fileName) {
     const attempts = retryDelaysMs.length + 1;
     let lastStatus = 0;
 
@@ -55,18 +59,19 @@ async function fetchWithRetry(url, init, label) {
         lastStatus = response.status;
         const retryable = response.status === 429 || response.status === 503;
         if (!retryable || attempt >= attempts - 1) {
-            throw new Error(`Failed to fetch ${label}: HTTP ${response.status}`);
+            throw new Error(`Failed to fetch ${fileName}: HTTP ${response.status}`);
         }
 
         const waitMs = parseRetryAfterMs(response) ?? retryDelaysMs[attempt];
-        console.warn(`Retrying ${label} after HTTP ${response.status} (attempt ${attempt + 2}/${attempts}, wait ${waitMs}ms)`);
+        console.warn(`Retrying ${fileName} after HTTP ${response.status} (attempt ${attempt + 2}/${attempts}, wait ${waitMs}ms)`);
         await sleep(waitMs);
     }
 
-    throw new Error(`Failed to fetch ${label}: HTTP ${lastStatus}`);
+    throw new Error(`Failed to fetch ${fileName}: HTTP ${lastStatus}`);
 }
 
 async function fetchPngFromGitHubApi(relPath, ref, token) {
+    const fileName = fileNameFromRelPath(relPath);
     const apiUrl = `https://api.github.com/repos/${repo}/contents/${relPath}?ref=${encodeURIComponent(ref)}`;
     const response = await fetchWithRetry(
         apiUrl,
@@ -78,20 +83,21 @@ async function fetchPngFromGitHubApi(relPath, ref, token) {
                 "User-Agent": "iclub-materialize-public-images",
             },
         },
-        `${relPath} (GitHub API)`,
+        fileName,
     );
 
     const payload = await response.json();
     if (!payload?.content || payload.encoding !== "base64") {
-        throw new Error(`${relPath} from GitHub API is not base64 content`);
+        throw new Error(`${fileName} is not base64 content`);
     }
 
     return Buffer.from(payload.content.replace(/\n/g, ""), "base64");
 }
 
 async function fetchPngFromRawGitHub(relPath, ref) {
+    const fileName = fileNameFromRelPath(relPath);
     const rawUrl = `https://raw.githubusercontent.com/${repo}/${ref}/${relPath}`;
-    const response = await fetchWithRetry(rawUrl, undefined, `${relPath} (raw.githubusercontent.com)`);
+    const response = await fetchWithRetry(rawUrl, undefined, fileName);
     return Buffer.from(await response.arrayBuffer());
 }
 
@@ -101,7 +107,8 @@ async function materializePng(relPath, ref) {
         try {
             return await fetchPngFromGitHubApi(relPath, ref, token);
         } catch (error) {
-            console.warn(`GitHub API fetch failed for ${relPath}: ${error instanceof Error ? error.message : error}`);
+            const fileName = fileNameFromRelPath(relPath);
+            console.warn(`Fetch failed for ${fileName}: ${error instanceof Error ? error.message : error}`);
         }
     }
 
@@ -110,6 +117,7 @@ async function materializePng(relPath, ref) {
 
 const ref = resolveGitRef();
 const pngFiles = fs.readdirSync(imagesDir).filter((file) => file.endsWith(".png"));
+let fetchedCount = 0;
 
 for (const file of pngFiles) {
     const relPath = `public-website/public/images/${file}`;
@@ -117,19 +125,21 @@ for (const file of pngFiles) {
     const existing = fs.readFileSync(localPath);
 
     if (isPng(existing)) {
-        console.log(`OK ${relPath} (${existing.length} bytes)`);
         continue;
     }
 
-    console.log(`Materializing ${relPath} from ${ref}...`);
     const data = await materializePng(relPath, ref);
     if (!isPng(data)) {
-        throw new Error(`${relPath} from GitHub is not a PNG (${data.length} bytes)`);
+        throw new Error(`${file} is not a PNG (${data.length} bytes)`);
     }
 
     fs.writeFileSync(localPath, data);
-    console.log(`Materialized ${relPath} (${data.length} bytes) from ${ref}`);
+    fetchedCount += 1;
 
     // Avoid burst rate limits when multiple pointer stubs need fetching.
     await sleep(500);
+}
+
+if (fetchedCount > 0) {
+    console.log(`${fetchedCount} images ready`);
 }

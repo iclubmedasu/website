@@ -1007,7 +1007,7 @@ router.patch('/:id/publish', async (req, res) => {
 });
 
 // ============================================
-// PATCH /api/projects/:id/disclose  –  show/hide archived project on public website
+// PATCH /api/projects/:id/disclose  –  show/hide project on public website
 // ============================================
 router.patch('/:id/disclose', async (req, res) => {
     try {
@@ -1024,9 +1024,6 @@ router.patch('/:id/disclose', async (req, res) => {
 
         const current = await getProjectById(id);
         if (!current) return res.status(404).json({ error: 'Project not found' });
-        if (!current.isArchived) {
-            return res.status(400).json({ error: 'Only archived projects can be disclosed on the public website' });
-        }
 
         const project = await prisma.project.update({
             where: { id },

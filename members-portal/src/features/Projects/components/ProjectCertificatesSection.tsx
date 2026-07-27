@@ -51,7 +51,6 @@ import './ProjectCertificatesSection.css';
 interface ProjectCertificatesSectionProps {
     projectId: Id | string;
     projectTitle: string;
-    isFinalized: boolean;
     canManage: boolean;
 }
 
@@ -202,7 +201,6 @@ function buildUnifiedRows(
 export default function ProjectCertificatesSection({
     projectId,
     projectTitle,
-    isFinalized,
     canManage,
 }: ProjectCertificatesSectionProps) {
     const [templates, setTemplates] = useState<CertificateTemplate[]>([]);
@@ -281,14 +279,13 @@ export default function ProjectCertificatesSection({
     }, [canManage, projectId]);
 
     useEffect(() => {
-        if (!isFinalized) return;
         void loadIssued();
-    }, [isFinalized, loadIssued]);
+    }, [loadIssued]);
 
     useEffect(() => {
-        if (!isFinalized || !canManage) return;
+        if (!canManage) return;
         void loadEligible();
-    }, [isFinalized, canManage, loadEligible]);
+    }, [canManage, loadEligible]);
 
     const unifiedRows = useMemo(
         () => buildUnifiedRows(eligible, issued),
@@ -449,14 +446,6 @@ export default function ProjectCertificatesSection({
             setDownloadingPdfCode(null);
         }
     };
-
-    if (!isFinalized) {
-        return (
-            <p className="project-cert-muted">
-                Certificates can only be issued after the project is finalized.
-            </p>
-        );
-    }
 
     const loading = (eligibleLoading && canManage && !eligible) || (issuedLoading && issued.length === 0);
     const hasTemplateSelected = selectedTemplateId.trim().length > 0;

@@ -47,7 +47,9 @@ export function StatusBadge({ status }: StatusBadgeProps) {
 }
 
 export function PriorityBadge({ priority }: PriorityBadgeProps) {
-    const normalizedPriority = priority ?? 'UNKNOWN';
+    // CRITICAL is the stored enum; UI/modals use Urgent — display them the same.
+    const raw = priority ?? 'UNKNOWN';
+    const normalizedPriority = raw === 'CRITICAL' ? 'URGENT' : raw;
     return (
         <span className={`badge badge-priority-${normalizedPriority}`}>
             {PRIORITY_LABELS[String(normalizedPriority)] ?? String(normalizedPriority)}

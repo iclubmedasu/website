@@ -47,6 +47,14 @@ function headers(): Record<string, string> {
     };
 }
 
+/** Map GitHub HTTP status to a short message safe to return to API clients. */
+function safeGithubErrorMessage(status: number, fallback: string): string {
+    if (status === 409) return 'Upload conflict. Please try again.';
+    if (status === 401 || status === 403) return 'Storage authentication failed.';
+    if (status === 404) return 'File not found in storage.';
+    return fallback;
+}
+
 /**
  * Try to find an existing profile photo for the given member (any supported extension).
  * Returns { path, sha, ext } if found, otherwise null.
@@ -111,8 +119,9 @@ async function uploadProfilePhoto(memberId: number, fileBuffer: Buffer, mimeType
     });
 
     if (!res.ok) {
-        const err = await res.text();
-        throw new Error(`GitHub upload failed (${res.status}): ${err}`);
+        await res.text();
+        console.error(`storage upload failed (${res.status})`);
+        throw new Error(safeGithubErrorMessage(res.status, 'Storage upload failed. Please try again.'));
     }
 
     const rawUrl = `https://raw.githubusercontent.com/${GITHUB_ORG}/${GITHUB_USER_DATA_REPO}/main/${filePath}?t=${Date.now()}`;
@@ -140,8 +149,8 @@ async function deleteProfilePhoto(memberId: number): Promise<void> {
     });
 
     if (!res.ok) {
-        const err = await res.text();
-        console.error(`GitHub delete failed (${res.status}): ${err}`);
+        await res.text();
+        console.error(`storage delete failed (${res.status})`);
     }
 }
 

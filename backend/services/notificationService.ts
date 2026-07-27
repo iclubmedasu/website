@@ -142,13 +142,11 @@ export async function emitNotificationEvent(input: EmitNotificationEventInput): 
         : dedupedRecipients.filter((memberId) => memberId !== actorMemberId);
 
     if (baseRecipients.length === 0 && !persistEventWhenNoRecipients) {
-        console.info(`[notifications] skipped ${input.eventType}: no recipients after actor filtering`);
         return null;
     }
 
     const recipientMemberIds = await filterDeliverableMemberIds(baseRecipients);
     if (recipientMemberIds.length === 0 && !persistEventWhenNoRecipients) {
-        console.info(`[notifications] skipped ${input.eventType}: no deliverable active recipients`);
         return null;
     }
 
@@ -175,8 +173,6 @@ export async function emitNotificationEvent(input: EmitNotificationEventInput): 
         createData.notifications = {
             create: notificationsCreateInput,
         };
-    } else {
-        console.info(`[notifications] persisted ${input.eventType} event with zero deliverable recipients`);
     }
 
     const createdEvent = await db.notificationEvent.create({
