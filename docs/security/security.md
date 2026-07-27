@@ -4,7 +4,7 @@ Defense-in-depth guide for the iClub platform: threat model, AI pentest tools (S
 
 **Companion runbook:** step-by-step staging commands, env vars, and tool install live in [security-pentest.md](./security-pentest.md). Use this page for the *why* and the operating model; use that page when you are about to run a scan.
 
-Related: [deployment.md](./deployment.md), [setup.md](./setup.md), [api.md](./api.md), [.github/SECRETS.md](../.github/SECRETS.md).
+Related: [deployment.md](../deployment.md), [setup.md](../setup.md), [api.md](../api.md), [.github/SECRETS.md](../.github/SECRETS.md).
 
 ---
 
@@ -19,7 +19,7 @@ Related: [deployment.md](./deployment.md), [setup.md](./setup.md), [api.md](./ap
 | Express API | JWT auth, RBAC, finance, files, certificates | Public HF Space (`/api`, `/health`) |
 | Postgres | Supabase-managed | Private DB; Prisma uses `DATABASE_URL` |
 
-Deploy topology and env vars: [deployment.md](./deployment.md).
+Deploy topology and env vars: [deployment.md](../deployment.md).
 
 ### Why private hosting ≠ security
 
@@ -82,7 +82,7 @@ You pay mainly for **LLM API tokens**, not a $50k human engagement. Shallow mode
 ### When to use which
 
 - **Strix first** — focused instruction on auth/JWT/IDOR/RBAC/`/api/public`, with test member + admin credentials.
-- **Shannon next** — same staging stack + monorepo root; use [`docs/security/shannon-iclub.example.yaml`](./security/shannon-iclub.example.yaml) (copy to gitignored `shannon.local.yaml`).
+- **Shannon next** — same staging stack + monorepo root; use [`docs/security/shannon-iclub.example.yaml`](./shannon-iclub.example.yaml) (copy to gitignored `shannon.local.yaml`).
 - **Neither against production** — only local Compose or a dedicated non-prod host with throwaway DB/secrets.
 
 Full install, env tables, and commands: [security-pentest.md — Phase 2](./security-pentest.md#phase-2--ai-pentest-against-staging).
@@ -129,7 +129,7 @@ Verified against current backend code. Prefer linking to source over assuming ch
 - `resolveJwtSecret()` — **required** when `NODE_ENV=production`; missing secret throws at startup (`backend/server.ts` calls this early). Non-production may use an insecure local fallback for tests only.
 - `resolveDeveloperCredentials()` — enabled only when both `DEVELOPER_EMAIL` and `DEVELOPER_PASSWORD` are set; in production the backdoor stays **off** unless `ALLOW_DEVELOPER_BACKDOOR=true`. No hardcoded credential fallbacks.
 
-Env documentation: [`backend/.env.example`](../backend/.env.example), [deployment.md](./deployment.md).
+Env documentation: [`backend/.env.example`](../backend/.env.example), [deployment.md](../deployment.md).
 
 ### Rate limits
 
@@ -337,8 +337,8 @@ Out of scope (typical): production HF/Supabase, social engineering, volumetric D
 | Need | Where |
 |------|--------|
 | Staging Compose + Strix/Shannon commands | [security-pentest.md](./security-pentest.md) |
-| Shannon example config | [security/shannon-iclub.example.yaml](./security/shannon-iclub.example.yaml) |
-| Deploy / production env | [deployment.md](./deployment.md) |
+| Shannon example config | [shannon-iclub.example.yaml](./shannon-iclub.example.yaml) |
+| Deploy / production env | [deployment.md](../deployment.md) |
 | CI secrets + security workflow enablement | [.github/SECRETS.md](../.github/SECRETS.md) |
-| Local ports (`pnpm dev`) | [setup.md](./setup.md) — API `:3000`, portal `:3001`, public `:3002` |
+| Local ports (`pnpm dev`) | [setup.md](../setup.md) — API `:3000`, portal `:3001`, public `:3002` |
 | Compose portal port | `:7860` (Docker image), not `:3001` |
