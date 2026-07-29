@@ -8,6 +8,7 @@ import type {
     EventCustomFieldRef,
     EventSessionRef,
     EventStatistics,
+    EventTicketDesignRef,
     EventTierRef,
     Id,
     ImportRegistrationsResult,
@@ -42,6 +43,8 @@ interface EventExpandedContentProps {
     eventId: Id | string;
     eventSlug?: string;
     eventTitle?: string;
+    eventDescription?: string | null;
+    eventVenue?: string | null;
     initialTab?: EventTabKey | null;
     allowWalkIns?: boolean;
     allowDirectCheckIn?: boolean;
@@ -66,6 +69,7 @@ interface EventExpandedContentProps {
     phoneFieldRequired?: boolean;
     sessionFieldOrder?: number;
     tierFieldOrder?: number;
+    ticketDesign?: EventTicketDesignRef | null;
     onReload: () => void;
 }
 
@@ -73,6 +77,8 @@ export default function EventExpandedContent({
     eventId,
     eventSlug,
     eventTitle,
+    eventDescription,
+    eventVenue,
     initialTab,
     allowWalkIns = false,
     allowDirectCheckIn = false,
@@ -97,6 +103,7 @@ export default function EventExpandedContent({
     phoneFieldRequired: initialPhoneFieldRequired = false,
     sessionFieldOrder: initialSessionFieldOrder = 0,
     tierFieldOrder: initialTierFieldOrder = 1,
+    ticketDesign,
     onReload,
 }: EventExpandedContentProps) {
     const [stats, setStats] = useState<EventStatistics | null>(null);
@@ -303,15 +310,20 @@ export default function EventExpandedContent({
                 <div className="event-expanded-tab-panel">
                     <EventTicketsSection
                         eventId={eventId}
+                        eventTitle={eventTitle}
+                        eventDescription={eventDescription}
+                        eventVenue={eventVenue}
                         eventDate={eventDate}
                         eventEndDate={eventEndDate}
                         eventTimezone={eventTimezone}
                         sessions={sessions}
                         tiers={tiers}
                         fields={fields}
+                        ticketDesign={ticketDesign}
                         canRemoveAttendance={canRemoveAttendance}
                         funnel={ticketsFunnel}
                         onFunnelChange={setTicketsFunnel}
+                        onReload={onReload}
                     />
                 </div>
             )}

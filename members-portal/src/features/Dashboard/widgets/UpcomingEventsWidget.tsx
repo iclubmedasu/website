@@ -27,8 +27,8 @@ function activityMeta(item: DashboardMyActivityItem): string {
             .filter(Boolean)
             .join(' · ');
     }
-    if (!item.date) return 'Project';
-    return `Project · ${formatDate(item.date)}`;
+    if (!item.date) return '';
+    return formatDate(item.date);
 }
 
 export default function UpcomingEventsWidget({
@@ -105,11 +105,6 @@ export default function UpcomingEventsWidget({
                     <div className="dashboard-list">
                         {items.map((item) => {
                             const meta = activityMeta(item);
-                            const showBadges =
-                                item.viaRegistration ||
-                                item.viaTaskAssignment ||
-                                item.viaCreated ||
-                                item.viaTeam;
 
                             return (
                                 <Link
@@ -119,32 +114,35 @@ export default function UpcomingEventsWidget({
                                 >
                                     <div className="dashboard-list-row-main">
                                         <h4 className="dashboard-list-row-title">{item.title}</h4>
-                                        <p className="dashboard-list-row-meta">{meta}</p>
+                                        {meta ? (
+                                            <p className="dashboard-list-row-meta">{meta}</p>
+                                        ) : null}
                                     </div>
-                                    {showBadges ? (
-                                        <div className="dashboard-list-row-badges">
-                                            {item.viaRegistration ? (
-                                                <span className="badge upcoming-events-badge--registered">
-                                                    Registered
-                                                </span>
-                                            ) : null}
-                                            {item.viaTaskAssignment ? (
-                                                <span className="badge upcoming-events-badge--assigned">
-                                                    Assigned
-                                                </span>
-                                            ) : null}
-                                            {item.viaCreated ? (
-                                                <span className="badge upcoming-events-badge--created">
-                                                    Created
-                                                </span>
-                                            ) : null}
-                                            {item.viaTeam ? (
-                                                <span className="badge upcoming-events-badge--team">
-                                                    Team
-                                                </span>
-                                            ) : null}
-                                        </div>
-                                    ) : null}
+                                    <div className="dashboard-list-row-badges">
+                                        <span className="badge dashboard-type-badge">
+                                            {item.kind === 'event' ? 'Event' : 'Project'}
+                                        </span>
+                                        {item.viaRegistration ? (
+                                            <span className="badge upcoming-events-badge--registered">
+                                                Registered
+                                            </span>
+                                        ) : null}
+                                        {item.viaTaskAssignment ? (
+                                            <span className="badge upcoming-events-badge--assigned">
+                                                Assigned
+                                            </span>
+                                        ) : null}
+                                        {item.viaCreated ? (
+                                            <span className="badge upcoming-events-badge--created">
+                                                Created
+                                            </span>
+                                        ) : null}
+                                        {item.viaTeam ? (
+                                            <span className="badge upcoming-events-badge--team">
+                                                Team
+                                            </span>
+                                        ) : null}
+                                    </div>
                                 </Link>
                             );
                         })}

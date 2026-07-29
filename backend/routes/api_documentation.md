@@ -290,6 +290,422 @@ DELETE /api/role-history/:id
 
 ---
 
+## 6. DOCUMENTS API
+
+All document endpoints require authentication (`Authorization` header / session).
+
+### Auth notes (two-tier visibility)
+- **ORG_LEADERSHIP**: developer, Officer, President, Vice President — sees **all** documents and folders; may manage/grant any (admin override)
+- **TEAM_LEADERSHIP**: Head/Vice of a non-Administration team — natural view+manage only for docs/folders whose `scopeTeamId` is one of their led teams
+- Ownership is positional: `scopeTeamId == null` → org-owned; `scopeTeamId == X` → Head/Vice of team X (plus org leadership)
+- Members with **no document rank** cannot open Documents (list endpoints return 403; nav is hidden)
+- **Grants are TEAM-only**: a TEAM grant means **Head + Vice of that team** (not all members). Legacy MEMBER grant rows are ignored in permission checks and cannot be created. Grant recipients are **view-only** (never manage)
+- Folder ACL (category grant) covers **all documents in that folder** (current + future) for Head/Vice of the granted team
+- Document ACL covers that document only (same TEAM Head/Vice rule)
+- **Categories** GET: requires document rank (else 403); locked stubs + `canManageAccess` for visible folders
+- **Categories** POST: document rank required; `scopeTeamId` resolved like document upload
+- **Categories** PUT/DELETE: `canMemberGrantCategory` (natural ownership / org override only)
+- **Documents** list GET: requires document rank (else 403); locked stubs + `canManageAccess` for visible docs
+- **Documents** create: document rank required; `categoryId` optional (null = root / uncategorized)
+- **Documents** PUT/PATCH/DELETE: admin-equivalent **or** the uploader (`uploadedById`)
+- **Documents** GET by id / download: `requireDocumentAccess` (org → team scope → folder ACL → doc ACL)
+- **Grants / access-request approve|deny**: `canMemberGrantDocument` / `canMemberGrantCategory` (**natural access only**)
+- **Category grants / access-log**: `canMemberGrantCategory`
+- **Create access request** (doc or folder): caller must have `TEAM_LEADERSHIP` rank and must **not** already pass view check
+- **Document access log**: admin-equivalent (`isDeveloper` or Administration membership) **or** uploader
+
+### List Document Categories
+```
+GET /api/document-categories
+Requires document rank (else 403)
+Returns categories ordered by `order` ascending
+
+For each category:
+  - If the member can view it → full payload (id, name, order, scopeTeamId, timestamps, …)
+    plus canManageAccess: boolean (canMemberGrantCategory — natural ownership only)
+  - If not → locked stub only: { id, name, locked: true }
+```
+
+### Create Document Category
+```
+POST /api/document-categories
+Body: {
+  "name": "Policies",
+  "order": 0,          // optional, defaults to 0
+  "scopeTeamId": 3     // optional; required semantics depend on rank
+}
+Requires org or team leadership document rank
+
+Scope rules (same as document upload via resolveScopeTeamId):
+  - TEAM_LEADERSHIP: scopeTeamId defaults to first leadership team; if provided must be in that list (else 403)
+  - ORG_LEADERSHIP: scopeTeamId optional (null = org-owned)
+```
+
+### Update Document Category
+```
+PUT /api/document-categories/:id
+Body: {
+  "name": "Updated Name",  // optional
+  "order": 1               // optional
+}
+Requires canMemberGrantCategory (folder owner or org leadership)
+403: { "error": "Folder update requires ownership" }
+```
+
+### Delete Document Category
+```
+DELETE /api/document-categories/:id
+Requires canMemberGrantCategory (folder owner or org leadership)
+403: { "error": "Folder delete requires ownership" }
+409 if the category still has documents: { "error": "Category still has documents..." }
+```
+
+### Create Category Access Request
+```
+POST /api/document-categories/:id/access-requests
+Requires TEAM_LEADERSHIP document rank (else 403)
+Caller must NOT already pass canMemberViewCategory (else 400)
+409 if a PENDING request already exists for the same member+category
+
+Body (optional): {
+  "note": "Need this for onboarding"   // not stored; included in notification body only
+}
+
+Creates PENDING DocumentCategoryAccessRequest
+Best-effort notification DOCUMENT_ACCESS_REQUESTED to grant reviewers:
+  - active Administration org leadership (Officer / President / VP)
+  - if category.scopeTeamId set: active Head/Vice on that team
+  - excludes requester
+201 → created DocumentCategoryAccessRequest
+```
+
+### List Category Access Requests
+```
+GET /api/document-categories/access-requests?status=PENDING
+Requires document rank (else 403)
+Query:
+  - status (optional, default PENDING)
+
+Loads requests with that status + category
+Returns only requests where the viewer passes canMemberGrantCategory for the category
+```
+
+### Approve Category Access Request
+```
+PATCH /api/document-categories/access-requests/:id/approve
+Requires canMemberGrantCategory on the request's category
+Rejects if request is not PENDING
+400 if the requester currently leads no teams as Head/Vice
+
+Body: {
+  "durationPreset": "DAY" | "WEEK" | "MONTH" | "INDEFINITE"
+}
+
+Creates DocumentCategoryAccessGrant(s) with grantedToType TEAM for **each** team the requester
+currently leads as Head/Vice (upserts active grant / updates expiresAt; grantedById = reviewer)
+Sets request status APPROVED + reviewedById / reviewedAt
+Response: { grants: DocumentCategoryAccessGrant[], request: DocumentCategoryAccessRequest }
+```
+
+### Deny Category Access Request
+```
+PATCH /api/document-categories/access-requests/:id/deny
+Requires canMemberGrantCategory on the request's category
+Rejects if request is not PENDING
+
+Body (optional): {
+  "reviewNote": "Not appropriate for this role"
+}
+
+Sets status DENIED + optional reviewNote + reviewedById / reviewedAt
+```
+
+### List Category Grants
+```
+GET /api/document-categories/:id/grants
+Requires canMemberGrantCategory
+Returns grants (newest first) including member/team names and grantedBy/revokedBy
+```
+
+### Create Category Grant
+```
+POST /api/document-categories/:id/grants
+Requires canMemberGrantCategory
+Body: {
+  "grantedToType": "TEAM",
+  "teamId": 3,               // required
+  "durationPreset": "DAY" | "WEEK" | "MONTH" | "INDEFINITE"
+}
+MEMBER grants are rejected with 400
+201 → created DocumentCategoryAccessGrant (applies to Head + Vice of that team)
+```
+
+### Revoke Category Grant
+```
+PATCH /api/document-categories/:id/grants/:grantId/revoke
+Requires canMemberGrantCategory
+```
+
+### Category Access Log
+```
+GET /api/document-categories/:id/access-log?cursor=&limit=
+Requires canMemberGrantCategory
+Response: { "accessLogs": [...], "nextCursor": <id|null> }
+```
+
+### Log Category View (folder open)
+```
+POST /api/document-categories/:id/view-log
+Any authenticated member
+Creates DocumentCategoryAccessLog with action VIEW
+```
+
+### List Documents
+```
+GET /api/documents
+Requires document rank (else 403)
+Query Parameters:
+  - categoryId (optional): numeric id, or "null"/empty for root docs
+  - root=true|1 (optional): filter to categoryId IS NULL (root / uncategorized)
+  - scopeTeamId (optional)
+
+For each document:
+  - If the member can view it → full payload (id, title, categoryId|null, fileUrl, fileType,
+    fileSizeBytes, scopeTeamId, creatorRank, uploadedById, timestamps, etc.)
+    plus canManageAccess: boolean (canMemberGrantDocument — natural access only)
+  - If not → locked stub only: { id, title, categoryId, locked: true }
+    (no fileUrl)
+```
+
+### Get Document
+```
+GET /api/documents/:id
+Requires document access
+Returns full document with:
+  - category: { id, name } | null
+  - uploadedBy: { id, fullName }
+  - canManageAccess: boolean (canMemberGrantDocument — natural access only)
+Fire-and-forget access log with action VIEW
+```
+
+### Download Document
+```
+GET /api/documents/:id/download
+Requires document access
+Streams file from GitHub storage (Content-Type / Content-Disposition)
+Fire-and-forget access log with action DOWNLOAD
+```
+
+### Create Document
+```
+POST /api/documents
+Content-Type: multipart/form-data (field "file") OR application/json with fileBase64
+
+Body (multipart or JSON): {
+  "title": "Handbook 2026",
+  "categoryId": 1,           // optional; omit/null = root upload
+  "scopeTeamId": 3,          // optional; required semantics depend on rank
+  "file": <binary>,          // multipart
+  "fileBase64": "...",       // JSON alternative when no multipart file
+  "fileName": "handbook.pdf", // optional with fileBase64
+  "mimeType": "application/pdf" // optional with fileBase64
+}
+
+Scope rules:
+  - TEAM_LEADERSHIP: scopeTeamId defaults to first leadership team; if provided must be in that list (else 403)
+  - ORG_LEADERSHIP: scopeTeamId optional (null = org-wide)
+
+Stores GitHub path in fileUrl (documents/{id}/{uuid}-{safeName})
+Requires ORG_LEADERSHIP or TEAM_LEADERSHIP document rank
+creatorRank stored as ORG_LEADERSHIP | TEAM_LEADERSHIP
+```
+
+### Batch Create Documents
+```
+POST /api/documents/batch
+Content-Type: multipart/form-data
+Fields:
+  - files: one or more files (field name "files", max 20)
+  - categoryId: optional
+  - scopeTeamId: optional (same rules as single upload)
+  - titles: optional JSON array of titles aligned with files (fallback: filename stem)
+
+201 → array of created documents
+```
+
+### Update Document
+```
+PUT /api/documents/:id
+PATCH /api/documents/:id
+Body: {
+  "title": "Updated Title",  // optional
+  "categoryId": 2            // optional; null or "" moves to root
+}
+Admin-equivalent or uploader only
+File replace is not supported on this endpoint
+Use categoryId change for drag-and-drop into folders
+```
+
+### Delete Document
+```
+DELETE /api/documents/:id
+Admin-equivalent or uploader only
+Best-effort GitHub delete (resolves SHA via getCurrentFileSha), then deletes DB row
+(cascades grants/logs)
+```
+
+### durationPreset
+Used by approve access-request and create grant:
+- `DAY` → expires in 1 day
+- `WEEK` → expires in 7 days
+- `MONTH` → expires in 30 days
+- `INDEFINITE` → `expiresAt: null`
+Invalid preset → 400
+
+### List Grants
+```
+GET /api/documents/:id/grants
+Requires canMemberGrantDocument
+Returns all grants for the document (active + past), newest first, including:
+  - grantedToType: TEAM (new grants); legacy MEMBER rows may still appear but are ignored for access
+  - team: { id, name } when TEAM
+  - grantedBy / revokedBy
+```
+
+### Create Direct Grant
+```
+POST /api/documents/:id/grants
+Requires canMemberGrantDocument
+
+Body: {
+  "grantedToType": "TEAM",
+  "teamId": 3,               // required
+  "durationPreset": "DAY" | "WEEK" | "MONTH" | "INDEFINITE"
+}
+
+MEMBER grants are rejected with 400
+201 → created DocumentAccessGrant (Head + Vice of that team)
+```
+
+### Revoke Grant
+```
+PATCH /api/documents/:id/grants/:grantId/revoke
+Requires canMemberGrantDocument
+400 if already revoked or already expired (expiresAt <= now)
+Sets revokedAt / revokedById
+```
+
+### Create Access Request
+```
+POST /api/documents/:id/access-requests
+Requires TEAM_LEADERSHIP document rank (else 403)
+Caller must NOT already pass canMemberViewDocument (else 400)
+409 if a PENDING request already exists for the same member+document
+
+Body (optional): {
+  "note": "Need this for onboarding"   // not stored; included in notification body only
+}
+
+Creates PENDING DocumentAccessRequest
+Best-effort notification DOCUMENT_ACCESS_REQUESTED to grant reviewers:
+  - active Administration org leadership (Officer / President / VP)
+  - if document.scopeTeamId set: active Head/Vice on that team
+  - excludes requester
+201 → created DocumentAccessRequest
+```
+
+### List Access Requests
+```
+GET /api/documents/access-requests?status=PENDING
+Requires document rank (else 403)
+Query:
+  - status (optional, default PENDING)
+
+Loads requests with that status + document
+Returns only requests where the viewer passes canMemberGrantDocument for the document
+```
+
+### Approve Access Request
+```
+PATCH /api/documents/access-requests/:id/approve
+Requires canMemberGrantDocument on the request's document
+Rejects if request is not PENDING
+400 if the requester currently leads no teams as Head/Vice
+
+Body: {
+  "durationPreset": "DAY" | "WEEK" | "MONTH" | "INDEFINITE"
+}
+
+Creates DocumentAccessGrant(s) with grantedToType TEAM for **each** team the requester
+currently leads as Head/Vice (upserts active grant / updates expiresAt; grantedById = reviewer)
+Sets request status APPROVED + reviewedById / reviewedAt
+Response: { grants: DocumentAccessGrant[], request: DocumentAccessRequest }
+```
+
+### Deny Access Request
+```
+PATCH /api/documents/access-requests/:id/deny
+Requires canMemberGrantDocument on the request's document
+Rejects if request is not PENDING
+
+Body (optional): {
+  "reviewNote": "Not appropriate for this role"
+}
+
+Sets status DENIED + optional reviewNote + reviewedById / reviewedAt
+```
+
+### Document Access Log
+```
+GET /api/documents/:id/access-log?cursor=&limit=
+Admin-equivalent (isDeveloper or Administration membership) OR document uploader only
+Query:
+  - cursor (optional): log id; returns rows with id < cursor
+  - limit (optional, default 20, clamped 1–100)
+
+Ordered by id desc
+Includes member fullName
+Response: { "accessLogs": [...], "nextCursor": <id|null> }
+```
+
+---
+
+## 6b. ANNOUNCEMENTS API
+
+Authenticated members. Management actions require developer / officer / administration / leadership / special (`canManageAnnouncements`).
+
+### Availability for assignment UIs (advisory)
+
+```
+GET /api/announcements/availability?eventId=
+GET /api/announcements/availability?projectId=
+```
+
+Exactly one of `eventId` / `projectId`.
+
+**Auth (not announcement-manager-only):**
+- `eventId`: same as event assignable-members (`canUserManageEventTasks`)
+- `projectId`: same as project visibility (`canUserViewProject`)
+
+Returns the **latest active** announcement for that target (`createdAt` desc), plus all responses:
+
+```json
+{
+  "announcement": { "id", "title", "targetType", "eventId", "projectId" },
+  "responses": [{
+    "memberId": 1,
+    "status": "AVAILABLE",
+    "notes": null,
+    "member": { "id", "fullName", "profilePhotoUrl" },
+    "periods": [{ "startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD" }]
+  }]
+}
+```
+
+When none: `{ "announcement": null, "responses": [] }`. Client assignment UIs use this for soft/advisory hints only — never blocks save.
+
+---
+
 ## Common Response Formats
 
 ### Success Response

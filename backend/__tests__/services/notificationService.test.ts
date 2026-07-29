@@ -15,6 +15,10 @@ const realtimeMocks = vi.hoisted(() => ({
     publishNotificationCreated: vi.fn()
 }))
 
+const webPushMocks = vi.hoisted(() => ({
+    sendWebPushToMembers: vi.fn()
+}))
+
 vi.mock('../../db', () => ({
     prisma: {
         member: {
@@ -39,12 +43,14 @@ vi.mock('../../db', () => ({
 }))
 
 vi.mock('../../services/notificationsRealtime', () => realtimeMocks)
+vi.mock('../../services/webPushService', () => webPushMocks)
 
 import { emitNotificationEvent } from '../../services/notificationService'
 
 describe('notificationService emitNotificationEvent', () => {
     beforeEach(() => {
         prismaMocks.memberFindMany.mockResolvedValue([])
+        webPushMocks.sendWebPushToMembers.mockResolvedValue(undefined)
         prismaMocks.notificationEventCreate.mockImplementation(async ({ data }: any) => ({
             id: 501,
             notifications: (data.notifications?.create || []).map((notification: any, index: number) => ({
@@ -72,6 +78,7 @@ describe('notificationService emitNotificationEvent', () => {
 
         expect(result).toBeNull()
         expect(prismaMocks.notificationEventCreate).not.toHaveBeenCalled()
+        expect(webPushMocks.sendWebPushToMembers).not.toHaveBeenCalled()
     })
 
     it('keeps actor recipient when includeActor is true', async () => {
@@ -99,6 +106,14 @@ describe('notificationService emitNotificationEvent', () => {
             })
         }))
         expect(realtimeMocks.publishNotificationCreated).toHaveBeenCalledTimes(1)
+        expect(webPushMocks.sendWebPushToMembers).toHaveBeenCalledWith(
+            [7],
+            expect.objectContaining({
+                title: 'Task Assigned',
+                body: 'You were assigned',
+                eventType: 'TASK_ASSIGNED',
+            }),
+        )
     })
 
     it('persists canonical event with zero recipients when configured', async () => {
@@ -117,5 +132,22 @@ describe('notificationService emitNotificationEvent', () => {
         expect(createArg.data.actorMemberId).toBe(9)
         expect(createArg.data.notifications).toBeUndefined()
         expect(realtimeMocks.publishNotificationCreated).not.toHaveBeenCalled()
+        expect(webPushMocks.sendWebPushToMembers).not.toHaveBeenCalled()
+    })
+
+    it('still returns successfully when web push fails', async () => {
+        prismaMocks.memberFindMany.mockResolvedValueOnce([{ id: 3 }])
+        webPushMocks.sendWebPushToMembers.mockRejectedValueOnce(new Error('push down'))
+
+        const result = await emitNotificationEvent({
+            eventType: 'TASK_ASSIGNED',
+            audienceType: 'TASK',
+            title: 'Task Assigned',
+            body: 'You were assigned',
+            recipientMemberIds: [3]
+        })
+
+        expect(result).toEqual({ eventId: 501, notificationCount: 1 })
+        expect(webPushMocks.sendWebPushToMembers).toHaveBeenCalled()
     })
 })

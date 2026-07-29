@@ -491,4 +491,5 @@ export {
     getFileHistory,
     downloadFileAtVersion,
     restoreDeletedFile,
+    getCurrentFileSha,
 };

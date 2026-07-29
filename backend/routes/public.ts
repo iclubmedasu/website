@@ -1,5 +1,4 @@
 import express, { Request, Response } from "express";
-import { Readable } from "stream";
 import { prisma } from "../db";
 import { isSessionEndedAt, serializeEventSession } from "../lib/eventSessionTime";
 import {
@@ -12,6 +11,7 @@ import {
     eventPhotoPreviewGithubPath,
     optimizeEventPhoto,
 } from "../lib/optimizeEventPhoto";
+import { pipeGithubBodyToResponse } from "../lib/pipeGithubResponse";
 import { sendEmail } from "../services/emailService";
 import { buildRegistrationJoinUrl } from "../services/eventTicketEmailService";
 import { generateTokensForRegistration, getSessionTokensForRegistration } from "../services/sessionTokenService";
@@ -656,7 +656,7 @@ router.get("/event-photos/:id/download", async (req: Request, res: Response) => 
             if (photo.previewFileSize) {
                 res.setHeader("Content-Length", photo.previewFileSize);
             }
-            Readable.fromWeb(ghResponse.body as import("stream/web").ReadableStream).pipe(res);
+            await pipeGithubBodyToResponse(ghResponse, res);
             return;
         }
 
@@ -688,6 +688,82 @@ router.get("/event-photos/:id/download", async (req: Request, res: Response) => 
     } catch (error) {
         console.error("GET /public/event-photos/:id/download error:", error);
         return res.status(500).json({ error: "Failed to download photo" });
+    }
+});
+
+async function streamPublicTicketDesignImage(
+    req: Request,
+    res: Response,
+    slot: "header" | "footer",
+): Promise<Response | void> {
+    const resolved = await resolveEventByIdOrSlug(String(req.params.id));
+    if (!resolved) {
+        return res.status(404).json({ error: "Image not found" });
+    }
+
+    const event = await prisma.event.findUnique({
+        where: { id: resolved.id },
+        select: {
+            isPublished: true,
+            isActive: true,
+            isArchived: true,
+            isDisclosed: true,
+            isFinalized: true,
+            ticketHeaderImageGithubPath: true,
+            ticketHeaderImageFileSize: true,
+            ticketHeaderImageMimeType: true,
+            ticketFooterImageGithubPath: true,
+            ticketFooterImageFileSize: true,
+            ticketFooterImageMimeType: true,
+        },
+    });
+
+    if (!event || !canPublicViewEvent(event)) {
+        return res.status(404).json({ error: "Image not found" });
+    }
+
+    const githubPath = slot === "header"
+        ? event.ticketHeaderImageGithubPath
+        : event.ticketFooterImageGithubPath;
+    const mimeType = slot === "header"
+        ? event.ticketHeaderImageMimeType
+        : event.ticketFooterImageMimeType;
+    const fileSize = slot === "header"
+        ? event.ticketHeaderImageFileSize
+        : event.ticketFooterImageFileSize;
+
+    if (!githubPath) {
+        return res.status(404).json({ error: "Image not found" });
+    }
+
+    const ghResponse = await githubStorage.downloadFile(githubPath);
+    res.setHeader("Cache-Control", PUBLIC_EVENT_PHOTO_CACHE_CONTROL);
+    res.setHeader("Content-Type", mimeType || "application/octet-stream");
+    res.setHeader(
+        "Content-Disposition",
+        `inline; filename="ticket-${slot}-image"`,
+    );
+    if (fileSize) {
+        res.setHeader("Content-Length", fileSize);
+    }
+    await pipeGithubBodyToResponse(ghResponse, res);
+}
+
+router.get("/events/:id/ticket-design/header-image", async (req: Request, res: Response) => {
+    try {
+        return await streamPublicTicketDesignImage(req, res, "header");
+    } catch (error) {
+        console.error("GET /public/events/:id/ticket-design/header-image error:", error);
+        return res.status(500).json({ error: "Failed to download ticket header image" });
+    }
+});
+
+router.get("/events/:id/ticket-design/footer-image", async (req: Request, res: Response) => {
+    try {
+        return await streamPublicTicketDesignImage(req, res, "footer");
+    } catch (error) {
+        console.error("GET /public/events/:id/ticket-design/footer-image error:", error);
+        return res.status(500).json({ error: "Failed to download ticket footer image" });
     }
 });
 
@@ -909,6 +985,12 @@ router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
                         isArchived: true,
                         isFinalized: true,
                         isPublished: true,
+                        ticketAccentColor: true,
+                        ticketHeaderTitle: true,
+                        ticketHeaderSubtitle: true,
+                        ticketFooterNote: true,
+                        ticketHeaderImageGithubPath: true,
+                        ticketFooterImageGithubPath: true,
                     },
                 },
                 tier: {
@@ -969,6 +1051,20 @@ router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
         const waitingForYouSessions = waitingForYou.map((session) => mapSession(session, "waitingForYou"));
         const dontMissOutSessions = dontMissOut.map((session) => mapSession(session, "dontMissOut"));
 
+        const eventPublicId = registration.event.slug || registration.event.id;
+        const ticketDesign = {
+            accentColor: registration.event.ticketAccentColor,
+            headerTitle: registration.event.ticketHeaderTitle,
+            headerSubtitle: registration.event.ticketHeaderSubtitle,
+            footerNote: registration.event.ticketFooterNote,
+            headerImageUrl: registration.event.ticketHeaderImageGithubPath
+                ? `/api/public/events/${eventPublicId}/ticket-design/header-image`
+                : null,
+            footerImageUrl: registration.event.ticketFooterImageGithubPath
+                ? `/api/public/events/${eventPublicId}/ticket-design/footer-image`
+                : null,
+        };
+
         return res.json({
             confirmationCode: registration.confirmationCode,
             fullName: registration.fullName,
@@ -986,6 +1082,7 @@ router.get("/events/:id/confirmation", async (req: Request, res: Response) => {
             sessions: [...waitingForYouSessions, ...dontMissOutSessions],
             waitingForYou: waitingForYouSessions,
             dontMissOut: dontMissOutSessions,
+            ticketDesign,
         });
     } catch (error) {
         console.error("GET /public/events/:id/confirmation error:", error);
@@ -1128,7 +1225,7 @@ router.get("/project-photos/:id/download", async (req: Request, res: Response) =
             if (photo.previewFileSize) {
                 res.setHeader("Content-Length", photo.previewFileSize);
             }
-            Readable.fromWeb(ghResponse.body as import("stream/web").ReadableStream).pipe(res);
+            await pipeGithubBodyToResponse(ghResponse, res);
             return;
         }
 

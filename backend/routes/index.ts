@@ -15,13 +15,19 @@ import projectsRoutes from "./projects";
 import tasksRoutes from "./tasks";
 import dashboardRoutes from "./dashboard";
 import eventsRoutes from "./events";
+import eventTicketDesignRoutes from "./eventTicketDesign";
 import phasesRoutes from "./phases";
 import scheduleSlotsRoutes from "./scheduleSlots";
 import projectFilesRoutes from "./projectFiles";
 import eventFilesRoutes from "./eventFiles";
 import eventPhotosRoutes from "./eventPhotos";
 import projectPhotosRoutes from "./projectPhotos";
+import announcementsRoutes from "./announcements";
+import documentCategoriesRoutes from "./documentCategories";
+import documentAccessRoutes from "./documentAccess";
+import documentsRoutes from "./documents";
 import notificationsRoutes from "./notifications";
+import pushSubscriptionsRoutes from "./pushSubscriptions";
 import publicRoutes from "./public";
 import siteContentRoutes from "./siteContent";
 import supportContentRoutes from "./supportContent";
@@ -86,6 +92,8 @@ router.use("/events", (req, res, next) => {
     return authenticateToken(req, res, next);
 }, eventsRoutes);
 
+router.use("/events", authenticateToken, eventTicketDesignRoutes);
+
 router.use("/phases", authenticateToken, phasesRoutes);
 router.use("/schedule-slots", authenticateToken, scheduleSlotsRoutes);
 router.use("/project-files", authenticateToken, projectFilesRoutes);
@@ -114,7 +122,12 @@ router.use("/project-photos", (req, res, next) => {
     return authenticateToken(req, res, next);
 }, projectPhotosRoutes);
 
+router.use("/announcements", authenticateToken, announcementsRoutes);
+router.use("/document-categories", authenticateToken, documentCategoriesRoutes);
+router.use("/documents", authenticateToken, documentAccessRoutes);
+router.use("/documents", authenticateToken, documentsRoutes);
 router.use("/notifications", authenticateToken, notificationsRoutes);
+router.use("/push-subscriptions", authenticateToken, pushSubscriptionsRoutes);
 router.use("/site-content", authenticateToken, siteContentRoutes);
 router.use("/site-content/support", authenticateToken, supportContentRoutes);
 router.use("/finance", authenticateToken, financeRoutes);
@@ -167,7 +180,11 @@ router.get("/", (_req: Request, res: Response) => {
             eventFiles: "/api/event-files",
             eventPhotos: "/api/event-photos",
             projectPhotos: "/api/project-photos",
+            announcements: "/api/announcements",
+            documentCategories: "/api/document-categories",
+            documents: "/api/documents",
             notifications: "/api/notifications",
+            pushSubscriptions: "/api/push-subscriptions",
             siteContent: "/api/site-content",
             finance: "/api/finance",
             certificateTemplates: "/api/certificate-templates",

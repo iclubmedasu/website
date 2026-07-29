@@ -1,5 +1,6 @@
 import { prisma } from '../db';
 import { publishNotificationCreated } from './notificationsRealtime';
+import { sendWebPushToMembers } from './webPushService';
 import type {
     NotificationAudienceType,
     NotificationEventType,
@@ -201,6 +202,18 @@ export async function emitNotificationEvent(input: EmitNotificationEventInput): 
             eventType: notification.eventType,
             createdAt: notification.createdAt,
         });
+    }
+
+    if (recipientMemberIds.length > 0) {
+        try {
+            await sendWebPushToMembers(recipientMemberIds, {
+                title: input.title,
+                body: input.body,
+                eventType: input.eventType,
+            });
+        } catch (error) {
+            console.error('Web push fan-out failed', error);
+        }
     }
 
     return {

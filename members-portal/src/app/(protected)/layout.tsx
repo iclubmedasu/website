@@ -5,6 +5,7 @@ import { AuthGuard } from '@/components/AuthGuard/AuthGuard'
 import { UnassignedGate } from '@/components/UnassignedGate/UnassignedGate'
 import { AlumniGate } from '@/components/AlumniGate/AlumniGate'
 import { SideBarNavigationSlim } from '@/components/SideBarNavigationSlim/SideBarNavigationSlim'
+import { PushNotificationPrompt } from '@/components/PushNotificationPrompt/PushNotificationPrompt'
 import { useAuth } from '@/context/AuthContext'
 import { RealtimeProvider, useOptionalRealtimeContext } from '@/context/RealtimeContext'
 import { notificationsAPI } from '@/services/api'
@@ -28,6 +29,8 @@ import {
     LifeBuoy,
     Wallet,
     Award,
+    Megaphone,
+    FileText,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -69,6 +72,18 @@ const NAV_ITEMS = [
         requiresCertificateAccess: true,
     },
     {
+        label: 'Announcements',
+        href: '/announcements',
+        icon: Megaphone,
+        requiresAnnouncementManagement: true,
+    },
+    {
+        label: 'Documents',
+        href: '/documents',
+        icon: FileText,
+        requiresDocumentAccess: true,
+    },
+    {
         label: 'Finance',
         href: '/finance',
         icon: Wallet,
@@ -96,10 +111,19 @@ function getNavItems(user: ReturnType<typeof useAuth>['user']) {
         user?.isAdmin ||
         user?.isLeadership
     )
+    const canManageAnnouncements = !!(user?.isDeveloper || user?.isOfficer || user?.isAdmin || user?.isLeadership || user?.isSpecial)
+    const requiresDocumentAccess = !!(
+        user?.isDeveloper ||
+        user?.isOfficer ||
+        user?.isAdmin ||
+        user?.isLeadership
+    )
 
     return NAV_ITEMS
         .filter((item) => !item.requiresFinanceAccess || canViewFinance)
         .filter((item) => !item.requiresCertificateAccess || canAccessCertificates)
+        .filter((item) => !item.requiresAnnouncementManagement || canManageAnnouncements)
+        .filter((item) => !item.requiresDocumentAccess || requiresDocumentAccess)
         .map((item) => {
         if (item.label !== 'General' || !item.items) return item
         return {
@@ -222,6 +246,7 @@ function PortalLayout({ children }: { children: React.ReactNode }) {
                     <div className="protected-layout-content">
                         {children}
                     </div>
+                    {user ? <PushNotificationPrompt /> : null}
                 </div>
             </UnassignedGate>
         </AlumniGate>

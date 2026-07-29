@@ -1,0 +1,274 @@
+/* badge variants: shared badge.css
+   btn / checkbox-group: shared modal.css / buttons.css */
+
+.announcement-post {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 0.625rem;
+    padding: 1rem 1.125rem;
+    background: var(--bg-card);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.announcement-post-content {
+    display: flow-root;
+    min-width: 0;
+}
+
+.announcement-post-corner-badges {
+    float: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+    margin: 0 0 0.5rem 0.75rem;
+    max-width: min(9.5rem, 45%);
+    pointer-events: none;
+}
+
+.announcement-post-corner-badges a {
+    pointer-events: auto;
+    text-decoration: none;
+}
+
+.announcement-post-corner-target {
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.announcement-post-corner-target > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.announcement-post-title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.5rem 0.625rem;
+}
+
+.announcement-post-title {
+    font-family: var(--font-heading);
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--gray-900);
+    line-height: 1.35;
+    margin: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+}
+
+.announcement-post-title--clamp {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    overflow: hidden;
+}
+
+.announcement-post-title-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+    flex-shrink: 0;
+}
+
+.announcement-post-body {
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+    color: var(--gray-700);
+    line-height: 1.55;
+    margin: 0.625rem 0 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.announcement-post-body--clamp {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    white-space: normal;
+}
+
+.announcement-post-expand-btn {
+    clear: both;
+    display: block;
+    margin: 0.375rem 0 0;
+    padding: 0;
+    border: none;
+    background: none;
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    cursor: pointer;
+    line-height: 1.3;
+}
+
+.announcement-post-expand-btn:hover {
+    color: var(--gray-900);
+    text-decoration: underline;
+}
+
+.announcement-post-expand-btn:focus-visible {
+    outline: 2px solid var(--gray-400);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+.announcement-post-bottom {
+    display: flex;
+    flex-direction: column;
+    margin-top: auto;
+    margin-right: -1.125rem;
+    margin-bottom: -1rem;
+    margin-left: -1.125rem;
+    overflow: hidden;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.announcement-post-meta {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 0.5rem 0.75rem;
+    align-items: center;
+    padding: 0.625rem 1.125rem;
+    border-top: 1px solid var(--gray-100);
+}
+
+.announcement-post-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+    min-width: 0;
+}
+
+.announcement-post-selected-days {
+    font-family: var(--font-body);
+    font-size: 0.8125rem;
+    color: var(--gray-600);
+    margin: 0;
+    min-width: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.announcement-post-signature {
+    align-self: flex-end;
+    margin: 0.125rem 0 0;
+    font-family: var(--font-body);
+    font-size: 0.8125rem;
+    font-style: italic;
+    color: var(--gray-500);
+    line-height: 1.35;
+    text-align: right;
+}
+
+.announcement-post-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border-top: 1px solid var(--gray-100);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    overflow: hidden;
+}
+
+.announcement-post-actions {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    min-height: 40px;
+    overflow: hidden;
+}
+
+.announcement-post-actions > .announcement-post-action:first-child {
+    border-bottom-left-radius: var(--radius-lg);
+}
+
+.announcement-post-actions > .announcement-post-action:last-child {
+    border-bottom-right-radius: var(--radius-lg);
+}
+
+.announcement-post-action {
+    flex: 1 1 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0.5rem 0.375rem;
+    border: 1px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    font-family: var(--font-body);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--gray-600);
+    cursor: pointer;
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.announcement-post-action:hover:not(:disabled) {
+    background: var(--gray-50);
+}
+
+.announcements-feed-card .announcement-post-action:hover:not(:disabled),
+.announcements-feed-card .announcement-post-action--selected {
+    background: var(--purple-50);
+    border-color: var(--purple-400);
+    color: var(--purple-700);
+    box-shadow: 0 0 0 2px var(--purple-400);
+}
+
+.announcement-post-action:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.announcement-post-action:focus-visible {
+    outline: 2px solid var(--gray-400);
+    outline-offset: -2px;
+    z-index: 1;
+}
+
+.announcement-post-action--edit {
+    color: #2563eb;
+}
+
+.announcement-post-action--pin {
+    color: var(--purple-700);
+}
+
+.announcement-post-action--responses {
+    color: var(--purple-700);
+}
+
+.announcement-post-action--deactivate {
+    color: var(--error-text);
+}
+
+.announcement-post-action--reactivate {
+    color: #2563eb;
+}
+
+.announcement-post-footer > .error-message {
+    margin: 0;
+    padding: 0.5rem 1.125rem 0.75rem;
+}

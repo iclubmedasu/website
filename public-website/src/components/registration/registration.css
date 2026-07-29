@@ -132,10 +132,26 @@
 
 .event-ticket-card {
     padding: 1.5rem;
-    border: 1px solid var(--purple-300);
+    border: 1px solid var(--ticket-accent-400, var(--purple-300));
     border-radius: var(--radius-xl);
     background: var(--bg-card);
     box-shadow: var(--shadow-sm);
+}
+
+.event-ticket-card-banner {
+    display: block;
+    width: 100%;
+    max-height: 10rem;
+    object-fit: cover;
+    border-radius: var(--radius-md);
+}
+
+.event-ticket-card-banner--header {
+    margin-bottom: 1rem;
+}
+
+.event-ticket-card-banner--footer {
+    margin-top: 1rem;
 }
 
 .event-ticket-card-header {
@@ -147,7 +163,7 @@
     font-weight: 600;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: var(--purple-700);
+    color: var(--ticket-accent-700, var(--purple-700));
 }
 
 .event-ticket-card-title {
@@ -155,7 +171,7 @@
     font-family: var(--font-heading);
     font-size: 1.5rem;
     font-weight: 700;
-    color: var(--purple-900);
+    color: var(--ticket-accent-900, var(--purple-900));
 }
 
 .event-ticket-card-body {
@@ -200,6 +216,13 @@
     font-size: 0.875rem;
     line-height: 1.6;
     color: var(--gray-600);
+}
+
+.event-ticket-card-footer-note {
+    margin: 0.75rem 0 0;
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: var(--ticket-accent-800, var(--purple-800, #662f91));
 }
 
 .event-ticket-display {
@@ -257,7 +280,7 @@
     margin: 0 0 0.35rem;
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--purple-900);
+    color: var(--ticket-accent-900, var(--purple-900));
 }
 
 .event-ticket-session-row__meta {
@@ -271,7 +294,7 @@
     margin-top: 0.25rem;
     padding: 0.5rem 0.875rem;
     border-radius: var(--radius-md);
-    background: var(--purple-800, #561789);
+    background: var(--ticket-accent-800, var(--purple-800, #561789));
     color: #ffffff;
     font-size: 0.8125rem;
     font-weight: 700;
@@ -279,7 +302,7 @@
 }
 
 .event-ticket-session-join-btn:hover {
-    background: var(--purple-900, #3f1166);
+    background: var(--ticket-accent-900, var(--purple-900, #3f1166));
     color: #ffffff;
 }
 

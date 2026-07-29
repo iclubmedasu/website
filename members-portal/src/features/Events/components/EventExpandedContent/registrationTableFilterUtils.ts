@@ -160,11 +160,11 @@ export function buildFilterableColumns(
     const columns: FilterableColumn[] = [
         { id: 'fullName', label: 'Name', kind: 'text' },
         { id: 'email', label: 'Email', kind: 'text' },
-        { id: 'phoneNumber', label: 'Phone', kind: 'text' },
     ];
 
     if (tableKind === 'registrations') {
         columns.push(
+            { id: 'phoneNumber', label: 'Phone', kind: 'text' },
             { id: 'confirmationCode', label: 'Code', kind: 'text' },
             { id: 'createdAt', label: 'Registered', kind: 'date' },
         );

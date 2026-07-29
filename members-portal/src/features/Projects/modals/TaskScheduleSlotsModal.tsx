@@ -1,10 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { X, Loader, Trash2 } from 'lucide-react';
 import { fromDateTimeLocalValue, formatDateTime } from '@iclub/shared/utils';
 import { scheduleSlotsAPI } from '../../../services/api';
 import ScheduleTimetable from '../components/ScheduleTimetable/ScheduleTimetable';
+import {
+    availabilityOptionSuffix,
+    availabilitySortRank,
+    chipTone,
+    summarizeAvailability,
+    toAssignmentDayString,
+} from '@/features/Announcements/announcementAvailability';
+import MemberAvailabilityHint from '@/components/MemberAvailabilityHint/MemberAvailabilityHint';
+import { useTargetAvailability } from '@/hooks/useTargetAvailability';
 import type { Id, MemberSummary, ScheduleSlot, TaskSummary } from '../../../types/backend-contracts';
 
 interface ScheduleSlotView extends ScheduleSlot {
@@ -32,6 +41,7 @@ interface TaskScheduleSlotFormState {
 
 interface TaskScheduleSlotsModalProps {
     task: TaskWithProject | null;
+    projectId?: Id | null;
     allMembers?: MemberSummary[];
     currentMemberId?: Id | null;
     onClose: () => void;
@@ -45,7 +55,13 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 
-export default function TaskScheduleSlotsModal({ task, allMembers = [], currentMemberId = null, onClose }: TaskScheduleSlotsModalProps) {
+export default function TaskScheduleSlotsModal({
+    task,
+    projectId: projectIdProp = null,
+    allMembers = [],
+    currentMemberId = null,
+    onClose,
+}: TaskScheduleSlotsModalProps) {
     const [slots, setSlots] = useState<ScheduleSlotView[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -64,7 +80,47 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], currentM
     const availableMembers = canManageOwnSlotsOnly
         ? allMembers.filter((member) => Number(member.id) === Number(currentMemberId))
         : allMembers;
-    const defaultMemberId = availableMembers[0]?.id ? String(availableMembers[0].id) : '';
+
+    const projectId = projectIdProp ?? task?.projectId ?? task?.project?.id ?? null;
+    const { byMemberId, announcement } = useTargetAvailability(
+        projectId != null ? { projectId } : null,
+    );
+    const slotStart = toAssignmentDayString(form.startDateTime || null);
+    const slotEnd = toAssignmentDayString(form.endDateTime || form.startDateTime || null);
+    const slotDateRange = { start: slotStart, end: slotEnd };
+
+    const sortedMembers = useMemo(() => {
+        return [...availableMembers].sort((a, b) => {
+            const toneA = chipTone(summarizeAvailability(byMemberId.get(Number(a.id)), slotDateRange));
+            const toneB = chipTone(summarizeAvailability(byMemberId.get(Number(b.id)), slotDateRange));
+            const rankDiff = availabilitySortRank(toneA) - availabilitySortRank(toneB);
+            if (rankDiff !== 0) return rankDiff;
+            return a.fullName.localeCompare(b.fullName);
+        });
+    }, [availableMembers, byMemberId, slotStart, slotEnd]);
+
+    const defaultMemberId = sortedMembers[0]?.id ? String(sortedMembers[0].id) : '';
+
+    const memberOptionLabel = (member: MemberSummary) => {
+        const summary = summarizeAvailability(byMemberId.get(Number(member.id)), slotDateRange);
+        return `${member.fullName}${availabilityOptionSuffix(summary)}`;
+    };
+
+    const selectedMemberHint = () => {
+        if (!form.memberId) return null;
+        const summary = summarizeAvailability(byMemberId.get(Number(form.memberId)), slotDateRange);
+        if (!summary) return null;
+        return (
+            <MemberAvailabilityHint
+                status={summary.status}
+                periodsLabel={summary.periodsLabel}
+                conflict={summary.conflict}
+                conflictNote={summary.conflictNote}
+                announcementTitle={announcement?.title}
+                compact
+            />
+        );
+    };
 
     const isOwnSlot = (slot: ScheduleSlotView) => Number(slot.memberId ?? slot.member?.id) === Number(currentMemberId);
 
@@ -266,12 +322,13 @@ export default function TaskScheduleSlotsModal({ task, allMembers = [], currentM
                                             disabled={canManageOwnSlotsOnly}
                                         >
                                             <option value="">Select a member</option>
-                                            {availableMembers.map((member) => (
+                                            {sortedMembers.map((member) => (
                                                 <option key={member.id} value={member.id}>
-                                                    {member.fullName}
+                                                    {memberOptionLabel(member)}
                                                 </option>
                                             ))}
                                         </select>
+                                        {selectedMemberHint()}
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label" htmlFor="task-slot-title">

@@ -141,7 +141,7 @@ But if you notice the SAME design appearing in 2+ places, it MUST be extracted t
 - **Colors:** Always use CSS variables from `:root` (Section 1)
 - **Border radius:** Always use `--radius-sm`, `--radius-md`, `--radius-lg`, `--radius-xl`, or `99px` for pills
 - **Shadows:** Always use `--shadow-sm`, `--shadow-md`, `--shadow-lg`, `--shadow-xl`
-- **Fonts:** Always use `--font-heading` or `--font-body`
+- **Fonts:** Always use `--font-heading`, `--font-body`, or `--font-mono` (monospace/code/path contexts only)
 - **Units:** Always use `rem` (exception: `1px` borders, `50%` circles)
 
 #### Rule 6: Comment the Source
@@ -168,7 +168,7 @@ This prevents future developers (or AI agents) from re-adding the styles.
 6. [Color System](#6-color-system)
 7. [Animations & Transitions](#7-animations--transitions) — includes [§7.8 Toolbar Icon Buttons](#78-toolbar-icon-buttons--no-layout-shift-on-hover-recurring)
 8. [Responsive Breakpoints](#8-responsive-breakpoints)
-9. [Naming Conventions](#9-naming-conventions)
+9. [Naming Conventions](#9-naming-conventions) — includes [§9.3 Reusable Patterns](#93-reusable-patterns)
 10. [File Organization & Architecture](#10-file-organization--architecture)
 11. [Quick Reference: Implementing a New Feature](#11-quick-reference-implementing-a-new-feature)
 12. [Data Tables](#12-data-tables)
@@ -177,7 +177,22 @@ This prevents future developers (or AI agents) from re-adding the styles.
 
 ## 1. Design Tokens (CSS Variables)
 
-All design tokens live in `:root` inside `app.css`. **Never hard-code a value that already has a token.**
+All design tokens live in `:root` inside each app's globals file (`public-website/src/app/globals.css` and `members-portal/src/app/globals.css`; historically referenced as `app.css`). **Never hard-code a value that already has a token.**
+
+This document covers **both** `public-website` and `members-portal`. Canonical token tables below match `public-website` (the original source). Where `members-portal` has diverged, use the values in that app's `:root` and prefer the delta table rather than forcing a cross-app rewrite:
+
+| Token | `public-website` (canonical below) | `members-portal` (current) |
+|---|---|---|
+| `--radius-lg` | `8px` | `20px` |
+| `--shadow-*` tint | `rgba(86,11,137,…)` | `rgba(86,23,137,…)` |
+| `--shadow-xl` spread | `0 8px 25px -5px …` | `0 20px 25px -5px …` |
+| `--shadow-focus` | `rgba(110,71,163,0.1)` | `rgba(122,71,163,0.1)` |
+| `--success-border` | `#10c55e` | `#22c55e` |
+| `--gray-200` | not present | `#e5e5e5` (alias of `--gray-80`) |
+| `--purple-100` | not present | `#f3e8ff` |
+| `--font-mono` | not present | monospace stack for code/path text |
+
+Reconciling `--radius-lg` and shadow tints across apps is out of scope until deliberately planned; both sets are valid per-app today.
 
 ### 1.1 Brand Colors — Purple Scale
 
@@ -188,6 +203,10 @@ All design tokens live in `:root` inside `app.css`. **Never hard-code a value th
 | `--purple-700` | `#7a47a3` | Links, focus rings, accent text |
 | `--purple-600` | `#9063b3` | Lighter accent, gradient mid-points |
 | `--purple-500` | `#af8fc8` | Soft accent, scrollbar hover |
+| `--purple-400` | `#c4b0d8` | Hover borders, soft accent borders |
+| `--purple-300` | `#d6c8e5` | Lighter hover borders / dividers |
+| `--purple-100` | `#f3e8ff` | Subtle lavender hover fills *(members-portal only — see delta note)* |
+| `--purple-50` | `#f5f3ff` | Subtle chip fills, zebra row tints, soft request/access chips |
 
 ### 1.2 Gradients
 
@@ -205,6 +224,7 @@ All design tokens live in `:root` inside `app.css`. **Never hard-code a value th
 | `--gray-50` | `#fafafa` | Table header bg, subtle bg modifiers |
 | `--gray-100` | `#f5f5f5` | Hover bg, disabled input bg, scrollbar track |
 | `--gray-80` | `#e5e5e5` | Borders, dividers, table row separators |
+| `--gray-200` | `#e5e5e5` | Alias of `--gray-80` *(members-portal only — see delta note)*. Prefer `--gray-80` / `--border-default` in new code |
 | `--gray-300` | `#d4d4d4` | Input borders (default), scrollbar thumb, toggle off |
 | `--gray-400` | `#a3a3a3` | Placeholder text, muted labels, section headers |
 | `--gray-500` | `#737373` | Secondary body text, hints |
@@ -227,6 +247,8 @@ All design tokens live in `:root` inside `app.css`. **Never hard-code a value th
 | `--error-bg` | `#fef2f2` | Error/warning box backgrounds |
 | `--error-text` | `#991b1b` | Error text, danger actions |
 | `--error-border` | `#fecaca` | Error border |
+
+> **App delta:** Semantic and shadow literals above match `public-website`. `members-portal` differs for `--success-border`, shadow purple tint, `--shadow-xl` spread, and `--shadow-focus` — see the §1 delta table. Do not silently unify them.
 
 **Additional tokens (already added to `:root` in `app.css`):**
 
@@ -274,7 +296,7 @@ All design tokens live in `:root` inside `app.css`. **Never hard-code a value th
 |---|---|---|
 | `--radius-sm` | `12px` | Action buttons, small elements, task items |
 | `--radius-md` | `16px` | Inputs, modal close buttons, badges, nav items |
-| `--radius-lg` | `8px` | Cards, modals, dropdown menus, avatars |
+| `--radius-lg` | `8px` | Cards, modals, dropdown menus, avatars *(members-portal currently renders `--radius-lg` as `20px` — see delta note; both values are valid per-app until reconciled)* |
 | `--radius-xl` | `24px` | Login card, large card containers, manage panels |
 
 **Pill / badge radius:** `99px` (full round — use literal `99px` or add `--radius-pill: 99px`)
@@ -285,6 +307,7 @@ All design tokens live in `:root` inside `app.css`. **Never hard-code a value th
 |---|---|---|
 | `--font-heading` | `'Poppins', -apple-system, BlinkMacSystemFont, sans-serif` | Headings, labels, buttons, nav, badges |
 | `--font-body` | `'Arial', Georgia, serif` | Body text, descriptions, hints, error messages |
+| `--font-mono` | `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace` | Monospace/code/path text (certificate codes, explorer path bars) — *members-portal* |
 
 ---
 
@@ -317,7 +340,8 @@ All design tokens live in `:root` inside `app.css`. **Never hard-code a value th
 | Section sub-label (uppercase) | `0.85rem–0.9rem` | `600–700` | `--gray-400` or `--purple-700` | `.form-section-title`, `.expanded-section-title` |
 | Body (default) | `0.95rem–1rem` | `400` | `--gray-600`–`--gray-800` | `.page p` |
 | Small label (uppercase) | `0.75rem` | `600` | `--gray-600` | `.exp-label`, `.info-label` |
-| Hint / helper | `0.75rem` | `400` | `--gray-500` | `.form-hint`, `.field-error` |
+| Hint / helper (after field) | `0.75rem` | `400` | `--gray-500` | `.form-hint`, `.field-error` |
+| Caption above controls | `0.85rem` | `400` | `--gray-600` | `.form-hint-text` |
 | Badge text | `0.7rem` | `600` | contextual | `.badge` |
 
 ### 2.3 Uppercase Labels Convention
@@ -373,17 +397,17 @@ color: var(--gray-600);
 | Nav items | `--radius-md` (16px) |
 | Table status badges | `--radius-md` (16px) |
 | Data table shells | `--radius-md` (16px) |
-| Cards | `--radius-lg` (8px) |
-| Modals | `--radius-lg` (8px) |
-| Dropdown menus | `--radius-lg` (8px) |
-| Avatars (grid) | `--radius-lg` (8px) |
+| Cards | `--radius-lg` (`8px` in public-website; `20px` in members-portal — see §1 delta) |
+| Modals | `--radius-lg` (same per-app note as Cards) |
+| Dropdown menus | `--radius-lg` (same per-app note as Cards) |
+| Avatars (grid) | `--radius-lg` (same per-app note as Cards) |
 | Login card | `--radius-xl` (24px) |
 | Manage-roles container | `--radius-xl` (24px) |
 | Badges / pills | `99px` (fully round) |
 | Circular avatars | `50%` |
 | Toggle slider | `34px` (capsule) |
 
-**Note:** If you encounter bare `px` values for border-radius (e.g., `6px`), replace with `--radius-sm` or the appropriate token.
+**Note:** If you encounter bare `px` values for border-radius (e.g., `6px`), replace with `--radius-sm` or the appropriate token. `members-portal` currently defines `--radius-lg` as `20px` while `public-website` uses `8px`; both are valid per-app until reconciled (see §1 delta note).
 
 ---
 
@@ -494,6 +518,29 @@ pointer-events: auto;
 
 - **Backdrop:** `fadeIn 0.2s ease-out`
 - **Container:** `slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)`
+
+### 7.5.1 Modal — Lock Page Scroll (required)
+
+While any `.modal-backdrop` is mounted, the page behind the modal **must not scroll**.
+
+App page scroll lives on `.main-content` (see `globals.css`), not on `document.body`. The shared rule in `modal.css` is:
+
+```css
+.modal-backdrop {
+    overscroll-behavior: none;
+}
+
+html:has(.modal-backdrop) .main-content {
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
+html:has(.modal-backdrop) body {
+    overflow: hidden;
+}
+```
+
+**Do not** re-implement per-modal `document.body.style.overflow = 'hidden'` for standard `.modal-backdrop` modals — rely on this shared CSS. Per-modal JS scroll locks remain only for non-standard overlays that do not use `.modal-backdrop`.
 
 ### 7.6 Dropdown Entrance
 
@@ -622,6 +669,48 @@ Transient success banners and soft validation hints (e.g. “Select a template f
 - Use arbitrary `px` for `border-radius` — use tokens
 - Prefix with `js-` — we use React refs, not DOM selectors
 - Create deeply nested selectors (max 3 levels)
+
+### 9.3 Reusable Patterns
+
+Patterns introduced by recent features. Prefer reusing these shapes; if a **third** consumer appears, extract into a centralized component CSS file per Rule 3.
+
+**Explorer path / address bar** — muted strip indicating current location (first child inside a card). First introduced by `.documents-breadcrumb`.
+
+```css
+.example-path-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--gray-100);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--gray-600);
+    font-size: 0.85rem;
+}
+```
+
+**Notification-style list row** — left accent bar + asymmetric radius + even-row zebra tint. Shared conceptually by `dashboardWidgets.css` `.dashboard-notification-row` and `DocumentsPage.css` `.documents-request-row`. Do not copy a third time — extract when needed.
+
+```css
+.example-notification-row {
+    border-left: 4px solid var(--purple-700);
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+    /* …padding, gap, etc. */
+}
+.example-notification-row:nth-child(even) {
+    background-color: var(--purple-50);
+}
+```
+
+**Equal-width paired action buttons** — side-by-side 2-button groups (e.g. Approve/Deny):
+
+```css
+.parent > .btn {
+    flex: 1 1 0;
+    min-width: 0;
+}
+```
 
 ---
 
@@ -762,9 +851,17 @@ src/
    - `.modal-header` + `.modal-body` + `.modal-footer` for layout
    - `.form-group` + `.form-label` + `.form-input` for forms
    - `.btn-primary` / `.btn-secondary` / `.btn-danger` for buttons
-4. **Boolean on/off fields** MUST use `Toggle` from `@/components/toggle/Toggle` (`role="switch"`), never raw `<input type="checkbox">`. Use `FormToggleRow` from `@/components/toggle/FormToggleRow` for label + switch layout (`.form-toggle-row`). Import `@/components/toggle/toggle.css`.
-5. If the modal needs a unique width: `.my-modal .modal-container { max-width: 500px; }`
-6. Do NOT redefine any base modal classes — import from `modal.css` (already in `app.css`)
+4. **Header content:** title (`.modal-title`) + optional subtitle (`.modal-subtitle`) + close button only. **Do not** add decorative header icons / logos (`.modal-icon-*`, Lucide icons in the header). Legacy lifecycle confirm modals elsewhere may still use `.modal-icon-*`; do not introduce that pattern on new form, list, detail, or history modals.
+5. **Boolean on/off fields** MUST use `Toggle` from `@/components/toggle/Toggle` (`role="switch"`), never raw `<input type="checkbox">`. Use `FormToggleRow` from `@/components/toggle/FormToggleRow` for label + switch layout (`.form-toggle-row`). Import `@/components/toggle/toggle.css`.
+6. **Multi-section modal bodies** MUST wrap each logical block in `.form-section`:
+   - Optional `.form-section-title`, then optional `.form-hint-text` caption, then fields/controls
+   - Dividers come from `.form-section` `border-bottom` — do not invent per-modal divider classes
+   - Captions/hints that sit **above** controls use `.form-hint-text` (space below). After-field helpers use `.form-hint`
+   - The last `.form-section` has no bottom border (`:last-of-type`)
+   - Single-purpose modals (one field / one confirm message) do not need multiple sections
+7. If the modal needs a unique width: `.my-modal .modal-container { max-width: 500px; }`
+8. Do NOT redefine any base modal classes — import from `modal.css` (already in `app.css`)
+9. Page scroll behind the modal is locked automatically via `html:has(.modal-backdrop)` rules in `modal.css` (see §7.5.1)
 
 ### 11.4 When Adding a New UI Component
 
@@ -836,6 +933,8 @@ The following centralizations have been completed and should never be undone:
 | Hard-coded colors | All files | Replaced hex/rgb with CSS variable tokens |
 | px → rem conversion | All files | Converted px units to rem |
 | Responsive breakpoints | All pages | Added standard breakpoint rules |
+| `--purple-100` token | `members-portal` `globals.css` | Added `#f3e8ff` so locked-tile / purple hover fills resolve (was referenced but undefined) |
+| `--font-mono` token | `members-portal` `globals.css` | Monospace stack for certificate codes and explorer path text; replaces raw `ui-monospace…` stacks |
 
 ### 11.8 Non-Standard Token Mapping
 

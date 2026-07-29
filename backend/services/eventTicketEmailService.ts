@@ -1,16 +1,25 @@
 import fs from 'fs';
 import path from 'path';
 import QRCode from 'qrcode';
-import { CLUB_TIMEZONE, formatEventDateRangeInTimezone, formatSessionRangeInTimezone } from '@iclub/shared/utils';
+import {
+    CLUB_TIMEZONE,
+    deriveTicketPalette,
+    formatEventDateRangeInTimezone,
+    formatSessionRangeInTimezone,
+    type TicketPalette,
+} from '@iclub/shared/utils';
 import { prisma } from '../db';
 import { generateTokensForRegistration, getSessionTokensForRegistration } from './sessionTokenService';
 import { sendEmail, type EmailAttachment } from './emailService';
 import { splitSessionsForTicket } from '../lib/eventSessionCapacity';
+import * as githubStorage from './githubStorageService';
 
 export const TICKET_QR_CONTENT_ID = 'ticket-qr-code';
 export const ICLUB_AVATAR_CID = 'iclub-avatar';
 export const ICLUB_LOGO_CID = 'iclub-logo';
 export const IHUB_LOGO_CID = 'ihub-logo';
+export const TICKET_HEADER_IMAGE_CID = 'ticket-header-image';
+export const TICKET_FOOTER_IMAGE_CID = 'ticket-footer-image';
 
 const EMAIL_ASSETS_DIR = (() => {
     const candidates = [
@@ -20,14 +29,6 @@ const EMAIL_ASSETS_DIR = (() => {
     const existing = candidates.find((dir) => fs.existsSync(dir));
     return existing ?? candidates[0];
 })();
-
-const PURPLE = {
-    900: '#561789',
-    800: '#662f91',
-    700: '#7a47a3',
-    600: '#9063b3',
-    400: '#af8fc8',
-} as const;
 
 export type EventRegistrationEmailVariant = 'ticket' | 'reminder';
 
@@ -66,6 +67,30 @@ function loadEmailAsset(filename: string, contentId: string): EmailAttachment {
         filename,
         contentType: 'image/png',
     };
+}
+
+async function loadGithubImageAttachment(input: {
+    githubPath: string;
+    contentId: string;
+    filename: string;
+    mimeType: string | null | undefined;
+}): Promise<EmailAttachment | null> {
+    try {
+        const response = await githubStorage.downloadFile(input.githubPath);
+        const buffer = Buffer.from(await response.arrayBuffer());
+        return {
+            contentId: input.contentId,
+            content: buffer.toString('base64'),
+            filename: input.filename,
+            contentType: input.mimeType || 'image/png',
+        };
+    } catch (error) {
+        console.error(
+            `Failed to load ticket design image for email (${input.contentId}):`,
+            error instanceof Error ? error.message : error,
+        );
+        return null;
+    }
 }
 
 function buildTicketEmailAttachments(confirmationCode: string): Promise<EmailAttachment[]> {
@@ -110,6 +135,7 @@ function buildSessionEmailRows(
     sessions: EmailSessionRow[],
     sessionTokens: Map<number, string>,
     eventTimezone: string,
+    palette: TicketPalette,
     options?: { includeJoinLinks?: boolean },
 ): string {
     const includeJoinLinks = options?.includeJoinLinks !== false;
@@ -146,7 +172,7 @@ function buildSessionEmailRows(
             return `<tr>
   <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;">
     <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#0f172a;">${header}</p>
-    <a href="${escapedJoinUrl}" style="display:inline-block;padding:10px 16px;background:${PURPLE[800]};color:#ffffff;text-decoration:none;border-radius:8px;font-size:12px;font-weight:700;">Join Online Session &rarr;</a>
+    <a href="${escapedJoinUrl}" style="display:inline-block;padding:10px 16px;background:${palette[800]};color:#ffffff;text-decoration:none;border-radius:8px;font-size:12px;font-weight:700;">Join Online Session &rarr;</a>
     <p class="session-join-url-print" style="margin:4px 0 0;font-size:10px;color:#64748b;word-break:break-all;">${escapedJoinUrl}</p>
   </td>
 </tr>`;
@@ -190,14 +216,15 @@ function buildSessionsEmailSection(
     dontMissOut: EmailSessionRow[],
     sessionTokens: Map<number, string>,
     eventTimezone: string,
+    palette: TicketPalette,
 ): string {
     const waitingHtml = buildSessionGroupHtml(
         'We will be waiting for you!',
-        buildSessionEmailRows(eventSlug, waitingForYou, sessionTokens, eventTimezone, { includeJoinLinks: true }),
+        buildSessionEmailRows(eventSlug, waitingForYou, sessionTokens, eventTimezone, palette, { includeJoinLinks: true }),
     );
     const missHtml = buildSessionGroupHtml(
         "Don't miss out on:",
-        buildSessionEmailRows(eventSlug, dontMissOut, sessionTokens, eventTimezone, { includeJoinLinks: false }),
+        buildSessionEmailRows(eventSlug, dontMissOut, sessionTokens, eventTimezone, palette, { includeJoinLinks: false }),
     );
     return `${waitingHtml}${missHtml}`;
 }
@@ -226,7 +253,14 @@ function buildRegistrationEmailHtml(input: {
     confirmationUrl: string;
     variant: EventRegistrationEmailVariant;
     sessionsSectionHtml?: string;
+    palette: TicketPalette;
+    headerTitle?: string | null;
+    headerSubtitle?: string | null;
+    footerNote?: string | null;
+    includeHeaderImage?: boolean;
+    includeFooterImage?: boolean;
 }): string {
+    const palette = input.palette;
     const eventTitle = escapeHtml(input.eventTitle);
     const eventDateLabel = escapeHtml(input.eventDateLabel);
     const venue = escapeHtml(input.venue);
@@ -236,19 +270,40 @@ function buildRegistrationEmailHtml(input: {
     const confirmationUrl = escapeHtml(input.confirmationUrl);
     const isReminder = input.variant === 'reminder';
 
-    const pageTitle = isReminder ? `Reminder: ${eventTitle}` : `Your ticket for ${eventTitle}`;
-    const eyebrow = isReminder ? 'iClub Med-asu · Event Reminder' : 'iClub Med-asu · Event Ticket';
+    const displayTitle = escapeHtml(
+        (input.headerTitle?.trim() || input.eventTitle),
+    );
+    const defaultEyebrow = isReminder ? 'iClub Med-asu · Event Reminder' : 'iClub Med-asu · Event Ticket';
+    const eyebrow = escapeHtml(input.headerSubtitle?.trim() || defaultEyebrow);
     const subtitle = isReminder ? 'Reminder for your upcoming event' : 'Issued for personal use only';
+    const pageTitle = isReminder ? `Reminder: ${eventTitle}` : `Your ticket for ${eventTitle}`;
     const instruction = isReminder
         ? 'We look forward to seeing you. Present this code or QR code at check-in.'
         : 'Present this code or QR code at the event entrance.';
     const autoNote = isReminder
         ? 'This reminder was issued automatically — please do not reply to this email.'
         : 'This ticket was issued automatically — please do not reply to this email.';
+    const footerNote = input.footerNote?.trim()
+        ? `<p style="margin:8px 0 0;font-size:10px;color:#7a8fa6;text-align:center;">${escapeHtml(input.footerNote.trim())}</p>`
+        : '';
     const introBlock = isReminder
-        ? `<p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#64748b;text-align:center;">This is a reminder that you are registered for <strong style="color:${PURPLE[900]};">${eventTitle}</strong>. Your confirmation details are below.</p>`
+        ? `<p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#64748b;text-align:center;">This is a reminder that you are registered for <strong style="color:${palette[900]};">${eventTitle}</strong>. Your confirmation details are below.</p>`
         : '';
     const sessionsSectionHtml = input.sessionsSectionHtml ?? '';
+    const headerImageRow = input.includeHeaderImage
+        ? `<tr>
+                  <td style="padding:0;line-height:0;font-size:0;">
+                    <img src="cid:${TICKET_HEADER_IMAGE_CID}" alt="" width="520" style="display:block;width:100%;max-width:520px;height:auto;" />
+                  </td>
+                </tr>`
+        : '';
+    const footerImageRow = input.includeFooterImage
+        ? `<tr>
+                  <td style="padding:0;line-height:0;font-size:0;">
+                    <img src="cid:${TICKET_FOOTER_IMAGE_CID}" alt="" width="520" style="display:block;width:100%;max-width:520px;height:auto;" />
+                  </td>
+                </tr>`
+        : '';
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -272,17 +327,18 @@ function buildRegistrationEmailHtml(input: {
           <tr>
             <td style="padding:24px 16px;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #dce4ef;">
+                ${headerImageRow}
                 <tr>
-                  <td style="height:4px;background:linear-gradient(90deg,${PURPLE[900]},${PURPLE[600]},${PURPLE[400]});font-size:0;line-height:0;">&nbsp;</td>
+                  <td style="height:4px;background:linear-gradient(90deg,${palette[900]},${palette[600]},${palette[400]});font-size:0;line-height:0;">&nbsp;</td>
                 </tr>
                 <tr>
-                  <td style="background:linear-gradient(135deg,${PURPLE[900]} 0%,${PURPLE[800]} 45%,${PURPLE[700]} 100%);padding:22px 24px;">
+                  <td style="background:linear-gradient(135deg,${palette[900]} 0%,${palette[800]} 45%,${palette[700]} 100%);padding:22px 24px;">
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                       <tr>
                         <td style="vertical-align:top;padding-right:12px;">
-                          <p style="margin:0 0 7px;font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:${PURPLE[400]};font-weight:700;">${eyebrow}</p>
-                          <p style="margin:0 0 5px;font-size:17px;font-weight:700;line-height:1.35;color:#ffffff !important;mso-color-alt:#ffffff;"><span style="color:#ffffff;display:block;">${eventTitle}</span></p>
-                          <p style="margin:0;font-size:11px;color:${PURPLE[400]};letter-spacing:0.05em;">${subtitle}</p>
+                          <p style="margin:0 0 7px;font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:${palette[400]};font-weight:700;">${eyebrow}</p>
+                          <p style="margin:0 0 5px;font-size:17px;font-weight:700;line-height:1.35;color:#ffffff !important;mso-color-alt:#ffffff;"><span style="color:#ffffff;display:block;">${displayTitle}</span></p>
+                          <p style="margin:0;font-size:11px;color:${palette[400]};letter-spacing:0.05em;">${subtitle}</p>
                         </td>
                         <td width="42" style="width:42px;vertical-align:top;text-align:right;">
                           <img src="cid:${ICLUB_AVATAR_CID}" alt="iClub" width="42" height="42" style="display:block;width:42px;height:42px;border-radius:50%;border:2px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.08);" />
@@ -308,16 +364,16 @@ function buildRegistrationEmailHtml(input: {
                       ${buildDetailRow('Date', eventDateLabel)}
                       ${buildDetailRow('Venue', venue)}
                       ${buildDetailRow('Name', attendeeName)}
-                      ${buildDetailRow('Tier', `<span style="background:#f3e8ff;color:${PURPLE[900]};font-size:11px;font-weight:700;padding:2px 10px;border-radius:999px;display:inline-block;">${tierName}</span>`, false)}
+                      ${buildDetailRow('Tier', `<span style="background:#f3e8ff;color:${palette[900]};font-size:11px;font-weight:700;padding:2px 10px;border-radius:999px;display:inline-block;">${tierName}</span>`, false)}
                     </table>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding:4px 24px 18px;">
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${PURPLE[900]};border-radius:10px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${palette[900]};border-radius:10px;">
                       <tr>
                         <td align="center" style="padding:18px 12px;">
-                          <p style="margin:0 0 8px;font-size:8px;letter-spacing:0.22em;text-transform:uppercase;color:${PURPLE[400]};font-weight:700;">Confirmation Code</p>
+                          <p style="margin:0 0 8px;font-size:8px;letter-spacing:0.22em;text-transform:uppercase;color:${palette[400]};font-weight:700;">Confirmation Code</p>
                           <p style="margin:0;font-size:30px;font-weight:700;letter-spacing:0.28em;font-family:'Courier New',Courier,monospace;color:#f0f9ff;">${confirmationCode}</p>
                         </td>
                       </tr>
@@ -342,10 +398,11 @@ function buildRegistrationEmailHtml(input: {
                 </tr>
                 <tr>
                   <td align="center" style="padding:0 24px 18px;">
-                    <a href="${confirmationUrl}" style="display:inline-block;padding:12px 20px;background:${PURPLE[800]};color:#ffffff;text-decoration:none;border-radius:10px;font-size:12px;font-weight:700;letter-spacing:0.04em;">View registration online</a>
+                    <a href="${confirmationUrl}" style="display:inline-block;padding:12px 20px;background:${palette[800]};color:#ffffff;text-decoration:none;border-radius:10px;font-size:12px;font-weight:700;letter-spacing:0.04em;">View registration online</a>
                   </td>
                 </tr>
                 ${sessionsSectionHtml}
+                ${footerImageRow}
                 <tr>
                   <td style="background:#f8fafc;border-top:1px solid #eef2f7;padding:16px 24px;">
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
@@ -373,6 +430,7 @@ function buildRegistrationEmailHtml(input: {
                 </tr>
               </table>
               <p style="margin:12px 0 0;font-size:10px;color:#7a8fa6;text-align:center;">${autoNote}</p>
+              ${footerNote}
             </td>
           </tr>
         </table>
@@ -405,6 +463,14 @@ async function sendRegistrationEmail(
                     eventDate: true,
                     eventEndDate: true,
                     timezone: true,
+                    ticketAccentColor: true,
+                    ticketHeaderTitle: true,
+                    ticketHeaderSubtitle: true,
+                    ticketFooterNote: true,
+                    ticketHeaderImageGithubPath: true,
+                    ticketHeaderImageMimeType: true,
+                    ticketFooterImageGithubPath: true,
+                    ticketFooterImageMimeType: true,
                 },
             },
             tier: {
@@ -451,6 +517,35 @@ async function sendRegistrationEmail(
     await generateTokensForRegistration(registrationId);
     const sessionTokens = await getSessionTokensForRegistration(registrationId);
     const attachments = await buildTicketEmailAttachments(registration.confirmationCode);
+    const palette = deriveTicketPalette(registration.event.ticketAccentColor);
+
+    let includeHeaderImage = false;
+    let includeFooterImage = false;
+    if (registration.event.ticketHeaderImageGithubPath) {
+        const headerAttachment = await loadGithubImageAttachment({
+            githubPath: registration.event.ticketHeaderImageGithubPath,
+            contentId: TICKET_HEADER_IMAGE_CID,
+            filename: 'ticket-header.png',
+            mimeType: registration.event.ticketHeaderImageMimeType,
+        });
+        if (headerAttachment) {
+            attachments.push(headerAttachment);
+            includeHeaderImage = true;
+        }
+    }
+    if (registration.event.ticketFooterImageGithubPath) {
+        const footerAttachment = await loadGithubImageAttachment({
+            githubPath: registration.event.ticketFooterImageGithubPath,
+            contentId: TICKET_FOOTER_IMAGE_CID,
+            filename: 'ticket-footer.png',
+            mimeType: registration.event.ticketFooterImageMimeType,
+        });
+        if (footerAttachment) {
+            attachments.push(footerAttachment);
+            includeFooterImage = true;
+        }
+    }
+
     const eventTimezone = registration.event.timezone?.trim() || CLUB_TIMEZONE;
     const html = buildRegistrationEmailHtml({
         eventTitle: registration.event.title,
@@ -467,7 +562,14 @@ async function sendRegistrationEmail(
             dontMissOut,
             sessionTokens,
             eventTimezone,
+            palette,
         ),
+        palette,
+        headerTitle: registration.event.ticketHeaderTitle,
+        headerSubtitle: registration.event.ticketHeaderSubtitle,
+        footerNote: registration.event.ticketFooterNote,
+        includeHeaderImage,
+        includeFooterImage,
     });
 
     await sendEmail({

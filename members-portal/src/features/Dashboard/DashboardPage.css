@@ -1,13 +1,18 @@
-/* Shared stack/grid/side-card layout: FinanceDashboardPage.css multi-selectors */
+/* Shared stack/side-card layout: FinanceDashboardPage.css multi-selectors */
 
-.dashboard-right-stack {
-    display: flex;
-    flex-direction: column;
+.dashboard-main-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1.5rem;
+    align-items: stretch;
 }
 
-@media (max-width: 640px) {
-    .dashboard-bottom-grid {
+.dashboard-main-grid > .card {
+    height: 100%;
+}
+
+@media (max-width: 900px) {
+    .dashboard-main-grid {
         grid-template-columns: 1fr;
     }
 }

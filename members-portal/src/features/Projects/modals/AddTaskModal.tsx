@@ -1,10 +1,19 @@
 'use client';
 
-import { useState, type ChangeEvent } from 'react';
-import { X } from 'lucide-react';
+import { useMemo, useState, type ChangeEvent, type ReactNode } from 'react';
+import { AlertTriangle, Check, X } from 'lucide-react';
 import { fromDateInputValue } from '@iclub/shared/utils';
 import { tasksAPI } from '../../../services/api';
 import { toTitleCase } from '../../../utils/titleCase';
+import {
+    availabilitySortRank,
+    chipTone,
+    summarizeAvailability,
+    type AvailabilityChipTone,
+} from '@/features/Announcements/announcementAvailability';
+import MemberAvailabilityChipBubble from '@/components/MemberAvailabilityHint/MemberAvailabilityChipBubble';
+import SearchableBadgePicker from '@/components/SearchableBadgePicker/SearchableBadgePicker';
+import { useTargetAvailability } from '@/hooks/useTargetAvailability';
 import type {
     CreateTaskPayload,
     Difficulty,
@@ -14,6 +23,13 @@ import type {
     TaskStatus,
     TaskSummary,
 } from '../../../types/backend-contracts';
+
+function availabilityToneIcon(tone: AvailabilityChipTone): ReactNode {
+    if (tone === 'available') return <Check className="team-badge-option-icon" aria-hidden />;
+    if (tone === 'unavailable') return <X className="team-badge-option-icon" aria-hidden />;
+    if (tone === 'partial') return <AlertTriangle className="team-badge-option-icon" aria-hidden />;
+    return null;
+}
 
 const DIFFICULTIES: readonly Difficulty[] = ['EASY', 'MEDIUM', 'HARD'];
 const STATUSES: readonly TaskStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'DELAYED', 'BLOCKED', 'ON_HOLD', 'CANCELLED'];
@@ -98,6 +114,52 @@ export default function AddTaskModal({
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const { byMemberId, announcement } = useTargetAvailability({ projectId });
+    const dateRange = {
+        start: form.startDate || null,
+        end: form.dueDate || form.startDate || null,
+    };
+
+    const sortedMembers = useMemo(() => {
+        return [...allMembers].sort((a, b) => {
+            const toneA = chipTone(summarizeAvailability(byMemberId.get(Number(a.id)), dateRange));
+            const toneB = chipTone(summarizeAvailability(byMemberId.get(Number(b.id)), dateRange));
+            const rankDiff = availabilitySortRank(toneA) - availabilitySortRank(toneB);
+            if (rankDiff !== 0) return rankDiff;
+            return a.fullName.localeCompare(b.fullName);
+        });
+    }, [allMembers, byMemberId, dateRange.start, dateRange.end]);
+
+    const renderMemberChip = (member: MemberSummary, selected: boolean, onToggle: () => void) => {
+        const summary = summarizeAvailability(byMemberId.get(Number(member.id)), dateRange);
+        const tone = chipTone(summary);
+        const toneClass = tone === 'neutral' ? '' : ` team-badge-option--avail-${tone}`;
+        const chip = (
+            <button
+                type="button"
+                className={`team-badge-option${selected ? ' team-badge-option--selected' : ''}${toneClass}`}
+                aria-label={member.fullName}
+                onClick={onToggle}
+            >
+                {availabilityToneIcon(tone)}
+                {member.fullName}
+            </button>
+        );
+        if (!summary) {
+            return <div className="member-assign-option">{chip}</div>;
+        }
+        return (
+            <MemberAvailabilityChipBubble
+                status={summary.status}
+                periodsLabel={summary.periodsLabel}
+                conflict={summary.conflict}
+                conflictNote={summary.conflictNote}
+                announcementTitle={announcement?.title}
+            >
+                {chip}
+            </MemberAvailabilityChipBubble>
+        );
+    };
 
     const setField =
         <K extends keyof Omit<TaskFormState, 'assigneeIds'>>(key: K) =>
@@ -302,42 +364,38 @@ export default function AddTaskModal({
                             ) : (
                                 <p className="form-hint">No leader selected.</p>
                             )}
-                            <div className="team-badge-picker">
-                                {allMembers.map((member) => {
-                                    const selected = form.leaderId === member.id;
-                                    return (
-                                        <button
-                                            key={member.id}
-                                            type="button"
-                                            className={`team-badge-option${selected ? ' team-badge-option--selected' : ''}`}
-                                            onClick={() => toggleLeader(member.id)}
-                                        >
-                                            {member.fullName}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            <SearchableBadgePicker
+                                items={sortedMembers}
+                                getKey={(member) => member.id}
+                                getLabel={(member) => member.fullName}
+                                searchPlaceholder="Search members…"
+                                renderItem={(member) =>
+                                    renderMemberChip(
+                                        member,
+                                        form.leaderId === member.id,
+                                        () => toggleLeader(member.id),
+                                    )
+                                }
+                            />
                         </div>
                     )}
 
                     {allMembers.length > 0 && (
                         <div className="form-section">
                             <h3 className="form-section-title">Assignees</h3>
-                            <div className="team-badge-picker">
-                                {allMembers.map((member) => {
-                                    const selected = form.assigneeIds.includes(member.id);
-                                    return (
-                                        <button
-                                            key={member.id}
-                                            type="button"
-                                            className={`team-badge-option${selected ? ' team-badge-option--selected' : ''}`}
-                                            onClick={() => toggleAssignee(member.id)}
-                                        >
-                                            {member.fullName}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            <SearchableBadgePicker
+                                items={sortedMembers}
+                                getKey={(member) => member.id}
+                                getLabel={(member) => member.fullName}
+                                searchPlaceholder="Search members…"
+                                renderItem={(member) =>
+                                    renderMemberChip(
+                                        member,
+                                        form.assigneeIds.includes(member.id),
+                                        () => toggleAssignee(member.id),
+                                    )
+                                }
+                            />
                         </div>
                     )}
                 </div>

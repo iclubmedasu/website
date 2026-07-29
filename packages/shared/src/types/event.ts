@@ -44,6 +44,22 @@ export interface EventTierRef {
     };
 }
 
+/** Flat ticket design overrides stored on Event (null = use default template). */
+export interface EventTicketDesignRef {
+    ticketAccentColor?: string | null;
+    ticketHeaderTitle?: string | null;
+    ticketHeaderSubtitle?: string | null;
+    ticketFooterNote?: string | null;
+    ticketHeaderImageGithubPath?: string | null;
+    ticketHeaderImageGithubSha?: string | null;
+    ticketHeaderImageFileSize?: number | null;
+    ticketHeaderImageMimeType?: string | null;
+    ticketFooterImageGithubPath?: string | null;
+    ticketFooterImageGithubSha?: string | null;
+    ticketFooterImageFileSize?: number | null;
+    ticketFooterImageMimeType?: string | null;
+}
+
 export interface EventCustomFieldRef {
     id: Id;
     eventId: Id;
@@ -155,7 +171,7 @@ export interface EventRegistrationRef {
     sessionSelections?: EventSessionSelectionRef[];
 }
 
-export interface EventSummary {
+export interface EventSummary extends EventTicketDesignRef {
     id: Id;
     slug: string;
     title: string;

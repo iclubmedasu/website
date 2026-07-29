@@ -131,6 +131,21 @@ function isAlumniAccess(input: unknown): input is { code: "ALUMNI_ACCESS"; error
     return !!input && typeof input === "object" && (input as { code?: string }).code === "ALUMNI_ACCESS";
 }
 
+function isNetworkFetchError(error: unknown): boolean {
+    return (
+        error instanceof TypeError &&
+        (error.message === "Failed to fetch" || error.message.includes("NetworkError") || error.message.includes("fetch"))
+    );
+}
+
+function logAuthNetworkOrError(label: string, error: unknown): void {
+    if (isNetworkFetchError(error)) {
+        console.error(`${label}: Backend unreachable at ${API_URL}`);
+        return;
+    }
+    console.error(`${label}:`, error);
+}
+
 interface AuthProviderProps {
     children: ReactNode;
 }
@@ -177,7 +192,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 setUser(null);
             }
         } catch (error) {
-            console.error("Auth check failed:", error);
+            logAuthNetworkOrError("Auth check failed", error);
             setUser(null);
             setIsAlumni(false);
         } finally {
@@ -201,7 +216,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 }
             }
         } catch (error) {
-            console.error("Refresh user failed:", error);
+            logAuthNetworkOrError("Refresh user failed", error);
         }
     };
 

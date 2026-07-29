@@ -9,6 +9,15 @@ import {
     formatTimeFromDate,
     isQuarterHourTime,
 } from '@/features/Events/components/eventTaskTimeUtils';
+import {
+    availabilityOptionSuffix,
+    availabilitySortRank,
+    chipTone,
+    summarizeAvailability,
+    toAssignmentDayString,
+} from '@/features/Announcements/announcementAvailability';
+import MemberAvailabilityHint from '@/components/MemberAvailabilityHint/MemberAvailabilityHint';
+import { useTargetAvailability } from '@/hooks/useTargetAvailability';
 import type {
     CreateEventTaskPayload,
     EventTaskAssignmentInput,
@@ -109,6 +118,40 @@ export default function AddEventTaskModal({ eventId, day, task, members, onClose
     const [error, setError] = useState('');
 
     const taskDay = initialState.day;
+    const { byMemberId, announcement } = useTargetAvailability({ eventId });
+    const taskDayKey = toAssignmentDayString(taskDay);
+    const dateRange = taskDayKey ? { start: taskDayKey, end: taskDayKey } : null;
+
+    const sortedMembers = useMemo(() => {
+        return [...members].sort((a, b) => {
+            const toneA = chipTone(summarizeAvailability(byMemberId.get(Number(a.id)), dateRange));
+            const toneB = chipTone(summarizeAvailability(byMemberId.get(Number(b.id)), dateRange));
+            const rankDiff = availabilitySortRank(toneA) - availabilitySortRank(toneB);
+            if (rankDiff !== 0) return rankDiff;
+            return a.fullName.localeCompare(b.fullName);
+        });
+    }, [members, byMemberId, taskDayKey]);
+
+    const memberOptionLabel = (member: MemberSummary) => {
+        const summary = summarizeAvailability(byMemberId.get(Number(member.id)), dateRange);
+        return `${member.fullName}${availabilityOptionSuffix(summary)}`;
+    };
+
+    const selectedHint = (memberId: string) => {
+        if (!memberId) return null;
+        const summary = summarizeAvailability(byMemberId.get(Number(memberId)), dateRange);
+        if (!summary) return null;
+        return (
+            <MemberAvailabilityHint
+                status={summary.status}
+                periodsLabel={summary.periodsLabel}
+                conflict={summary.conflict}
+                conflictNote={summary.conflictNote}
+                announcementTitle={announcement?.title}
+                compact
+            />
+        );
+    };
 
     const updateAssignee = (index: number, patch: Partial<AssigneeRow>) => {
         setAssignees((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
@@ -259,8 +302,8 @@ export default function AddEventTaskModal({ eventId, day, task, members, onClose
                                 onChange={(event) => setLeaderId(event.target.value)}
                             >
                                 <option value="">No leader</option>
-                                {members.map((member) => (
-                                    <option key={member.id} value={member.id}>{member.fullName}</option>
+                                {sortedMembers.map((member) => (
+                                    <option key={member.id} value={member.id}>{memberOptionLabel(member)}</option>
                                 ))}
                             </select>
                             <QuarterHourTimeSelect
@@ -276,42 +319,46 @@ export default function AddEventTaskModal({ eventId, day, task, members, onClose
                                 disabled={!leaderId}
                             />
                         </div>
+                        {selectedHint(leaderId)}
                     </div>
 
                     <div className="form-group">
                         <label className="form-label">Assignees</label>
                         <div className="custom-field-options-list">
                             {assignees.map((row, index) => (
-                                <div key={index} className="form-slot-row">
-                                    <select
-                                        className="form-input"
-                                        aria-label={`Assignee ${index + 1}`}
-                                        value={row.memberId}
-                                        onChange={(event) => updateAssignee(index, { memberId: event.target.value })}
-                                    >
-                                        <option value="">Select member</option>
-                                        {members.map((member) => (
-                                            <option key={member.id} value={member.id}>{member.fullName}</option>
-                                        ))}
-                                    </select>
-                                    <QuarterHourTimeSelect
-                                        aria-label={`Assignee ${index + 1} start time`}
-                                        value={row.startTime}
-                                        onChange={(startTime) => updateAssignee(index, { startTime })}
-                                    />
-                                    <QuarterHourTimeSelect
-                                        aria-label={`Assignee ${index + 1} end time`}
-                                        value={row.endTime}
-                                        onChange={(endTime) => updateAssignee(index, { endTime })}
-                                    />
-                                    <button
-                                        type="button"
-                                        className="custom-field-option-remove"
-                                        onClick={() => setAssignees((current) => (current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyAssignee()]))}
-                                        aria-label={`Remove assignee ${index + 1}`}
-                                    >
-                                        <Trash2 size={15} />
-                                    </button>
+                                <div key={index}>
+                                    <div className="form-slot-row">
+                                        <select
+                                            className="form-input"
+                                            aria-label={`Assignee ${index + 1}`}
+                                            value={row.memberId}
+                                            onChange={(event) => updateAssignee(index, { memberId: event.target.value })}
+                                        >
+                                            <option value="">Select member</option>
+                                            {sortedMembers.map((member) => (
+                                                <option key={member.id} value={member.id}>{memberOptionLabel(member)}</option>
+                                            ))}
+                                        </select>
+                                        <QuarterHourTimeSelect
+                                            aria-label={`Assignee ${index + 1} start time`}
+                                            value={row.startTime}
+                                            onChange={(startTime) => updateAssignee(index, { startTime })}
+                                        />
+                                        <QuarterHourTimeSelect
+                                            aria-label={`Assignee ${index + 1} end time`}
+                                            value={row.endTime}
+                                            onChange={(endTime) => updateAssignee(index, { endTime })}
+                                        />
+                                        <button
+                                            type="button"
+                                            className="custom-field-option-remove"
+                                            onClick={() => setAssignees((current) => (current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : [emptyAssignee()]))}
+                                            aria-label={`Remove assignee ${index + 1}`}
+                                        >
+                                            <Trash2 size={15} />
+                                        </button>
+                                    </div>
+                                    {selectedHint(row.memberId)}
                                 </div>
                             ))}
                         </div>

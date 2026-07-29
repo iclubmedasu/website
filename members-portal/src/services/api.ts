@@ -39,6 +39,7 @@ import type {
     EventTierRef,
     EventSessionRef,
     EventTaskRef,
+    EventTicketDesignRef,
     MemberSummary,
     NotificationMarkAllReadResponse,
     NotificationMarkReadResponse,
@@ -1255,6 +1256,34 @@ export const notificationsAPI = {
 };
 
 // ============================================
+// PUSH SUBSCRIPTIONS API
+// ============================================
+
+export const pushSubscriptionsAPI = {
+    subscribe: async (subscription: {
+        endpoint: string;
+        keys: { p256dh: string; auth: string };
+        userAgent?: string;
+    }) => {
+        const response = await apiFetch(`${API_BASE_URL}/push-subscriptions`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(subscription),
+        });
+        return handleResponse(response);
+    },
+
+    unsubscribe: async (endpoint: string) => {
+        const response = await apiFetch(`${API_BASE_URL}/push-subscriptions`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ endpoint }),
+        });
+        return handleResponse(response);
+    },
+};
+
+// ============================================
 // DASHBOARD API
 // ============================================
 
@@ -1324,6 +1353,133 @@ export const roleHistoryAPI: ApiNamespace = {
 
     getById: async (id) => {
         const response = await apiFetch(`${API_BASE_URL}/role-history/${id}`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+};
+
+// ============================================
+// ANNOUNCEMENTS API
+// ============================================
+
+export const announcementsAPI = {
+    getAll: async (options?: { includeInactive?: boolean }) => {
+        const params = new URLSearchParams();
+        if (options?.includeInactive) params.set('includeInactive', 'true');
+        const query = params.toString();
+        const response = await apiFetch(
+            `${API_BASE_URL}/announcements${query ? `?${query}` : ''}`,
+            {
+                headers: getAuthHeaders(),
+            },
+        );
+        return handleResponse(response);
+    },
+
+    getById: async (id: Id | string) => {
+        const response = await apiFetch(`${API_BASE_URL}/announcements/${id}`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    create: async (data: {
+        title: string;
+        body: string;
+        targetType: 'NONE' | 'EVENT' | 'PROJECT';
+        eventId?: number | null;
+        projectId?: number | null;
+        isPinned?: boolean;
+    }) => {
+        const response = await apiFetch(`${API_BASE_URL}/announcements`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+        return handleResponse(response);
+    },
+
+    update: async (
+        id: Id | string,
+        data: {
+            title?: string;
+            body?: string;
+            targetType?: 'NONE' | 'EVENT' | 'PROJECT';
+            eventId?: number | null;
+            projectId?: number | null;
+            isPinned?: boolean;
+            isActive?: boolean;
+        },
+    ) => {
+        const response = await apiFetch(`${API_BASE_URL}/announcements/${id}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+        return handleResponse(response);
+    },
+
+    deactivate: async (id: Id | string) => {
+        const response = await apiFetch(`${API_BASE_URL}/announcements/${id}/deactivate`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    reactivate: async (id: Id | string) => {
+        const response = await apiFetch(`${API_BASE_URL}/announcements/${id}/reactivate`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    setPinned: async (id: Id | string, isPinned: boolean) => {
+        const response = await apiFetch(`${API_BASE_URL}/announcements/${id}/pin`, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ isPinned }),
+        });
+        return handleResponse(response);
+    },
+
+    respond: async (
+        id: Id | string,
+        data: {
+            status: 'AVAILABLE' | 'UNAVAILABLE';
+            notes?: string | null;
+            periods?: Array<{ start: string; end: string }>;
+        },
+    ) => {
+        const response = await apiFetch(`${API_BASE_URL}/announcements/${id}/respond`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+        return handleResponse(response);
+    },
+
+    getMyResponse: async (id: Id | string) => {
+        const response = await apiFetch(`${API_BASE_URL}/announcements/${id}/my-response`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    getResponses: async (id: Id | string) => {
+        const response = await apiFetch(`${API_BASE_URL}/announcements/${id}/responses`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse(response);
+    },
+
+    getAvailability: async (target: { eventId: Id | string } | { projectId: Id | string }) => {
+        const params = new URLSearchParams();
+        if ('eventId' in target) params.set('eventId', String(target.eventId));
+        else params.set('projectId', String(target.projectId));
+        const response = await apiFetch(`${API_BASE_URL}/announcements/availability?${params}`, {
             headers: getAuthHeaders(),
         });
         return handleResponse(response);
@@ -2448,6 +2604,74 @@ export const eventsAPI = {
         });
 
         return handleResponse<{ ok: boolean; message: string }>(response);
+    },
+
+    /**
+     * Update per-event ticket design text/color overrides.
+     * Pass `null` for a field to clear that override back to the default template.
+     */
+    updateTicketDesign: async (
+        eventId: Id | string,
+        payload: {
+            accentColor?: string | null;
+            headerTitle?: string | null;
+            headerSubtitle?: string | null;
+            footerNote?: string | null;
+        },
+    ): Promise<EventTicketDesignRef & { id: Id }> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/ticket-design`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+
+        return handleResponse<EventTicketDesignRef & { id: Id }>(response);
+    },
+
+    /**
+     * Upload a ticket header or footer banner image.
+     * FormData field name: `image` (backend multer uses `upload.single('image')`).
+     */
+    uploadTicketDesignImage: async (
+        eventId: Id | string,
+        slot: 'header' | 'footer',
+        file: File,
+    ): Promise<EventTicketDesignRef & { id: Id }> => {
+        const formData = new FormData();
+        formData.append('image', file);
+        const response = await apiFetch(
+            `${API_BASE_URL}/events/${eventId}/ticket-design/${slot}-image`,
+            {
+                method: 'POST',
+                headers: getAuthOnlyHeaders(),
+                body: formData,
+            },
+        );
+
+        return handleResponse<EventTicketDesignRef & { id: Id }>(response);
+    },
+
+    deleteTicketDesignImage: async (
+        eventId: Id | string,
+        slot: 'header' | 'footer',
+    ): Promise<EventTicketDesignRef & { id: Id }> => {
+        const response = await apiFetch(
+            `${API_BASE_URL}/events/${eventId}/ticket-design/${slot}-image`,
+            {
+                method: 'DELETE',
+                headers: getAuthHeaders(),
+            },
+        );
+
+        return handleResponse<EventTicketDesignRef & { id: Id }>(response);
+    },
+
+    /** Authenticated download URL for portal ticket-design image previews. */
+    getTicketDesignImageDownloadUrl: (
+        eventId: Id | string,
+        slot: 'header' | 'footer',
+    ): string => {
+        return `${API_BASE_URL}/events/${eventId}/ticket-design/${slot}-image/download`;
     },
 
     getStatistics: async (eventId: Id | string): Promise<EventStatistics> => {

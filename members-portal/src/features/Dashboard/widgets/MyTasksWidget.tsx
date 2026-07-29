@@ -153,9 +153,16 @@ export default function MyTasksWidget({ data, error: errorProp }: MyTasksWidgetP
                                     <h4 className="dashboard-list-row-title">{item.title}</h4>
                                     <p className="dashboard-list-row-meta">{item.parentTitle}</p>
                                 </div>
-                                <span className={`badge ${urgencyBadgeClass(item.urgency)}`}>
-                                    {urgencyBadgeLabel(item)}
-                                </span>
+                                <div className="dashboard-list-row-badges">
+                                    <span className="badge dashboard-type-badge">
+                                        {item.parentType === 'event' || item.kind === 'EVENT_TASK'
+                                            ? 'Event'
+                                            : 'Project'}
+                                    </span>
+                                    <span className={`badge ${urgencyBadgeClass(item.urgency)}`}>
+                                        {urgencyBadgeLabel(item)}
+                                    </span>
+                                </div>
                             </Link>
                         ))}
                     </div>

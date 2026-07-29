@@ -130,6 +130,8 @@ export const ENTITY_LABEL_OVERRIDES: Record<string, string> = {
     subtask: 'Subtask',
     phase: 'Phase',
     file: 'File',
+    document: 'Document',
+    category: 'Folder',
     member: 'Member',
     team: 'Team',
     tier: 'Tier',
@@ -161,6 +163,8 @@ export const BADGE_LABEL_OVERRIDES: Record<string, string> = {
     DEPENDENCY_REMOVED: 'Dependency Removed',
     ASSIGNMENT_STATUS_CHANGED: 'Assignment Status',
     SELF_ASSIGNED: 'Self Assigned',
+    VIEW: 'Viewed',
+    DOWNLOAD: 'Downloaded',
 };
 
 export function parseMaybeJson(value: unknown): unknown {
@@ -668,6 +672,14 @@ export function getToneClass(event: ActivityTimelineEvent, contextEntity: Activi
 
     if (COMMENT_ACTION_TYPES.has(actionType) || actionType.includes('COMMENT')) {
         return 'activity-tone-comment';
+    }
+
+    if (actionType === 'VIEW') {
+        return 'activity-tone-default';
+    }
+
+    if (actionType === 'DOWNLOAD') {
+        return 'activity-tone-updated';
     }
 
     if (entityType === 'SCHEDULE_SLOT' || entityType === 'SCHEDULE' || textIncludesAny(searchText, ['schedule slot', 'schedule'])) {

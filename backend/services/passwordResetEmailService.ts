@@ -7,7 +7,9 @@ export const ICLUB_LOGO_CID = 'iclub-logo';
 export const IHUB_LOGO_CID = 'ihub-logo';
 
 // Reset links target the members portal (FRONTEND_URL), not PUBLIC_WEBSITE_URL.
-// Local: set FRONTEND_URL=http://localhost:3001 so links hit a portal with /reset-password.
+// Env is the source of truth. Local: FRONTEND_URL=http://localhost:3001.
+// After custom-domain cutover: FRONTEND_URL=https://members-portal.iclubmedasu.com.
+// HF fallback kept until that env is set in production.
 const DEFAULT_FRONTEND_URL = 'https://iclubmedasu-members-portal.hf.space';
 
 const EMAIL_ASSETS_DIR = (() => {

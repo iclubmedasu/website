@@ -4,6 +4,7 @@ import { useEffect, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { Checkbox } from '@/components/checkbox';
+import SearchableBadgePicker from '@/components/SearchableBadgePicker/SearchableBadgePicker';
 import { eventsAPI, projectsAPI, projectTypesAPI } from '@/services/api';
 import {
     CLUB_TIMEZONE,
@@ -556,13 +557,16 @@ export default function CreateEventModal({
                                 {userTeamIds.length > 0 && (
                                     <p className="form-hint-text">Your team{userTeamIds.length > 1 ? 's are' : ' is'} automatically included and cannot be removed.</p>
                                 )}
-                                <div className="team-badge-picker">
-                                    {allTeams.map((team) => {
+                                <SearchableBadgePicker
+                                    items={allTeams}
+                                    getKey={(team) => team.id}
+                                    getLabel={(team) => team.name}
+                                    searchPlaceholder="Search teams…"
+                                    renderItem={(team) => {
                                         const selected = form.teamIds.some((teamSelection) => teamSelection.teamId === team.id);
                                         const locked = userTeamIds.includes(team.id);
                                         return (
                                             <button
-                                                key={team.id}
                                                 type="button"
                                                 className={`team-badge-option${selected ? ' team-badge-option--selected' : ''}${locked ? ' team-badge-option--locked' : ''}`}
                                                 onClick={() => toggleTeam(team.id)}
@@ -571,8 +575,8 @@ export default function CreateEventModal({
                                                 {team.name}
                                             </button>
                                         );
-                                    })}
-                                </div>
+                                    }}
+                                />
                             </div>
                         )}
                     </div>

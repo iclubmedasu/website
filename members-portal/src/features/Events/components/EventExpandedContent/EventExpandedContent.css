@@ -40,6 +40,7 @@
 }
 
 .event-expanded-tab-panel > .event-expanded-panel:has(.event-registrations-layout),
+.event-expanded-tab-panel > .event-expanded-panel:has(.event-tickets-layout),
 .event-expanded-tab-panel > .event-expanded-panel:has(.event-registration-search-row) {
     flex: 1;
     min-height: 0;
@@ -56,6 +57,7 @@
 .event-expanded-tab-panel > .event-expanded-panel:has(.event-registrations-layout) > .event-expanded-form-grid,
 .event-expanded-tab-panel > .event-expanded-panel:has(.event-registrations-layout) > .event-registration-search-row,
 .event-expanded-tab-panel > .event-expanded-panel:has(.event-registrations-layout) > .event-registration-filter-chips,
+.event-expanded-tab-panel > .event-expanded-panel:has(.event-tickets-layout) > .event-expanded-header,
 .event-expanded-tab-panel > .event-expanded-panel:has(.event-registration-search-row) > .event-expanded-header,
 .event-expanded-tab-panel > .event-expanded-panel:has(.event-registration-search-row) > .event-registration-search-row,
 .event-expanded-tab-panel > .event-expanded-panel:has(.event-registration-search-row) > .event-registration-filter-chips {
@@ -586,6 +588,35 @@
     overflow: hidden;
 }
 
+/* Tickets + design panel split layout (mirrors registrations) */
+.event-tickets-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: stretch;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.event-tickets-table-column {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    overflow: hidden;
+}
+
+.event-tickets-design-column {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
+    overflow: hidden;
+}
+
 .event-registrations-table-column {
     min-width: 0;
     min-height: 0;
@@ -676,17 +707,7 @@
     gap: 0.5rem;
 }
 
-.sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-}
+/* .sr-only now in globals.css */
 
 .event-registrations-checkin-column {
     min-width: 0;
@@ -1097,6 +1118,11 @@
 
 .event-tickets-table-shell {
     margin-top: 0;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .event-tickets-empty {
@@ -1145,12 +1171,35 @@
     line-height: 1.2;
 }
 
+/* Shrink Ticket/Reminder to content so Actions stays visible */
+.event-tickets-table-shell .event-tickets-delivery-col {
+    width: 1%;
+    min-width: 0;
+    max-width: none;
+    padding-left: 0.45rem;
+    padding-right: 0.45rem;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.event-tickets-table-shell .event-tickets-delivery-col .event-email-delivery-status {
+    min-width: 0;
+    align-items: center;
+}
+
+.event-tickets-table-shell .event-registrations-actions-col {
+    width: 1%;
+    min-width: 4.5rem;
+    max-width: none;
+}
+
 .event-tickets-actions-col {
     display: flex;
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0.35rem;
     align-items: center;
+    justify-content: center;
 }
 
 .event-tickets-io-bar {
@@ -1474,7 +1523,18 @@
         min-height: 0;
     }
 
+    .event-tickets-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) minmax(0, auto);
+        align-items: stretch;
+        min-height: 0;
+    }
+
     .event-registrations-table-column {
+        min-height: 0;
+    }
+
+    .event-tickets-table-column {
         min-height: 0;
     }
 
@@ -1489,6 +1549,11 @@
     }
 
     .event-registrations-checkin-column {
+        flex-shrink: 0;
+        max-height: min(50vh, 28rem);
+    }
+
+    .event-tickets-design-column {
         flex-shrink: 0;
         max-height: min(50vh, 28rem);
     }

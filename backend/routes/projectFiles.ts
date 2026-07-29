@@ -1,12 +1,12 @@
 const express: any = require('express');
 const router: any = express.Router();
 const multer = require('multer');
-const { Readable } = require('stream');
 const { v4: uuidv4 } = require('uuid') as { v4: () => string };
 const { prisma }: { prisma: any } = require('../db');
 const githubStorage = require('../services/githubStorageService');
 const { logProjectActivity } = require('../services/activityLogService');
 const { extractAuthToken, JWT_SECRET } = require('../middleware/auth');
+const { pipeGithubBodyToResponse } = require('../lib/pipeGithubResponse');
 
 // Multer: memory storage, 25MB limit (GitHub Contents API limit)
 const upload = multer({
@@ -636,7 +636,7 @@ router.get('/:id/download', async (req, res) => {
         if (file.fileSize) res.setHeader('Content-Length', file.fileSize);
 
         // Pipe the readable stream to the response
-        Readable.fromWeb(ghResponse.body).pipe(res);
+        await pipeGithubBodyToResponse(ghResponse, res);
     } catch (error) {
         console.error('GET /project-files/:id/download', error);
         res.status(500).json({ error: 'Failed to download file' });
@@ -887,7 +887,7 @@ router.get('/:id/version/:commitSha', async (req, res) => {
         res.setHeader('Content-Type', file.mimeType);
         res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
 
-        Readable.fromWeb(ghResponse.body).pipe(res);
+        await pipeGithubBodyToResponse(ghResponse, res);
     } catch (error) {
         console.error('GET /project-files/:id/version/:commitSha', error);
         res.status(500).json({ error: 'Failed to download file version' });

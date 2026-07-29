@@ -105,6 +105,17 @@ export interface PublicConfirmationSession {
     section?: 'waitingForYou' | 'dontMissOut';
 }
 
+export interface PublicTicketDesign {
+    accentColor?: string | null;
+    headerTitle?: string | null;
+    headerSubtitle?: string | null;
+    footerNote?: string | null;
+    /** Relative `/api/public/...` path when a header image is set. */
+    headerImageUrl?: string | null;
+    /** Relative `/api/public/...` path when a footer image is set. */
+    footerImageUrl?: string | null;
+}
+
 export interface PublicRegistrationConfirmation {
     confirmationCode: string;
     fullName: string;
@@ -122,6 +133,8 @@ export interface PublicRegistrationConfirmation {
     sessions: PublicConfirmationSession[];
     waitingForYou?: PublicConfirmationSession[];
     dontMissOut?: PublicConfirmationSession[];
+    /** Per-event ticket styling; omit or null fields use the default template. */
+    ticketDesign?: PublicTicketDesign;
 }
 
 export type PublicEventJoinStatus =

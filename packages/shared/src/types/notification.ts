@@ -12,7 +12,8 @@ export type NotificationEventType =
     | "PROJECT_STATUS_CHANGED"
     | "SCHEDULE_SLOT_ASSIGNED"
     | "TEAM_MEMBER_JOINED"
-    | "ANNOUNCEMENT";
+    | "ANNOUNCEMENT"
+    | "DOCUMENT_ACCESS_REQUESTED";
 
 export type NotificationAudienceType =
     | "MEMBER"

@@ -8,6 +8,7 @@ import type {
     NotificationUnreadCountResponse,
 } from '@iclub/shared';
 import { dashboardAPI, notificationsAPI } from '@/services/api';
+import AnnouncementsFeed from '@/features/Announcements/AnnouncementsFeed';
 import MyTasksWidget from './widgets/MyTasksWidget';
 import UpcomingEventsWidget from './widgets/UpcomingEventsWidget';
 import NotificationsFeedWidget from './widgets/NotificationsFeedWidget';
@@ -96,6 +97,21 @@ export default function DashboardPage() {
         };
     }, []);
 
+    const handleNotificationMarkedRead = async () => {
+        try {
+            const unreadCount = await notificationsAPI.getUnreadCount();
+            setUnread({ data: unreadCount, error: null });
+        } catch (err) {
+            setUnread((previous) => ({
+                data: previous.data,
+                error:
+                    err instanceof Error && err.message
+                        ? err.message
+                        : 'Failed to load unread count',
+            }));
+        }
+    };
+
     return (
         <div className="members-page dashboard-page">
             <div className="page-header">
@@ -103,29 +119,29 @@ export default function DashboardPage() {
             </div>
             <hr className="title-divider" />
 
-            {loading ? (
-                <p className="loading-message">Loading dashboard…</p>
-            ) : (
-                <div className="dashboard-cards-stack">
-                    <QuickStatsCards
-                        dueThisWeekCount={countDueThisWeek(tasks.data)}
-                        overdueCount={tasks.data?.overdueCount ?? 0}
-                        activitiesCount={activities.data?.totalCount ?? 0}
-                        unreadNotificationsCount={unread.data?.unreadCount ?? 0}
-                    />
+            <div className="dashboard-cards-stack">
+                <AnnouncementsFeed />
 
-                    <div className="dashboard-bottom-grid">
+                {loading ? (
+                    <p className="loading-message">Loading dashboard…</p>
+                ) : (
+                    <div className="dashboard-main-grid">
+                        <QuickStatsCards
+                            dueThisWeekCount={countDueThisWeek(tasks.data)}
+                            overdueCount={tasks.data?.overdueCount ?? 0}
+                            activitiesCount={activities.data?.totalCount ?? 0}
+                            unreadNotificationsCount={unread.data?.unreadCount ?? 0}
+                        />
                         <MyTasksWidget data={tasks.data} error={tasks.error} />
-                        <div className="dashboard-right-stack">
-                            <UpcomingEventsWidget data={activities.data} error={activities.error} />
-                            <NotificationsFeedWidget
-                                notifications={notifications.data}
-                                error={notifications.error}
-                            />
-                        </div>
+                        <UpcomingEventsWidget data={activities.data} error={activities.error} />
+                        <NotificationsFeedWidget
+                            notifications={notifications.data}
+                            error={notifications.error}
+                            onMarkedRead={() => void handleNotificationMarkedRead()}
+                        />
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 }

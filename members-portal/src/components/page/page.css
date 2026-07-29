@@ -2,7 +2,7 @@
    PAGE LAYOUT — Centralized page-level styles
    Used by: TeamsPage, MembersPage, AlumniPage,
             ProjectsPage, EventsPage, HelpAndSupportPage,
-            AdministrationPage, UserPage
+            AdministrationPage, UserPage, DocumentsPage
    ============================================ */
 
 
@@ -17,7 +17,9 @@
 .certificates-page,
 .finance-page,
 .help-support-page,
-.administration-page {
+.administration-page,
+.announcements-page,
+.documents-page {
     max-width: 1400px;
     margin: 0 auto;
     padding: 2rem;
@@ -358,18 +360,22 @@
 .members-page .error-message,
 .members-page .loading-message,
 .certificates-page .error-message,
-.certificates-page .loading-message {
+.certificates-page .loading-message,
+.documents-page .error-message,
+.documents-page .loading-message {
     margin-bottom: 1rem;
     font-size: 0.9375rem;
 }
 
 .members-page .loading-message,
-.certificates-page .loading-message {
+.certificates-page .loading-message,
+.documents-page .loading-message {
     color: var(--gray-500);
 }
 
 .members-page .error-message,
-.certificates-page .error-message {
+.certificates-page .error-message,
+.documents-page .error-message {
     color: var(--error-text);
 }
 
@@ -482,7 +488,8 @@
    ============================================ */
 
 .projects-grid,
-.events-grid {
+.events-grid,
+.announcements-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 1.25rem;
@@ -493,7 +500,8 @@
 @media (max-width: 900px) {
 
     .projects-grid,
-    .events-grid {
+    .events-grid,
+    .announcements-grid {
         grid-template-columns: 1fr;
     }
 }
@@ -503,7 +511,9 @@
    ============================================ */
 
 .project-add-card,
-.events-add-card {
+.events-add-card,
+.documents-folder-add-card,
+.announcements-add-card {
     border: 2px dashed var(--gray-300);
     border-radius: var(--radius-lg);
     display: flex;
@@ -518,13 +528,17 @@
 }
 
 .project-add-card:hover,
-.events-add-card:hover {
+.events-add-card:hover,
+.documents-folder-add-card:hover,
+.announcements-add-card:hover {
     border-color: var(--purple-400);
     background: var(--purple-50);
 }
 
 .project-add-card-icon,
-.events-add-card-icon {
+.events-add-card-icon,
+.documents-folder-add-card-icon,
+.announcements-add-card-icon {
     width: 2rem;
     height: 2rem;
     color: var(--gray-300);
@@ -532,12 +546,16 @@
 }
 
 .project-add-card:hover .project-add-card-icon,
-.events-add-card:hover .events-add-card-icon {
+.events-add-card:hover .events-add-card-icon,
+.documents-folder-add-card:hover .documents-folder-add-card-icon,
+.announcements-add-card:hover .announcements-add-card-icon {
     color: var(--purple-500);
 }
 
 .project-add-card-text,
-.events-add-card-text {
+.events-add-card-text,
+.documents-folder-add-card-text,
+.announcements-add-card-text {
     font-family: var(--font-heading);
     font-size: 0.85rem;
     font-weight: 600;
@@ -546,7 +564,9 @@
 }
 
 .project-add-card:hover .project-add-card-text,
-.events-add-card:hover .events-add-card-text {
+.events-add-card:hover .events-add-card-text,
+.documents-folder-add-card:hover .documents-folder-add-card-text,
+.announcements-add-card:hover .announcements-add-card-text {
     color: var(--purple-700);
 }
 

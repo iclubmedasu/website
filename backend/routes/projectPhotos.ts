@@ -1,6 +1,5 @@
 import express from 'express';
 import multer from 'multer';
-import { Readable } from 'stream';
 import { prisma } from '../db';
 import * as githubStorage from '../services/githubStorageService';
 import { extractAuthToken, JWT_SECRET } from '../middleware/auth';
@@ -9,6 +8,7 @@ import {
     eventPhotoPreviewGithubPath,
     optimizeEventPhoto,
 } from '../lib/optimizeEventPhoto';
+import { pipeGithubBodyToResponse } from '../lib/pipeGithubResponse';
 
 const { v4: uuidv4 } = require('uuid') as { v4: () => string };
 const router: any = express.Router();
@@ -223,7 +223,7 @@ router.get('/:id/download', async (req, res) => {
         res.setHeader('Content-Disposition', `inline; filename="${photo.fileName}"`);
         if (photo.fileSize) res.setHeader('Content-Length', photo.fileSize);
 
-        Readable.fromWeb(ghResponse.body as import('stream/web').ReadableStream).pipe(res);
+        await pipeGithubBodyToResponse(ghResponse, res);
     } catch (error) {
         console.error('GET /project-photos/:id/download', error);
         res.status(500).json({ error: 'Failed to download photo' });

@@ -3,17 +3,19 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import type { NotificationItem } from '@iclub/shared';
+import type { Id, NotificationItem } from '@iclub/shared';
 import { notificationsAPI } from '@/services/api';
 
 export interface NotificationsFeedWidgetProps {
     notifications?: NotificationItem[] | null;
     error?: string | null;
+    onMarkedRead?: () => void;
 }
 
 export default function NotificationsFeedWidget({
     notifications: notificationsProp,
     error: errorProp,
+    onMarkedRead,
 }: NotificationsFeedWidgetProps = {}) {
     const hasProvidedData = notificationsProp != null;
     const hasProvidedError = !hasProvidedData && Boolean(errorProp);
@@ -25,6 +27,7 @@ export default function NotificationsFeedWidget({
     const [error, setError] = useState<string | null>(() =>
         hasProvidedData ? null : (errorProp ?? null),
     );
+    const [markingIds, setMarkingIds] = useState<Set<Id>>(new Set());
 
     useEffect(() => {
         if (notificationsProp != null) {
@@ -66,6 +69,27 @@ export default function NotificationsFeedWidget({
         };
     }, [notificationsProp, errorProp]);
 
+    const handleMarkRead = async (notificationId: Id) => {
+        setMarkingIds((previous) => new Set(previous).add(notificationId));
+        try {
+            await notificationsAPI.markRead(notificationId);
+            setNotifications((previous) =>
+                previous.map((notification) =>
+                    notification.id === notificationId
+                        ? { ...notification, isRead: true, readAt: new Date().toISOString() }
+                        : notification,
+                ),
+            );
+            onMarkedRead?.();
+        } finally {
+            setMarkingIds((previous) => {
+                const next = new Set(previous);
+                next.delete(notificationId);
+                return next;
+            });
+        }
+    };
+
     return (
         <div className="card dashboard-side-card">
             <div className="card-header">
@@ -88,16 +112,33 @@ export default function NotificationsFeedWidget({
                                 key={notification.id}
                                 className={`dashboard-list-row dashboard-notification-row${notification.isRead ? ' is-read' : ''}`}
                             >
-                                <h4 className="dashboard-list-row-title">{notification.title}</h4>
-                                <p className="dashboard-list-row-meta">{notification.body}</p>
-                                <time
-                                    className="dashboard-list-row-meta dashboard-notification-time"
-                                    dateTime={notification.createdAt}
-                                >
-                                    {formatDistanceToNow(parseISO(notification.createdAt), {
-                                        addSuffix: true,
-                                    })}
-                                </time>
+                                <div className="dashboard-notification-row-main">
+                                    <h4 className="dashboard-list-row-title">{notification.title}</h4>
+                                    <p className="dashboard-list-row-meta">{notification.body}</p>
+                                    <time
+                                        className="dashboard-list-row-meta dashboard-notification-time"
+                                        dateTime={notification.createdAt}
+                                    >
+                                        {formatDistanceToNow(parseISO(notification.createdAt), {
+                                            addSuffix: true,
+                                        })}
+                                    </time>
+                                </div>
+                                {!notification.isRead ? (
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary dashboard-notification-read-btn"
+                                        disabled={markingIds.has(notification.id)}
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            void handleMarkRead(notification.id);
+                                        }}
+                                    >
+                                        {markingIds.has(notification.id)
+                                            ? 'Saving...'
+                                            : 'Mark as read'}
+                                    </button>
+                                ) : null}
                             </div>
                         ))}
                     </div>

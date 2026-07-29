@@ -1,0 +1,34 @@
+.searchable-badge-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-width: 0;
+}
+
+.searchable-badge-picker-search-label {
+    display: block;
+    min-width: 0;
+}
+
+.searchable-badge-picker-search {
+    width: 100%;
+}
+
+.searchable-badge-picker-grid {
+    max-height: calc(5 * 1.9rem + 4 * 0.5rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.15rem;
+    align-content: flex-start;
+}
+
+.searchable-badge-picker-item {
+    max-width: 100%;
+}
+
+.searchable-badge-picker-empty {
+    margin: 0;
+    width: 100%;
+}
+
+/* .sr-only now in globals.css */

@@ -1,0 +1,55 @@
+/* Ticket design edit modal — wider body with preview | controls layout */
+
+.ticket-design-edit-modal.modal-container {
+    max-width: min(56rem, calc(100vw - 2rem));
+    width: 100%;
+}
+
+.ticket-design-edit-modal__body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.ticket-design-edit-modal__preview {
+    min-width: 0;
+}
+
+.ticket-design-edit-modal__controls {
+    flex: unset;
+    min-height: 0;
+    max-height: min(28rem, 55vh);
+    overflow-y: auto;
+}
+
+.ticket-design-edit-modal__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.ticket-design-edit-modal__footer .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ticket-design-edit-modal__footer-end {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+@media (max-width: 720px) {
+    .ticket-design-edit-modal__body {
+        grid-template-columns: 1fr;
+    }
+
+    .ticket-design-edit-modal__controls {
+        max-height: none;
+    }
+}

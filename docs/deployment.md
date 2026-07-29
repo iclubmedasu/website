@@ -2,7 +2,9 @@
 
 ## Overview
 
-This project is deployed using GitHub Actions, with the following services:
+This project is deployed using GitHub Actions, with the following services.
+
+**Current deploy targets** (Hugging Face Space URLs — live today):
 
 | Service           | Purpose                | Provider/URL |
 |-------------------|------------------------|--------------|
@@ -10,6 +12,8 @@ This project is deployed using GitHub Actions, with the following services:
 | Database          | PostgreSQL             | [Supabase](https://supabase.com/) |
 | Members Portal    | Next.js Node.js app    | [Hugging Face Spaces](https://huggingface.co/spaces/iclubmedasu/members-portal) ([Live site](https://iclubmedasu-members-portal.hf.space)) |
 | Public Website    | Next.js Node.js app    | [Hugging Face Spaces](https://huggingface.co/spaces/iclubmedasu/public-website) ([Live site](https://iclubmedasu-public-website.hf.space)) |
+
+Custom website hostnames (`iclubmedasu.com`, `members-portal.…`) are **deferred** — HF custom domains require a paid HF plan. Sites stay on `*.hf.space` for now; branded email From (`noreply@iclubmedasu.com`) still works via Resend.
 
 ## Deployment Flow
 
@@ -37,6 +41,53 @@ Docker Spaces must be **created once manually** on Hugging Face (Settings → Ne
 
 **If deploy fails with 402:** Your Spaces already exist; ensure the workflow does not call `create_repo` (upload-only). If you need a **new** Docker Space, create it in the HF web UI or subscribe to PRO.
 
+## Production now: email branding only
+
+Sites and API stay on Hugging Face URLs. Outbound mail uses your verified Resend domain.
+
+**Local testing uses Resend too** when `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are set in `backend/.env` — send a ticket from localhost to confirm `noreply@iclubmedasu.com` works before or after updating the HF Space.
+
+### Resend + Cloudflare (email DNS only)
+
+1. In Resend → Domains → `iclubmedasu.com`, confirm SPF, DKIM, and DMARC (if shown) are **Verified**.
+2. Add **exactly** the DNS records Resend shows in Cloudflare (no HF website CNAMEs needed for this step).
+3. You do **not** need a `noreply` subdomain — `noreply@iclubmedasu.com` is just the local-part on the verified root domain.
+
+### Backend HF Space (Variables / Secrets)
+
+| Variable | Value |
+|----------|--------|
+| `RESEND_FROM_EMAIL` | `noreply@iclubmedasu.com` |
+| `RESEND_REPLY_TO` | A mailbox that **receives** mail (e.g. club Gmail) |
+| `RESEND_API_KEY` | Keep existing |
+| `FRONTEND_URL` | `https://iclubmedasu-members-portal.hf.space` |
+| `FRONTEND_ORIGINS` | `https://iclubmedasu-members-portal.hf.space,https://iclubmedasu-public-website.hf.space` |
+| `PUBLIC_WEBSITE_URL` | `https://iclubmedasu-public-website.hf.space` |
+| `API_PUBLIC_URL` | `https://iclubmedasu-backend.hf.space/api` |
+
+Restart the backend Space. Frontends keep `NEXT_PUBLIC_API_URL=https://iclubmedasu-backend.hf.space/api`.
+
+### Smoke test
+
+1. Local or HF: send a test ticket → From = `noreply@iclubmedasu.com`, Reply-To = your inbox.
+2. Ticket links open on `*.hf.space` public/portal URLs.
+3. Login / CORS still work on HF hosts.
+
+**GitHub:** nothing new for email branding (custom domains are not configured in GitHub).
+
+## Deferred: custom domain overlay (HF paid custom domains)
+
+Requires Hugging Face custom domains (paid). Skip until you subscribe. When ready:
+
+| Hostname | HF Space |
+|----------|----------|
+| `iclubmedasu.com` (+ optional `www`) | `iclubmedasu/public-website` |
+| `members-portal.iclubmedasu.com` | `iclubmedasu/members-portal` |
+| `api.iclubmedasu.com` (optional) | `iclubmedasu/backend` |
+
+Then attach domains in each Space → Custom domains, create the exact Cloudflare records HF shows, and add those origins to `FRONTEND_ORIGINS` **in addition to** the HF fronts (never remove HF as fallback). Do **not** point `PUBLIC_WEBSITE_URL` / `FRONTEND_URL` at custom hosts until those domains are live, or email links will break.
+
+**Common pitfalls:** domain verified in Resend but From still `onboarding@resend.dev`; expecting mail at `noreply@…` (use `RESEND_REPLY_TO`); setting branded site URLs before custom domains work.
 ## Environment Variables
 
 Here's a clear breakdown of where each variable belongs:
@@ -60,26 +111,28 @@ Set these in your backend Hugging Face Space → Settings → Variables and secr
 | GITHUB_USER_DATA_OWNER    | e.g. iclubmedasu                                 |
 | GITHUB_USER_DATA_REPO     | e.g. user-data                                   |
 | GITHUB_USER_DATA_TOKEN    | Your GitHub PAT for user data                    |
-| FRONTEND_URL              | https://iclubmedasu-members-portal.hf.space      |
-| FRONTEND_ORIGINS          | Comma-separated origins, e.g. `https://iclubmedasu-members-portal.hf.space,https://iclubmedasu-public-website.hf.space` (list every allowed origin; arbitrary `*.hf.space` is not allowed) |
-| RESEND_API_KEY            | Resend API key for ticket emails                 |
-| RESEND_FROM_EMAIL         | Verified sender in Resend (not @gmail.com); use your domain e.g. tickets@yourdomain.com |
-| RESEND_REPLY_TO           | Optional reply-to address e.g. asu.medicine.iclub@gmail.com |
-| PUBLIC_WEBSITE_URL        | `https://iclubmedasu-public-website.hf.space` in production (ticket email confirmation links); `http://localhost:3002` locally |
+| FRONTEND_URL              | `https://iclubmedasu-members-portal.hf.space` (password-reset / email links). Local: `http://localhost:3001` |
+| FRONTEND_ORIGINS          | Comma-separated HF fronts (and localhost for local). Example: `https://iclubmedasu-members-portal.hf.space,https://iclubmedasu-public-website.hf.space`. List every origin explicitly — arbitrary `*.hf.space` is not allowed |
+| API_PUBLIC_URL            | `https://iclubmedasu-backend.hf.space/api`. Local: `http://localhost:3000/api` |
+| RESEND_API_KEY            | Resend API key for ticket / reminder / certificate emails |
+| RESEND_FROM_EMAIL         | `noreply@iclubmedasu.com` after domain Verified in Resend (works for local testing too). Fallback: `onboarding@resend.dev` |
+| RESEND_REPLY_TO           | Address that actually receives mail (e.g. Gmail) |
+| PUBLIC_WEBSITE_URL        | `https://iclubmedasu-public-website.hf.space`. Local: `http://localhost:3002` |
 
 ### Hugging Face Space Settings (Members Portal)
-Set these in the members portal Hugging Face Space → Settings → **Variables** (not Secrets — build-time vars must be Variables).
+Set these in the members portal Hugging Face Space → Settings → **Variables** (not Secrets — build-time vars must be Variables). Rebuild after any change.
 
-| Variable             | Value                                              |
-|----------------------|----------------------------------------------------|
-| NEXT_PUBLIC_API_URL  | https://iclubmedasu-backend.hf.space/api           |
+| Variable                        | Value |
+|---------------------------------|-------|
+| NEXT_PUBLIC_API_URL             | `https://iclubmedasu-backend.hf.space/api` |
+| NEXT_PUBLIC_PUBLIC_WEBSITE_URL  | Optional: `https://iclubmedasu-public-website.hf.space` |
 
 ### Hugging Face Space Settings (Public Website)
-Set these in the public website Hugging Face Space → Settings → **Variables** (not Secrets — build-time vars must be Variables).
+Set these in the public website Hugging Face Space → Settings → **Variables** (not Secrets — build-time vars must be Variables). Rebuild after any change.
 
-| Variable             | Value                                              |
-|----------------------|----------------------------------------------------|
-| NEXT_PUBLIC_API_URL  | https://iclubmedasu-backend.hf.space/api           |
+| Variable             | Value |
+|----------------------|-------|
+| NEXT_PUBLIC_API_URL  | `https://iclubmedasu-backend.hf.space/api` |
 
 That's the only build-time variable each frontend needs. HF passes Variables as Docker build args, which Next.js inlines at build time.
 
@@ -243,3 +296,5 @@ docker build -f public-website/Dockerfile \
 - [ ] Public website `NEXT_PUBLIC_API_URL` = `https://iclubmedasu-backend.hf.space/api` in HF Space **Variables** (rebuild after change)
 - [ ] Public API smoke test: `https://iclubmedasu-backend.hf.space/api/public/events?limit=5&upcoming=false` returns JSON
 - [ ] Login works (cookie set, API calls succeed, no CORS errors)
+- [ ] *(Email branding)* Resend domain Verified; backend HF (and/or local `.env`) has `RESEND_FROM_EMAIL=noreply@iclubmedasu.com` and `RESEND_REPLY_TO`; test ticket From/Reply-To
+- [ ] *(Deferred)* Custom website domains — see [Deferred: custom domain overlay](#deferred-custom-domain-overlay-hf-paid-custom-domains) when HF paid custom domains are available

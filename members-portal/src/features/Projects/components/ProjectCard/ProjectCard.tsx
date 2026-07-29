@@ -421,6 +421,7 @@ export default function ProjectCard({
                     {!archivedView && editTaskTarget && (
                         <EditTaskModal
                             task={editTaskTarget}
+                            projectId={detail.id}
                             projectDetail={detail}
                             allMembers={allMembers}
                             onClose={() => setEditTaskTarget(null)}
@@ -437,6 +438,7 @@ export default function ProjectCard({
                     {!archivedView && taskScheduleTarget && (
                         <TaskScheduleSlotsModal
                             task={taskScheduleTarget}
+                            projectId={detail.id}
                             allMembers={allMembers}
                             currentMemberId={user?.id}
                             onClose={() => setTaskScheduleTarget(null)}

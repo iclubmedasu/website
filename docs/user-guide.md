@@ -102,9 +102,9 @@ Not every member sees every page. Access depends on your role and assignment sta
 | **Invited but not yet assigned to a team** | Your profile page only, until an officer assigns you |
 | **Alumni** | Your profile page only |
 | **Regular assigned member** | Dashboard, Personnel, Projects, Events, Help & Support |
-| **Team leadership** (Head / Vice) | Everything above, plus **Certificates** |
+| **Team leadership** (Head / Vice) | Everything above, plus **Documents** and **Certificates** |
 | **Fundraising Head/Vice** | Everything above, plus **Finance** (view) |
-| **Officers / President / VP / Developers** | Full access including site editors, Administration, Finance, and Certificates |
+| **Officers / President / VP / Developers** | Full access including Documents, site editors, Administration, Finance, and Certificates |
 
 If you try to open a page you do not have access to, it simply will not appear in your sidebar.
 
@@ -177,6 +177,63 @@ Click a project to expand it and work with:
 - **Certificates** — issue certificates to eligible participants (leadership+)
 
 Project leads can create projects, add phases and tasks, assign members, and move projects through their lifecycle (active → on hold → finalized → archived).
+
+### Documents
+
+Go to **Documents** to browse club folders, root (uncategorized) files, and open documents you have access to. Regular members do not see Documents — only org leadership and team Heads/Vice.
+
+**Who can see what (two tiers)**
+
+| Tier | Who | Default visibility |
+|------|-----|--------------------|
+| Org leadership | Developer, Officer, President, Vice President | All documents and folders (admin override) |
+| Team leadership | Head / Vice of a team | Only documents/folders scoped to their team(s), unless granted |
+
+Ownership is positional and live: a document or folder is owned by whoever currently holds the position tied to its team scope.
+
+- **Team-scoped** (`scopeTeamId` set): that team's current Head/Vice own it. Org leadership (Officer / President / VP / developers) can always view and manage as an admin override.
+- **Org-owned** (`scopeTeamId` empty): only org leadership has natural access.
+
+Team-scoped items are exclusive to that team's Head/Vice (plus org leadership). Other teams do not see them unless explicitly granted access.
+
+**Browsing**
+
+- Root view shows **Folders** (3-row scroll) and **Root documents** (files not in a folder).
+- Open a **folder** to see its documents as tiles.
+- **Locked** documents and folders show a lock badge and a **Request access** control — click to request access (optionally with a note). Cross-team Heads/Vice see locks; Head and Vice of the item's own team share access and are not locked.
+- A **file grant** unlocks the parent folder for the granted team, but inside they see **only** the granted files (other files are hidden, not shown as locked). A **folder grant** shows **all** files in that folder (view-only).
+- Open a document you can access to view details and **Download** it.
+- Review pending **Access Requests** (documents and folders) whenever you can manage items you own. Empty when nothing is waiting for you to approve.
+
+**Uploading and folders**
+
+Anyone with upload rights (org or team leadership) can:
+
+- **Upload** at root (no folder) — multi-file upload is supported
+- **Upload into a folder** only if they **own** that folder (positional team scope) or are org leadership — grant recipients cannot upload into folders they were only granted access to
+- **Create** folders scoped to a team (team Heads/Vice create under their led team; org leadership may leave scope empty for org-owned folders)
+- **Rename or delete** only folders they own (org leadership can manage any folder; folders that still contain documents cannot be deleted)
+- **Drag** a root document onto a folder tile to move it (destination must be a folder they can manage)
+
+Inside a folder there is a single **Upload** control in the toolbar (empty folders show hint text only, not a second button). Upload appears only for folder owners / org leadership.
+
+**Granting access**
+
+Owners only — org leadership for any item, or team leadership for documents/folders in their scope — can:
+
+- **Grant access** to a **team** for a set duration (day, week, month, or indefinite). A team grant covers that team's **Head and Vice** together — not all members, and not a single person.
+- **Grant folder access** — the same TEAM rule; Head/Vice of the granted team can view and download every document in that folder (including future uploads while the folder grant remains)
+- **Manage access** on a folder (overflow menu) or revoke grants from the document detail **Access** list — review active TEAM grants
+- Approve or deny pending access requests (approval creates a **TEAM** grant for each team the requester currently leads as Head/Vice, with the chosen duration)
+
+Grant recipients (Head/Vice via TEAM grants) can **view and download only** — they cannot rename, delete, upload into the folder, grant further, or manage access.
+
+Document grants apply to that file only (and unlock the parent folder with a partial listing). Folder grants apply to all files in the folder.
+
+**Access logs**
+
+- Document access log (who viewed or downloaded a file): document owners (positional scope) or org leadership — not grant-only viewers, and not based on who originally uploaded the file
+- Folder access log: available from the folder overflow menu for members who can manage folder access
 
 ### Events
 
@@ -300,6 +357,7 @@ Projects
 Events
   ├── Events
   └── Past Events
+Documents
 Certificates                  (leadership+)
 Finance                       (officers / FR leadership)
 General

@@ -1,4 +1,4 @@
-# iClub — Cursor Prompts: Usage Analytics + Security Fixes
+# iClub — Cursor Prompts: Analytics, Security, Multi-Client Structure, and Deploy Safety
 
 **How to use these prompts:** Every prompt below follows the same shape:
 Cursor investigates the relevant code first, explains what it found **in plain
@@ -11,9 +11,11 @@ to silently judge what's safe to change.
 If Cursor ever skips straight to making changes without asking first, stop it
 and re-paste the prompt — that means it didn't follow the instruction.
 
-Two independent tracks. Phase B (security) is more urgent than Phase A
-(analytics) — do B1 through B4 first if you only have time for a few this
-week.
+Four tracks. Phase B (security) is the most urgent. Phase C (multi-client
+structure) matters most **before** you create a separate deployment for Dr.
+Ashraf. Phase D (rollback/beta/error logging) is worth doing before you're
+pushing frequent changes to a paying client's live deployment. Do B1 through
+B4 first if you only have time for a few things this week.
 
 ---
 
@@ -266,6 +268,336 @@ Do not modify any code in this pass. Just report and ask.
 
 ---
 
+## PHASE C — Multi-Client Codebase Structure (Theming, Feature Flags, Branching)
+
+**Goal:** Avoid the "copy-paste and slowly diverge" trap when Dr. Ashraf's
+company gets its own branded/customized deployment. The approach: isolate
+client-specific differences (branding, enabled features, role/team
+structure) into a small number of designated places, so new club features
+can still flow into his version without a painful manual merge every time.
+
+Do C1–C3 before creating any separate deployment for Dr. Ashraf. C4 onward
+only after you've decided the customization level in C3.
+
+### C1 — Audit how hardcoded the branding currently is
+
+```
+Investigate, explain, and ask — do not change anything yet.
+
+Search members-portal and public-website for hardcoded branding: the
+club's name, logo file references, and color values (hex codes) used
+directly inside individual component or CSS files, rather than pulled from
+one central place.
+
+Step 1: Tell me plainly how scattered this currently is — for example, "the
+logo filename appears in about 12 different files" or "colors are mostly
+already centralized in one globals.css file." Give me a rough sense and a
+few example locations, not an exhaustive list.
+
+Step 2: Explain in plain terms what this means for creating a second
+branded version for a client: would I need to hunt through many files to
+re-brand today, or is most of it already centralized in a few places?
+
+Step 3: Ask me: "Based on what I found, do you want me to consolidate all
+branding (logo, colors, fonts, organization name text) into one central
+config file that every part of the app reads from, before we go further?
+This would be a one-time cleanup with no visible change to how the site
+currently looks — should I proceed?"
+
+Do not modify any code in this pass. Just report and ask.
+```
+
+### C2 — Audit how hardcoded permissions/roles currently are
+
+```
+Investigate, explain, and ask — do not change anything yet.
+
+Look at backend/lib/authorityFlags.ts, teamRoles.ts, and anywhere role or
+team names (like "President" or "Fundraising Head") are checked directly
+by name in code, versus checked through a generic flag (like isLeadership
+or isOfficer).
+
+Step 1: Tell me plainly: are role checks mostly based on generic flags
+(which would work fine for a client with a totally different org
+structure), or do they check specific hardcoded role/team names (which
+would need actual code changes for a client whose departments don't match
+the club's)?
+
+Step 2: Explain in plain terms: if a new client has a completely different
+structure than the club (e.g. no "Fundraising Head," instead "Operations
+Manager"), would today's code handle that through just different database
+rows, or would someone need to edit code each time?
+
+Step 3: Ask me: "Do you want me to look at converting any hardcoded
+role-name checks into generic flag-based checks? This affects how much
+per-client org customization is possible without touching code at all —
+should I proceed, or is this not worth it for the customization level you
+have in mind?"
+
+Do not modify any code in this pass. Just report and ask.
+```
+
+### C3 — Propose customization levels and ask which to support
+
+```
+This is a planning and proposal task only — explain the options clearly
+and ask me to choose. Do not build anything yet.
+
+Based on what you found in C1 and C2, and on how the app is structured
+today (one Next.js codebase per app, one database per deployment), propose
+three levels of customization I could offer a client, from least to most
+effort:
+
+1. "Basic re-brand" — swap logo, colors, and organization name only. Same
+   layout, same features, same permission structure everywhere.
+2. "Feature toggle" — basic re-brand, plus the ability to turn specific
+   existing features on or off per client (e.g. a client with no
+   fundraising arm simply doesn't see the Finance module).
+3. "Structural customization" — basic re-brand and feature toggle, plus
+   allowing genuinely different role/team hierarchies per client, which
+   depends on the changes discussed in C2.
+
+For each level, give me a rough plain-English sense of effort (small /
+medium / large) and flag any real limitation you can already see (for
+example, "level 3 for an org very differently shaped than a club might
+expose features that assume a club-like hierarchy").
+
+Then ask me directly: "Which level of customization do you want for Dr.
+Ashraf's company specifically, and which level do you want the underlying
+system generally capable of, even if his first deployment only needs level
+1?" Wait for my answer before doing anything further.
+```
+
+### C4 — Build the centralized branding config (after C1 + C3 confirmed)
+
+```
+Only proceed once I've confirmed the plan from C1 and told you which
+customization level from C3 to build toward.
+
+Create one clearly-named, central config location (check whether
+packages/shared is the right place, or whether a per-app config file fits
+the current structure better) holding: logo path, primary/secondary
+colors, organization display name, and any other branding value found
+scattered in C1.
+
+Update the scattered locations from C1 to read from this central config
+instead of hardcoding values directly. If the actual scope turns out
+larger than C1 estimated, stop and confirm with me before touching more
+files than expected — I'd rather approve a bigger cleanup explicitly than
+have it happen silently.
+
+After this change, the current site (club branding) should look
+pixel-identical to before — this is a structural cleanup, not a visual
+change. Confirm this is genuinely true before considering it done.
+```
+
+### C5 — Feature flags (only if you chose level 2 or 3 in C3)
+
+```
+Only proceed if I chose customization level 2 or 3 in C3.
+
+Propose, in plain language, a simple mechanism for turning specific
+existing features on or off per deployment (e.g. Finance, Certificates,
+Site Content editors). Favor the simplest approach that fits how the app
+already reads its environment variables (check backend/.env.example and
+each frontend .env.local.example for the existing pattern) rather than
+introducing a new configuration system from scratch.
+
+Ask me: "Here's the specific approach I'd use [describe it] — does this
+match how you'd want to manage this across many future clients, or would
+you prefer something like a database table listing enabled features per
+client instead of environment variables?"
+
+Wait for my answer before implementing anything.
+```
+
+### C6 — Git branching workflow for per-client deployments
+
+```
+This is a workflow explanation, not a code change to the app — walk me
+through it in plain English. Only create example files or documentation if
+I ask you to in your reply.
+
+Explain, step by step, in a way a non-coder can follow:
+1. How to create a new long-lived git branch for a client (e.g.
+   client/dr-ashraf) off of main.
+2. How that branch's copy of the theme/config file (from C4) would differ
+   from main's, while everything else stays identical.
+3. How to bring a new feature built on main into that client branch later
+   (the merge/rebase step) — what it typically looks like when it goes
+   smoothly, and what it looks like when there's a conflict I'd need help
+   resolving.
+4. How each branch maps to its own separate deployment (its own Hugging
+   Face Space or host, its own database), so client branches never share
+   infrastructure with each other or with the club's deployment.
+
+Ask me: "Do you want this written up as a short reference document you can
+follow yourself for future clients, or would you rather I walk you through
+creating the first client branch live, step by step, right now?"
+```
+
+---
+
+## PHASE D — Beta Rollout Safety, Deploy Rollback, and Error Logging
+
+**Goal:** Let you ship risky/new features without every user seeing them
+immediately (beta flags), automatically catch and reverse a broken deploy
+before it stays live (rollback), and actually be able to investigate what
+went wrong afterward (error logging) — three related but separate pieces.
+
+Do D1–D2 first (audit + choose scope) before building anything else in this
+phase.
+
+### D1 — Audit what happens today if a deploy breaks
+
+```
+Investigate, explain, and ask — do not change anything yet.
+
+Look at .github/workflows/deploy.yml and docs/deployment.md.
+
+Step 1: Explain plainly, step by step, what currently happens from the
+moment code is pushed to main until it's live on Hugging Face: does
+anything check that the site is actually working after deploying, or does
+it just upload the files and assume it worked?
+
+Step 2: Tell me plainly: if a bad deploy goes out right now, what would
+actually happen? Would the broken version just stay live until I notice
+and manually fix it, or is there already some check/rollback in place?
+
+Step 3: Look up (or tell me you're not fully certain and to double check
+against Hugging Face's current documentation) how Hugging Face Spaces
+handle version history — specifically, whether reverting to a previous
+working version is something that can be automated as part of the
+existing GitHub Actions workflow, or whether it would need to be done
+manually through the Space's own interface.
+
+Do not change anything yet — just report clearly so I understand the
+current gap before we decide what to build.
+```
+
+### D2 — Propose scope tiers and ask which to build
+
+```
+This is a planning and proposal task only — do not build anything yet.
+
+Based on D1's findings, propose three tiers, from least to most effort:
+
+1. "Basic safety net" — after each deploy, automatically check that
+   /health returns 200; if it doesn't within a short wait, automatically
+   revert to the previous working version and notify me (however
+   notification is simplest to wire up, e.g. a GitHub Actions failure
+   email).
+2. "Basic safety net + beta flags" — everything in tier 1, plus a simple
+   way to mark specific new features as "beta" so they're only visible to
+   me (or a short list of member accounts I choose) until I turn them on
+   for everyone.
+3. "Full pipeline" — everything above, plus a proper error-tracking
+   service (like Sentry) capturing real stack traces after something
+   breaks in production, and a separate staging deployment that changes
+   go to first, before touching the real production Space.
+
+For each tier, give me a plain-English sense of effort (small / medium /
+large) and be honest about diminishing returns — e.g. whether tier 3 is
+overkill right now for a small number of deployments versus something
+worth building once you have several paying clients.
+
+Ask me directly: "Which tier do you want to build toward right now?" Wait
+for my answer before doing anything further.
+```
+
+### D3 — Build the health-check + rollback safety net (tier 1)
+
+```
+Only proceed once I've confirmed at least tier 1 from D2.
+
+Modify .github/workflows/deploy.yml so that after deploying, it checks the
+relevant /health endpoint (and equivalent basic checks for the frontends
+if reasonable) and waits briefly for a healthy response.
+
+If the check fails, explain to me first, in plain language, exactly what
+you're proposing as the automatic recovery step (e.g. "revert the Space to
+the last commit that passed this same check") before implementing it —
+this is the part most likely to need Hugging Face's current documented
+behavior confirmed, so double check rather than guessing.
+
+Also add a way for me to actually notice a failed deploy happened (e.g. a
+GitHub Actions job failure shows up in my email if that's already
+connected, or a simple notification step) — ask me which notification
+method I actually want before wiring it in.
+
+Confirm with me before merging this into the actual deploy workflow used
+for real deploys — I'd like to test this on a deliberately broken small
+change first to see it actually catch something.
+```
+
+### D4 — Beta feature flags (tier 2+)
+
+```
+Only proceed if I chose tier 2 or 3 in D2.
+
+Propose, in plain language, the simplest mechanism for marking a specific
+new feature as "beta" so only you (or a short list of member accounts) see
+it, while everyone else sees the current behavior. Check whether this can
+reuse anything from the feature-flag work in Phase C (if that was already
+built) before creating a separate new mechanism.
+
+Ask me: "Do you want beta access controlled by a specific list of member
+emails/IDs, or by a simple role like 'is this the developer/admin
+account'? And once a beta feature is confirmed working, do you want a
+manual step to turn it on for everyone, or should removing the flag from
+the code be enough?"
+
+Wait for my answer before implementing.
+```
+
+### D5 — Error tracking (tier 3)
+
+```
+Only proceed if I chose tier 3 in D2.
+
+Explain plainly what a service like Sentry (or a similar error-tracking
+tool) actually does: it captures the real error and stack trace whenever
+something breaks while the app is live, and lets you look it up later,
+instead of relying on Hugging Face's own logs which are harder to search
+after the fact.
+
+Explain the privacy tradeoff clearly: whatever data is present when an
+error happens (e.g. request details) could be sent to this third-party
+service unless it's deliberately configured not to include things like
+registrant names, emails, or phone numbers. Propose a configuration that
+excludes that kind of data from error reports.
+
+Ask me: "Do you want to set this up with a specific service (I'd suggest
+Sentry's free tier as a starting point, but confirm current pricing/limits
+before committing), and are you comfortable with the privacy tradeoff as I
+described it, configured to exclude PII from reports?"
+
+Wait for my answer before implementing.
+```
+
+### D6 — Staging deployment (tier 3, most effort)
+
+```
+Only proceed if I chose tier 3 in D2, and only after D3–D5 are in place.
+
+Propose, in plain language, what a staging deployment would look like
+given the current setup (e.g. a second Hugging Face Space, or another
+low-cost host, running the same code with a separate throwaway database)
+and how the GitHub Actions workflow would deploy there first, giving you a
+chance to check it before promoting the same change to the real production
+Space.
+
+Ask me: "Given you're currently managing this mostly on your own, do you
+want a staging deployment that requires you to manually approve promotion
+to production each time, or would you rather changes only go to staging
+automatically and you decide when to push them to production yourself
+through a separate manual step?"
+
+Wait for my answer before building anything.
+```
+
+---
+
 ## PHASE A — Usage Analytics / Data Collection
 
 ### A1 — Where to store usage data
@@ -425,3 +757,20 @@ day-to-day way of checking numbers for now — it needs no new app code and
 no new authenticated page. Only build **A4-later** (the in-app admin page)
 once Dr. Ashraf's trial is actually running and checking Supabase manually
 starts to feel like a hassle.
+
+For Phase C: run **C1, C2, and C3 before you create Dr. Ashraf's separate
+deployment** — C3 specifically is where you tell Cursor how much
+customization to actually support, based on what it found. Once you've
+answered C3, C4 (and C5 if relevant) do the structural cleanup, and C6 sets
+up the actual branch you'll deploy his version from. Doing this before his
+branch exists means his version starts clean instead of needing to be
+untangled later.
+
+For Phase D: run **D1 and D2 as soon as Dr. Ashraf's trial is about to
+start** — you'll be pushing changes to a live paying-adjacent client soon
+after, and the tier-1 health-check-and-rollback safety net (D3) is cheap
+insurance against a bad push staying live unnoticed. D4 (beta flags) is
+worth having before you ship your first genuinely risky new feature to his
+deployment; D5 and D6 (error tracking, staging) can wait until you have
+more than one or two clients, per D2's own honesty check on diminishing
+returns.

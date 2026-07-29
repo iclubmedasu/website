@@ -260,6 +260,8 @@ export default function EventCard({
                             eventId={fullDetail.id}
                             eventSlug={fullDetail.slug}
                             eventTitle={fullDetail.title}
+                            eventDescription={fullDetail.description}
+                            eventVenue={fullDetail.venue}
                             initialTab={initialTab}
                             allowWalkIns={fullDetail.allowWalkIns ?? false}
                             allowDirectCheckIn={fullDetail.allowDirectCheckIn ?? false}
@@ -284,6 +286,20 @@ export default function EventCard({
                             phoneFieldRequired={fullDetail.phoneFieldRequired ?? false}
                             sessionFieldOrder={fullDetail.sessionFieldOrder ?? 0}
                             tierFieldOrder={fullDetail.tierFieldOrder ?? 1}
+                            ticketDesign={{
+                                ticketAccentColor: fullDetail.ticketAccentColor,
+                                ticketHeaderTitle: fullDetail.ticketHeaderTitle,
+                                ticketHeaderSubtitle: fullDetail.ticketHeaderSubtitle,
+                                ticketFooterNote: fullDetail.ticketFooterNote,
+                                ticketHeaderImageGithubPath: fullDetail.ticketHeaderImageGithubPath,
+                                ticketHeaderImageGithubSha: fullDetail.ticketHeaderImageGithubSha,
+                                ticketHeaderImageFileSize: fullDetail.ticketHeaderImageFileSize,
+                                ticketHeaderImageMimeType: fullDetail.ticketHeaderImageMimeType,
+                                ticketFooterImageGithubPath: fullDetail.ticketFooterImageGithubPath,
+                                ticketFooterImageGithubSha: fullDetail.ticketFooterImageGithubSha,
+                                ticketFooterImageFileSize: fullDetail.ticketFooterImageFileSize,
+                                ticketFooterImageMimeType: fullDetail.ticketFooterImageMimeType,
+                            }}
                             onReload={() => onReloadDetail?.()}
                         />
                     </div>

@@ -1,10 +1,10 @@
 "use client";
 
 import type { PublicConfirmationSession, PublicRegistrationConfirmation } from "@iclub/shared";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import QRCode from "qrcode";
 import { Button } from "@/components/ui";
-import { formatSessionRangeDual } from "@iclub/shared/utils";
+import { deriveTicketPalette, formatSessionRangeDual } from "@iclub/shared/utils";
 import {
     ClientEventDateRangeDual,
 } from "@/components/datetime/ClientDateTime";
@@ -12,6 +12,7 @@ import {
     downloadTicketAsPdf,
     // downloadTicketAsPng,
 } from "@/lib/ticketDownload";
+import { getPublicEventPhotoUrl } from "@/lib/api";
 
 interface EventTicketDisplayProps {
     confirmation: PublicRegistrationConfirmation;
@@ -112,6 +113,24 @@ export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {
     const legacySessions = confirmation.sessions ?? [];
 
     const eventTimezone = confirmation.event.timezone ?? "Africa/Cairo";
+    const design = confirmation.ticketDesign;
+    const palette = useMemo(
+        () => deriveTicketPalette(design?.accentColor),
+        [design?.accentColor],
+    );
+    const headerImageSrc = getPublicEventPhotoUrl(design?.headerImageUrl);
+    const footerImageSrc = getPublicEventPhotoUrl(design?.footerImageUrl);
+    const headerEyebrow = design?.headerSubtitle?.trim() || "Your ticket";
+    const headerTitle = design?.headerTitle?.trim() || confirmation.event.title;
+    const footerNote = design?.footerNote?.trim() || "";
+
+    const ticketAccentStyle = {
+        "--ticket-accent-900": palette[900],
+        "--ticket-accent-800": palette[800],
+        "--ticket-accent-700": palette[700],
+        "--ticket-accent-600": palette[600],
+        "--ticket-accent-400": palette[400],
+    } as CSSProperties;
 
     useEffect(() => {
         let cancelled = false;
@@ -120,7 +139,7 @@ export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {
             margin: 1,
             width: 220,
             color: {
-                dark: "#561789",
+                dark: palette[900],
                 light: "#ffffff",
             },
         }).then((url) => {
@@ -136,7 +155,7 @@ export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {
         return () => {
             cancelled = true;
         };
-    }, [confirmation.confirmationCode]);
+    }, [confirmation.confirmationCode, palette]);
 
     async function handleDownloadPdf() {
         setExportError("");
@@ -158,10 +177,24 @@ export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {
 
     return (
         <div className="event-ticket-display">
-            <section ref={ticketRef} className="event-ticket-card" aria-label="Event ticket">
+            <section
+                ref={ticketRef}
+                className="event-ticket-card"
+                aria-label="Event ticket"
+                style={ticketAccentStyle}
+            >
+                {headerImageSrc ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                        src={headerImageSrc}
+                        alt=""
+                        className="event-ticket-card-banner event-ticket-card-banner--header"
+                    />
+                ) : null}
+
                 <div className="event-ticket-card-header">
-                    <p className="event-ticket-card-eyebrow">Your ticket</p>
-                    <h2 className="event-ticket-card-title">{confirmation.event.title}</h2>
+                    <p className="event-ticket-card-eyebrow">{headerEyebrow}</p>
+                    <h2 className="event-ticket-card-title">{headerTitle}</h2>
                 </div>
 
                 <div className="event-ticket-card-body">
@@ -239,6 +272,18 @@ export function EventTicketDisplay({ confirmation }: EventTicketDisplayProps) {
                     Present this QR code or confirmation code at check-in. A copy has also been emailed to{" "}
                     <strong>{confirmation.email}</strong>.
                 </p>
+                {footerNote ? (
+                    <p className="event-ticket-card-footer-note">{footerNote}</p>
+                ) : null}
+
+                {footerImageSrc ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                        src={footerImageSrc}
+                        alt=""
+                        className="event-ticket-card-banner event-ticket-card-banner--footer"
+                    />
+                ) : null}
             </section>
 
             <div className="event-ticket-download-actions">

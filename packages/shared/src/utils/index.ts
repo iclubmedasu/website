@@ -67,3 +67,11 @@ export {
     type TemplateLayoutStaticText,
     type TemplateLayoutWording,
 } from "./certificateLayoutWording";
+export {
+    DEFAULT_TICKET_ACCENT,
+    DEFAULT_TICKET_PALETTE,
+    deriveTicketPalette,
+    normalizeHex,
+    type TicketPalette,
+    type TicketPaletteShade,
+} from "./ticketDesign";

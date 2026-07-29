@@ -1,10 +1,19 @@
 'use client';
 
-import { useState, useEffect, type ChangeEvent } from 'react';
-import { X, Link2, Trash2 } from 'lucide-react';
+import { useState, useEffect, useMemo, type ChangeEvent, type ReactNode } from 'react';
+import { AlertTriangle, Check, X, Link2, Trash2 } from 'lucide-react';
 import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
 import { tasksAPI } from '../../../services/api';
 import { toTitleCase } from '../../../utils/titleCase';
+import {
+    availabilitySortRank,
+    chipTone,
+    summarizeAvailability,
+    type AvailabilityChipTone,
+} from '@/features/Announcements/announcementAvailability';
+import MemberAvailabilityChipBubble from '@/components/MemberAvailabilityHint/MemberAvailabilityChipBubble';
+import SearchableBadgePicker from '@/components/SearchableBadgePicker/SearchableBadgePicker';
+import { useTargetAvailability } from '@/hooks/useTargetAvailability';
 import type {
     Difficulty,
     Id,
@@ -15,6 +24,13 @@ import type {
     TaskSummary,
     UpdateTaskPayload,
 } from '../../../types/backend-contracts';
+
+function availabilityToneIcon(tone: AvailabilityChipTone): ReactNode {
+    if (tone === 'available') return <Check className="team-badge-option-icon" aria-hidden />;
+    if (tone === 'unavailable') return <X className="team-badge-option-icon" aria-hidden />;
+    if (tone === 'partial') return <AlertTriangle className="team-badge-option-icon" aria-hidden />;
+    return null;
+}
 
 const DIFFICULTIES: readonly Difficulty[] = ['EASY', 'MEDIUM', 'HARD'];
 const STATUSES: readonly TaskStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'DELAYED', 'BLOCKED', 'ON_HOLD', 'CANCELLED'];
@@ -86,6 +102,7 @@ interface EditTaskFormState {
 
 interface EditTaskModalProps {
     task: TaskSummaryWithRelations | null;
+    projectId?: Id | null;
     projectDetail?: ProjectDetail | null;
     allMembers?: MemberSummary[];
     onClose: () => void;
@@ -132,6 +149,7 @@ function formatDependencyTaskLabel(taskNode: FlattenedProjectTask) {
 
 export default function EditTaskModal({
     task,
+    projectId: projectIdProp = null,
     projectDetail = null,
     allMembers = [],
     onClose,
@@ -157,6 +175,66 @@ export default function EditTaskModal({
     const [taskDetail, setTaskDetail] = useState<TaskSummaryWithRelations | null>(task);
     const [dependencyTaskId, setDependencyTaskId] = useState('');
     const [dependencyType, setDependencyType] = useState<DependencyType>('FINISH_TO_START');
+
+    const projectId =
+        projectIdProp
+        ?? projectDetail?.id
+        ?? (task as { projectId?: Id } | null)?.projectId
+        ?? null;
+    const { byMemberId, announcement } = useTargetAvailability(
+        projectId != null ? { projectId } : null,
+    );
+    const dateRange = {
+        start: form.startDate || null,
+        end: form.dueDate || form.startDate || null,
+    };
+
+    const sortedMembers = useMemo(() => {
+        return [...allMembers].sort((a, b) => {
+            const toneA = chipTone(summarizeAvailability(byMemberId.get(Number(a.id)), dateRange));
+            const toneB = chipTone(summarizeAvailability(byMemberId.get(Number(b.id)), dateRange));
+            const rankDiff = availabilitySortRank(toneA) - availabilitySortRank(toneB);
+            if (rankDiff !== 0) return rankDiff;
+            return a.fullName.localeCompare(b.fullName);
+        });
+    }, [allMembers, byMemberId, dateRange.start, dateRange.end]);
+
+    const renderMemberChip = (
+        member: MemberSummary,
+        selected: boolean,
+        onToggle: () => void,
+        disabled = false,
+    ) => {
+        const summary = summarizeAvailability(byMemberId.get(Number(member.id)), dateRange);
+        const tone = chipTone(summary);
+        const toneClass = tone === 'neutral' ? '' : ` team-badge-option--avail-${tone}`;
+        const chip = (
+            <button
+                type="button"
+                className={`team-badge-option${selected ? ' team-badge-option--selected' : ''}${toneClass}`}
+                aria-label={member.fullName}
+                onClick={onToggle}
+                disabled={disabled}
+            >
+                {availabilityToneIcon(tone)}
+                {member.fullName}
+            </button>
+        );
+        if (!summary) {
+            return <div className="member-assign-option">{chip}</div>;
+        }
+        return (
+            <MemberAvailabilityChipBubble
+                status={summary.status}
+                periodsLabel={summary.periodsLabel}
+                conflict={summary.conflict}
+                conflictNote={summary.conflictNote}
+                announcementTitle={announcement?.title}
+            >
+                {chip}
+            </MemberAvailabilityChipBubble>
+        );
+    };
 
     useEffect(() => {
         if (task) {
@@ -595,22 +673,20 @@ export default function EditTaskModal({
                             <p className="form-hint">No leader selected.</p>
                         )}
                         {allMembers.length > 0 ? (
-                            <div className="team-badge-picker">
-                                {allMembers.map((member) => {
-                                    const selected = form.leaderId === member.id;
-                                    return (
-                                        <button
-                                            key={member.id}
-                                            type="button"
-                                            className={`team-badge-option${selected ? ' team-badge-option--selected' : ''}`}
-                                            onClick={() => toggleLeader(member.id)}
-                                            disabled={!canManageTask}
-                                        >
-                                            {member.fullName}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            <SearchableBadgePicker
+                                items={sortedMembers}
+                                getKey={(member) => member.id}
+                                getLabel={(member) => member.fullName}
+                                searchPlaceholder="Search members…"
+                                renderItem={(member) =>
+                                    renderMemberChip(
+                                        member,
+                                        form.leaderId === member.id,
+                                        () => toggleLeader(member.id),
+                                        !canManageTask,
+                                    )
+                                }
+                            />
                         ) : (
                             <p className="form-hint">No members available.</p>
                         )}
@@ -619,22 +695,20 @@ export default function EditTaskModal({
                     <div className="form-section">
                         <h3 className="form-section-title">Assignees</h3>
                         {allMembers.length > 0 ? (
-                            <div className="team-badge-picker">
-                                {allMembers.map((member) => {
-                                    const selected = form.assigneeIds.includes(member.id);
-                                    return (
-                                        <button
-                                            key={member.id}
-                                            type="button"
-                                            className={`team-badge-option${selected ? ' team-badge-option--selected' : ''}`}
-                                            onClick={() => toggleAssignee(member.id)}
-                                            disabled={!canManageTask}
-                                        >
-                                            {member.fullName}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            <SearchableBadgePicker
+                                items={sortedMembers}
+                                getKey={(member) => member.id}
+                                getLabel={(member) => member.fullName}
+                                searchPlaceholder="Search members…"
+                                renderItem={(member) =>
+                                    renderMemberChip(
+                                        member,
+                                        form.assigneeIds.includes(member.id),
+                                        () => toggleAssignee(member.id),
+                                        !canManageTask,
+                                    )
+                                }
+                            />
                         ) : (
                             <p className="form-hint">No members available.</p>
                         )}

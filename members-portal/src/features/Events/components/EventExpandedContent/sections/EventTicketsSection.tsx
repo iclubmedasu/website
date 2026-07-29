@@ -8,6 +8,7 @@ import type {
     EventCustomFieldRef,
     EventRegistrationRef,
     EventSessionRef,
+    EventTicketDesignRef,
     EventTierRef,
     Id,
     SendRegistrationTicketsResult,
@@ -19,7 +20,6 @@ import {
     isImportPlaceholderEmail,
     REGISTRATION_EMAIL_DISPLAY_LIMIT,
     REGISTRATION_NAME_DISPLAY_LIMIT,
-    REGISTRATION_PHONE_DISPLAY_LIMIT,
     truncateRegistrationCell,
 } from '../customFieldUtils';
 import { isMultiDayEvent, isWithinEventDays } from '../../eventDateUtils';
@@ -42,15 +42,20 @@ import {
     type RegistrationSortSpec,
 } from '../registrationTableFilterUtils';
 import type { RegistrationTableFunnelState } from '../eventExpandedFunnelState';
+import TicketDesignPanel from './TicketDesign/TicketDesignPanel';
 
 interface EventTicketsSectionProps {
     eventId: Id | string;
+    eventTitle?: string;
+    eventDescription?: string | null;
+    eventVenue?: string | null;
     eventDate?: string | null;
     eventEndDate?: string | null;
     eventTimezone?: string;
     sessions?: EventSessionRef[];
     tiers?: EventTierRef[];
     fields?: EventCustomFieldRef[];
+    ticketDesign?: EventTicketDesignRef | null;
     canRemoveAttendance?: boolean;
     funnel: RegistrationTableFunnelState;
     onFunnelChange: (
@@ -58,6 +63,7 @@ interface EventTicketsSectionProps {
             | RegistrationTableFunnelState
             | ((prev: RegistrationTableFunnelState) => RegistrationTableFunnelState),
     ) => void;
+    onReload: () => void;
 }
 
 function formatBulkSummary(result: SendRegistrationTicketsResult, label: string): string {
@@ -87,15 +93,20 @@ function EmailDeliveryStatusCell({
 
 export default function EventTicketsSection({
     eventId,
+    eventTitle = 'Event',
+    eventDescription,
+    eventVenue,
     eventDate,
     eventEndDate,
     eventTimezone = CLUB_TIMEZONE,
     sessions = [],
     tiers = [],
     fields = [],
+    ticketDesign,
     canRemoveAttendance = false,
     funnel,
     onFunnelChange,
+    onReload,
 }: EventTicketsSectionProps) {
     const [registrations, setRegistrations] = useState<EventRegistrationRef[]>([]);
     const ticketSearch = funnel.search;
@@ -149,7 +160,7 @@ export default function EventTicketsSection({
             return [String(session.id), day ?? ''] as const;
         }),
     );
-    const columnCount = multiDayEvent ? 7 : 6;
+    const columnCount = multiDayEvent ? 6 : 5;
     const filterableColumns = useMemo(
         () => buildFilterableColumns('tickets', fields, tiers, sessions, multiDayEvent),
         [fields, multiDayEvent, sessions, tiers],
@@ -406,237 +417,255 @@ export default function EventTicketsSection({
                 <h2 className="expanded-section-title">Tickets</h2>
             </div>
 
-            <div className="page-search-row event-registration-search-row">
-                <div className="page-search-field page-search-field--full event-registration-search-field">
-                    <Search className="page-search-icon" size={16} />
-                    <input
-                        type="search"
-                        className="page-search-input"
-                        value={ticketSearch}
-                        onChange={(event) => setTicketSearch(event.target.value)}
-                        placeholder="Search by name, email, or code"
-                        aria-label="Search tickets"
+            <div className="event-tickets-layout">
+                <div className="event-tickets-table-column">
+                    <div className="page-search-row event-registration-search-row">
+                        <div className="page-search-field page-search-field--full event-registration-search-field">
+                            <Search className="page-search-icon" size={16} />
+                            <input
+                                type="search"
+                                className="page-search-input"
+                                value={ticketSearch}
+                                onChange={(event) => setTicketSearch(event.target.value)}
+                                placeholder="Search by name, email, or code"
+                                aria-label="Search tickets"
+                            />
+                            <button
+                                type="button"
+                                className={`page-search-filter-btn${hasFunnelFiltersActive ? ' page-search-filter-btn--active' : ''}`}
+                                onClick={() => setFilterModalOpen(true)}
+                                aria-label="Open sort and filters"
+                            >
+                                <Filter size={16} />
+                                <span className="page-search-filter-label">Sort & Filters</span>
+                            </button>
+                        </div>
+                    </div>
+                    <RegistrationFilterChips
+                        filters={columnFilters}
+                        serverFilters={serverFilters}
+                        columns={filterableColumns}
+                        context={tableContext}
+                        tiers={tiers}
+                        onRemove={(index) => setColumnFilters((current) => current.filter((_, filterIndex) => filterIndex !== index))}
+                        onRemoveServerFilter={(key) => {
+                            setServerFilters((current) => ({ ...current, [key]: EMPTY_REGISTRATION_SERVER_FILTERS[key] }));
+                        }}
+                        onClearAll={() => {
+                            setColumnFilters([]);
+                            setServerFilters(EMPTY_REGISTRATION_SERVER_FILTERS);
+                        }}
                     />
-                    <button
-                        type="button"
-                        className={`page-search-filter-btn${hasFunnelFiltersActive ? ' page-search-filter-btn--active' : ''}`}
-                        onClick={() => setFilterModalOpen(true)}
-                        aria-label="Open sort and filters"
-                    >
-                        <Filter size={16} />
-                        <span className="page-search-filter-label">Sort & Filters</span>
-                    </button>
-                </div>
-            </div>
-            <RegistrationFilterChips
-                filters={columnFilters}
-                serverFilters={serverFilters}
-                columns={filterableColumns}
-                context={tableContext}
-                tiers={tiers}
-                onRemove={(index) => setColumnFilters((current) => current.filter((_, filterIndex) => filterIndex !== index))}
-                onRemoveServerFilter={(key) => {
-                    setServerFilters((current) => ({ ...current, [key]: EMPTY_REGISTRATION_SERVER_FILTERS[key] }));
-                }}
-                onClearAll={() => {
-                    setColumnFilters([]);
-                    setServerFilters(EMPTY_REGISTRATION_SERVER_FILTERS);
-                }}
-            />
-            <RegistrationColumnFilterModal
-                open={filterModalOpen}
-                columns={filterableColumns}
-                activeFilters={columnFilters}
-                sortSpec={sortSpec}
-                serverFilters={serverFilters}
-                serverFilterConfig={{
-                    showSource: true,
-                    showCheckIn: true,
-                    showTicketStatus: true,
-                    showReminderStatus: true,
-                    showCheckedInToday: multiDayEvent && withinEventDays,
-                }}
-                context={tableContext}
-                tiers={tiers}
-                sessions={sessions}
-                onClose={() => setFilterModalOpen(false)}
-                onApply={(filters, nextSort, nextServerFilters) => {
-                    setColumnFilters(filters);
-                    setSortSpec(nextSort);
-                    setServerFilters({
-                        ...EMPTY_REGISTRATION_SERVER_FILTERS,
-                        sourceGroup: nextServerFilters.sourceGroup,
-                        checkInStatus: nextServerFilters.checkInStatus,
-                        ticketStatus: nextServerFilters.ticketStatus,
-                        reminderStatus: nextServerFilters.reminderStatus,
-                    });
-                }}
-                onClear={() => {
-                    setColumnFilters([]);
-                    setSortSpec(DEFAULT_REGISTRATION_SORT);
-                    setServerFilters(EMPTY_REGISTRATION_SERVER_FILTERS);
-                }}
-            />
+                    <RegistrationColumnFilterModal
+                        open={filterModalOpen}
+                        columns={filterableColumns}
+                        activeFilters={columnFilters}
+                        sortSpec={sortSpec}
+                        serverFilters={serverFilters}
+                        serverFilterConfig={{
+                            showSource: true,
+                            showCheckIn: true,
+                            showTicketStatus: true,
+                            showReminderStatus: true,
+                            showCheckedInToday: multiDayEvent && withinEventDays,
+                        }}
+                        context={tableContext}
+                        tiers={tiers}
+                        sessions={sessions}
+                        onClose={() => setFilterModalOpen(false)}
+                        onApply={(filters, nextSort, nextServerFilters) => {
+                            setColumnFilters(filters);
+                            setSortSpec(nextSort);
+                            setServerFilters({
+                                ...EMPTY_REGISTRATION_SERVER_FILTERS,
+                                sourceGroup: nextServerFilters.sourceGroup,
+                                checkInStatus: nextServerFilters.checkInStatus,
+                                ticketStatus: nextServerFilters.ticketStatus,
+                                reminderStatus: nextServerFilters.reminderStatus,
+                            });
+                        }}
+                        onClear={() => {
+                            setColumnFilters([]);
+                            setSortSpec(DEFAULT_REGISTRATION_SORT);
+                            setServerFilters(EMPTY_REGISTRATION_SERVER_FILTERS);
+                        }}
+                    />
 
-            <div className="event-registrations-table-shell event-tickets-table-shell">
-                <div className="table-container event-registrations-table-scroll">
-                    <table className="members-table event-registrations-table">
-                        <thead>
-                            <tr>
-                                <th className="event-registrations-name-cell">Name</th>
-                                <th className="event-registrations-email-cell">Email</th>
-                                <th className="event-registrations-phone-cell">Phone</th>
-                                {multiDayEvent ? <th>Attendance</th> : null}
-                                <th>Ticket</th>
-                                <th>Reminder</th>
-                                <th className="event-registrations-actions-col">Actions</th>
-                                {/* Source and Check-in columns hidden */}
-                                {/* <th>Source</th> */}
-                                {/* <th className="event-registrations-status-cell">Check-in</th> */}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.length === 0 ? (
-                                <tr>
-                                    <td colSpan={columnCount} className="event-tickets-empty">No registrations match these filters.</td>
-                                </tr>
-                            ) : filtered.map((registration, index) => {
-                                const ticketStatus = formatTicketEmailStatus(registration);
-                                const reminderStatus = formatReminderEmailStatus(registration);
-                                const sendable = canSendEmail(registration);
-
-                                return (
-                                    <tr key={registration.id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
-                                        <td className="event-registrations-name-cell" title={registration.fullName || undefined}>
-                                            {registration.fullName
-                                                ? truncateRegistrationCell(registration.fullName, REGISTRATION_NAME_DISPLAY_LIMIT)
-                                                : '—'}
-                                        </td>
-                                        <td className="event-registrations-email-cell" title={registration.email || undefined}>
-                                            {registration.email
-                                                ? truncateRegistrationCell(registration.email, REGISTRATION_EMAIL_DISPLAY_LIMIT)
-                                                : '—'}
-                                        </td>
-                                        <td className="event-registrations-phone-cell" title={registration.phoneNumber || undefined}>
-                                            {registration.phoneNumber
-                                                ? truncateRegistrationCell(registration.phoneNumber, REGISTRATION_PHONE_DISPLAY_LIMIT)
-                                                : '—'}
-                                        </td>
-                                        {multiDayEvent ? (
-                                            <td>
-                                                <CollapsibleAttendanceChips
-                                                    registration={registration}
-                                                    sessionDateById={sessionDateById}
-                                                    canRemoveAttendance={canRemoveAttendance}
-                                                    collapsible={multiDayEvent}
-                                                    onRequestRemoval={setAttendanceRemovalTarget}
-                                                />
-                                            </td>
-                                        ) : null}
-                                        <td><EmailDeliveryStatusCell status={ticketStatus} /></td>
-                                        <td><EmailDeliveryStatusCell status={reminderStatus} /></td>
-                                        <td className="event-registrations-actions-col">
-                                            {sendable ? (
-                                                <div className="event-tickets-actions-col">
-                                                    <button
-                                                        type="button"
-                                                        className="table-action-btn view-btn"
-                                                        title="Resend ticket"
-                                                        disabled={resendingTicketId === Number(registration.id)}
-                                                        onClick={() => void handleResendTicket(registration)}
-                                                    >
-                                                        {resendingTicketId === Number(registration.id)
-                                                            ? <Loader2 className="animate-spin" />
-                                                            : <Mail />}
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className="table-action-btn view-btn"
-                                                        title="Send reminder"
-                                                        disabled={sendingReminderId === Number(registration.id)}
-                                                        onClick={() => void handleSendReminder(registration)}
-                                                    >
-                                                        {sendingReminderId === Number(registration.id)
-                                                            ? <Loader2 className="animate-spin" />
-                                                            : <Bell />}
-                                                    </button>
-                                                </div>
-                                            ) : '—'}
-                                        </td>
-                                        {/* Source and Check-in cells hidden */}
-                                        {/* <td>{formatRegistrationSource(registration)}</td> */}
-                                        {/* <td className="event-registrations-status-cell">{formatRegistrationStatus(registration)}</td> */}
+                    <div className="event-registrations-table-shell event-tickets-table-shell">
+                        <div className="table-container event-registrations-table-scroll">
+                            <table className="members-table event-registrations-table">
+                                <thead>
+                                    <tr>
+                                        <th className="event-registrations-name-cell">Name</th>
+                                        <th className="event-registrations-email-cell">Email</th>
+                                        {multiDayEvent ? <th>Attendance</th> : null}
+                                        <th className="event-tickets-delivery-col">Ticket</th>
+                                        <th className="event-tickets-delivery-col">Reminder</th>
+                                        <th className="event-registrations-actions-col">Actions</th>
+                                        {/* Source and Check-in columns hidden */}
+                                        {/* <th>Source</th> */}
+                                        {/* <th className="event-registrations-status-cell">Check-in</th> */}
                                     </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                </thead>
+                                <tbody>
+                                    {filtered.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={columnCount} className="event-tickets-empty">No registrations match these filters.</td>
+                                        </tr>
+                                    ) : filtered.map((registration, index) => {
+                                        const ticketStatus = formatTicketEmailStatus(registration);
+                                        const reminderStatus = formatReminderEmailStatus(registration);
+                                        const sendable = canSendEmail(registration);
+
+                                        return (
+                                            <tr key={registration.id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
+                                                <td className="event-registrations-name-cell" title={registration.fullName || undefined}>
+                                                    {registration.fullName
+                                                        ? truncateRegistrationCell(registration.fullName, REGISTRATION_NAME_DISPLAY_LIMIT)
+                                                        : '—'}
+                                                </td>
+                                                <td className="event-registrations-email-cell" title={registration.email || undefined}>
+                                                    {registration.email
+                                                        ? truncateRegistrationCell(registration.email, REGISTRATION_EMAIL_DISPLAY_LIMIT)
+                                                        : '—'}
+                                                </td>
+                                                {multiDayEvent ? (
+                                                    <td>
+                                                        <CollapsibleAttendanceChips
+                                                            registration={registration}
+                                                            sessionDateById={sessionDateById}
+                                                            canRemoveAttendance={canRemoveAttendance}
+                                                            collapsible={multiDayEvent}
+                                                            onRequestRemoval={setAttendanceRemovalTarget}
+                                                        />
+                                                    </td>
+                                                ) : null}
+                                                <td className="event-tickets-delivery-col">
+                                                    <EmailDeliveryStatusCell status={ticketStatus} />
+                                                </td>
+                                                <td className="event-tickets-delivery-col">
+                                                    <EmailDeliveryStatusCell status={reminderStatus} />
+                                                </td>
+                                                <td className="event-registrations-actions-col">
+                                                    {sendable ? (
+                                                        <div className="event-tickets-actions-col">
+                                                            <button
+                                                                type="button"
+                                                                className="table-action-btn view-btn"
+                                                                title="Resend ticket"
+                                                                disabled={resendingTicketId === Number(registration.id)}
+                                                                onClick={() => void handleResendTicket(registration)}
+                                                            >
+                                                                {resendingTicketId === Number(registration.id)
+                                                                    ? <Loader2 className="animate-spin" />
+                                                                    : <Mail />}
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="table-action-btn view-btn"
+                                                                title="Send reminder"
+                                                                disabled={sendingReminderId === Number(registration.id)}
+                                                                onClick={() => void handleSendReminder(registration)}
+                                                            >
+                                                                {sendingReminderId === Number(registration.id)
+                                                                    ? <Loader2 className="animate-spin" />
+                                                                    : <Bell />}
+                                                            </button>
+                                                        </div>
+                                                    ) : '—'}
+                                                </td>
+                                                {/* Source and Check-in cells hidden */}
+                                                {/* <td>{formatRegistrationSource(registration)}</td> */}
+                                                {/* <td className="event-registrations-status-cell">{formatRegistrationStatus(registration)}</td> */}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="event-tickets-io-bar">
+                            {/* Send tickets to imported — hidden for now
+                            <button
+                                type="button"
+                                className="btn btn-secondary event-tickets-io-btn"
+                                disabled={bulkAction !== null || importUnsentCount === 0}
+                                onClick={() => void handleSendImportedTickets()}
+                            >
+                                {bulkAction === 'imported'
+                                    ? 'Sending…'
+                                    : importUnsentCount > 0
+                                        ? `Send tickets to imported (${importUnsentCount})`
+                                        : 'Send tickets to imported'}
+                            </button>
+                            */}
+                            <button
+                                type="button"
+                                className="btn btn-secondary event-tickets-io-btn"
+                                disabled={bulkAction !== null || filteredSendable.length === 0}
+                                onClick={() => void handleSendFilteredTickets()}
+                            >
+                                {bulkAction === 'filtered'
+                                    ? 'Sending…'
+                                    : filteredSendable.length > 0
+                                        ? `Send tickets to filtered (${filteredSendable.length})`
+                                        : 'Send tickets to filtered'}
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-primary event-tickets-io-btn"
+                                disabled={bulkAction !== null || allTicketsCount === 0}
+                                onClick={() => void handleResendAllTickets()}
+                            >
+                                {bulkAction === 'allTickets'
+                                    ? 'Sending…'
+                                    : allTicketsCount > 0
+                                        ? `Send tickets to all (${allTicketsCount})`
+                                        : 'Send tickets to all'}
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-primary event-tickets-io-btn"
+                                disabled={bulkAction !== null || allRemindersCount === 0}
+                                onClick={() => void handleSendReminders()}
+                            >
+                                {bulkAction === 'reminders'
+                                    ? 'Sending…'
+                                    : allRemindersCount > 0
+                                        ? `Send reminders to all (${allRemindersCount})`
+                                        : 'Send reminders to all'}
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-secondary event-tickets-io-btn"
+                                disabled={bulkAction !== null || filteredReminderSendable.length === 0}
+                                onClick={() => void handleSendFilteredReminders()}
+                            >
+                                {bulkAction === 'filteredReminders'
+                                    ? 'Sending…'
+                                    : filteredReminderSendable.length > 0
+                                        ? `Send reminders to filtered (${filteredReminderSendable.length})`
+                                        : 'Send reminders to filtered'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="event-tickets-io-bar">
-                    {/* Send tickets to imported — hidden for now
-                    <button
-                        type="button"
-                        className="btn btn-secondary event-tickets-io-btn"
-                        disabled={bulkAction !== null || importUnsentCount === 0}
-                        onClick={() => void handleSendImportedTickets()}
-                    >
-                        {bulkAction === 'imported'
-                            ? 'Sending…'
-                            : importUnsentCount > 0
-                                ? `Send tickets to imported (${importUnsentCount})`
-                                : 'Send tickets to imported'}
-                    </button>
-                    */}
-                    <button
-                        type="button"
-                        className="btn btn-secondary event-tickets-io-btn"
-                        disabled={bulkAction !== null || filteredSendable.length === 0}
-                        onClick={() => void handleSendFilteredTickets()}
-                    >
-                        {bulkAction === 'filtered'
-                            ? 'Sending…'
-                            : filteredSendable.length > 0
-                                ? `Send tickets to filtered (${filteredSendable.length})`
-                                : 'Send tickets to filtered'}
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-primary event-tickets-io-btn"
-                        disabled={bulkAction !== null || allTicketsCount === 0}
-                        onClick={() => void handleResendAllTickets()}
-                    >
-                        {bulkAction === 'allTickets'
-                            ? 'Sending…'
-                            : allTicketsCount > 0
-                                ? `Send tickets to all (${allTicketsCount})`
-                                : 'Send tickets to all'}
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-primary event-tickets-io-btn"
-                        disabled={bulkAction !== null || allRemindersCount === 0}
-                        onClick={() => void handleSendReminders()}
-                    >
-                        {bulkAction === 'reminders'
-                            ? 'Sending…'
-                            : allRemindersCount > 0
-                                ? `Send reminders to all (${allRemindersCount})`
-                                : 'Send reminders to all'}
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-secondary event-tickets-io-btn"
-                        disabled={bulkAction !== null || filteredReminderSendable.length === 0}
-                        onClick={() => void handleSendFilteredReminders()}
-                    >
-                        {bulkAction === 'filteredReminders'
-                            ? 'Sending…'
-                            : filteredReminderSendable.length > 0
-                                ? `Send reminders to filtered (${filteredReminderSendable.length})`
-                                : 'Send reminders to filtered'}
-                    </button>
-                </div>
+                <aside className="event-tickets-design-column">
+                    <TicketDesignPanel
+                        eventId={eventId}
+                        eventTitle={eventTitle}
+                        eventDescription={eventDescription}
+                        eventVenue={eventVenue}
+                        eventDate={eventDate}
+                        eventEndDate={eventEndDate}
+                        eventTimezone={eventTimezone}
+                        sessions={sessions}
+                        tiers={tiers}
+                        ticketDesign={ticketDesign}
+                        onReload={onReload}
+                    />
+                </aside>
             </div>
 
             {attendanceRemovalTarget ? (

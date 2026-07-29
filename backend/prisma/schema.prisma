@@ -10,105 +10,125 @@ datasource db {
 // MEMBERS - Core member information
 // ============================================
 model Member {
-  id                Int       @id @default(autoincrement())
-  fullName          String
-  email             String    @unique   // Official: studentId@med.asu.edu.eg (auto, not editable by user)
-  email2            String?   @unique   // Optional secondary email (editable)
-  email3            String?   @unique   // Optional tertiary email (editable)
-  phoneNumber       String    @unique   // Primary phone (with country code, e.g. +201234567890)
-  phoneNumber2      String?   @unique   // Optional second phone (with country code)
-  studentId         Int?      @unique   // Nullable for officers (they have no student ID)
-  profilePhotoUrl   String?
-  linkedInUrl       String?
-  isActive          Boolean   @default(true)  // Overall active status
-  assignmentStatus  String    @default("UNASSIGNED")  // ASSIGNED | UNASSIGNED | ALUMNI (explicit tag for filtering)
-  joinDate          DateTime  @default(now())
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id               Int      @id @default(autoincrement())
+  fullName         String
+  email            String   @unique // Official: studentId@med.asu.edu.eg (auto, not editable by user)
+  email2           String?  @unique // Optional secondary email (editable)
+  email3           String?  @unique // Optional tertiary email (editable)
+  phoneNumber      String   @unique // Primary phone (with country code, e.g. +201234567890)
+  phoneNumber2     String?  @unique // Optional second phone (with country code)
+  studentId        Int?     @unique // Nullable for officers (they have no student ID)
+  profilePhotoUrl  String?
+  linkedInUrl      String?
+  isActive         Boolean  @default(true) // Overall active status
+  assignmentStatus String   @default("UNASSIGNED") // ASSIGNED | UNASSIGNED | ALUMNI (explicit tag for filtering)
+  joinDate         DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   // Contact visibility to other members / public (default hidden)
-  showPhoneNumber   Boolean   @default(false)
-  showPhoneNumber2  Boolean   @default(false)
-  showEmail2        Boolean   @default(false)
-  showEmail3        Boolean   @default(false)
-  showStudentId     Boolean   @default(false)
+  showPhoneNumber  Boolean @default(false)
+  showPhoneNumber2 Boolean @default(false)
+  showEmail2       Boolean @default(false)
+  showEmail3       Boolean @default(false)
+  showStudentId    Boolean @default(false)
 
   // Relations
-  user            User?
-  teamMemberships TeamMember[]
-  roleHistory     MemberRoleHistory[]
-  alumniRecords   Alumni[]
-  createdProjects     Project[]               // Projects created by this member
-  leadingTasks        Task[]                  // Tasks where this member is the optional leader
-  taskAssignments     TaskAssignment[]        // Tasks assigned to this member
-  taskComments        TaskComment[]           // Comments on tasks
-  projectFileComments ProjectFileComment[]    // Comments on project files
-  eventFileComments   EventFileComment[]      // Comments on event files
-  taskActivityLog     TaskActivityLog[]       // Activity log entries
-  projectActivityLog  ProjectActivityLog[]     // Project-level activity log entries
-  eventActivityLog    EventActivityLog[]       // Event-level activity log entries
-  scheduleSlots       ProjectScheduleSlot[]    // Time slots assigned to this member
-  createdScheduleSlots ProjectScheduleSlot[]   @relation("ProjectScheduleSlotCreatedBy")
-  uploadedFiles       ProjectFile[]           // Files uploaded by this member
-  createdFolders      ProjectFolder[]         // Folders created by this member
-  uploadedEventFiles  EventFile[]             // Event files uploaded by this member
-  uploadedEventPhotos EventPhoto[]            // Event photos uploaded by this member
-  uploadedProjectPhotos ProjectPhoto[]        // Project photos uploaded by this member
-  createdEventFolders EventFolder[]           // Event folders created by this member
-  createdEvents       Event[]                 @relation("EventCreatedBy")
-  eventRegistrations  EventRegistration[]
-  eventTaskAssignments EventTaskAssignment[]   // Event task time slots assigned to this member
-  eventTasksLed       EventTask[]             @relation("EventTaskLeader")
-  eventTasksCreated   EventTask[]             @relation("EventTaskCreatedBy")
+  user                       User?
+  teamMemberships            TeamMember[]
+  roleHistory                MemberRoleHistory[]
+  alumniRecords              Alumni[]
+  createdProjects            Project[] // Projects created by this member
+  leadingTasks               Task[] // Tasks where this member is the optional leader
+  taskAssignments            TaskAssignment[] // Tasks assigned to this member
+  taskComments               TaskComment[] // Comments on tasks
+  projectFileComments        ProjectFileComment[] // Comments on project files
+  eventFileComments          EventFileComment[] // Comments on event files
+  taskActivityLog            TaskActivityLog[] // Activity log entries
+  projectActivityLog         ProjectActivityLog[] // Project-level activity log entries
+  eventActivityLog           EventActivityLog[] // Event-level activity log entries
+  scheduleSlots              ProjectScheduleSlot[] // Time slots assigned to this member
+  createdScheduleSlots       ProjectScheduleSlot[]  @relation("ProjectScheduleSlotCreatedBy")
+  uploadedFiles              ProjectFile[] // Files uploaded by this member
+  createdFolders             ProjectFolder[] // Folders created by this member
+  uploadedEventFiles         EventFile[] // Event files uploaded by this member
+  uploadedEventPhotos        EventPhoto[] // Event photos uploaded by this member
+  uploadedProjectPhotos      ProjectPhoto[] // Project photos uploaded by this member
+  createdEventFolders        EventFolder[] // Event folders created by this member
+  createdEvents              Event[]                @relation("EventCreatedBy")
+  eventRegistrations         EventRegistration[]
+  eventTaskAssignments       EventTaskAssignment[] // Event task time slots assigned to this member
+  eventTasksLed              EventTask[]            @relation("EventTaskLeader")
+  eventTasksCreated          EventTask[]            @relation("EventTaskCreatedBy")
+  createdAnnouncements       Announcement[]         @relation("AnnouncementCreatedBy")
+  announcementResponses      AnnouncementResponse[]
   financeTransactionsCreated FinanceTransaction[]
-  notificationEventsAuthored NotificationEvent[] @relation("NotificationEventActor")
-  notifications      Notification[]
-  incidentReports    IncidentReport[]
-  certificates       Certificate[] @relation("MemberCertificates")
+  notificationEventsAuthored NotificationEvent[]    @relation("NotificationEventActor")
+  notifications              Notification[]
+  incidentReports            IncidentReport[]
+  certificates               Certificate[]          @relation("MemberCertificates")
+  uploadedDocuments              Document[]              @relation("DocumentUploadedBy")
+  documentAccessGrants           DocumentAccessGrant[]   @relation("DocumentGrantMember")
+  documentAccessGrantsGranted    DocumentAccessGrant[]   @relation("DocumentGrantGrantedBy")
+  documentAccessGrantsRevoked    DocumentAccessGrant[]   @relation("DocumentGrantRevokedBy")
+  documentAccessRequests         DocumentAccessRequest[] @relation("DocumentRequestMember")
+  documentAccessRequestsReviewed DocumentAccessRequest[] @relation("DocumentRequestReviewedBy")
+  documentAccessLogs             DocumentAccessLog[]     @relation("DocumentAccessLogMember")
+  documentCategoryAccessGrants           DocumentCategoryAccessGrant[]   @relation("DocumentCategoryGrantMember")
+  documentCategoryAccessGrantsGranted    DocumentCategoryAccessGrant[]   @relation("DocumentCategoryGrantGrantedBy")
+  documentCategoryAccessGrantsRevoked    DocumentCategoryAccessGrant[]   @relation("DocumentCategoryGrantRevokedBy")
+  documentCategoryAccessLogs             DocumentCategoryAccessLog[]     @relation("DocumentCategoryAccessLogMember")
+  documentCategoryAccessRequests         DocumentCategoryAccessRequest[] @relation("DocumentCategoryRequestMember")
+  documentCategoryAccessRequestsReviewed DocumentCategoryAccessRequest[] @relation("DocumentCategoryRequestReviewedBy")
+  pushSubscriptions                      PushSubscription[]
 }
 
 // ============================================
 // TEAMS - Teams/Committees/Departments
 // ============================================
 model Team {
-  id               Int       @id @default(autoincrement())
-  name             String    @unique
-  isActive         Boolean   @default(true)
-  establishedDate  DateTime  @default(now())
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  
+  id              Int      @id @default(autoincrement())
+  name            String   @unique
+  isActive        Boolean  @default(true)
+  establishedDate DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
   // Relations
-  members          TeamMember[]
-  roles            TeamRole[]
-  subteams         Subteam[]
-  roleHistory      MemberRoleHistory[]
-  alumni           Alumni[]
-  projectTeams     ProjectTeam[]           // Projects assigned to this team
-  eventTeams       EventTeam[]             // Events assigned to this team
-  taskTeams        TaskTeam[]              // Tasks assigned to this team
+  members      TeamMember[]
+  roles        TeamRole[]
+  subteams     Subteam[]
+  roleHistory  MemberRoleHistory[]
+  alumni       Alumni[]
+  projectTeams ProjectTeam[] // Projects assigned to this team
+  eventTeams   EventTeam[] // Events assigned to this team
+  taskTeams    TaskTeam[] // Tasks assigned to this team
+  scopedDocuments              Document[]
+  scopedDocumentCategories     DocumentCategory[]
+  documentAccessGrants         DocumentAccessGrant[]         @relation("DocumentGrantTeam")
+  documentCategoryAccessGrants DocumentCategoryAccessGrant[] @relation("DocumentCategoryGrantTeam")
 }
 
 // ============================================
 // TEAM ROLES - Available roles per team
 // ============================================
 model TeamRole {
-  id             Int       @id @default(autoincrement())
-  teamId         Int
-  roleName       String
-  roleType       String    @default("Member")
-  maxCount       Int?      // Null = unlimited, number = max people allowed
-  isActive       Boolean   @default(true)
-  systemRoleKey  Int?      // 1=Head, 2=Vice, 3=Member; 10=Officer, 11=President, 12=Vice President (Administration only); null=custom (can be deactivated)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  
+  id            Int      @id @default(autoincrement())
+  teamId        Int
+  roleName      String
+  roleType      String   @default("Member")
+  maxCount      Int? // Null = unlimited, number = max people allowed
+  isActive      Boolean  @default(true)
+  systemRoleKey Int? // 1=Head, 2=Vice, 3=Member; 10=Officer, 11=President, 12=Vice President (Administration only); null=custom (can be deactivated)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
   // Relations
-  team            Team              @relation(fields: [teamId], references: [id], onDelete: Restrict)
-  assignments     TeamMember[]
-  roleHistory     MemberRoleHistory[]
-  alumni          Alumni[]
-  
+  team        Team                @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  assignments TeamMember[]
+  roleHistory MemberRoleHistory[]
+  alumni      Alumni[]
+
   // Unique constraint: same role name can't exist twice in same team
   @@unique([teamId, roleName])
   // One system role per key per team (1=Head, 2=Vice, 3=Member)
@@ -120,20 +140,20 @@ model TeamRole {
 // SUBTEAMS - Subteams within a team (like roles, per-team)
 // ============================================
 model Subteam {
-  id          Int       @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   teamId      Int
   name        String
   description String?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
   // Relations
-  team            Team                @relation(fields: [teamId], references: [id], onDelete: Restrict)
-  assignments     TeamMember[]
-  roleHistory     MemberRoleHistory[]
-  alumni          Alumni[]
-  
+  team        Team                @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  assignments TeamMember[]
+  roleHistory MemberRoleHistory[]
+  alumni      Alumni[]
+
   @@unique([teamId, name])
   @@index([teamId])
 }
@@ -146,19 +166,19 @@ model TeamMember {
   teamId     Int
   memberId   Int
   roleId     Int
-  subteamId  Int?      // Optional: member can be assigned to a subteam within the team
+  subteamId  Int? // Optional: member can be assigned to a subteam within the team
   joinedDate DateTime  @default(now())
   leftDate   DateTime? // When they left (null if current)
-  isActive   Boolean   @default(true)   // Currently active in this team?
+  isActive   Boolean   @default(true) // Currently active in this team?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
-  
+
   // Relations
-  team    Team      @relation(fields: [teamId], references: [id], onDelete: Restrict)
-  member  Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  role    TeamRole  @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  subteam Subteam?  @relation(fields: [subteamId], references: [id], onDelete: SetNull)
-  
+  team    Team     @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  member  Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  role    TeamRole @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  subteam Subteam? @relation(fields: [subteamId], references: [id], onDelete: SetNull)
+
   // Unique constraint: A member can only be in a team once (active or not)
   // If they rejoin later, you update the existing row, not create new one
   @@unique([teamId, memberId])
@@ -175,22 +195,22 @@ model MemberRoleHistory {
   memberId     Int
   teamId       Int
   roleId       Int
-  subteamId    Int?      // Subteam at time of this history entry
-  changeType   String    // "Assignment", "Promotion", "Demotion", "New", "Transfer", "Resignation", "Expulsion", "Graduation", "Retirement", etc.
-  changeReason String?   // Free text explanation
+  subteamId    Int? // Subteam at time of this history entry
+  changeType   String // "Assignment", "Promotion", "Demotion", "New", "Transfer", "Resignation", "Expulsion", "Graduation", "Retirement", etc.
+  changeReason String? // Free text explanation
   notes        String?
   startDate    DateTime  @default(now())
-  endDate     DateTime? // Null if current
-  isActive     Boolean   @default(true)  // Is this the active entry?
+  endDate      DateTime? // Null if current
+  isActive     Boolean   @default(true) // Is this the active entry?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-  
+
   // Relations
   member  Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
   team    Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
   role    TeamRole? @relation(fields: [roleId], references: [id], onDelete: SetNull)
   subteam Subteam?  @relation(fields: [subteamId], references: [id], onDelete: SetNull)
-  
+
   // Indexes for common queries
   @@index([memberId, startDate])
   @@index([teamId, startDate])
@@ -201,17 +221,17 @@ model MemberRoleHistory {
 // ALUMNI - Members who left the club (separate from current assignments)
 // ============================================
 model Alumni {
-  id           Int       @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   memberId     Int
-  teamId       Int?      // Last team they were in (for display: "Left from X"); null if team deleted
-  roleId       Int?      // Last role; null if role deleted
-  subteamId    Int?      // Last subteam if any
-  leaveType    String    // Graduation, Resignation, Expulsion, Retirement
-  leftDate     DateTime  @default(now())
+  teamId       Int? // Last team they were in (for display: "Left from X"); null if team deleted
+  roleId       Int? // Last role; null if role deleted
+  subteamId    Int? // Last subteam if any
+  leaveType    String // Graduation, Resignation, Expulsion, Retirement
+  leftDate     DateTime @default(now())
   changeReason String?
   notes        String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Relations (SetNull so alumni record stays if team/role/subteam removed)
   member  Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
@@ -228,110 +248,128 @@ model Alumni {
 // USERS - Authentication & Access Control
 // ============================================
 model User {
-  id              Int       @id @default(autoincrement())
-  memberId        Int       @unique  // Links to Member table
-  passwordHash    String
-  lastLogin       DateTime?
-  resetToken      String?   @unique
+  id               Int       @id @default(autoincrement())
+  memberId         Int       @unique // Links to Member table
+  passwordHash     String
+  lastLogin        DateTime?
+  resetToken       String?   @unique
   resetTokenExpiry DateTime?
-  isVerified      Boolean   @default(false)
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
+  isVerified       Boolean   @default(false)
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
   // Relations
-  member          Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
   @@index([memberId])
 }
 
-  // ============================================
-  // NOTIFICATION EVENTS - Canonical event records
-  // ============================================
-  model NotificationEvent {
-    id            Int       @id @default(autoincrement())
-    eventType     String
-    audienceType  String
-    actorMemberId Int?
-    title         String
-    body          String
-    metadata      Json?
-    audienceData  Json?
-    createdAt     DateTime  @default(now())
+// ============================================
+// NOTIFICATION EVENTS - Canonical event records
+// ============================================
+model NotificationEvent {
+  id            Int      @id @default(autoincrement())
+  eventType     String
+  audienceType  String
+  actorMemberId Int?
+  title         String
+  body          String
+  metadata      Json?
+  audienceData  Json?
+  createdAt     DateTime @default(now())
 
-    actor         Member?   @relation("NotificationEventActor", fields: [actorMemberId], references: [id], onDelete: SetNull)
-    notifications Notification[]
+  actor         Member?        @relation("NotificationEventActor", fields: [actorMemberId], references: [id], onDelete: SetNull)
+  notifications Notification[]
 
-    @@index([eventType])
-    @@index([audienceType])
-    @@index([actorMemberId])
-    @@index([createdAt])
-  }
+  @@index([eventType])
+  @@index([audienceType])
+  @@index([actorMemberId])
+  @@index([createdAt])
+}
 
-  // ============================================
-  // NOTIFICATIONS - Per-member delivery and read state
-  // ============================================
-  model Notification {
-    id         Int       @id @default(autoincrement())
-    memberId   Int
-    eventId    Int?
-    eventType  String
-    title      String
-    body       String
-    metadata   Json?
-    isRead     Boolean   @default(false)
-    readAt     DateTime?
-    createdAt  DateTime  @default(now())
+// ============================================
+// NOTIFICATIONS - Per-member delivery and read state
+// ============================================
+model Notification {
+  id        Int       @id @default(autoincrement())
+  memberId  Int
+  eventId   Int?
+  eventType String
+  title     String
+  body      String
+  metadata  Json?
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
 
-    member     Member             @relation(fields: [memberId], references: [id], onDelete: Cascade)
-    event      NotificationEvent? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  member Member             @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  event  NotificationEvent? @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
-    @@unique([memberId, eventId])
-    @@index([memberId])
-    @@index([eventId])
-    @@index([eventType])
-    @@index([memberId, isRead, createdAt])
-    @@index([memberId, createdAt])
-  }
+  @@unique([memberId, eventId])
+  @@index([memberId])
+  @@index([eventId])
+  @@index([eventType])
+  @@index([memberId, isRead, createdAt])
+  @@index([memberId, createdAt])
+}
+
+// ============================================
+// PUSH SUBSCRIPTIONS - Web Push endpoints per member device
+// ============================================
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  memberId  Int
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+}
 
 // ============================================
 // PROJECTS - Main project entity
 // ============================================
 model Project {
-  id              Int       @id @default(autoincrement())
-  slug            String    @unique
-  projectTypeId   Int
-  title           String
-  description     String?
+  id                Int       @id @default(autoincrement())
+  slug              String    @unique
+  projectTypeId     Int
+  title             String
+  description       String?
   createdByMemberId Int
-  status          String    @default("NOT_STARTED")  // NOT_STARTED, IN_PROGRESS, COMPLETED, ON_HOLD, CANCELLED
-  priority        String    @default("MEDIUM")       // LOW, MEDIUM, HIGH, URGENT
-  startDate       DateTime?
-  dueDate         DateTime?
-  completedDate   DateTime?
-  isActive        Boolean   @default(true)
-  isFinalized     Boolean   @default(false)
-  isArchived      Boolean   @default(false)
-  isDisclosed     Boolean   @default(false)
-  version         Int       @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
+  status            String    @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED, ON_HOLD, CANCELLED
+  priority          String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  startDate         DateTime?
+  dueDate           DateTime?
+  completedDate     DateTime?
+  isActive          Boolean   @default(true)
+  isFinalized       Boolean   @default(false)
+  isArchived        Boolean   @default(false)
+  isDisclosed       Boolean   @default(false)
+  version           Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
   // Relations
-  createdBy       Member           @relation(fields: [createdByMemberId], references: [id], onDelete: Restrict)
-  projectTeams    ProjectTeam[]    // Teams assigned to this project
-  tasks           Task[]           // Tasks under this project
-  tags            ProjectTag[]     // Tags for categorization
-  phases          ProjectPhase[]   // Phases within this project
-  activityLog     ProjectActivityLog[] // Project and task history entries
-  scheduleSlots   ProjectScheduleSlot[] // People/time allocations for this project
-  folders         ProjectFolder[]  // Folder containers for attached files
-  files           ProjectFile[]    // Files attached to this project
-  photos          ProjectPhoto[]   // Photos attached to this project
-  events          Event[]          // Events linked to this project
-  certificates    Certificate[]
-  projectType     ProjectType      @relation(fields: [projectTypeId], references: [id], onDelete: Restrict)
-  
+  createdBy     Member                @relation(fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  projectTeams  ProjectTeam[] // Teams assigned to this project
+  tasks         Task[] // Tasks under this project
+  tags          ProjectTag[] // Tags for categorization
+  phases        ProjectPhase[] // Phases within this project
+  activityLog   ProjectActivityLog[] // Project and task history entries
+  scheduleSlots ProjectScheduleSlot[] // People/time allocations for this project
+  folders       ProjectFolder[] // Folder containers for attached files
+  files         ProjectFile[] // Files attached to this project
+  photos        ProjectPhoto[] // Photos attached to this project
+  events        Event[] // Events linked to this project
+  announcements Announcement[]
+  certificates  Certificate[]
+  projectType   ProjectType           @relation(fields: [projectTypeId], references: [id], onDelete: Restrict)
+
   @@index([createdByMemberId])
   @@index([status])
   @@index([dueDate])
@@ -346,57 +384,70 @@ model Project {
 // EVENTS - Club events and registrations
 // ============================================
 model Event {
-  id                  Int       @id @default(autoincrement())
-  slug                String    @unique
-  projectId           Int?
-  projectTypeId       Int?
-  createdByMemberId   Int
-  title               String
-  description         String?
-  venue               String?
-  timezone            String    @default("Africa/Cairo")
-  eventDate           DateTime
-  eventEndDate        DateTime
-  registrationDeadline DateTime?
-  capacity            Int?
-  allowWalkIns        Boolean   @default(false)
-  allowDirectCheckIn  Boolean   @default(false)
-  isCertifiable       Boolean   @default(false)
-  status              String    @default("DRAFT") // DRAFT, PUBLISHED, COMPLETED, CANCELLED
-  priority            String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
-  progressStatus      String    @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED, ON_HOLD, CANCELLED
-  isActive            Boolean   @default(true)
-  isFinalized         Boolean   @default(false)
-  isArchived          Boolean   @default(false)
-  isPublished         Boolean   @default(false)
-  isDisclosed         Boolean   @default(false)
-  tierFieldShowOnPublic   Boolean   @default(true)
-  tierFieldRequired       Boolean   @default(true)
-  sessionFieldShowOnPublic Boolean  @default(false)
-  sessionFieldRequired    Boolean   @default(false)
-  phoneFieldRequired      Boolean   @default(false)
-  sessionFieldOrder       Int       @default(0)
-  tierFieldOrder          Int       @default(1)
-  deletedAt           DateTime?
-  version             Int       @default(0)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                       Int       @id @default(autoincrement())
+  slug                     String    @unique
+  projectId                Int?
+  projectTypeId            Int?
+  createdByMemberId        Int
+  title                    String
+  description              String?
+  venue                    String?
+  timezone                 String    @default("Africa/Cairo")
+  eventDate                DateTime
+  eventEndDate             DateTime
+  registrationDeadline     DateTime?
+  capacity                 Int?
+  allowWalkIns             Boolean   @default(false)
+  allowDirectCheckIn       Boolean   @default(false)
+  isCertifiable            Boolean   @default(false)
+  status                   String    @default("DRAFT") // DRAFT, PUBLISHED, COMPLETED, CANCELLED
+  priority                 String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  progressStatus           String    @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED, ON_HOLD, CANCELLED
+  isActive                 Boolean   @default(true)
+  isFinalized              Boolean   @default(false)
+  isArchived               Boolean   @default(false)
+  isPublished              Boolean   @default(false)
+  isDisclosed              Boolean   @default(false)
+  tierFieldShowOnPublic    Boolean   @default(true)
+  tierFieldRequired        Boolean   @default(true)
+  sessionFieldShowOnPublic Boolean   @default(false)
+  sessionFieldRequired     Boolean   @default(false)
+  phoneFieldRequired       Boolean   @default(false)
+  sessionFieldOrder        Int       @default(0)
+  tierFieldOrder           Int       @default(1)
+  ticketAccentColor           String?
+  ticketHeaderTitle           String?
+  ticketHeaderSubtitle        String?
+  ticketFooterNote            String?
+  ticketHeaderImageGithubPath String?
+  ticketHeaderImageGithubSha  String?
+  ticketHeaderImageFileSize   Int?
+  ticketHeaderImageMimeType   String?
+  ticketFooterImageGithubPath String?
+  ticketFooterImageGithubSha  String?
+  ticketFooterImageFileSize   Int?
+  ticketFooterImageMimeType   String?
+  deletedAt                DateTime?
+  version                  Int       @default(0)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   // Relations
-  project             Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  projectType         ProjectType?        @relation(fields: [projectTypeId], references: [id], onDelete: SetNull)
-  createdBy           Member              @relation("EventCreatedBy", fields: [createdByMemberId], references: [id], onDelete: Restrict)
-  eventTeams          EventTeam[]
-  tiers               EventTier[]
-  customFields        EventCustomField[]
-  registrations       EventRegistration[]
-  tasks               EventTask[]
-  files               EventFile[]
-  photos              EventPhoto[]
-  folders             EventFolder[]
-  activityLog         EventActivityLog[]
-  sessions            EventSession[]
-  certificates        Certificate[]
+  project       Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  projectType   ProjectType?        @relation(fields: [projectTypeId], references: [id], onDelete: SetNull)
+  createdBy     Member              @relation("EventCreatedBy", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  eventTeams    EventTeam[]
+  tiers         EventTier[]
+  customFields  EventCustomField[]
+  registrations EventRegistration[]
+  tasks         EventTask[]
+  files         EventFile[]
+  photos        EventPhoto[]
+  folders       EventFolder[]
+  activityLog   EventActivityLog[]
+  sessions      EventSession[]
+  certificates  Certificate[]
+  announcements Announcement[]
 
   @@index([projectId])
   @@index([projectTypeId])
@@ -415,21 +466,21 @@ model Event {
 }
 
 model EventTier {
-  id              Int       @id @default(autoincrement())
-  eventId         Int
-  name            String
-  description     String?
-  maxCapacity     Int?
-  price           Decimal?  @db.Decimal(10, 2)
-  currency        String    @default("EGP")
-  order           Int       @default(0)
-  isActive        Boolean   @default(true)
-  showOnPublic    Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id           Int      @id @default(autoincrement())
+  eventId      Int
+  name         String
+  description  String?
+  maxCapacity  Int?
+  price        Decimal? @db.Decimal(10, 2)
+  currency     String   @default("EGP")
+  order        Int      @default(0)
+  isActive     Boolean  @default(true)
+  showOnPublic Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  event           Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  registrations   EventRegistration[]
+  event         Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registrations EventRegistration[]
 
   @@unique([eventId, name])
   @@index([eventId])
@@ -437,52 +488,52 @@ model EventTier {
 }
 
 model EventCustomField {
-  id              Int       @id @default(autoincrement())
-  eventId         Int
-  label           String
-  type            String
-  options         Json?
-  required        Boolean   @default(false)
-  showOnPublic    Boolean   @default(false)
-  order           Int       @default(0)
-  isLocked        Boolean   @default(false)
-  isActive        Boolean   @default(true)
-  version         Int       @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id           Int      @id @default(autoincrement())
+  eventId      Int
+  label        String
+  type         String
+  options      Json?
+  required     Boolean  @default(false)
+  showOnPublic Boolean  @default(false)
+  order        Int      @default(0)
+  isLocked     Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  version      Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  event           Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId])
   @@index([eventId, order])
 }
 
 model EventRegistration {
-  id                 Int       @id @default(autoincrement())
-  eventId            Int
-  tierId             Int?
-  memberId           Int?
-  fullName           String
-  email              String
-  phoneNumber        String?
-  confirmationCode   String    @unique
-  source             String    @default("PORTAL") // PORTAL, PUBLIC, IMPORT, WALK_IN
-  status             String    @default("REGISTERED") // REGISTERED, CHECKED_IN, CANCELLED
-  isWalkIn           Boolean   @default(false)
-  checkedInAt        DateTime?
-  cancelledAt        DateTime?
-  notes              String?
-  customFieldValues  Json?
-  ticketEmailSentAt  DateTime?
+  id                  Int       @id @default(autoincrement())
+  eventId             Int
+  tierId              Int?
+  memberId            Int?
+  fullName            String
+  email               String
+  phoneNumber         String?
+  confirmationCode    String    @unique
+  source              String    @default("PORTAL") // PORTAL, PUBLIC, IMPORT, WALK_IN
+  status              String    @default("REGISTERED") // REGISTERED, CHECKED_IN, CANCELLED
+  isWalkIn            Boolean   @default(false)
+  checkedInAt         DateTime?
+  cancelledAt         DateTime?
+  notes               String?
+  customFieldValues   Json?
+  ticketEmailSentAt   DateTime?
   reminderEmailSentAt DateTime?
-  onlineAccessToken  String?   @unique
-  version            Int       @default(0)
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  onlineAccessToken   String?   @unique
+  version             Int       @default(0)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  event              Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  tier               EventTier? @relation(fields: [tierId], references: [id], onDelete: SetNull)
-  member             Member?    @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  event              Event                      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tier               EventTier?                 @relation(fields: [tierId], references: [id], onDelete: SetNull)
+  member             Member?                    @relation(fields: [memberId], references: [id], onDelete: SetNull)
   attendanceDays     EventRegistrationDay[]
   sessionAttendances EventSessionAttendance[]
   sessionSelections  EventRegistrationSession[]
@@ -525,7 +576,7 @@ model EventSession {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  event         Event                    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event         Event                      @relation(fields: [eventId], references: [id], onDelete: Cascade)
   attendances   EventSessionAttendance[]
   tokens        EventSessionToken[]
   registrations EventRegistrationSession[]
@@ -536,14 +587,14 @@ model EventSession {
 }
 
 model EventSessionAttendance {
-  id             Int          @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   sessionId      Int
   registrationId Int
-  mode           String       @default("ONSITE")
-  joinedAt       DateTime     @default(now())
+  mode           String   @default("ONSITE")
+  joinedAt       DateTime @default(now())
 
-  session        EventSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  registration   EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  session      EventSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  registration EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, registrationId, mode])
   @@index([sessionId])
@@ -551,14 +602,14 @@ model EventSessionAttendance {
 }
 
 model EventSessionToken {
-  id             Int               @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   sessionId      Int
   registrationId Int
-  token          String            @unique
-  createdAt      DateTime          @default(now())
+  token          String   @unique
+  createdAt      DateTime @default(now())
 
-  session        EventSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  registration   EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  session      EventSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  registration EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, registrationId])
   @@index([sessionId])
@@ -566,13 +617,13 @@ model EventSessionToken {
 }
 
 model EventRegistrationSession {
-  id             Int               @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   registrationId Int
   sessionId      Int
-  createdAt      DateTime          @default(now())
+  createdAt      DateTime @default(now())
 
-  registration   EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
-  session        EventSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  registration EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  session      EventSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@unique([registrationId, sessionId])
   @@index([registrationId])
@@ -583,17 +634,17 @@ model EventRegistrationSession {
 // EVENT TEAMS - Which teams can access/edit an event
 // ============================================
 model EventTeam {
-  id              Int       @id @default(autoincrement())
-  eventId         Int
-  teamId          Int
-  canEdit         Boolean   @default(true)
-  isOwner         Boolean   @default(false)
-  assignedDate    DateTime  @default(now())
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id           Int      @id @default(autoincrement())
+  eventId      Int
+  teamId       Int
+  canEdit      Boolean  @default(true)
+  isOwner      Boolean  @default(false)
+  assignedDate DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  event           Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  team            Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  team  Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, teamId])
   @@index([eventId])
@@ -605,17 +656,17 @@ model EventTeam {
 // EVENT TASKS - Roles/duties assigned to team members for an event
 // ============================================
 model EventTask {
-  id                Int       @id @default(autoincrement())
+  id                Int      @id @default(autoincrement())
   eventId           Int
   leaderId          Int?
   createdByMemberId Int?
   title             String
   description       String?
   location          String
-  taskDate          DateTime  // The day this task belongs to
-  isActive          Boolean   @default(true)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  taskDate          DateTime // The day this task belongs to
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   // Relations
   event       Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
@@ -633,16 +684,16 @@ model EventTask {
 // EVENT ACTIVITY LOG - Event, task, tier, registration, and file history
 // ============================================
 model EventActivityLog {
-  id          Int       @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   eventId     Int
   eventTaskId Int?
   memberId    Int?
-  entityType  String    @default("EVENT") // EVENT, TIER, CUSTOM_FIELD, REGISTRATION, TASK, ASSIGNMENT, FILE, etc.
-  actionType  String    // CREATED, UPDATED, DEACTIVATED, REACTIVATED, FINALIZED, ARCHIVED, COMMENTED, etc.
+  entityType  String   @default("EVENT") // EVENT, TIER, CUSTOM_FIELD, REGISTRATION, TASK, ASSIGNMENT, FILE, etc.
+  actionType  String // CREATED, UPDATED, DEACTIVATED, REACTIVATED, FINALIZED, ARCHIVED, COMMENTED, etc.
   oldValue    String?
   newValue    String?
   description String?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime @default(now())
 
   event     Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
   eventTask EventTask? @relation(fields: [eventTaskId], references: [id], onDelete: SetNull)
@@ -660,13 +711,13 @@ model EventActivityLog {
 // EVENT TASK ASSIGNMENTS - Per-member time slots for an event task
 // ============================================
 model EventTaskAssignment {
-  id            Int       @id @default(autoincrement())
+  id            Int      @id @default(autoincrement())
   eventTaskId   Int
   memberId      Int
   startDateTime DateTime
   endDateTime   DateTime
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
   eventTask EventTask @relation(fields: [eventTaskId], references: [id], onDelete: Cascade)
@@ -682,19 +733,19 @@ model EventTaskAssignment {
 // PROJECT TEAMS - Which teams can access/edit a project
 // ============================================
 model ProjectTeam {
-  id              Int       @id @default(autoincrement())
-  projectId       Int
-  teamId          Int
-  canEdit         Boolean   @default(true)   // Can this team edit the project?
-  isOwner         Boolean   @default(false)  // Is this the team that created it?
-  assignedDate    DateTime  @default(now())
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
+  id           Int      @id @default(autoincrement())
+  projectId    Int
+  teamId       Int
+  canEdit      Boolean  @default(true) // Can this team edit the project?
+  isOwner      Boolean  @default(false) // Is this the team that created it?
+  assignedDate DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
   // Relations
-  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  team            Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  team    Team    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
   @@unique([projectId, teamId])
   @@index([projectId])
   @@index([teamId])
@@ -705,14 +756,14 @@ model ProjectTeam {
 // PROJECT TAGS - For categorizing projects
 // ============================================
 model ProjectTag {
-  id          Int       @id @default(autoincrement())
-  projectId   Int
-  tagName     String    // e.g., "urgent", "client-project", "internal"
-  createdAt   DateTime  @default(now())
-  
+  id        Int      @id @default(autoincrement())
+  projectId Int
+  tagName   String // e.g., "urgent", "client-project", "internal"
+  createdAt DateTime @default(now())
+
   // Relations
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   @@unique([projectId, tagName])
   @@index([projectId])
   @@index([tagName])
@@ -723,18 +774,18 @@ model ProjectTag {
 // ============================================
 
 model ProjectType {
-  id          Int       @id @default(autoincrement())
-  name        String    @unique
-  category    String    // "Events & Activities", "Technology", etc.
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  category    String // "Events & Activities", "Technology", etc.
   description String?
-  icon        String?   // For UI display
-  isActive    Boolean   @default(true)
-  sortOrder   Int       @default(0)
-  createdAt   DateTime  @default(now())
-  
+  icon        String? // For UI display
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
   // Relations
-  projects    Project[]
-  events      Event[]
+  projects Project[]
+  events   Event[]
 
   @@index([category])
   @@index([isActive])
@@ -744,19 +795,19 @@ model ProjectType {
 // PROJECT PHASES - Phases within a project
 // ============================================
 model ProjectPhase {
-  id          Int       @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   projectId   Int
   title       String
   description String?
-  order       Int       @default(0)
-  wbs         String    @default("")
-  isActive    Boolean   @default(true)
-  version     Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  order       Int      @default(0)
+  wbs         String   @default("")
+  isActive    Boolean  @default(true)
+  version     Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
   tasks       Task[]
   activityLog ProjectActivityLog[]
 
@@ -768,47 +819,47 @@ model ProjectPhase {
 // TASKS - Tasks within a project
 // ============================================
 model Task {
-  id              Int       @id @default(autoincrement())
-  projectId       Int
-  parentTaskId    Int?      // For subtasks - null if top-level task
-  phaseId         Int?      // Optional: which phase this task belongs to
-  leaderId        Int?      // Optional ownership lead for the task
-  type            String
-  title           String
-  description     String?
-  status          String    @default("NOT_STARTED")  // NOT_STARTED, IN_PROGRESS, COMPLETED, DELAYED, BLOCKED
-  difficulty      String    @default("MEDIUM")
-  priority        String    @default("MEDIUM")       // LOW, MEDIUM, HIGH, URGENT
-  order           Int       @default(0)              // Manual sort order within phase/parent
-  wbs             String    @default("")              // Work Breakdown Structure code (e.g. 1.2.3)
-  startDate       DateTime?
-  dueDate         DateTime?
-  completedDate   DateTime?
-  baselineStartDate DateTime?   // Baseline: planned start date snapshot
-  baselineDueDate   DateTime?   // Baseline: planned due date snapshot
-  estimatedHours  Float?
-  actualHours     Float?
-  isActive        Boolean   @default(true)
-  version         Int       @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
+  id                Int       @id @default(autoincrement())
+  projectId         Int
+  parentTaskId      Int? // For subtasks - null if top-level task
+  phaseId           Int? // Optional: which phase this task belongs to
+  leaderId          Int? // Optional ownership lead for the task
+  type              String
+  title             String
+  description       String?
+  status            String    @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED, DELAYED, BLOCKED
+  difficulty        String    @default("MEDIUM")
+  priority          String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  order             Int       @default(0) // Manual sort order within phase/parent
+  wbs               String    @default("") // Work Breakdown Structure code (e.g. 1.2.3)
+  startDate         DateTime?
+  dueDate           DateTime?
+  completedDate     DateTime?
+  baselineStartDate DateTime? // Baseline: planned start date snapshot
+  baselineDueDate   DateTime? // Baseline: planned due date snapshot
+  estimatedHours    Float?
+  actualHours       Float?
+  isActive          Boolean   @default(true)
+  version           Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
   // Relations
-  project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  parentTask      Task?              @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
-  subtasks        Task[]             @relation("TaskSubtasks")
-  phase           ProjectPhase?      @relation(fields: [phaseId], references: [id], onDelete: Cascade)
-  leader          Member?            @relation(fields: [leaderId], references: [id], onDelete: SetNull)
-  taskTeams       TaskTeam[]         // Teams assigned to this task
-  assignments     TaskAssignment[]   // Individual members assigned
-  comments        TaskComment[]      // Comments/discussion
-  activityLog     TaskActivityLog[]  // History of changes
+  project            Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentTask         Task?                 @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subtasks           Task[]                @relation("TaskSubtasks")
+  phase              ProjectPhase?         @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  leader             Member?               @relation(fields: [leaderId], references: [id], onDelete: SetNull)
+  taskTeams          TaskTeam[] // Teams assigned to this task
+  assignments        TaskAssignment[] // Individual members assigned
+  comments           TaskComment[] // Comments/discussion
+  activityLog        TaskActivityLog[] // History of changes
   projectActivityLog ProjectActivityLog[] // Project-level history entries mirrored from task changes
-  scheduleSlots   ProjectScheduleSlot[] // Time slots assigned to this task
-  tags            TaskTag[]          // Status tags
-  dependencies    TaskDependency[]   @relation("DependentTask")      // Tasks that depend on this one
-  dependsOn       TaskDependency[]   @relation("DependsOnTask")      // Tasks this one depends on
-  
+  scheduleSlots      ProjectScheduleSlot[] // Time slots assigned to this task
+  tags               TaskTag[] // Status tags
+  dependencies       TaskDependency[]      @relation("DependentTask") // Tasks that depend on this one
+  dependsOn          TaskDependency[]      @relation("DependsOnTask") // Tasks this one depends on
+
   @@index([projectId])
   @@index([parentTaskId])
   @@index([leaderId])
@@ -822,18 +873,18 @@ model Task {
 // TASK TEAMS - Which teams are assigned to a task
 // ============================================
 model TaskTeam {
-  id              Int       @id @default(autoincrement())
-  taskId          Int
-  teamId          Int
-  canEdit         Boolean   @default(true)
-  assignedDate    DateTime  @default(now())
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
+  id           Int      @id @default(autoincrement())
+  taskId       Int
+  teamId       Int
+  canEdit      Boolean  @default(true)
+  assignedDate DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
   // Relations
-  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  team            Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
   @@unique([taskId, teamId])
   @@index([taskId])
   @@index([teamId])
@@ -843,22 +894,22 @@ model TaskTeam {
 // TASK ASSIGNMENTS - Individual members assigned to tasks
 // ============================================
 model TaskAssignment {
-  id              Int       @id @default(autoincrement())
-  taskId          Int
-  memberId        Int
-  assignedBy      Int?      // Member who made the assignment (null if self-assigned)
-  isSelfAssigned  Boolean   @default(false)
-  status          String    @default("ASSIGNED")  // ASSIGNED, ACCEPTED, IN_PROGRESS, COMPLETED
-  assignedDate    DateTime  @default(now())
-  acceptedDate    DateTime?
-  completedDate   DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
+  id             Int       @id @default(autoincrement())
+  taskId         Int
+  memberId       Int
+  assignedBy     Int? // Member who made the assignment (null if self-assigned)
+  isSelfAssigned Boolean   @default(false)
+  status         String    @default("ASSIGNED") // ASSIGNED, ACCEPTED, IN_PROGRESS, COMPLETED
+  assignedDate   DateTime  @default(now())
+  acceptedDate   DateTime?
+  completedDate  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
   // Relations
-  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  member          Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
   @@unique([taskId, memberId])
   @@index([taskId])
   @@index([memberId])
@@ -870,15 +921,15 @@ model TaskAssignment {
 // TASK TAGS - Status and category tags for tasks
 // ============================================
 model TaskTag {
-  id          Int       @id @default(autoincrement())
-  taskId      Int
-  tagType     String    // "STATUS", "CATEGORY", "CUSTOM"
-  tagName     String    // "yet-to-start", "in-progress", "completed", "delayed", "blocked", etc.
-  createdAt   DateTime  @default(now())
-  
+  id        Int      @id @default(autoincrement())
+  taskId    Int
+  tagType   String // "STATUS", "CATEGORY", "CUSTOM"
+  tagName   String // "yet-to-start", "in-progress", "completed", "delayed", "blocked", etc.
+  createdAt DateTime @default(now())
+
   // Relations
-  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
   @@unique([taskId, tagName])
   @@index([taskId])
   @@index([tagName])
@@ -889,16 +940,16 @@ model TaskTag {
 // TASK DEPENDENCIES - Tasks that depend on other tasks
 // ============================================
 model TaskDependency {
-  id              Int       @id @default(autoincrement())
-  taskId          Int       // Task that has the dependency
-  dependsOnTaskId Int       // Task that must be completed first
-  dependencyType  String    @default("FINISH_TO_START")  // FINISH_TO_START, START_TO_START, etc.
-  createdAt       DateTime  @default(now())
-  
+  id              Int      @id @default(autoincrement())
+  taskId          Int // Task that has the dependency
+  dependsOnTaskId Int // Task that must be completed first
+  dependencyType  String   @default("FINISH_TO_START") // FINISH_TO_START, START_TO_START, etc.
+  createdAt       DateTime @default(now())
+
   // Relations
-  task            Task      @relation("DependentTask", fields: [taskId], references: [id], onDelete: Cascade)
-  dependsOnTask   Task      @relation("DependsOnTask", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
-  
+  task          Task @relation("DependentTask", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOnTask Task @relation("DependsOnTask", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+
   @@unique([taskId, dependsOnTaskId])
   @@index([taskId])
   @@index([dependsOnTaskId])
@@ -908,18 +959,18 @@ model TaskDependency {
 // TASK COMMENTS - Discussion/notes on tasks
 // ============================================
 model TaskComment {
-  id          Int       @id @default(autoincrement())
-  taskId      Int
-  memberId    Int
-  comment     String
-  isEdited    Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
+  id        Int      @id @default(autoincrement())
+  taskId    Int
+  memberId  Int
+  comment   String
+  isEdited  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  member      Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
   @@index([taskId])
   @@index([memberId])
   @@index([taskId, createdAt])
@@ -929,19 +980,19 @@ model TaskComment {
 // TASK ACTIVITY LOG - Complete history of changes
 // ============================================
 model TaskActivityLog {
-  id          Int       @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   taskId      Int
-  memberId    Int       // Who made the change
-  actionType  String    // "CREATED", "STATUS_CHANGED", "ASSIGNED", "COMMENTED", "DEADLINE_CHANGED", etc.
-  oldValue    String?   // Previous value (JSON string)
-  newValue    String?   // New value (JSON string)
-  description String?   // Human-readable description
-  createdAt   DateTime  @default(now())
-  
+  memberId    Int // Who made the change
+  actionType  String // "CREATED", "STATUS_CHANGED", "ASSIGNED", "COMMENTED", "DEADLINE_CHANGED", etc.
+  oldValue    String? // Previous value (JSON string)
+  newValue    String? // New value (JSON string)
+  description String? // Human-readable description
+  createdAt   DateTime @default(now())
+
   // Relations
-  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  member      Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
   @@index([taskId])
   @@index([memberId])
   @@index([taskId, createdAt])
@@ -952,23 +1003,23 @@ model TaskActivityLog {
 // PROJECT ACTIVITY LOG - Project, task, and phase history
 // ============================================
 model ProjectActivityLog {
-  id          Int       @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   projectId   Int
   taskId      Int?
   phaseId     Int?
   memberId    Int
-  entityType  String    @default("PROJECT") // PROJECT, TASK, SUBTASK, PHASE, COMMENT, DEPENDENCY, ASSIGNMENT, SCHEDULE_SLOT, etc.
-  actionType  String    // CREATED, UPDATED, DEACTIVATED, REACTIVATED, FINALIZED, ARCHIVED, COMMENTED, etc.
-  oldValue    String?   // Previous value (JSON string)
-  newValue    String?   // New value (JSON string)
-  description String?   // Human-readable description
-  createdAt   DateTime  @default(now())
+  entityType  String   @default("PROJECT") // PROJECT, TASK, SUBTASK, PHASE, COMMENT, DEPENDENCY, ASSIGNMENT, SCHEDULE_SLOT, etc.
+  actionType  String // CREATED, UPDATED, DEACTIVATED, REACTIVATED, FINALIZED, ARCHIVED, COMMENTED, etc.
+  oldValue    String? // Previous value (JSON string)
+  newValue    String? // New value (JSON string)
+  description String? // Human-readable description
+  createdAt   DateTime @default(now())
 
   // Relations
-  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  task        Task?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  phase       ProjectPhase? @relation(fields: [phaseId], references: [id], onDelete: SetNull)
-  member      Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task    Task?         @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  phase   ProjectPhase? @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  member  Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([taskId])
@@ -983,24 +1034,24 @@ model ProjectActivityLog {
 // PROJECT SCHEDULE SLOTS - People/time allocations for projects and tasks
 // ============================================
 model ProjectScheduleSlot {
-  id                Int       @id @default(autoincrement())
+  id                Int      @id @default(autoincrement())
   projectId         Int
   taskId            Int?
   memberId          Int
-  createdByMemberId  Int?
+  createdByMemberId Int?
   title             String?
   notes             String?
   startDateTime     DateTime
   endDateTime       DateTime
-  isActive          Boolean   @default(true)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   // Relations
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  task        Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  member      Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  createdBy   Member?   @relation("ProjectScheduleSlotCreatedBy", fields: [createdByMemberId], references: [id], onDelete: SetNull)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task      Task?   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  member    Member  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdBy Member? @relation("ProjectScheduleSlotCreatedBy", fields: [createdByMemberId], references: [id], onDelete: SetNull)
 
   @@index([projectId])
   @@index([taskId])
@@ -1014,24 +1065,24 @@ model ProjectScheduleSlot {
 // PROJECT FILES - Files attached to projects
 // ============================================
 model ProjectFile {
-  id                  Int       @id @default(autoincrement())
-  projectId           Int
-  folderId            Int?
-  uploadedByMemberId  Int
-  fileName            String    // Original file name shown to users
-  githubPath          String    // File path in GitHub storage repo, e.g. "projects/42/uuid-originalname.pdf"
-  githubSha           String    // Blob SHA returned by GitHub (required to delete)
-  fileSize            Int       // Size in bytes
-  mimeType            String    // e.g. "application/pdf", "image/jpeg"
-  isActive            Boolean   @default(true)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                 Int      @id @default(autoincrement())
+  projectId          Int
+  folderId           Int?
+  uploadedByMemberId Int
+  fileName           String // Original file name shown to users
+  githubPath         String // File path in GitHub storage repo, e.g. "projects/42/uuid-originalname.pdf"
+  githubSha          String // Blob SHA returned by GitHub (required to delete)
+  fileSize           Int // Size in bytes
+  mimeType           String // e.g. "application/pdf", "image/jpeg"
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   // Relations
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  folder      ProjectFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  uploadedBy  Member    @relation(fields: [uploadedByMemberId], references: [id])
-  comments    ProjectFileComment[]
+  project    Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  folder     ProjectFolder?       @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  uploadedBy Member               @relation(fields: [uploadedByMemberId], references: [id])
+  comments   ProjectFileComment[]
 
   @@index([projectId])
   @@index([folderId])
@@ -1042,17 +1093,17 @@ model ProjectFile {
 // PROJECT FILE COMMENTS - Discussion/notes on files
 // ============================================
 model ProjectFileComment {
-  id          Int       @id @default(autoincrement())
-  fileId      Int
-  memberId    Int
-  comment     String
-  isEdited    Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id        Int      @id @default(autoincrement())
+  fileId    Int
+  memberId  Int
+  comment   String
+  isEdited  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  file        ProjectFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
-  member      Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  file   ProjectFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  member Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@index([fileId])
   @@index([memberId])
@@ -1063,21 +1114,21 @@ model ProjectFileComment {
 // PROJECT FOLDERS - Folder containers for files
 // ============================================
 model ProjectFolder {
-  id                  Int       @id @default(autoincrement())
-  projectId           Int
-  createdByMemberId    Int
-  folderName          String
-  githubPath          String    // Folder path in GitHub storage repo, e.g. "projects/42/folders/specs-uuid"
-  githubSha           String    // Blob SHA for the .gitkeep marker
-  isActive            Boolean   @default(true)
-  deletedAt           DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                Int       @id @default(autoincrement())
+  projectId         Int
+  createdByMemberId Int
+  folderName        String
+  githubPath        String // Folder path in GitHub storage repo, e.g. "projects/42/folders/specs-uuid"
+  githubSha         String // Blob SHA for the .gitkeep marker
+  isActive          Boolean   @default(true)
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   // Relations
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy   Member    @relation(fields: [createdByMemberId], references: [id])
-  files       ProjectFile[]
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy Member        @relation(fields: [createdByMemberId], references: [id])
+  files     ProjectFile[]
 
   @@index([projectId])
   @@index([projectId, isActive])
@@ -1088,23 +1139,23 @@ model ProjectFolder {
 // EVENT FILES - Files attached to events
 // ============================================
 model EventFile {
-  id                  Int       @id @default(autoincrement())
-  eventId             Int
-  folderId            Int?
-  uploadedByMemberId  Int
-  fileName            String
-  githubPath          String
-  githubSha           String
-  fileSize            Int
-  mimeType            String
-  isActive            Boolean   @default(true)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                 Int      @id @default(autoincrement())
+  eventId            Int
+  folderId           Int?
+  uploadedByMemberId Int
+  fileName           String
+  githubPath         String
+  githubSha          String
+  fileSize           Int
+  mimeType           String
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  event       Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  folder      EventFolder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  uploadedBy  Member         @relation(fields: [uploadedByMemberId], references: [id])
-  comments    EventFileComment[]
+  event      Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  folder     EventFolder?       @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  uploadedBy Member             @relation(fields: [uploadedByMemberId], references: [id])
+  comments   EventFileComment[]
 
   @@index([eventId])
   @@index([folderId])
@@ -1141,7 +1192,7 @@ model EventPhoto {
 }
 
 model ProjectPhoto {
-  id                 Int       @id @default(autoincrement())
+  id                 Int      @id @default(autoincrement())
   projectId          Int
   uploadedByMemberId Int
   fileName           String
@@ -1153,12 +1204,12 @@ model ProjectPhoto {
   previewGithubSha   String?
   previewFileSize    Int?
   caption            String?
-  order              Int       @default(0)
-  showOnPublic       Boolean   @default(true)
-  isCore             Boolean   @default(false)
-  isActive           Boolean   @default(true)
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  order              Int      @default(0)
+  showOnPublic       Boolean  @default(true)
+  isCore             Boolean  @default(false)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   uploadedBy Member  @relation(fields: [uploadedByMemberId], references: [id])
@@ -1171,16 +1222,16 @@ model ProjectPhoto {
 // EVENT FILE COMMENTS - Discussion/notes on event files
 // ============================================
 model EventFileComment {
-  id          Int       @id @default(autoincrement())
-  fileId      Int
-  memberId    Int
-  comment     String
-  isEdited    Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id        Int      @id @default(autoincrement())
+  fileId    Int
+  memberId  Int
+  comment   String
+  isEdited  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  file        EventFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
-  member      Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  file   EventFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  member Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@index([fileId])
   @@index([memberId])
@@ -1191,20 +1242,20 @@ model EventFileComment {
 // EVENT FOLDERS - Folder containers for event files
 // ============================================
 model EventFolder {
-  id                  Int       @id @default(autoincrement())
-  eventId             Int
-  createdByMemberId   Int
-  folderName          String
-  githubPath          String
-  githubSha           String
-  isActive            Boolean   @default(true)
-  deletedAt           DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                Int       @id @default(autoincrement())
+  eventId           Int
+  createdByMemberId Int
+  folderName        String
+  githubPath        String
+  githubSha         String
+  isActive          Boolean   @default(true)
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  event       Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  createdBy   Member      @relation(fields: [createdByMemberId], references: [id])
-  files       EventFile[]
+  event     Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdBy Member      @relation(fields: [createdByMemberId], references: [id])
+  files     EventFile[]
 
   @@index([eventId])
   @@index([eventId, isActive])
@@ -1280,14 +1331,14 @@ model AboutSponsor {
 }
 
 model ContactMethod {
-  id        Int              @id @default(autoincrement())
+  id        Int               @id @default(autoincrement())
   sortOrder Int
   type      ContactMethodType
   label     String
   value     String
-  isActive  Boolean          @default(true)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 
   @@index([sortOrder])
 }
@@ -1373,15 +1424,15 @@ model IncidentReport {
 // FINANCE - Club money tracking (FR team)
 // ============================================
 model FinanceAccount {
-  id             Int       @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   name           String
-  accountType    String    @default("BANK")
-  currency       String    @default("EGP")
-  openingBalance Decimal   @default(0) @db.Decimal(12, 2)
-  isActive       Boolean   @default(true)
+  accountType    String   @default("BANK")
+  currency       String   @default("EGP")
+  openingBalance Decimal  @default(0) @db.Decimal(12, 2)
+  isActive       Boolean  @default(true)
   description    String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   transactions   FinanceTransaction[]
   scheduledItems FinanceScheduledItem[]
@@ -1472,18 +1523,18 @@ enum CertificateStatus {
 }
 
 model CertificateTemplate {
-  id                  Int       @id @default(autoincrement())
+  id                  Int      @id @default(autoincrement())
   name                String
   backgroundImagePath String?
   backgroundImageSha  String?
   /// Focus/crop for background: { scale: number (>=1), offsetX: number (0-1), offsetY: number (0-1) }. Null = cover, centered.
   backgroundFocus     Json?
-  canvasWidth         Int       @default(1122)
-  canvasHeight        Int       @default(794)
+  canvasWidth         Int      @default(1122)
+  canvasHeight        Int      @default(794)
   layout              Json
-  isActive            Boolean   @default(true)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   certificates Certificate[]
 
@@ -1498,18 +1549,18 @@ model CertificateTemplate {
 // Valid field values: recipientName, title, description, issuedDate, verificationCode, verificationUrl, issuerName
 
 model Certificate {
-  id                Int               @id @default(autoincrement())
-  templateId        Int?
-  type              CertificateType
-  status            CertificateStatus @default(DRAFT)
-  eventId           Int?
-  projectId         Int?
-  recipientMemberId Int?
-  recipientName     String
-  recipientEmail    String
-  title             String
-  description       String
-  fieldValues       Json
+  id                     Int               @id @default(autoincrement())
+  templateId             Int?
+  type                   CertificateType
+  status                 CertificateStatus @default(DRAFT)
+  eventId                Int?
+  projectId              Int?
+  recipientMemberId      Int?
+  recipientName          String
+  recipientEmail         String
+  title                  String
+  description            String
+  fieldValues            Json
   verificationCode       String            @unique
   issuedAt               DateTime?
   certificateEmailSentAt DateTime?
@@ -1531,4 +1582,198 @@ model Certificate {
   @@index([status])
   @@index([type])
   @@index([createdAt])
+}
+
+// ============================================
+// DOCUMENTS - Document library, grants, requests, access logs
+// ============================================
+enum DocumentGrantTargetType {
+  TEAM
+  MEMBER
+}
+
+enum DocumentAccessAction {
+  VIEW
+  DOWNLOAD
+}
+
+enum DocumentCreatorRank {
+  TEAM_LEADERSHIP
+  ORG_LEADERSHIP
+}
+
+model DocumentCategory {
+  id          Int                             @id @default(autoincrement())
+  name        String
+  order       Int                             @default(0)
+  scopeTeamId Int?
+  scopeTeam   Team?                           @relation(fields: [scopeTeamId], references: [id])
+  createdAt   DateTime                        @default(now())
+  updatedAt   DateTime                        @updatedAt
+  documents   Document[]
+  grants      DocumentCategoryAccessGrant[]
+  requests    DocumentCategoryAccessRequest[]
+  accessLogs  DocumentCategoryAccessLog[]
+}
+
+model Document {
+  id            Int                 @id @default(autoincrement())
+  categoryId    Int?
+  category      DocumentCategory?   @relation(fields: [categoryId], references: [id])
+  title         String
+  fileUrl       String
+  fileType      String
+  fileSizeBytes Int?
+  scopeTeamId   Int?
+  scopeTeam     Team?               @relation(fields: [scopeTeamId], references: [id])
+  creatorRank   DocumentCreatorRank
+  uploadedById  Int
+  uploadedBy    Member              @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  grants        DocumentAccessGrant[]
+  requests      DocumentAccessRequest[]
+  accessLogs    DocumentAccessLog[]
+}
+
+model DocumentCategoryAccessGrant {
+  id            Int                     @id @default(autoincrement())
+  categoryId    Int
+  category      DocumentCategory        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  grantedToType DocumentGrantTargetType
+  memberId      Int?
+  member        Member?                 @relation("DocumentCategoryGrantMember", fields: [memberId], references: [id])
+  teamId        Int?
+  team          Team?                   @relation("DocumentCategoryGrantTeam", fields: [teamId], references: [id])
+  grantedById   Int
+  grantedBy     Member                  @relation("DocumentCategoryGrantGrantedBy", fields: [grantedById], references: [id])
+  expiresAt     DateTime?
+  revokedAt     DateTime?
+  revokedById   Int?
+  revokedBy     Member?                 @relation("DocumentCategoryGrantRevokedBy", fields: [revokedById], references: [id])
+  createdAt     DateTime                @default(now())
+}
+
+model DocumentCategoryAccessLog {
+  id         Int                  @id @default(autoincrement())
+  categoryId Int
+  category   DocumentCategory     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  memberId   Int
+  member     Member               @relation("DocumentCategoryAccessLogMember", fields: [memberId], references: [id])
+  action     DocumentAccessAction
+  createdAt  DateTime             @default(now())
+}
+
+model DocumentCategoryAccessRequest {
+  id           Int              @id @default(autoincrement())
+  categoryId   Int
+  category     DocumentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  memberId     Int
+  member       Member           @relation("DocumentCategoryRequestMember", fields: [memberId], references: [id])
+  status       String           @default("PENDING")
+  reviewedById Int?
+  reviewedBy   Member?          @relation("DocumentCategoryRequestReviewedBy", fields: [reviewedById], references: [id])
+  reviewNote   String?
+  createdAt    DateTime         @default(now())
+  reviewedAt   DateTime?
+}
+
+model DocumentAccessGrant {
+  id            Int                     @id @default(autoincrement())
+  documentId    Int
+  document      Document                @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  grantedToType DocumentGrantTargetType
+  memberId      Int?
+  member        Member?                 @relation("DocumentGrantMember", fields: [memberId], references: [id])
+  teamId        Int?
+  team          Team?                   @relation("DocumentGrantTeam", fields: [teamId], references: [id])
+  grantedById   Int
+  grantedBy     Member                  @relation("DocumentGrantGrantedBy", fields: [grantedById], references: [id])
+  expiresAt     DateTime?
+  revokedAt     DateTime?
+  revokedById   Int?
+  revokedBy     Member?                 @relation("DocumentGrantRevokedBy", fields: [revokedById], references: [id])
+  createdAt     DateTime                @default(now())
+}
+
+model DocumentAccessRequest {
+  id           Int       @id @default(autoincrement())
+  documentId   Int
+  document     Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  memberId     Int
+  member       Member    @relation("DocumentRequestMember", fields: [memberId], references: [id])
+  status       String    @default("PENDING")
+  reviewedById Int?
+  reviewedBy   Member?   @relation("DocumentRequestReviewedBy", fields: [reviewedById], references: [id])
+  reviewNote   String?
+  createdAt    DateTime  @default(now())
+  reviewedAt   DateTime?
+}
+
+model DocumentAccessLog {
+  id         Int                  @id @default(autoincrement())
+  documentId Int
+  document   Document             @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  memberId   Int
+  member     Member               @relation("DocumentAccessLogMember", fields: [memberId], references: [id])
+  action     DocumentAccessAction
+  createdAt  DateTime             @default(now())
+}
+
+// ============================================
+// ANNOUNCEMENTS - Club announcements and RSVP responses
+// ============================================
+model Announcement {
+  id                Int      @id @default(autoincrement())
+  createdByMemberId Int
+  title             String
+  body              String
+  targetType        String   @default("NONE") // NONE | EVENT | PROJECT
+  eventId           Int?
+  projectId         Int?
+  isPinned          Boolean  @default(false)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  createdBy Member                 @relation("AnnouncementCreatedBy", fields: [createdByMemberId], references: [id], onDelete: Restrict)
+  event     Event?                 @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  project   Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  responses AnnouncementResponse[]
+
+  @@index([createdByMemberId])
+  @@index([eventId])
+  @@index([projectId])
+  @@index([isActive, createdAt])
+}
+
+model AnnouncementResponse {
+  id             Int      @id @default(autoincrement())
+  announcementId Int
+  memberId       Int
+  status         String // AVAILABLE | UNAVAILABLE
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  announcement Announcement                  @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  member       Member                        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  periods      AnnouncementResponsePeriod[]
+
+  @@unique([announcementId, memberId])
+  @@index([announcementId])
+  @@index([memberId])
+}
+
+model AnnouncementResponsePeriod {
+  id         Int      @id @default(autoincrement())
+  responseId Int
+  startDate  DateTime @db.Date
+  endDate    DateTime @db.Date
+  createdAt  DateTime @default(now())
+
+  response AnnouncementResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+
+  @@index([responseId])
+  @@index([responseId, startDate, endDate])
 }

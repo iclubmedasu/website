@@ -1,0 +1,107 @@
+.member-availability-hint {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.3rem 0.4rem;
+    margin-top: 0.35rem;
+    min-width: 0;
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    line-height: 1.3;
+    color: var(--gray-600);
+}
+
+.member-availability-hint--compact {
+    margin-top: 0.25rem;
+}
+
+.member-availability-hint-icon {
+    flex-shrink: 0;
+    align-self: center;
+}
+
+.member-availability-hint-status {
+    flex-shrink: 0;
+    font-weight: 600;
+}
+
+.member-availability-hint-periods {
+    min-width: 0;
+    flex: 1 1 8rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    color: var(--gray-500);
+}
+
+.member-availability-hint--available {
+    color: var(--status-completed-text);
+}
+
+.member-availability-hint--available .member-availability-hint-periods {
+    color: var(--status-completed-text);
+    opacity: 0.85;
+}
+
+.member-availability-hint--unavailable {
+    color: var(--status-cancelled-text);
+}
+
+.member-availability-hint--unavailable .member-availability-hint-periods {
+    color: var(--status-cancelled-text);
+    opacity: 0.85;
+}
+
+.member-availability-hint--partial {
+    color: var(--status-on-hold-text);
+}
+
+.member-availability-hint--partial .member-availability-hint-periods {
+    color: var(--status-on-hold-text);
+    opacity: 0.85;
+}
+
+.member-assign-option {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: max-content;
+    max-width: 100%;
+}
+
+.member-assign-option .team-badge-option {
+    max-width: 100%;
+}
+
+/* Portaled hover bubble (fixed on body; escapes picker overflow) */
+.member-availability-chip-bubble {
+    box-sizing: border-box;
+    width: max-content;
+    max-width: min(20rem, calc(100vw - 1.5rem));
+    padding: 0.3rem 0.45rem;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    box-shadow: var(--shadow-xl);
+    pointer-events: none;
+}
+
+.member-availability-chip-bubble .member-availability-hint {
+    margin-top: 0;
+    flex-wrap: wrap;
+    align-items: baseline;
+    width: 100%;
+}
+
+.member-availability-chip-bubble .member-availability-hint--compact {
+    margin-top: 0;
+}
+
+.member-availability-chip-bubble .member-availability-hint-periods {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: anywhere;
+}

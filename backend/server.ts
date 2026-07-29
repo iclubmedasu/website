@@ -22,6 +22,9 @@ app.use(
     }),
 );
 
+// CORS allowlist: env vars are the source of truth for production hosts.
+// HF Space URLs below are safe fallbacks until custom domains are live; add
+// https://members-portal.iclubmedasu.com / https://iclubmedasu.com via FRONTEND_ORIGINS.
 const frontendOrigins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -84,11 +87,14 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.get("/", (_req: Request, res: Response) => {
+    // Prefer FRONTEND_URL in Space/env settings; HF URL is a fallback until custom domains cut over.
+    const membersPortal =
+        process.env.FRONTEND_URL?.trim() || "https://iclubmedasu-members-portal.hf.space";
     res.json({
         service: "iClub Members Portal API",
         status: "ok",
-        message: "This Hugging Face Space hosts the backend API only. Open the members portal to sign in.",
-        membersPortal: process.env.FRONTEND_URL ?? "https://iclubmedasu-members-portal.hf.space",
+        message: "Backend API only. Open the members portal to sign in.",
+        membersPortal,
         health: "/health",
         api: "/api",
     });
@@ -123,7 +129,10 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
 const PORT = Number(process.env.PORT ?? 8080);
 const server = app.listen(PORT, () => {
+    const emailFrom =
+        process.env.RESEND_FROM_EMAIL?.trim() || "asu.medicine.iclub@gmail.com";
     console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Email From: ${emailFrom}`);
 });
 
 attachNotificationsWebSocketServer(server);
