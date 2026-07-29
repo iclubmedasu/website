@@ -1475,7 +1475,23 @@ export const announcementsAPI = {
         return handleResponse(response);
     },
 
-    getAvailability: async (target: { eventId: Id | string } | { projectId: Id | string }) => {
+    getAvailability: async (
+        target: { eventId: Id | string } | { projectId: Id | string },
+    ): Promise<{
+        announcement: {
+            id: number;
+            title: string;
+            targetType: string;
+            eventId: number | null;
+            projectId: number | null;
+        } | null;
+        responses: Array<{
+            memberId: number;
+            notes?: string | null;
+            periods?: Array<{ startDate: string; endDate: string }>;
+            [key: string]: unknown;
+        }>;
+    }> => {
         const params = new URLSearchParams();
         if ('eventId' in target) params.set('eventId', String(target.eventId));
         else params.set('projectId', String(target.projectId));

@@ -87,7 +87,7 @@ const isPlaceholderPhone = (value) => typeof value === 'string' && value.startsW
 
 // Password: at least 8 chars, one upper, one lower, one number, one symbol;
 // must not contain any related email (full address or local-part length >= 3).
-function validatePassword(password, emails = []) {
+function validatePassword(password, emails: string[] = []) {
     if (!password || typeof password !== 'string') return { valid: false, error: 'Password is required' };
     if (password.length < 8) return { valid: false, error: 'Password must be at least 8 characters' };
     if (!/[A-Z]/.test(password)) return { valid: false, error: 'Password must contain at least one uppercase letter' };
@@ -115,11 +115,11 @@ function validatePassword(password, emails = []) {
     return { valid: true };
 }
 
-function collectMemberEmails(...values) {
+function collectMemberEmails(...values: Array<string | null | undefined>): string[] {
     return [
         ...new Set(
             values
-                .filter((e) => typeof e === 'string' && e.trim())
+                .filter((e): e is string => typeof e === 'string' && Boolean(e.trim()))
                 .map((e) => e.trim())
         ),
     ];
@@ -540,11 +540,11 @@ router.post('/complete-profile', authPostLimiter, async (req, res) => {
             return res.status(400).json({ error: 'Use the email flow to set your password.' });
         }
 
-        const officialEmail = `${sid}@med.asu.edu.eg`;
+        const primaryEmail = officialEmail(sid);
         const pwdCheck = validatePassword(
             password,
             collectMemberEmails(
-                officialEmail,
+                primaryEmail,
                 member.email,
                 email2,
                 email3,
@@ -605,7 +605,6 @@ router.post('/complete-profile', authPostLimiter, async (req, res) => {
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
-        const primaryEmail = officialEmail(sid);
 
         const [, userRecord] = await prisma.$transaction([
             prisma.member.update({

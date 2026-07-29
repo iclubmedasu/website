@@ -245,7 +245,9 @@ export default function DocumentsExplorerGrid({
         setDragOverId(null);
         const raw = event.dataTransfer.getData('application/x-document-id');
         if (!raw) return;
-        void onDropDocument(raw as Id, category.id);
+        const documentId = Number(raw);
+        if (!Number.isFinite(documentId)) return;
+        void onDropDocument(documentId, category.id);
     };
 
     const handleDocDragStart = (event: DragEvent, doc: DocumentFull) => {

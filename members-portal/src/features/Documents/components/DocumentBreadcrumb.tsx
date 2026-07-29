@@ -36,7 +36,9 @@ export default function DocumentBreadcrumb({
         setDragOverRoot(false);
         const raw = event.dataTransfer.getData('application/x-document-id');
         if (!raw) return;
-        void onDropToRoot(raw as Id);
+        const documentId = Number(raw);
+        if (!Number.isFinite(documentId)) return;
+        void onDropToRoot(documentId);
     };
 
     return (

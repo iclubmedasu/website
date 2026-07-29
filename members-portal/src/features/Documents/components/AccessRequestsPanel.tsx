@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { formatDate as formatSharedDate } from '@iclub/shared/utils';
 
 import {
     documentsAPI,
@@ -32,13 +33,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 function formatDate(value: string | null | undefined): string {
     if (!value) return '—';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '—';
-    return date.toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-    });
+    return formatSharedDate(value);
 }
 
 function requestKey(request: PendingAccessRequest): string {

@@ -220,7 +220,7 @@ router.patch('/access-requests/:id/approve', async (req: Request, res: Response)
 
         const now = new Date();
         const result = await prisma.$transaction(async (tx) => {
-            const grants = [];
+            const grants: Awaited<ReturnType<typeof tx.documentAccessGrant.create>>[] = [];
             for (const teamId of ledTeamIds) {
                 const existing = await tx.documentAccessGrant.findFirst({
                     where: {

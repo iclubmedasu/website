@@ -65,7 +65,11 @@ export function useTargetAvailability(target: Target) {
                 const data = await announcementsAPI.getAvailability(query);
                 if (cancelled) return;
                 setAnnouncement(data?.announcement ?? null);
-                setResponses(Array.isArray(data?.responses) ? data.responses : []);
+                setResponses(
+                    Array.isArray(data?.responses)
+                        ? (data.responses as unknown as TargetAvailabilityResponse[])
+                        : [],
+                );
             } catch (err) {
                 if (cancelled) return;
                 setAnnouncement(null);
