@@ -9,7 +9,8 @@ import {
     type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlignCenter, AlignLeft, AlignRight, X } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, QrCode, X } from 'lucide-react';
+import QRCode from 'qrcode';
 import {
     certificatesAPI,
     type BackgroundFocus,
@@ -22,20 +23,24 @@ const TEXT_OVERFLOW_MSG =
     "Text doesn't fit — reduce font size or enlarge the element";
 const DEFAULT_ELEMENT_FONT_SIZE = 120;
 const DEFAULT_ELEMENT_HEIGHT = Math.ceil(DEFAULT_ELEMENT_FONT_SIZE * 1.2);
+const DEFAULT_QR_SIZE = 180;
+const MIN_ELEMENT_SIZE = 40;
+/** Sample verify URL for editor/preview QR payload (matches Verify URL field sample). */
+export const SAMPLE_VERIFICATION_URL = 'https://example.com/verify/ABC12345';
 
 export interface CanvasElement {
     id: string;
-    type: 'field' | 'static';
+    type: 'field' | 'static' | 'qr';
     field?: string;
     text?: string;
     x: number;
     y: number;
     width: number;
     height: number;
-    fontSize: number;
-    fontWeight: 'normal' | 'bold';
-    align: 'left' | 'center' | 'right';
-    color: string;
+    fontSize?: number;
+    fontWeight?: 'normal' | 'bold';
+    align?: 'left' | 'center' | 'right';
+    color?: string;
 }
 
 export const AVAILABLE_FIELDS = [
@@ -78,11 +83,62 @@ const FOCUS_SCALE_MAX = 3;
 
 function isWordingElement(element: CanvasElement): boolean {
     if (element.type === 'static') return true;
+    if (element.type === 'qr') return false;
     return Boolean(element.field && WORDING_FIELDS.has(element.field));
 }
 
 function fieldAlreadyOnCanvas(elements: CanvasElement[], fieldKey: string): boolean {
     return elements.some((el) => el.type === 'field' && el.field === fieldKey);
+}
+
+function hasQrOnCanvas(elements: CanvasElement[]): boolean {
+    return elements.some((el) => el.type === 'qr');
+}
+
+function useQrDataUrl(value: string, pixelSize: number): string | null {
+    const [dataUrl, setDataUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        const size = Math.max(32, Math.round(pixelSize));
+        void QRCode.toDataURL(value || 'SAMPLE', {
+            margin: 2,
+            width: size,
+            color: {
+                dark: '#000000',
+                light: '#ffffff',
+            },
+        })
+            .then((url) => {
+                if (!cancelled) setDataUrl(url);
+            })
+            .catch(() => {
+                if (!cancelled) setDataUrl(null);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [value, pixelSize]);
+
+    return dataUrl;
+}
+
+function CertificateQrPreview({ value, size }: { value: string; size: number }) {
+    const qrUrl = useQrDataUrl(value, size);
+    if (!qrUrl) {
+        return <div className="template-editor-qr-placeholder" aria-hidden />;
+    }
+    return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+            src={qrUrl}
+            alt=""
+            className="template-editor-qr-img"
+            width={size}
+            height={size}
+            draggable={false}
+        />
+    );
 }
 
 /** 1-based index among static elements in array order (order of addition). */
@@ -129,6 +185,7 @@ function normalizeFocus(value: BackgroundFocus | null | undefined): BackgroundFo
 }
 
 export function previewTextFor(element: CanvasElement): string {
+    if (element.type === 'qr') return '';
     if (element.type === 'static') return element.text || '';
     if (element.field && WORDING_FIELDS.has(element.field)) {
         if (element.text != null) return element.text;
@@ -141,6 +198,7 @@ export function previewTextFor(element: CanvasElement): string {
 }
 
 function labelFor(element: CanvasElement, elements: CanvasElement[]): string {
+    if (element.type === 'qr') return 'QR code';
     if (element.type === 'static') {
         return `Static Text ${staticTextOrdinal(elements, element.id)}`;
     }
@@ -155,13 +213,25 @@ function clampElementsToCanvas(
     width: number,
     height: number,
 ): CanvasElement[] {
-    return elements.map((el) => ({
-        ...el,
-        width: Math.min(el.width, width),
-        height: Math.min(el.height, height),
-        x: clamp(el.x, 0, Math.max(0, width - Math.min(el.width, width))),
-        y: clamp(el.y, 0, Math.max(0, height - Math.min(el.height, height))),
-    }));
+    return elements.map((el) => {
+        if (el.type === 'qr') {
+            const size = Math.min(Math.max(MIN_ELEMENT_SIZE, el.width), width, height);
+            return {
+                ...el,
+                width: size,
+                height: size,
+                x: clamp(el.x, 0, Math.max(0, width - size)),
+                y: clamp(el.y, 0, Math.max(0, height - size)),
+            };
+        }
+        return {
+            ...el,
+            width: Math.min(el.width, width),
+            height: Math.min(el.height, height),
+            x: clamp(el.x, 0, Math.max(0, width - Math.min(el.width, width))),
+            y: clamp(el.y, 0, Math.max(0, height - Math.min(el.height, height))),
+        };
+    });
 }
 
 type Selection = 'background' | string | null;
@@ -219,9 +289,11 @@ export default function TemplateEditor({
     const canvasSizeRef = useRef({ w: canvasWidth, h: canvasHeight });
 
     const isDragging = useRef(false);
+    const isResizing = useRef(false);
     const dragElementId = useRef<string | null>(null);
     const dragStartMousePos = useRef({ x: 0, y: 0 });
     const dragStartElementPos = useRef({ x: 0, y: 0 });
+    const resizeStartSize = useRef({ width: 0, height: 0 });
     const isPanningBg = useRef(false);
     const panStartMouse = useRef({ x: 0, y: 0 });
     const panStartFocus = useRef(DEFAULT_FOCUS);
@@ -320,14 +392,32 @@ export default function TemplateEditor({
     const updateSelected = (patch: Partial<CanvasElement>) => {
         if (!selectedElementId || !selectedElement) return;
 
+        if (selectedElement.type === 'qr') {
+            markDirty();
+            setTextFitError(null);
+            setElements((prev) =>
+                prev.map((el) => {
+                    if (el.id !== selectedElementId) return el;
+                    const merged = { ...el, ...patch };
+                    const size = Math.max(MIN_ELEMENT_SIZE, merged.width);
+                    merged.width = size;
+                    merged.height = size;
+                    return merged;
+                }),
+            );
+            return;
+        }
+
         if (isWordingElement(selectedElement)) {
             const next = { ...selectedElement, ...patch };
             const text = next.text ?? '';
+            const fontSize = next.fontSize ?? DEFAULT_ELEMENT_FONT_SIZE;
+            const fontWeight = next.fontWeight ?? 'normal';
             const fits =
                 !text ||
                 textFitsInBox(
                     text,
-                    { fontSize: next.fontSize, fontWeight: next.fontWeight },
+                    { fontSize, fontWeight },
                     next.width,
                     next.height,
                 );
@@ -476,6 +566,24 @@ export default function TemplateEditor({
         setSelection(id);
     };
 
+    const addQr = () => {
+        if (hasQrOnCanvas(elements)) return;
+        const size = Math.min(DEFAULT_QR_SIZE, canvasWidth - 40, canvasHeight - 40);
+        if (size < MIN_ELEMENT_SIZE) return;
+        const id = crypto.randomUUID();
+        const element: CanvasElement = {
+            id,
+            type: 'qr',
+            x: Math.round((canvasWidth - size) / 2),
+            y: Math.round((canvasHeight - size) / 2),
+            width: size,
+            height: size,
+        };
+        markDirty();
+        setElements((prev) => [...prev, element]);
+        setSelection(id);
+    };
+
     const deleteSelected = () => {
         if (!selectedElementId) return;
         markDirty();
@@ -503,8 +611,10 @@ export default function TemplateEditor({
             setElements((prev) =>
                 prev.map((el) => {
                     if (el.id !== dragElementId.current) return el;
-                    const x = clamp(dragStartElementPos.current.x + dx, 0, Math.max(0, cw - el.width));
-                    const y = clamp(dragStartElementPos.current.y + dy, 0, Math.max(0, ch - el.height));
+                    const elW = el.width;
+                    const elH = el.type === 'qr' ? el.width : el.height;
+                    const x = clamp(dragStartElementPos.current.x + dx, 0, Math.max(0, cw - elW));
+                    const y = clamp(dragStartElementPos.current.y + dy, 0, Math.max(0, ch - elH));
                     return { ...el, x, y };
                 }),
             );
@@ -513,6 +623,62 @@ export default function TemplateEditor({
 
         const onUp = () => {
             isDragging.current = false;
+            dragElementId.current = null;
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        };
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    };
+
+    const handleResizeMouseDown = (e: ReactMouseEvent, element: CanvasElement) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setSelection(element.id);
+
+        isResizing.current = true;
+        dragElementId.current = element.id;
+        dragStartMousePos.current = { x: e.clientX, y: e.clientY };
+        resizeStartSize.current = { width: element.width, height: element.height };
+        dragStartElementPos.current = { x: element.x, y: element.y };
+
+        const onMove = (ev: MouseEvent) => {
+            if (!isResizing.current || !dragElementId.current) return;
+            const currentScale = scaleRef.current || 1;
+            const dx = (ev.clientX - dragStartMousePos.current.x) / currentScale;
+            const dy = (ev.clientY - dragStartMousePos.current.y) / currentScale;
+            const { w: cw, h: ch } = canvasSizeRef.current;
+
+            setElements((prev) =>
+                prev.map((el) => {
+                    if (el.id !== dragElementId.current) return el;
+                    if (el.type === 'qr') {
+                        const size = clamp(
+                            Math.round(resizeStartSize.current.width + Math.max(dx, dy)),
+                            MIN_ELEMENT_SIZE,
+                            Math.min(cw - el.x, ch - el.y),
+                        );
+                        return { ...el, width: size, height: size };
+                    }
+                    const width = clamp(
+                        Math.round(resizeStartSize.current.width + dx),
+                        MIN_ELEMENT_SIZE,
+                        cw - el.x,
+                    );
+                    const height = clamp(
+                        Math.round(resizeStartSize.current.height + dy),
+                        MIN_ELEMENT_SIZE,
+                        ch - el.y,
+                    );
+                    return { ...el, width, height };
+                }),
+            );
+            setDirty(true);
+        };
+
+        const onUp = () => {
+            isResizing.current = false;
             dragElementId.current = null;
             document.removeEventListener('mousemove', onMove);
             document.removeEventListener('mouseup', onUp);
@@ -749,6 +915,20 @@ export default function TemplateEditor({
                         >
                             Background
                         </button>
+                        <button
+                            type="button"
+                            className="template-editor-field-btn template-editor-field-btn--with-icon"
+                            disabled={hasQrOnCanvas(elements)}
+                            title={
+                                hasQrOnCanvas(elements)
+                                    ? 'QR code already on canvas (only one allowed)'
+                                    : undefined
+                            }
+                            onClick={addQr}
+                        >
+                            <QrCode size={14} aria-hidden />
+                            QR code
+                        </button>
                         {AVAILABLE_FIELDS.map((field) => {
                             const alreadyOnCanvas =
                                 field.field !== '__static' &&
@@ -844,17 +1024,30 @@ export default function TemplateEditor({
                                 )}
 
                                 {elements.map((element) => {
-                                    const selected = element.id === selectedElementId;
+                                    if (element.type === 'qr') {
+                                        const size = element.width;
+                                        return (
+                                            <div
+                                                key={element.id}
+                                                className="template-editor-element template-editor-element--qr"
+                                                style={{
+                                                    left: element.x,
+                                                    top: element.y,
+                                                    width: size,
+                                                    height: size,
+                                                }}
+                                            >
+                                                <CertificateQrPreview
+                                                    value={SAMPLE_VERIFICATION_URL}
+                                                    size={size}
+                                                />
+                                            </div>
+                                        );
+                                    }
                                     return (
                                         <div
                                             key={element.id}
-                                            className={[
-                                                'template-editor-element',
-                                                `template-editor-element--align-${element.align}`,
-                                                selected ? 'template-editor-element--selected' : '',
-                                            ]
-                                                .filter(Boolean)
-                                                .join(' ')}
+                                            className={`template-editor-element template-editor-element--align-${element.align || 'left'}`}
                                             style={{
                                                 left: element.x,
                                                 top: element.y,
@@ -865,13 +1058,45 @@ export default function TemplateEditor({
                                                 textAlign: element.align,
                                                 color: element.color,
                                             }}
+                                        >
+                                            {previewTextFor(element)}
+                                        </div>
+                                    );
+                                })}
+
+                                {elements.map((element) => {
+                                    const selected = element.id === selectedElementId;
+                                    const size = element.type === 'qr' ? element.width : undefined;
+                                    return (
+                                        <div
+                                            key={`hit-${element.id}`}
+                                            className={`template-editor-hit${selected ? ' template-editor-hit--selected' : ''}`}
+                                            style={{
+                                                left: element.x,
+                                                top: element.y,
+                                                width: size ?? element.width,
+                                                height: size ?? element.height,
+                                            }}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setSelection(element.id);
                                             }}
                                             onMouseDown={(e) => handleElementMouseDown(e, element)}
                                         >
-                                            {previewTextFor(element)}
+                                            {selected ? (
+                                                <button
+                                                    type="button"
+                                                    className="template-editor-resize-handle"
+                                                    aria-label={
+                                                        element.type === 'qr'
+                                                            ? 'Resize QR code'
+                                                            : 'Resize element'
+                                                    }
+                                                    onMouseDown={(e) =>
+                                                        handleResizeMouseDown(e, element)
+                                                    }
+                                                />
+                                            ) : null}
                                         </div>
                                     );
                                 })}
@@ -925,7 +1150,7 @@ export default function TemplateEditor({
                                         className="btn btn-secondary"
                                         onClick={() => fileInputRef.current?.click()}
                                     >
-                                        {backgroundImageUrl ? 'Replace image' : 'Choose image'}
+                                        {backgroundImageUrl ? 'Replace' : 'Choose image'}
                                     </button>
                                     {backgroundImageUrl ? (
                                         <button
@@ -1025,144 +1250,223 @@ export default function TemplateEditor({
                             </div>
 
                             <div className="template-editor-prop-group">
-                                <label className="form-label" htmlFor="te-font-size">
-                                    Font Size
+                                <label className="form-label" htmlFor="te-el-x">
+                                    X
                                 </label>
                                 <ClampedNumberInput
-                                    id="te-font-size"
-                                    min={8}
-                                    max={120}
-                                    value={selectedElement.fontSize}
-                                    onCommit={(v) => updateSelected({ fontSize: v })}
+                                    id="te-el-x"
+                                    min={0}
+                                    max={Math.max(0, canvasWidth - selectedElement.width)}
+                                    value={Math.round(selectedElement.x)}
+                                    onCommit={(v) => updateSelected({ x: v })}
                                 />
                             </div>
 
                             <div className="template-editor-prop-group">
-                                <span className="form-label">Font Weight</span>
-                                <div className="template-editor-prop-row">
-                                    <button
-                                        type="button"
-                                        className={`template-editor-toggle-btn${
-                                            selectedElement.fontWeight === 'normal' ? ' active' : ''
-                                        }`}
-                                        onClick={() => updateSelected({ fontWeight: 'normal' })}
-                                    >
-                                        Normal
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={`template-editor-toggle-btn${
-                                            selectedElement.fontWeight === 'bold' ? ' active' : ''
-                                        }`}
-                                        onClick={() => updateSelected({ fontWeight: 'bold' })}
-                                    >
-                                        Bold
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="template-editor-prop-group">
-                                <span className="form-label">Align</span>
-                                <div className="template-editor-prop-row">
-                                    <button
-                                        type="button"
-                                        className={`template-editor-toggle-btn${
-                                            selectedElement.align === 'left' ? ' active' : ''
-                                        }`}
-                                        aria-label="Align left"
-                                        onClick={() => updateSelected({ align: 'left' })}
-                                    >
-                                        <AlignLeft size={16} />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={`template-editor-toggle-btn${
-                                            selectedElement.align === 'center' ? ' active' : ''
-                                        }`}
-                                        aria-label="Align center"
-                                        onClick={() => updateSelected({ align: 'center' })}
-                                    >
-                                        <AlignCenter size={16} />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={`template-editor-toggle-btn${
-                                            selectedElement.align === 'right' ? ' active' : ''
-                                        }`}
-                                        aria-label="Align right"
-                                        onClick={() => updateSelected({ align: 'right' })}
-                                    >
-                                        <AlignRight size={16} />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="template-editor-prop-group">
-                                <label className="form-label" htmlFor="te-color">
-                                    Color
-                                </label>
-                                <input
-                                    id="te-color"
-                                    type="color"
-                                    className="template-editor-color-input"
-                                    value={selectedElement.color}
-                                    onChange={(e) => updateSelected({ color: e.target.value })}
-                                />
-                            </div>
-
-                            <div className="template-editor-prop-group">
-                                <label className="form-label" htmlFor="te-width">
-                                    Width
+                                <label className="form-label" htmlFor="te-el-y">
+                                    Y
                                 </label>
                                 <ClampedNumberInput
-                                    id="te-width"
-                                    min={20}
-                                    max={CANVAS_MAX}
-                                    value={selectedElement.width}
-                                    onCommit={(v) => updateSelected({ width: v })}
+                                    id="te-el-y"
+                                    min={0}
+                                    max={Math.max(
+                                        0,
+                                        canvasHeight -
+                                            (selectedElement.type === 'qr'
+                                                ? selectedElement.width
+                                                : selectedElement.height),
+                                    )}
+                                    value={Math.round(selectedElement.y)}
+                                    onCommit={(v) => updateSelected({ y: v })}
                                 />
                             </div>
 
-                            <div className="template-editor-prop-group">
-                                <label className="form-label" htmlFor="te-height">
-                                    Height
-                                </label>
-                                <ClampedNumberInput
-                                    id="te-height"
-                                    min={20}
-                                    max={CANVAS_MAX}
-                                    value={selectedElement.height}
-                                    onCommit={(v) => updateSelected({ height: v })}
-                                />
-                            </div>
-
-                            {isWordingElement(selectedElement) ? (
+                            {selectedElement.type === 'qr' ? (
                                 <div className="template-editor-prop-group">
-                                    <label className="form-label" htmlFor="te-text">
-                                        Text Content
+                                    <label className="form-label" htmlFor="te-qr-size">
+                                        Size
                                     </label>
-                                    <textarea
-                                        id="te-text"
-                                        className="form-input template-editor-prop-textarea"
-                                        value={selectedElement.text || ''}
-                                        onChange={(e) => updateSelected({ text: e.target.value })}
-                                        aria-invalid={textFitError ? true : undefined}
-                                        aria-describedby={
-                                            textFitError ? 'te-text-fit-error' : undefined
+                                    <ClampedNumberInput
+                                        id="te-qr-size"
+                                        min={MIN_ELEMENT_SIZE}
+                                        max={Math.max(
+                                            MIN_ELEMENT_SIZE,
+                                            Math.min(
+                                                canvasWidth - selectedElement.x,
+                                                canvasHeight - selectedElement.y,
+                                            ),
+                                        )}
+                                        value={selectedElement.width}
+                                        onCommit={(v) =>
+                                            updateSelected({ width: v, height: v })
                                         }
                                     />
                                 </div>
-                            ) : null}
+                            ) : (
+                                <>
+                                    <div className="template-editor-prop-group">
+                                        <label className="form-label" htmlFor="te-width">
+                                            Width
+                                        </label>
+                                        <ClampedNumberInput
+                                            id="te-width"
+                                            min={20}
+                                            max={CANVAS_MAX}
+                                            value={selectedElement.width}
+                                            onCommit={(v) => updateSelected({ width: v })}
+                                        />
+                                    </div>
 
-                            {textFitError ? (
-                                <span
-                                    id="te-text-fit-error"
-                                    className="field-error"
-                                    role="alert"
-                                >
-                                    {textFitError}
-                                </span>
-                            ) : null}
+                                    <div className="template-editor-prop-group">
+                                        <label className="form-label" htmlFor="te-height">
+                                            Height
+                                        </label>
+                                        <ClampedNumberInput
+                                            id="te-height"
+                                            min={20}
+                                            max={CANVAS_MAX}
+                                            value={selectedElement.height}
+                                            onCommit={(v) => updateSelected({ height: v })}
+                                        />
+                                    </div>
+
+                                    {isWordingElement(selectedElement) ? (
+                                        <div className="template-editor-prop-group">
+                                            <label className="form-label" htmlFor="te-text">
+                                                Text Content
+                                            </label>
+                                            <textarea
+                                                id="te-text"
+                                                className="form-input template-editor-prop-textarea"
+                                                value={selectedElement.text || ''}
+                                                onChange={(e) =>
+                                                    updateSelected({ text: e.target.value })
+                                                }
+                                                aria-invalid={textFitError ? true : undefined}
+                                                aria-describedby={
+                                                    textFitError ? 'te-text-fit-error' : undefined
+                                                }
+                                            />
+                                        </div>
+                                    ) : null}
+
+                                    <div className="template-editor-prop-group">
+                                        <label className="form-label" htmlFor="te-font-size">
+                                            Font Size
+                                        </label>
+                                        <ClampedNumberInput
+                                            id="te-font-size"
+                                            min={8}
+                                            max={120}
+                                            value={
+                                                selectedElement.fontSize ??
+                                                DEFAULT_ELEMENT_FONT_SIZE
+                                            }
+                                            onCommit={(v) => updateSelected({ fontSize: v })}
+                                        />
+                                    </div>
+
+                                    <div className="template-editor-prop-group">
+                                        <span className="form-label">Font Weight</span>
+                                        <div className="template-editor-prop-row">
+                                            <button
+                                                type="button"
+                                                className={`template-editor-toggle-btn${
+                                                    (selectedElement.fontWeight ?? 'normal') ===
+                                                    'normal'
+                                                        ? ' active'
+                                                        : ''
+                                                }`}
+                                                onClick={() =>
+                                                    updateSelected({ fontWeight: 'normal' })
+                                                }
+                                            >
+                                                Normal
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={`template-editor-toggle-btn${
+                                                    selectedElement.fontWeight === 'bold'
+                                                        ? ' active'
+                                                        : ''
+                                                }`}
+                                                onClick={() =>
+                                                    updateSelected({ fontWeight: 'bold' })
+                                                }
+                                            >
+                                                Bold
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="template-editor-prop-group">
+                                        <span className="form-label">Align</span>
+                                        <div className="template-editor-prop-row">
+                                            <button
+                                                type="button"
+                                                className={`template-editor-toggle-btn${
+                                                    (selectedElement.align ?? 'left') === 'left'
+                                                        ? ' active'
+                                                        : ''
+                                                }`}
+                                                aria-label="Align left"
+                                                onClick={() => updateSelected({ align: 'left' })}
+                                            >
+                                                <AlignLeft size={16} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={`template-editor-toggle-btn${
+                                                    selectedElement.align === 'center'
+                                                        ? ' active'
+                                                        : ''
+                                                }`}
+                                                aria-label="Align center"
+                                                onClick={() => updateSelected({ align: 'center' })}
+                                            >
+                                                <AlignCenter size={16} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={`template-editor-toggle-btn${
+                                                    selectedElement.align === 'right'
+                                                        ? ' active'
+                                                        : ''
+                                                }`}
+                                                aria-label="Align right"
+                                                onClick={() => updateSelected({ align: 'right' })}
+                                            >
+                                                <AlignRight size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="template-editor-prop-group">
+                                        <label className="form-label" htmlFor="te-color">
+                                            Color
+                                        </label>
+                                        <input
+                                            id="te-color"
+                                            type="color"
+                                            className="template-editor-color-input"
+                                            value={selectedElement.color || '#000000'}
+                                            onChange={(e) =>
+                                                updateSelected({ color: e.target.value })
+                                            }
+                                        />
+                                    </div>
+
+                                    {textFitError ? (
+                                        <span
+                                            id="te-text-fit-error"
+                                            className="field-error"
+                                            role="alert"
+                                        >
+                                            {textFitError}
+                                        </span>
+                                    ) : null}
+                                </>
+                            )}
 
                             <button
                                 type="button"

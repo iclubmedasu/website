@@ -6,9 +6,11 @@ import type { EventStatistics } from '@/types/backend-contracts';
 import LineChart from '@/components/charts/LineChart';
 import PieChart from '@/components/charts/PieChart';
 import EventStatTile from '../EventStatTile';
+import ExpandedSectionTitle from '../ExpandedSectionTitle';
 
 interface EventStatisticsSectionProps {
     stats: EventStatistics | null;
+    onReload: () => void | Promise<void>;
 }
 
 const CHART_COLOR = '#561789';
@@ -43,7 +45,7 @@ function buildLineChartOptions(categories: string[], color: string): ApexOptions
     };
 }
 
-export default function EventStatisticsSection({ stats }: EventStatisticsSectionProps) {
+export default function EventStatisticsSection({ stats, onReload }: EventStatisticsSectionProps) {
     const registered = stats?.totalRegistered ?? 0;
     const checkedIn = stats?.totalCheckedIn ?? 0;
     const walkIns = stats?.walkInCount ?? 0;
@@ -101,7 +103,7 @@ export default function EventStatisticsSection({ stats }: EventStatisticsSection
 
     return (
         <section className="event-expanded-panel">
-           <h2 className="expanded-section-title">Statistics</h2>
+            <ExpandedSectionTitle label="Statistics" onReload={onReload} />
             <div className="event-expanded-summary-grid event-expanded-summary-grid--stats">
                 <EventStatTile label="Registered" value={String(registered)} />
                 <EventStatTile label="Check-ins" value={String(checkedIn)} />

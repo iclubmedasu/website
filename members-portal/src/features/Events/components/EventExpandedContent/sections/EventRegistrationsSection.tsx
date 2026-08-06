@@ -11,6 +11,7 @@ import RemoveAttendanceModal from '@/features/Events/modals/RemoveAttendanceModa
 import { exportEventRegistrationsExcel } from '@/features/Events/components/registrationExcelExport';
 import type {
     EventCustomFieldRef,
+    EventIdCardDesignRef,
     EventRegistrationRef,
     EventSessionRef,
     EventTierRef,
@@ -63,6 +64,7 @@ import {
     type RegistrationSortSpec,
 } from '../registrationTableFilterUtils';
 import type { RegistrationTableFunnelState } from '../eventExpandedFunnelState';
+import ExpandedSectionTitle from '../ExpandedSectionTitle';
 
 interface EventRegistrationsSectionProps {
     eventId: Id | string;
@@ -100,6 +102,7 @@ interface EventRegistrationsSectionProps {
             | RegistrationTableFunnelState
             | ((prev: RegistrationTableFunnelState) => RegistrationTableFunnelState),
     ) => void;
+    idCardDesign?: EventIdCardDesignRef | null;
 }
 
 export default function EventRegistrationsSection({
@@ -134,6 +137,7 @@ export default function EventRegistrationsSection({
     onImportComplete,
     funnel,
     onFunnelChange,
+    idCardDesign,
 }: EventRegistrationsSectionProps) {
     const [registrations, setRegistrations] = useState<EventRegistrationRef[]>([]);
     const registrationSearch = funnel.search;
@@ -650,7 +654,7 @@ export default function EventRegistrationsSection({
     return (
         <section className="event-expanded-panel">
             <div className="event-expanded-header event-expanded-header--compact">
-                <h2 className="expanded-section-title">Registrations</h2>
+                <ExpandedSectionTitle label="Registrations" onReload={loadRegistrations} />
                 <div className="event-expanded-header-actions">
                     <div className="event-expanded-copy-link">
                         <button
@@ -692,78 +696,78 @@ export default function EventRegistrationsSection({
                     <CopyPublicEventLinkButton eventSlug={eventSlug || String(eventId)} isPublished={isPublished} />
                 </div>
             </div>
-            <div className="page-search-row event-registration-search-row">
-                <div className="page-search-field page-search-field--full event-registration-search-field">
-                    <Search className="page-search-icon" size={16} />
-                    <input
-                        type="search"
-                        className="page-search-input"
-                        value={registrationSearch}
-                        onChange={(e) => setRegistrationSearch(e.target.value)}
-                        placeholder="Search by name, email, phone, or code"
-                        aria-label="Search registrations"
-                    />
-                    <button
-                        type="button"
-                        className={`page-search-filter-btn${hasFunnelFiltersActive ? ' page-search-filter-btn--active' : ''}`}
-                        onClick={() => setFilterModalOpen(true)}
-                        aria-label="Open sort and filters"
-                    >
-                        <Filter size={16} />
-                        <span className="page-search-filter-label">Sort & Filters</span>
-                    </button>
-                </div>
-            </div>
-            <RegistrationFilterChips
-                filters={columnFilters}
-                serverFilters={serverFilters}
-                columns={filterableColumns}
-                context={tableContext}
-                tiers={tiers}
-                onRemove={(index) => setColumnFilters((current) => current.filter((_, filterIndex) => filterIndex !== index))}
-                onRemoveServerFilter={(key) => {
-                    setServerFilters((current) => ({ ...current, [key]: EMPTY_REGISTRATION_SERVER_FILTERS[key] }));
-                }}
-                onClearAll={() => {
-                    setColumnFilters([]);
-                    setServerFilters(EMPTY_REGISTRATION_SERVER_FILTERS);
-                }}
-            />
-            <RegistrationColumnFilterModal
-                open={filterModalOpen}
-                columns={filterableColumns}
-                activeFilters={columnFilters}
-                sortSpec={sortSpec}
-                serverFilters={serverFilters}
-                serverFilterConfig={{
-                    showTier: true,
-                    showSource: true,
-                    showCheckIn: true,
-                    showCheckedInToday: multiDayEvent && withinEventDays,
-                }}
-                context={tableContext}
-                tiers={tiers}
-                sessions={sessions}
-                onClose={() => setFilterModalOpen(false)}
-                onApply={(filters, nextSort, nextServerFilters) => {
-                    setColumnFilters(filters);
-                    setSortSpec(nextSort);
-                    setServerFilters({
-                        ...EMPTY_REGISTRATION_SERVER_FILTERS,
-                        tierId: nextServerFilters.tierId,
-                        sourceGroup: nextServerFilters.sourceGroup,
-                        checkInStatus: nextServerFilters.checkInStatus,
-                    });
-                }}
-                onClear={() => {
-                    setColumnFilters([]);
-                    setSortSpec(DEFAULT_REGISTRATION_SORT);
-                    setServerFilters(EMPTY_REGISTRATION_SERVER_FILTERS);
-                }}
-            />
-            {draftErrors._form ? <p className="error-message">{draftErrors._form}</p> : null}
             <div className="event-registrations-layout">
                 <div className="event-registrations-table-column">
+                    <div className="page-search-row event-registration-search-row">
+                        <div className="page-search-field page-search-field--full event-registration-search-field">
+                            <Search className="page-search-icon" size={16} />
+                            <input
+                                type="search"
+                                className="page-search-input"
+                                value={registrationSearch}
+                                onChange={(e) => setRegistrationSearch(e.target.value)}
+                                placeholder="Search by name, email, phone, or code"
+                                aria-label="Search registrations"
+                            />
+                            <button
+                                type="button"
+                                className={`page-search-filter-btn${hasFunnelFiltersActive ? ' page-search-filter-btn--active' : ''}`}
+                                onClick={() => setFilterModalOpen(true)}
+                                aria-label="Open sort and filters"
+                            >
+                                <Filter size={16} />
+                                <span className="page-search-filter-label">Sort & Filters</span>
+                            </button>
+                        </div>
+                    </div>
+                    <RegistrationFilterChips
+                        filters={columnFilters}
+                        serverFilters={serverFilters}
+                        columns={filterableColumns}
+                        context={tableContext}
+                        tiers={tiers}
+                        onRemove={(index) => setColumnFilters((current) => current.filter((_, filterIndex) => filterIndex !== index))}
+                        onRemoveServerFilter={(key) => {
+                            setServerFilters((current) => ({ ...current, [key]: EMPTY_REGISTRATION_SERVER_FILTERS[key] }));
+                        }}
+                        onClearAll={() => {
+                            setColumnFilters([]);
+                            setServerFilters(EMPTY_REGISTRATION_SERVER_FILTERS);
+                        }}
+                    />
+                    <RegistrationColumnFilterModal
+                        open={filterModalOpen}
+                        columns={filterableColumns}
+                        activeFilters={columnFilters}
+                        sortSpec={sortSpec}
+                        serverFilters={serverFilters}
+                        serverFilterConfig={{
+                            showTier: true,
+                            showSource: true,
+                            showCheckIn: true,
+                            showCheckedInToday: multiDayEvent && withinEventDays,
+                        }}
+                        context={tableContext}
+                        tiers={tiers}
+                        sessions={sessions}
+                        onClose={() => setFilterModalOpen(false)}
+                        onApply={(filters, nextSort, nextServerFilters) => {
+                            setColumnFilters(filters);
+                            setSortSpec(nextSort);
+                            setServerFilters({
+                                ...EMPTY_REGISTRATION_SERVER_FILTERS,
+                                tierId: nextServerFilters.tierId,
+                                sourceGroup: nextServerFilters.sourceGroup,
+                                checkInStatus: nextServerFilters.checkInStatus,
+                            });
+                        }}
+                        onClear={() => {
+                            setColumnFilters([]);
+                            setSortSpec(DEFAULT_REGISTRATION_SORT);
+                            setServerFilters(EMPTY_REGISTRATION_SERVER_FILTERS);
+                        }}
+                    />
+                    {draftErrors._form ? <p className="error-message">{draftErrors._form}</p> : null}
                     <div className={`event-registrations-table-shell${isAddingAttendee ? ' event-registrations-table-shell--drafting' : ''}`}>
                         <div ref={tableScrollRef} className="table-container event-registrations-table-scroll">
                             <table className="members-table event-registrations-table">
@@ -899,9 +903,12 @@ export default function EventRegistrationsSection({
                 </div>
                 <aside className="event-registrations-checkin-column">
                     <EventCheckInPanel
+                        eventId={eventId}
                         checkInFlow={checkInFlow}
                         suspended={fieldModalOpen || importModalOpen || isAddingAttendee || walkInAttendanceOpen || checkInFlow.showCombinedModal}
                         tiers={tiers}
+                        fields={fields}
+                        idCardDesign={idCardDesign}
                     />
                 </aside>
             </div>

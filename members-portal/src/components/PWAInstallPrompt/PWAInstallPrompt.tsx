@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { isStandalonePwa } from '@/lib/standalonePwa'
 import './PWAInstallPrompt.css'
 
 interface BeforeInstallPromptEvent extends Event {
@@ -14,12 +15,6 @@ function isIOS(): boolean {
         !(window as unknown as { MSStream?: unknown }).MSStream !== undefined
 }
 
-function isInStandaloneMode(): boolean {
-    if (typeof window === 'undefined') return false
-    return window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as Navigator & { standalone?: boolean }).standalone === true
-}
-
 type PromptState = 'hidden' | 'android' | 'ios'
 
 export function PWAInstallPrompt() {
@@ -30,7 +25,7 @@ export function PWAInstallPrompt() {
 
     useEffect(() => {
         // Already installed — never show
-        if (isInStandaloneMode()) return
+        if (isStandalonePwa()) return
 
         // Already dismissed this session
         if (sessionStorage.getItem('pwa-prompt-dismissed')) return

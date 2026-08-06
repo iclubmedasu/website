@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext'
 import { RealtimeProvider, useOptionalRealtimeContext } from '@/context/RealtimeContext'
 import { notificationsAPI } from '@/services/api'
 import type { NotificationRealtimeMessage } from '@/types/backend-contracts'
+import { syncAppBadge } from '@/lib/appBadge'
 import {
     Users,
     FolderKanban,
@@ -149,12 +150,15 @@ function PortalLayout({ children }: { children: React.ReactNode }) {
     const refreshUnreadCount = useCallback(async () => {
         if (!user?.id) {
             setUnreadCount(0)
+            syncAppBadge(0)
             return
         }
 
         try {
             const result = await notificationsAPI.getUnreadCount()
-            setUnreadCount(Math.max(0, Number(result.unreadCount || 0)))
+            const count = Math.max(0, Number(result.unreadCount || 0))
+            setUnreadCount(count)
+            syncAppBadge(count)
         } catch {
             // Keep previous value when refresh fails.
         }

@@ -60,6 +60,41 @@ export interface EventTicketDesignRef {
     ticketFooterImageMimeType?: string | null;
 }
 
+/** Positioned element on an attendee ID card canvas. */
+export interface IdCardLayoutElement {
+    id: string;
+    type: 'qr' | 'field' | 'static';
+    field?: string;
+    text?: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    fontSize?: number;
+    fontWeight?: 'normal' | 'bold';
+    align?: 'left' | 'center' | 'right';
+    color?: string;
+}
+
+/** Cover-scale zoom + pan focus for ID card background (mirrors certificate backgroundFocus). */
+export interface IdCardBackgroundFocus {
+    scale: number;
+    offsetX: number;
+    offsetY: number;
+}
+
+/** Flat attendee ID card design stored on Event. */
+export interface EventIdCardDesignRef {
+    idCardCanvasWidth?: number | null;
+    idCardCanvasHeight?: number | null;
+    idCardLayout?: IdCardLayoutElement[] | null;
+    idCardBackgroundFocus?: IdCardBackgroundFocus | null;
+    idCardBackgroundImageGithubPath?: string | null;
+    idCardBackgroundImageGithubSha?: string | null;
+    idCardBackgroundImageFileSize?: number | null;
+    idCardBackgroundImageMimeType?: string | null;
+}
+
 export interface EventCustomFieldRef {
     id: Id;
     eventId: Id;
@@ -171,7 +206,7 @@ export interface EventRegistrationRef {
     sessionSelections?: EventSessionSelectionRef[];
 }
 
-export interface EventSummary extends EventTicketDesignRef {
+export interface EventSummary extends EventTicketDesignRef, EventIdCardDesignRef {
     id: Id;
     slug: string;
     title: string;

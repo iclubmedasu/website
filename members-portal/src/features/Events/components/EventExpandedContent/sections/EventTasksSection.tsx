@@ -14,6 +14,7 @@ import {
     Undo2,
 } from 'lucide-react';
 import { eventsAPI } from '@/services/api';
+import { useResourceChannel } from '@/hooks/useResourceChannel';
 import type { EventTaskRef, Id, MemberSummary } from '@/types/backend-contracts';
 import { exportEventTasksExcel } from '@/features/Events/components/eventTaskExcelExport';
 import {
@@ -29,6 +30,7 @@ import RemoveEventTaskAssignmentModal from '../../../modals/RemoveEventTaskAssig
 import DeleteEventTaskModal from '../../../modals/DeleteEventTaskModal';
 import EventTasksTimetable, { type RemoveAssignmentTarget } from '../EventTasksTimetable';
 import AddEventTaskModal from '../../../modals/AddEventTaskModal';
+import ExpandedSectionTitle from '../ExpandedSectionTitle';
 import './EventTasksSection.css';
 
 interface EventTasksSectionProps {
@@ -109,6 +111,21 @@ export default function EventTasksSection({
         setTasks(Array.isArray(data) ? data : []);
     }, [eventId]);
 
+    const reloadSection = useCallback(async () => {
+        setError('');
+        try {
+            const [tasksResult, membersResult] = await Promise.all([
+                eventsAPI.getTasks(eventId),
+                canManage ? eventsAPI.getAssignableMembers(eventId).catch(() => []) : Promise.resolve([]),
+            ]);
+            setTasks(Array.isArray(tasksResult) ? tasksResult : []);
+            setMembers(Array.isArray(membersResult) ? membersResult : []);
+        } catch {
+            setError('Failed to load tasks.');
+            setTasks([]);
+        }
+    }, [canManage, eventId]);
+
     useEffect(() => {
         let active = true;
 
@@ -135,6 +152,12 @@ export default function EventTasksSection({
         void load();
         return () => { active = false; };
     }, [eventId, canManage]);
+
+    useResourceChannel({
+        resource: 'event',
+        resourceId: eventId,
+        onRefresh: () => { void loadTasks(); },
+    });
 
     useEffect(() => {
         if (!isMaximized) return undefined;
@@ -368,9 +391,7 @@ export default function EventTasksSection({
     return (
         <section className="event-expanded-panel">
             <div className="event-expanded-header event-expanded-header--compact">
-                <div>
-                    <h2 className="expanded-section-title">Tasks</h2>
-                </div>
+                <ExpandedSectionTitle label="Tasks" onReload={reloadSection} />
             </div>
             <div className={`event-tasks-section${isMaximized ? ' event-tasks-section--maximized' : ''}`}>
                 {error ? <p className="error-message">{error}</p> : null}

@@ -16,6 +16,7 @@ import tasksRoutes from "./tasks";
 import dashboardRoutes from "./dashboard";
 import eventsRoutes from "./events";
 import eventTicketDesignRoutes from "./eventTicketDesign";
+import eventIdCardDesignRoutes from "./eventIdCardDesign";
 import phasesRoutes from "./phases";
 import scheduleSlotsRoutes from "./scheduleSlots";
 import projectFilesRoutes from "./projectFiles";
@@ -93,6 +94,7 @@ router.use("/events", (req, res, next) => {
 }, eventsRoutes);
 
 router.use("/events", authenticateToken, eventTicketDesignRoutes);
+router.use("/events", authenticateToken, eventIdCardDesignRoutes);
 
 router.use("/phases", authenticateToken, phasesRoutes);
 router.use("/schedule-slots", authenticateToken, scheduleSlotsRoutes);

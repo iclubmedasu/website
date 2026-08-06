@@ -20,6 +20,8 @@ export interface AuthTokenResponse {
 
 export interface AuthMeResponse {
     user: AuthUser;
+    /** Present when server re-issued a longer-lived PWA session token. */
+    token?: string;
 }
 
 export interface AlumniAccessResponse {
@@ -54,14 +56,18 @@ export interface CheckStudentIdInput {
     studentId: string | number;
 }
 
+export type ClientSurface = 'pwa' | 'web';
+
 export interface SetupPasswordInput {
     email: string;
     password: string;
+    clientSurface?: ClientSurface;
 }
 
 export interface LoginInput {
     email: string;
     password: string;
+    clientSurface?: ClientSurface;
 }
 
 export interface CompleteProfileInput {
@@ -72,6 +78,7 @@ export interface CompleteProfileInput {
     password?: string;
     email2?: string;
     email3?: string;
+    clientSurface?: ClientSurface;
 }
 
 export interface CompleteOfficerProfileInput {
@@ -84,6 +91,7 @@ export interface CompleteOfficerProfileInput {
     password?: string;
     confirmPassword?: string;
     officerEmail?: string;
+    clientSurface?: ClientSurface;
 }
 
 export interface UpdateInvitedProfileInput {

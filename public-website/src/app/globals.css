@@ -211,6 +211,7 @@ h4 {
   align-items: center;
   text-align: center;
   width: 100%;
+  min-width: 0;
 }
 
 .verify-page--with-canvas {
@@ -278,6 +279,9 @@ h4 {
   font-weight: 700;
   color: var(--purple-900);
   line-height: 1.2;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .verify-page-meta {

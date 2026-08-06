@@ -40,14 +40,50 @@
     position: absolute;
     display: flex;
     align-items: flex-start;
-    overflow: hidden;
+    overflow: visible;
     white-space: normal;
     word-break: break-word;
+    overflow-wrap: anywhere;
     line-height: 1.2;
     pointer-events: none;
     font-family: var(--font-heading);
     box-sizing: border-box;
     padding: 0 0.25rem;
+}
+
+.certificate-canvas-element--qr {
+    display: grid;
+    place-items: center;
+    /* Modest white inset — keep scannable modules dominant (not % of plate). */
+    padding: 4px;
+    background: #ffffff;
+    border-radius: 8%;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.certificate-canvas-qr-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    object-fit: contain;
+    border-radius: 4%;
+    pointer-events: none;
+}
+
+.certificate-canvas-qr-placeholder {
+    width: 100%;
+    height: 100%;
+    background:
+        repeating-linear-gradient(
+            45deg,
+            var(--gray-200),
+            var(--gray-200) 4px,
+            var(--gray-100) 4px,
+            var(--gray-100) 8px
+        );
 }
 
 .certificate-canvas-element--align-left {

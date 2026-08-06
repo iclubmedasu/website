@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { X } from 'lucide-react';
+import QRCode from 'qrcode';
 import { apiFetch } from '@/services/api';
 import {
     certificatesAPI,
@@ -11,6 +12,7 @@ import {
 import type { Id } from '@/types/backend-contracts';
 import {
     previewTextFor,
+    SAMPLE_VERIFICATION_URL,
     type CanvasElement,
 } from '../TemplateEditor/TemplateEditor';
 import './TemplatePreviewModal.css';
@@ -20,6 +22,52 @@ const DEFAULT_FOCUS: BackgroundFocus = { scale: 1, offsetX: 0.5, offsetY: 0.5 };
 function parseLayout(layout: unknown): CanvasElement[] {
     if (!Array.isArray(layout)) return [];
     return layout as CanvasElement[];
+}
+
+function useQrDataUrl(value: string, pixelSize: number): string | null {
+    const [dataUrl, setDataUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        const size = Math.max(32, Math.round(pixelSize));
+        void QRCode.toDataURL(value || 'SAMPLE', {
+            margin: 2,
+            width: size,
+            color: {
+                dark: '#000000',
+                light: '#ffffff',
+            },
+        })
+            .then((url) => {
+                if (!cancelled) setDataUrl(url);
+            })
+            .catch(() => {
+                if (!cancelled) setDataUrl(null);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [value, pixelSize]);
+
+    return dataUrl;
+}
+
+function PreviewQrCell({ value, size }: { value: string; size: number }) {
+    const qrUrl = useQrDataUrl(value, size);
+    if (!qrUrl) {
+        return <div className="template-preview-qr-placeholder" aria-hidden />;
+    }
+    return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+            src={qrUrl}
+            alt=""
+            className="template-preview-qr-img"
+            width={size}
+            height={size}
+            draggable={false}
+        />
+    );
 }
 
 function parseBackgroundFocus(value: unknown): BackgroundFocus {
@@ -244,24 +292,46 @@ export default function TemplatePreviewModal({ templateId, onClose }: TemplatePr
                                     ) : (
                                         <div className="template-preview-bg-placeholder" />
                                     )}
-                                    {elements.map((element) => (
-                                        <div
-                                            key={element.id}
-                                            className={`template-preview-element template-preview-element--align-${element.align}`}
-                                            style={{
-                                                left: element.x,
-                                                top: element.y,
-                                                width: element.width,
-                                                height: element.height,
-                                                fontSize: element.fontSize,
-                                                fontWeight: element.fontWeight,
-                                                textAlign: element.align,
-                                                color: element.color,
-                                            }}
-                                        >
-                                            {previewTextFor(element)}
-                                        </div>
-                                    ))}
+                                    {elements.map((element) => {
+                                        if (element.type === 'qr') {
+                                            const size = element.width;
+                                            return (
+                                                <div
+                                                    key={element.id}
+                                                    className="template-preview-element template-preview-element--qr"
+                                                    style={{
+                                                        left: element.x,
+                                                        top: element.y,
+                                                        width: size,
+                                                        height: size,
+                                                    }}
+                                                >
+                                                    <PreviewQrCell
+                                                        value={SAMPLE_VERIFICATION_URL}
+                                                        size={size}
+                                                    />
+                                                </div>
+                                            );
+                                        }
+                                        return (
+                                            <div
+                                                key={element.id}
+                                                className={`template-preview-element template-preview-element--align-${element.align || 'left'}`}
+                                                style={{
+                                                    left: element.x,
+                                                    top: element.y,
+                                                    width: element.width,
+                                                    height: element.height,
+                                                    fontSize: element.fontSize,
+                                                    fontWeight: element.fontWeight,
+                                                    textAlign: element.align,
+                                                    color: element.color,
+                                                }}
+                                            >
+                                                {previewTextFor(element)}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>

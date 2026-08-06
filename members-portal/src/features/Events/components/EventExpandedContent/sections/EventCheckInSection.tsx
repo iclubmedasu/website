@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { Maximize2, Minimize2, Printer } from 'lucide-react';
 import { YesNoField } from '@/components/YesNoField/YesNoField';
 import type {
     EventCustomFieldRef,
+    EventIdCardDesignRef,
     EventSessionRef,
     EventTierRef,
+    Id,
 } from '@/types/backend-contracts';
 import EventStaffModal from '@/features/Events/components/EventStaffModal';
+import { eventsAPI } from '@/services/api';
 import {
     dropdownOptions,
     getCustomFieldValueFromRecord,
@@ -16,11 +19,16 @@ import { unlockCheckInAudio } from '../checkInSounds';
 import type { UseCheckInFlowReturn } from '../useCheckInFlow';
 import { useHardwareScannerCapture } from '../useHardwareScannerCapture';
 import SessionAttendanceOptions from './SessionAttendanceOptions';
+import { useAuthorizedIdCardBackground } from './IdCardDesign/useAuthorizedIdCardBackground';
+import { printIdCard } from './IdCardDesign/idCardPrint';
 
 interface EventCheckInPanelProps {
+    eventId: Id | string;
     checkInFlow: UseCheckInFlowReturn;
     suspended?: boolean;
     tiers?: EventTierRef[];
+    fields?: EventCustomFieldRef[];
+    idCardDesign?: EventIdCardDesignRef | null;
 }
 
 function getSessionTitle(session: EventSessionRef): string {
@@ -28,12 +36,18 @@ function getSessionTitle(session: EventSessionRef): string {
 }
 
 export default function EventCheckInPanel({
+    eventId,
     checkInFlow,
     suspended = false,
     tiers = [],
+    fields = [],
+    idCardDesign,
 }: EventCheckInPanelProps) {
     const manualInputRef = useRef<HTMLInputElement>(null);
     const [isMaximized, setIsMaximized] = useState(false);
+    const [printingId, setPrintingId] = useState(false);
+    const [printCode, setPrintCode] = useState('');
+    const [printError, setPrintError] = useState<string | null>(null);
 
     const {
         manualCode,
@@ -62,7 +76,22 @@ export default function EventCheckInPanel({
         updatePendingField,
         handleManualLookup,
         pendingCustomValues,
+        lastCheckedInRegistration,
     } = checkInFlow;
+
+    const hasBackground = Boolean(idCardDesign?.idCardBackgroundImageGithubPath);
+    const backgroundImageUrl = useAuthorizedIdCardBackground(
+        eventId,
+        hasBackground,
+        idCardDesign?.idCardBackgroundImageGithubSha
+            ?? idCardDesign?.idCardBackgroundImageGithubPath,
+    );
+
+    useEffect(() => {
+        if (!lastCheckedInRegistration?.confirmationCode) return;
+        setPrintCode(lastCheckedInRegistration.confirmationCode);
+        setPrintError(null);
+    }, [lastCheckedInRegistration]);
 
     const handleScannerCode = useCallback((raw: string) => {
         void processConfirmationCode(raw, 'scanner');
@@ -113,6 +142,43 @@ export default function EventCheckInPanel({
         unlockCheckInAudio();
         panelClickHandler(event);
     }, [panelClickHandler]);
+
+    const handlePrintId = useCallback(async () => {
+        if (printingId || suspended || showCombinedModal) return;
+
+        const code = printCode.trim().toUpperCase();
+        if (!code) {
+            setPrintError('Enter a confirmation code.');
+            return;
+        }
+
+        setPrintError(null);
+        setPrintingId(true);
+        try {
+            const lookup = await eventsAPI.lookupRegistrationByCode(eventId, code);
+            await printIdCard({
+                registration: lookup.registration,
+                idCardDesign,
+                tiers,
+                fields,
+                backgroundImageUrl,
+            });
+        } catch (err) {
+            setPrintError(err instanceof Error ? err.message : 'Could not print ID card.');
+        } finally {
+            setPrintingId(false);
+        }
+    }, [
+        backgroundImageUrl,
+        eventId,
+        fields,
+        idCardDesign,
+        printCode,
+        printingId,
+        showCombinedModal,
+        suspended,
+        tiers,
+    ]);
 
     const renderMissingFieldInput = (field: EventCustomFieldRef) => {
         const fieldKey = String(field.id);
@@ -234,6 +300,41 @@ export default function EventCheckInPanel({
                             {loading ? 'Looking up…' : 'Check in'}
                         </button>
                     </div>
+                </div>
+                <hr className="event-checkin-divider" />
+                <div className="event-registrations-checkin-print-id">
+                    <h3 className="expanded-section-title expanded-section-title--sm">Print ID</h3>
+                    <div className="event-registrations-checkin-manual-row">
+                        <input
+                            value={printCode}
+                            onChange={(e) => {
+                                setPrintCode(e.target.value);
+                                if (printError) setPrintError(null);
+                            }}
+                            placeholder="6-character code"
+                            className="form-input"
+                            disabled={printingId || showCombinedModal || suspended}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter') void handlePrintId();
+                            }}
+                            aria-label="Confirmation code for printing ID"
+                        />
+                        <button
+                            type="button"
+                            className="btn btn-primary"
+                            disabled={printingId || showCombinedModal || suspended}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                void handlePrintId();
+                            }}
+                        >
+                            <Printer size={16} />
+                            {printingId ? 'Preparing…' : 'Print ID'}
+                        </button>
+                    </div>
+                    {printError ? (
+                        <div className="error-message">{printError}</div>
+                    ) : null}
                 </div>
                 {result ? (
                     <div className={result.type === 'error' ? 'error-message' : 'success-message'}>

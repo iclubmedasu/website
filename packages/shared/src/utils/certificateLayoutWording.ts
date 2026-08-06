@@ -1,6 +1,7 @@
 /**
  * Parse template-owned wording from a certificate template layout JSON array.
- * Layout elements: { id, type: "field"|"static", field?, text?, ... }
+ * Layout elements: { id, type: "field"|"static"|"qr", field?, text?, ... }
+ * type "qr" is geometry-only (verification URL payload at render) and has no wording.
  */
 
 export type TemplateLayoutStaticText = {

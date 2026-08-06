@@ -60,6 +60,14 @@ const layoutWithRecipient = [
         align: 'center',
         color: '#333333',
     },
+    {
+        id: 'verify-qr',
+        type: 'qr',
+        x: 900,
+        y: 560,
+        width: 160,
+        height: 160,
+    },
 ];
 
 describe('generateCertificatePdfBuffer', () => {

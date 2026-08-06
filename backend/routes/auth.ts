@@ -58,18 +58,37 @@ const OFFICIAL_EMAIL_DOMAIN = '@med.asu.edu.eg';
 const officialEmail = (studentId) => `${studentId}${OFFICIAL_EMAIL_DOMAIN}`;
 
 const AUTH_COOKIE_NAME = 'token';
-const AUTH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const WEB_SESSION_TTL = '7d';
+const PWA_SESSION_TTL = '30d';
+const WEB_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const PWA_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+/** Re-issue a 30d PWA token when remaining JWT life is under this threshold. */
+const PWA_REISSUE_REMAINING_MS = WEB_COOKIE_MAX_AGE_MS;
 
+function isPwaClient(req: { body?: { clientSurface?: unknown }; headers?: Record<string, unknown> }): boolean {
+    const bodySurface = req.body?.clientSurface;
+    if (bodySurface === 'pwa') return true;
+    if (bodySurface === 'web') return false;
 
-function setAuthCookie(res, token) {
+    const raw = req.headers?.['x-client-surface'];
+    const header = Array.isArray(raw) ? raw[0] : raw;
+    return typeof header === 'string' && header.trim().toLowerCase() === 'pwa';
+}
+
+function issueAuthToken(payload: object, longLived: boolean): string {
+    return jwt.sign(payload, JWT_SECRET, {
+        expiresIn: longLived ? PWA_SESSION_TTL : WEB_SESSION_TTL,
+    });
+}
+
+function setAuthCookie(res, token: string, longLived: boolean) {
     res.cookie(AUTH_COOKIE_NAME, token, {
         httpOnly: true,
         secure: true, // must be true when sameSite is 'none'
         sameSite: 'none', // allows cross-domain cookies
-        maxAge: AUTH_COOKIE_MAX_AGE_MS
+        maxAge: longLived ? PWA_COOKIE_MAX_AGE_MS : WEB_COOKIE_MAX_AGE_MS,
     });
 }
-
 
 function clearAuthCookie(res) {
     res.clearCookie(AUTH_COOKIE_NAME, {
@@ -77,6 +96,21 @@ function clearAuthCookie(res) {
         secure: true,
         sameSite: 'none'
     });
+}
+
+/**
+ * Strip JWT standard claims before re-signing so `expiresIn` is applied cleanly.
+ */
+function sessionPayloadFromDecoded(decoded: RequestUser & { iat?: number; exp?: number; [key: string]: unknown }) {
+    const { iat: _iat, exp: _exp, ...payload } = decoded;
+    return payload;
+}
+
+function shouldReissuePwaToken(decoded: { exp?: number }, longLived: boolean): boolean {
+    if (!longLived) return false;
+    if (typeof decoded.exp !== 'number') return true;
+    const remainingMs = decoded.exp * 1000 - Date.now();
+    return remainingMs < PWA_REISSUE_REMAINING_MS;
 }
 
 // Placeholder member (added with only student ID) - can complete profile via Student ID flow
@@ -259,13 +293,13 @@ router.post('/setup-password', authPostLimiter, async (req, res) => {
         const authority = buildSessionAuthority(teamMemberships, false);
 
         // Generate token with authority flags
-        const token = jwt.sign(
+        const longLived = isPwaClient(req);
+        const token = issueAuthToken(
             { userId: user.id, memberId: member.id, email: member.email, ...authority },
-            JWT_SECRET,
-            { expiresIn: '7d' }
+            longLived,
         );
 
-        setAuthCookie(res, token);
+        setAuthCookie(res, token, longLived);
 
         res.status(201).json({
             user: {
@@ -280,7 +314,8 @@ router.post('/setup-password', authPostLimiter, async (req, res) => {
                 profilePhotoUrl: member.profilePhotoUrl ?? null,
                 linkedInUrl: member.linkedInUrl ?? null,
                 ...authority,
-            }
+            },
+            token,
         });
     } catch (error) {
         console.error('Setup password error:', error);
@@ -637,13 +672,13 @@ router.post('/complete-profile', authPostLimiter, async (req, res) => {
         });
         const authority = buildSessionAuthority(teamMemberships, false);
 
-        const token = jwt.sign(
+        const longLived = isPwaClient(req);
+        const token = issueAuthToken(
             { userId: userRecord.id, memberId: member.id, email: primaryEmail, ...authority },
-            JWT_SECRET,
-            { expiresIn: '7d' }
+            longLived,
         );
 
-        setAuthCookie(res, token);
+        setAuthCookie(res, token, longLived);
 
         res.status(200).json({
             user: {
@@ -887,13 +922,13 @@ router.post('/complete-officer-profile', authPostLimiter, async (req, res) => {
         });
         const authority = buildSessionAuthority(teamMemberships, false);
 
-        const token = jwt.sign(
+        const longLived = isPwaClient(req);
+        const token = issueAuthToken(
             { userId: userRecord.id, memberId: member.id, email: updatedMember.email, ...authority },
-            JWT_SECRET,
-            { expiresIn: '7d' }
+            longLived,
         );
 
-        setAuthCookie(res, token);
+        setAuthCookie(res, token, longLived);
 
         res.status(200).json({
             user: {
@@ -926,7 +961,8 @@ router.post('/login', authPostLimiter, async (req, res) => {
         const developer = getDeveloperCredentials();
         if (developer && email === developer.email) {
             if (password === developer.password) {
-                const token = jwt.sign(
+                const longLived = isPwaClient(req);
+                const token = issueAuthToken(
                     {
                         userId: 0,
                         memberId: 0,
@@ -935,11 +971,10 @@ router.post('/login', authPostLimiter, async (req, res) => {
                         isSupportFormsEditor: true,
                         isFinanceViewer: true,
                     },
-                    JWT_SECRET,
-                    { expiresIn: '7d' }
+                    longLived,
                 );
 
-                setAuthCookie(res, token);
+                setAuthCookie(res, token, longLived);
 
                 return res.json({
                     user: {
@@ -1018,13 +1053,13 @@ router.post('/login', authPostLimiter, async (req, res) => {
         const authority = buildSessionAuthority(teamMemberships, false);
 
         // Generate token with authority flags
-        const token = jwt.sign(
+        const longLived = isPwaClient(req);
+        const token = issueAuthToken(
             { userId: member.user.id, memberId: member.id, email: member.email, ...authority },
-            JWT_SECRET,
-            { expiresIn: '7d' }
+            longLived,
         );
 
-        setAuthCookie(res, token);
+        setAuthCookie(res, token, longLived);
 
         res.json({
             user: {
@@ -1061,27 +1096,35 @@ router.get('/me', async (req, res) => {
             return res.status(401).json({ error: 'No token provided' });
         }
 
-        const decoded = jwt.verify(token, JWT_SECRET) as RequestUser;
+        const decoded = jwt.verify(token, JWT_SECRET) as RequestUser & { iat?: number; exp?: number };
+        const longLived = isPwaClient(req);
+        const reissue = shouldReissuePwaToken(decoded, longLived);
 
         // Developer backdoor (authority level 1)
         if (decoded.isDeveloper) {
             const developer = getDeveloperCredentials();
-            return res.json({
-                user: {
-                    id: 0,
-                    email: decoded.email || developer?.email || 'developer',
-                    fullName: 'Developer 🔧',
-                    isDeveloper: true,
-                    isOfficer: true,
-                    isAdmin: false,
-                    isLeadership: false,
-                    isSpecial: false,
-                    isSupportFormsEditor: true,
-                    isFinanceViewer: true,
-                    teamIds: [],
-                    leadershipTeamIds: []
-                }
-            });
+            const userPayload = {
+                id: 0,
+                email: decoded.email || developer?.email || 'developer',
+                fullName: 'Developer 🔧',
+                isDeveloper: true,
+                isOfficer: true,
+                isAdmin: false,
+                isLeadership: false,
+                isSpecial: false,
+                isSupportFormsEditor: true,
+                isFinanceViewer: true,
+                teamIds: [],
+                leadershipTeamIds: []
+            };
+
+            if (reissue) {
+                const newToken = issueAuthToken(sessionPayloadFromDecoded(decoded), true);
+                setAuthCookie(res, newToken, true);
+                return res.json({ user: userPayload, token: newToken });
+            }
+
+            return res.json({ user: userPayload });
         }
 
         const member = await prisma.member.findUnique({
@@ -1141,6 +1184,22 @@ router.get('/me', async (req, res) => {
             assignmentStatus: memberData.assignmentStatus ?? 'UNASSIGNED',
             ...authority,
         };
+
+        if (reissue) {
+            // Prefer current authority flags on the re-issued token
+            const newToken = issueAuthToken(
+                {
+                    userId: decoded.userId,
+                    memberId: member.id,
+                    email: member.email,
+                    ...authority,
+                },
+                true,
+            );
+            setAuthCookie(res, newToken, true);
+            return res.json({ user: userPayload, token: newToken });
+        }
+
         res.json({ user: userPayload });
     } catch (error) {
         if (error instanceof jwt.TokenExpiredError) {

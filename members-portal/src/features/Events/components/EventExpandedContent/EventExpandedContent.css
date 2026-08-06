@@ -30,6 +30,11 @@
     overflow: hidden;
 }
 
+.event-expanded-tab-panel--inactive,
+.event-expanded-tab-panel[hidden] {
+    display: none;
+}
+
 .event-expanded-tab-panel > .event-expanded-panel {
     flex: 1;
     min-height: 0;
@@ -252,6 +257,7 @@
     gap: 0.5rem;
     flex-wrap: wrap;
     flex-shrink: 0;
+    align-items: center;
 }
 
 .event-expanded-tab-button {
@@ -281,6 +287,72 @@
     background: var(--gradient-primary);
     color: var(--bg-card);
     border-color: transparent;
+}
+
+.expanded-section-title-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    /* Match .expanded-section-title so reload btn em sizes sit on the same midline */
+    font-size: 0.85rem;
+    line-height: 1.2;
+}
+
+.expanded-section-title-row .expanded-section-title {
+    margin: 0;
+    line-height: inherit;
+}
+
+.event-section-reload-btn {
+    box-sizing: border-box;
+    width: 1.2em;
+    height: 1.2em;
+    min-width: 1.2em;
+    min-height: 1.2em;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid var(--gray-80);
+    background: var(--bg-card);
+    color: var(--gray-600);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-size: inherit;
+    transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+}
+
+.event-section-reload-btn svg {
+    width: 0.85em;
+    height: 0.85em;
+}
+
+.event-section-reload-btn:hover:not(:disabled) {
+    border-color: var(--purple-500);
+    color: var(--purple-700);
+    background: var(--purple-50, #f5f3ff);
+}
+
+.event-section-reload-btn:focus-visible {
+    outline: 2px solid var(--purple-500);
+    outline-offset: 2px;
+}
+
+.event-section-reload-btn:disabled {
+    cursor: wait;
+    opacity: 0.75;
+}
+
+.event-section-reload-btn--spinning svg {
+    animation: event-section-reload-spin 0.75s linear infinite;
+}
+
+@keyframes event-section-reload-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .event-expanded-panel {
@@ -613,6 +685,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    gap: 0.75rem;
     align-self: stretch;
     overflow: hidden;
 }
@@ -622,6 +695,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    gap: 0.5rem;
     overflow: hidden;
 }
 
@@ -1358,6 +1432,19 @@
     gap: 0.5rem;
 }
 
+.event-registrations-checkin-print-id {
+    flex-shrink: 0;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.event-registrations-checkin-print-id .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+}
+
 .event-registrations-checkin-panel > .error-message,
 .event-registrations-checkin-panel > .success-message {
     flex-shrink: 0;
@@ -1494,7 +1581,7 @@
         max(0.65rem, env(safe-area-inset-bottom))
         max(0.75rem, env(safe-area-inset-left));
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
     gap: 0.5rem;
     overflow: hidden;
 }
@@ -1555,12 +1642,12 @@
 
     .event-tickets-design-column {
         flex-shrink: 0;
-        max-height: min(50vh, 28rem);
+        max-height: min(70vh, 40rem);
     }
 
     .event-registrations-checkin-panel {
         display: grid;
-        grid-template-rows: auto minmax(4.5rem, 1fr) auto auto;
+        grid-template-rows: auto minmax(4.5rem, 1fr) auto auto auto auto;
         gap: 0.5rem;
         flex: 1;
         min-height: 0;
@@ -1611,7 +1698,11 @@
 
     .event-registrations-checkin-panel > .error-message,
     .event-registrations-checkin-panel > .success-message {
-        grid-row: 5;
+        grid-row: 7;
+    }
+
+    .event-registrations-checkin-print-id {
+        flex-shrink: 0;
     }
 
     .event-registrations-row--draft {
@@ -1770,7 +1861,9 @@
     justify-content: center;
 }
 
-.event-expanded-panel .event-expanded-header .expanded-section-title {
+/* Header spacing on the title row or bare title only — not nested h2s inside the row */
+.event-expanded-panel .event-expanded-header .expanded-section-title-row,
+.event-expanded-panel .event-expanded-header > .expanded-section-title {
     margin-bottom: 0.35rem;
 }
 

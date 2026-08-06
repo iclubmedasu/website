@@ -1,0 +1,117 @@
+/* Attendee ID card preview — fit-scaled canvas used by panel, editor, and print */
+
+.id-card-preview-wrap {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    overflow: auto;
+}
+
+.id-card-preview-label {
+    margin: 0;
+    font-size: 0.75rem;
+    font-family: var(--font-body);
+    color: var(--gray-500);
+    flex-shrink: 0;
+}
+
+.id-card-preview-scale {
+    position: relative;
+    flex-shrink: 0;
+    width: 100%;
+    overflow: hidden;
+}
+
+.id-card-preview-scale--print {
+    overflow: visible;
+}
+
+.id-card-preview {
+    position: absolute;
+    top: 0;
+    left: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    background: #ffffff;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-brand);
+}
+
+.id-card-preview__bg {
+    display: block;
+    z-index: 0;
+    pointer-events: none;
+    user-select: none;
+}
+
+.id-card-preview__bg-placeholder {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background:
+        linear-gradient(180deg, var(--gray-50) 0%, #ffffff 55%, var(--gray-100) 100%);
+}
+
+.id-card-preview__element {
+    position: absolute;
+    z-index: 1;
+    box-sizing: border-box;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.id-card-preview__element--text {
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.2;
+    display: flex;
+    align-items: flex-start;
+    padding: 0 0.15rem;
+    font-family: var(--font-heading);
+}
+
+.id-card-preview__element--align-left {
+    justify-content: flex-start;
+}
+
+.id-card-preview__element--align-center {
+    justify-content: center;
+}
+
+.id-card-preview__element--align-right {
+    justify-content: flex-end;
+}
+
+.id-card-preview__element--qr {
+    display: grid;
+    place-items: center;
+    padding: 4px;
+    background: #ffffff;
+    border-radius: 8%;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.id-card-preview__qr-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.id-card-preview__qr-placeholder {
+    width: 100%;
+    height: 100%;
+    background:
+        repeating-linear-gradient(
+            45deg,
+            var(--gray-200),
+            var(--gray-200) 4px,
+            var(--gray-100) 4px,
+            var(--gray-100) 8px
+        );
+}

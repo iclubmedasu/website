@@ -427,6 +427,14 @@ model Event {
   ticketFooterImageGithubSha  String?
   ticketFooterImageFileSize   Int?
   ticketFooterImageMimeType   String?
+  idCardCanvasWidth               Int      @default(384)
+  idCardCanvasHeight              Int      @default(576)
+  idCardLayout                    Json?
+  idCardBackgroundFocus           Json?
+  idCardBackgroundImageGithubPath String?
+  idCardBackgroundImageGithubSha  String?
+  idCardBackgroundImageFileSize   Int?
+  idCardBackgroundImageMimeType   String?
   deletedAt                DateTime?
   version                  Int       @default(0)
   createdAt                DateTime  @default(now())
@@ -1542,10 +1550,11 @@ model CertificateTemplate {
 }
 
 // layout is a JSON array of elements. Each element shape:
-// { id: string, type: "field"|"static", field?: string, text?: string,
+// { id: string, type: "field"|"static"|"qr", field?: string, text?: string,
 //   x: number, y: number, width: number, height: number,
-//   fontSize: number, fontWeight: "normal"|"bold",
-//   align: "left"|"center"|"right", color: string }
+//   fontSize?: number, fontWeight?: "normal"|"bold",
+//   align?: "left"|"center"|"right", color?: string }
+// type "qr": square plate (height locked to width); payload is always the verification URL at render time.
 // Valid field values: recipientName, title, description, issuedDate, verificationCode, verificationUrl, issuerName
 
 model Certificate {

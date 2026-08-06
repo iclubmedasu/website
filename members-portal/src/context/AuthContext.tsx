@@ -14,6 +14,7 @@ import type {
     ResetPasswordResponse,
 } from "../types/backend-contracts";
 import { sanitizePhoneForStorage } from "@/utils/countryCodes";
+import { getClientSurface } from "@/lib/standalonePwa";
 
 type AlumniCode = "ALUMNI_ACCESS";
 
@@ -131,6 +132,24 @@ function isAlumniAccess(input: unknown): input is { code: "ALUMNI_ACCESS"; error
     return !!input && typeof input === "object" && (input as { code?: string }).code === "ALUMNI_ACCESS";
 }
 
+function authClientHeaders(): Record<string, string> {
+    const surface = getClientSurface();
+    return {
+        "Content-Type": "application/json",
+        "X-Client-Surface": surface,
+    };
+}
+
+function withClientSurface<T extends Record<string, unknown>>(body: T): T & { clientSurface: "pwa" | "web" } {
+    return { ...body, clientSurface: getClientSurface() };
+}
+
+function applyMeResponse(data: AuthMeResponse): void {
+    if (typeof data.token === "string" && data.token.length > 0) {
+        setToken(data.token);
+    }
+}
+
 function isNetworkFetchError(error: unknown): boolean {
     return (
         error instanceof TypeError &&
@@ -172,6 +191,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
             if (response.ok) {
                 const data = (await response.json()) as AuthMeResponse;
+                applyMeResponse(data);
                 setUser(data.user);
                 setIsAlumni(false);
             } else if (response.status === 403) {
@@ -206,6 +226,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
             if (response.ok) {
                 const data = (await response.json()) as AuthMeResponse;
+                applyMeResponse(data);
                 setUser(data.user);
                 setIsAlumni(false);
             } else if (response.status === 403) {
@@ -285,10 +306,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
             const response = await fetch(`${API_URL}/auth/complete-profile`, {
                 method: "POST",
                 credentials: shouldSendCredentials() ? "include" : "omit",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
+                headers: authClientHeaders(),
+                body: JSON.stringify(withClientSurface({
                     studentId: String(studentId).trim(),
                     fullName: fullName.trim(),
                     phoneNumber: sanitizePhoneForStorage(phoneNumber),
@@ -296,7 +315,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     password,
                     email2: email2?.trim() || undefined,
                     email3: email3?.trim() || undefined,
-                }),
+                })),
             });
 
             const data = (await response.json()) as { user: AuthUser, token?: string } & ApiErrorResponse;
@@ -330,10 +349,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
             const response = await fetch(`${API_URL}/auth/complete-officer-profile`, {
                 method: "POST",
                 credentials: shouldSendCredentials() ? "include" : "omit",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
+                headers: authClientHeaders(),
+                body: JSON.stringify(withClientSurface({
                     identifier: identifier.trim(),
                     fullName: fullName.trim(),
                     phoneNumber: sanitizePhoneForStorage(phoneNumber),
@@ -343,7 +360,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     officerEmail: officerEmail?.trim() || undefined,
                     password,
                     confirmPassword,
-                }),
+                })),
             });
 
             const data = (await response.json()) as { user: AuthUser, token?: string } & ApiErrorResponse;
@@ -406,10 +423,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
             const response = await fetch(`${API_URL}/auth/setup-password`, {
                 method: "POST",
                 credentials: shouldSendCredentials() ? "include" : "omit",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ email, password }),
+                headers: authClientHeaders(),
+                body: JSON.stringify(withClientSurface({ email, password })),
             });
 
             const data = (await response.json()) as { user: AuthUser, token?: string } & ApiErrorResponse;
@@ -499,10 +514,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
             const response = await fetch(`${API_URL}/auth/login`, {
                 method: "POST",
                 credentials: shouldSendCredentials() ? "include" : "omit",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ email, password }),
+                headers: authClientHeaders(),
+                body: JSON.stringify(withClientSurface({ email, password })),
             });
 
             const data = (await response.json()) as { user: AuthUser, token?: string } & ApiErrorResponse;

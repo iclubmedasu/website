@@ -9,15 +9,17 @@ import {
     parseTierPrice,
 } from '../../tierPriceUtils';
 import TierPriceFields from '../TierPriceFields';
+import ExpandedSectionTitle from '../ExpandedSectionTitle';
 
 interface EventTiersSectionProps {
     eventId: Id | string;
     tiers: EventTierRef[];
     onTiersChange: (tiers: EventTierRef[]) => void;
     canManage?: boolean;
+    onReload: () => void | Promise<void>;
 }
 
-export default function EventTiersSection({ eventId, tiers, onTiersChange, canManage = false }: EventTiersSectionProps) {
+export default function EventTiersSection({ eventId, tiers, onTiersChange, canManage = false, onReload }: EventTiersSectionProps) {
     const [tierName, setTierName] = useState('');
     const [tierDescription, setTierDescription] = useState('');
     const [tierCapacity, setTierCapacity] = useState('');
@@ -117,7 +119,7 @@ export default function EventTiersSection({ eventId, tiers, onTiersChange, canMa
 
     return (
         <section className="event-expanded-panel">
-            <h2 className="expanded-section-title">Tiers</h2>
+            <ExpandedSectionTitle label="Tiers" onReload={onReload} />
             {formError ? <p className="error-message">{formError}</p> : null}
             {canManage ? (
             <div className="event-expanded-form-grid">

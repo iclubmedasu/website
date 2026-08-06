@@ -4,7 +4,8 @@
     display: flex;
     flex-direction: column;
     height: calc(100vh - 8rem);
-    min-height: 32.5rem;
+    max-height: calc(100vh - 8rem);
+    min-height: 0;
     gap: 0;
     background: var(--bg-card);
     border: 1px solid var(--border-brand);
@@ -14,9 +15,12 @@
 }
 
 .template-editor--nested {
+    /* Size from flex parent, not % of an unbounded ancestor */
+    flex: 1 1 0;
+    min-height: 0;
     height: auto;
-    flex: 1;
-    min-height: 32.5rem;
+    max-height: 100%;
+    overflow: hidden;
     border: none;
     border-radius: 0;
     box-shadow: none;
@@ -25,14 +29,18 @@
 .template-editor-body {
     display: grid;
     grid-template-columns: 13.75rem 1fr 16.25rem;
-    flex: 1;
+    grid-template-rows: minmax(0, 1fr);
+    flex: 1 1 0;
     min-height: 0;
+    overflow: hidden;
 }
 
-.template-editor-panel {
+.template-editor-panel,
+.template-editor-panel--right {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    overflow: hidden; /* contain scroll to children */
     background: var(--bg-subtle);
     border-right: 1px solid var(--border-brand);
 }
@@ -45,6 +53,7 @@
 .template-editor-panel-title {
     margin: 0;
     padding: 0.85rem 1rem;
+    flex-shrink: 0;
     font-family: var(--font-heading);
     font-size: 0.75rem;
     font-weight: 600;
@@ -58,6 +67,8 @@
 .template-editor-field-list {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
     gap: 0.4rem;
     padding: 0.75rem;
     overflow-y: auto;
@@ -92,11 +103,9 @@
 
 .template-editor-field-btn--active {
     border-color: var(--purple-700);
-    background: var(--bg-card);
     color: var(--purple-700);
+    background: var(--purple-50);
     font-weight: 600;
-    outline: 1px solid var(--purple-700);
-    outline-offset: -2px;
 }
 
 .template-editor-center {
@@ -104,6 +113,7 @@
     flex-direction: column;
     min-width: 0;
     min-height: 0;
+    overflow: hidden;
     background: var(--bg-subtle);
 }
 
@@ -152,7 +162,6 @@
     position: absolute;
     top: 0;
     left: 0;
-    overflow: hidden;
     background-color: var(--bg-card);
     box-shadow: var(--shadow-md);
     transform-origin: top left;
@@ -175,16 +184,21 @@
     z-index: 0;
 }
 
+.template-editor-field-btn--with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
 .template-editor-element {
     position: absolute;
     z-index: 1;
     box-sizing: border-box;
     overflow: hidden;
+    pointer-events: none;
+    user-select: none;
     white-space: normal;
     word-break: break-word;
-    cursor: move;
-    user-select: none;
-    border: 1px solid transparent;
     line-height: 1.2;
     display: flex;
     align-items: flex-start;
@@ -192,9 +206,72 @@
     font-family: var(--font-heading);
 }
 
-.template-editor-element--selected {
+.template-editor-element--qr {
+    display: grid;
+    place-items: center;
+    padding: 4px;
+    background: #ffffff;
+    border-radius: 8%;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.template-editor-qr-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    object-fit: contain;
+    border-radius: 4%;
+    pointer-events: none;
+}
+
+.template-editor-qr-placeholder {
+    width: 100%;
+    height: 100%;
+    background:
+        repeating-linear-gradient(
+            45deg,
+            var(--gray-200),
+            var(--gray-200) 4px,
+            var(--gray-100) 4px,
+            var(--gray-100) 8px
+        );
+}
+
+.template-editor-hit {
+    position: absolute;
+    z-index: 3;
+    box-sizing: border-box;
+    border: 1px solid transparent;
+    cursor: move;
+}
+
+.template-editor-hit--selected {
     border: 2px solid var(--purple-700);
-    z-index: 2;
+    z-index: 4;
+}
+
+.template-editor-resize-handle {
+    position: absolute;
+    right: -5px;
+    bottom: -5px;
+    width: 12px;
+    height: 12px;
+    min-width: 12px;
+    min-height: 12px;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    border: 2px solid var(--purple-700);
+    border-radius: 2px;
+    background: var(--bg-card);
+    cursor: nwse-resize;
+    z-index: 5;
+    line-height: 0;
+    flex-shrink: 0;
+    appearance: none;
 }
 
 .template-editor-element--align-left {
@@ -234,6 +311,8 @@
 .template-editor-props {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
     gap: 0.85rem;
     padding: 0.85rem;
     overflow-y: auto;
@@ -283,17 +362,17 @@
 
 /* §7.8 — icon/toggle toolbar controls: bg/color only, no layout shift */
 .template-editor-toggle-btn {
-    flex: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.25rem;
-    padding: 0.4rem 0.45rem;
+    min-width: 2.25rem;
+    padding: 0.35rem 0.55rem;
     border: 1px solid var(--border-brand);
     border-radius: var(--radius-sm);
     background: var(--bg-card);
     color: var(--gray-700);
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-family: var(--font-heading);
     cursor: pointer;
     transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
@@ -308,11 +387,9 @@
 
 .template-editor-toggle-btn.active {
     border-color: var(--purple-700);
-    background: var(--bg-card);
     color: var(--purple-700);
+    background: var(--purple-50);
     font-weight: 600;
-    outline: 1px solid var(--purple-700);
-    outline-offset: -2px;
 }
 
 .template-editor-color-input {
@@ -330,6 +407,7 @@
 }
 
 .template-editor-error {
+    flex-shrink: 0;
     padding: 0.65rem 1rem;
     background: var(--error-bg);
     color: var(--error-text);
@@ -339,6 +417,7 @@
 }
 
 .template-editor-issued-warning {
+    flex-shrink: 0;
     padding: 0.65rem 1rem;
     background: var(--warning-bg);
     color: var(--warning-text);

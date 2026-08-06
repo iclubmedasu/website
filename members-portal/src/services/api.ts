@@ -39,6 +39,7 @@ import type {
     EventTierRef,
     EventSessionRef,
     EventTaskRef,
+    EventIdCardDesignRef,
     EventTicketDesignRef,
     MemberSummary,
     NotificationMarkAllReadResponse,
@@ -87,6 +88,7 @@ import type {
     ResetPasswordResponse,
 } from "../types/backend-contracts";
 import { ConflictError } from './conflictError';
+import { isStandalonePwa } from '../lib/standalonePwa';
 
 function isLoopbackHost(hostname: string): boolean {
     return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
@@ -200,6 +202,10 @@ export const apiFetch = (input: RequestInfo | URL, init: RequestInit = {}): Prom
     };
     if (authToken) {
         headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    // Let GET /auth/me re-issue longer tokens when the installed PWA calls authenticated APIs.
+    if (isStandalonePwa() && !headers['X-Client-Surface'] && !headers['x-client-surface']) {
+        headers['X-Client-Surface'] = 'pwa';
     }
     return globalThis.fetch(input, {
         ...init,
@@ -2688,6 +2694,68 @@ export const eventsAPI = {
         slot: 'header' | 'footer',
     ): string => {
         return `${API_BASE_URL}/events/${eventId}/ticket-design/${slot}-image/download`;
+    },
+
+    /**
+     * Update per-event attendee ID card canvas size and layout.
+     */
+    updateIdCardDesign: async (
+        eventId: Id | string,
+        payload: {
+            canvasWidth?: number;
+            canvasHeight?: number;
+            layout?: unknown[] | null;
+            backgroundFocus?: { scale: number; offsetX: number; offsetY: number } | null;
+        },
+    ): Promise<EventIdCardDesignRef & { id: Id }> => {
+        const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/id-card-design`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload),
+        });
+
+        return handleResponse<EventIdCardDesignRef & { id: Id }>(response);
+    },
+
+    /**
+     * Upload an ID card background image.
+     * FormData field name: `image` (backend multer uses `upload.single('image')`).
+     */
+    uploadIdCardBackgroundImage: async (
+        eventId: Id | string,
+        file: File,
+    ): Promise<EventIdCardDesignRef & { id: Id }> => {
+        const formData = new FormData();
+        formData.append('image', file);
+        const response = await apiFetch(
+            `${API_BASE_URL}/events/${eventId}/id-card-design/background-image`,
+            {
+                method: 'POST',
+                headers: getAuthOnlyHeaders(),
+                body: formData,
+            },
+        );
+
+        return handleResponse<EventIdCardDesignRef & { id: Id }>(response);
+    },
+
+    deleteIdCardBackgroundImage: async (
+        eventId: Id | string,
+    ): Promise<EventIdCardDesignRef & { id: Id }> => {
+        const response = await apiFetch(
+            `${API_BASE_URL}/events/${eventId}/id-card-design/background-image`,
+            {
+                method: 'DELETE',
+                headers: getAuthHeaders(),
+            },
+        );
+
+        return handleResponse<EventIdCardDesignRef & { id: Id }>(response);
+    },
+
+    /** Authenticated download URL for portal ID card background previews. */
+    getIdCardBackgroundDownloadUrl: (eventId: Id | string): string => {
+        return `${API_BASE_URL}/events/${eventId}/id-card-design/background-image/download`;
     },
 
     getStatistics: async (eventId: Id | string): Promise<EventStatistics> => {

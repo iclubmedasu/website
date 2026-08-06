@@ -14,6 +14,7 @@ import {
     parseLayout,
     readIssuerName,
     readStaticTextOverrides,
+    renderVerificationQrPng,
 } from '../../services/certificatePdfService';
 
 describe('certificatePdfService helpers', () => {
@@ -32,11 +33,29 @@ describe('certificatePdfService helpers', () => {
                 align: 'center',
                 color: '#111111',
             },
+            {
+                id: 'qr-1',
+                type: 'qr',
+                x: 50,
+                y: 60,
+                width: 160,
+                height: 160,
+            },
             { id: 'bad' },
             null,
         ]);
-        expect(layout).toHaveLength(1);
+        expect(layout).toHaveLength(2);
         expect(layout[0].field).toBe('recipientName');
+        expect(layout[1]).toMatchObject({ id: 'qr-1', type: 'qr', width: 160, height: 160 });
+    });
+
+    it('renders verification QR PNG with rounded-rect mask', async () => {
+        const png = await renderVerificationQrPng(
+            'https://public.example.com/verify/CODE1234',
+            128,
+        );
+        expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+        expect(png.length).toBeGreaterThan(100);
     });
 
     it('parses background focus with clamps', () => {
@@ -108,6 +127,22 @@ describe('certificatePdfService helpers', () => {
             '',
             { 'static-1': 'Override' },
         )).toBe('Override');
+
+        expect(fieldValueFor(
+            {
+                id: 'qr-1',
+                type: 'qr',
+                x: 0,
+                y: 0,
+                width: 100,
+                height: 100,
+            },
+            certificate,
+            'July 23, 2026',
+            'Issuer',
+            'https://public.example.com/verify/CODE1234',
+            {},
+        )).toBe('');
     });
 
     it('reads issuer and static text overrides from fieldValues', () => {

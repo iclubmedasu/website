@@ -300,6 +300,16 @@ export default function EventCard({
                                 ticketFooterImageFileSize: fullDetail.ticketFooterImageFileSize,
                                 ticketFooterImageMimeType: fullDetail.ticketFooterImageMimeType,
                             }}
+                            idCardDesign={{
+                                idCardCanvasWidth: fullDetail.idCardCanvasWidth,
+                                idCardCanvasHeight: fullDetail.idCardCanvasHeight,
+                                idCardLayout: fullDetail.idCardLayout,
+                                idCardBackgroundFocus: fullDetail.idCardBackgroundFocus,
+                                idCardBackgroundImageGithubPath: fullDetail.idCardBackgroundImageGithubPath,
+                                idCardBackgroundImageGithubSha: fullDetail.idCardBackgroundImageGithubSha,
+                                idCardBackgroundImageFileSize: fullDetail.idCardBackgroundImageFileSize,
+                                idCardBackgroundImageMimeType: fullDetail.idCardBackgroundImageMimeType,
+                            }}
                             onReload={() => onReloadDetail?.()}
                         />
                     </div>

@@ -1,0 +1,46 @@
+/* ID card design edit modal — large canvas editor host */
+
+.id-card-design-edit-modal.modal-container {
+    max-width: min(96vw, 76rem);
+    width: 100%;
+}
+
+.id-card-design-edit-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
+}
+
+.id-card-design-edit-modal__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.id-card-design-edit-modal__dirty {
+    margin-right: auto;
+    font-size: 0.8rem;
+    font-family: var(--font-body);
+    color: var(--gray-500);
+}
+
+.id-card-design-edit-modal__dirty--idle {
+    min-height: 1em;
+}
+
+.id-card-design-edit-modal__footer .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.id-card-design-discard-backdrop {
+    z-index: 1220;
+}
+
+.id-card-design-discard-modal.modal-container {
+    z-index: 1221;
+}

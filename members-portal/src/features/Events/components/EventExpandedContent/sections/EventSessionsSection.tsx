@@ -19,6 +19,7 @@ interface EventSessionsSectionProps {
     eventId: Id | string;
     eventTimezone?: string;
     canManage?: boolean;
+    registerReload?: (fn: (() => void | Promise<void>) | null) => void;
 }
 
 function formatModeLabel(mode: EventSessionMode | string): string {
@@ -126,6 +127,7 @@ export default function EventSessionsSection({
     eventId,
     eventTimezone = CLUB_TIMEZONE,
     canManage = false,
+    registerReload,
 }: EventSessionsSectionProps) {
     const [sessions, setSessions] = useState<EventSessionRef[]>([]);
     const [loading, setLoading] = useState(true);
@@ -166,6 +168,12 @@ export default function EventSessionsSection({
     useEffect(() => {
         void loadSessions();
     }, [loadSessions]);
+
+    useEffect(() => {
+        if (!registerReload) return undefined;
+        registerReload(loadSessions);
+        return () => registerReload(null);
+    }, [loadSessions, registerReload]);
 
     const resetCreateForm = () => {
         setLabel('');

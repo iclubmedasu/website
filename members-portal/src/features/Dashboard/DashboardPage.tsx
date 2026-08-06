@@ -8,6 +8,7 @@ import type {
     NotificationUnreadCountResponse,
 } from '@iclub/shared';
 import { dashboardAPI, notificationsAPI } from '@/services/api';
+import { syncAppBadge } from '@/lib/appBadge';
 import AnnouncementsFeed from '@/features/Announcements/AnnouncementsFeed';
 import MyTasksWidget from './widgets/MyTasksWidget';
 import UpcomingEventsWidget from './widgets/UpcomingEventsWidget';
@@ -89,6 +90,9 @@ export default function DashboardPage() {
             });
 
             setUnread(settledSource(unreadResult, 'Failed to load unread count'));
+            if (unreadResult.status === 'fulfilled') {
+                syncAppBadge(Math.max(0, Number(unreadResult.value.unreadCount || 0)));
+            }
             setLoading(false);
         })();
 
@@ -101,6 +105,7 @@ export default function DashboardPage() {
         try {
             const unreadCount = await notificationsAPI.getUnreadCount();
             setUnread({ data: unreadCount, error: null });
+            syncAppBadge(Math.max(0, Number(unreadCount.unreadCount || 0)));
         } catch (err) {
             setUnread((previous) => ({
                 data: previous.data,

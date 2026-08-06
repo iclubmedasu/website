@@ -6,6 +6,7 @@ import { useResourceChannel } from '@/hooks/useResourceChannel';
 import { eventsAPI } from '@/services/api';
 import type {
     EventCustomFieldRef,
+    EventIdCardDesignRef,
     EventRegistrationRef,
     EventSessionRef,
     EventTicketDesignRef,
@@ -42,7 +43,9 @@ import {
     type RegistrationSortSpec,
 } from '../registrationTableFilterUtils';
 import type { RegistrationTableFunnelState } from '../eventExpandedFunnelState';
+import ExpandedSectionTitle from '../ExpandedSectionTitle';
 import TicketDesignPanel from './TicketDesign/TicketDesignPanel';
+import IdCardDesignPanel from './IdCardDesign/IdCardDesignPanel';
 
 interface EventTicketsSectionProps {
     eventId: Id | string;
@@ -56,6 +59,7 @@ interface EventTicketsSectionProps {
     tiers?: EventTierRef[];
     fields?: EventCustomFieldRef[];
     ticketDesign?: EventTicketDesignRef | null;
+    idCardDesign?: EventIdCardDesignRef | null;
     canRemoveAttendance?: boolean;
     funnel: RegistrationTableFunnelState;
     onFunnelChange: (
@@ -103,6 +107,7 @@ export default function EventTicketsSection({
     tiers = [],
     fields = [],
     ticketDesign,
+    idCardDesign,
     canRemoveAttendance = false,
     funnel,
     onFunnelChange,
@@ -414,7 +419,7 @@ export default function EventTicketsSection({
     return (
         <section className="event-expanded-panel">
             <div className="event-expanded-header event-expanded-header--compact event-tickets-header">
-                <h2 className="expanded-section-title">Tickets</h2>
+                <ExpandedSectionTitle label="Tickets" onReload={refreshAll} />
             </div>
 
             <div className="event-tickets-layout">
@@ -663,6 +668,13 @@ export default function EventTicketsSection({
                         sessions={sessions}
                         tiers={tiers}
                         ticketDesign={ticketDesign}
+                        onReload={onReload}
+                    />
+                    <IdCardDesignPanel
+                        eventId={eventId}
+                        fields={fields}
+                        tiers={tiers}
+                        idCardDesign={idCardDesign}
                         onReload={onReload}
                     />
                 </aside>

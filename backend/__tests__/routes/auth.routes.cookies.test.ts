@@ -1,5 +1,6 @@
 import cookieParser from 'cookie-parser'
 import express from 'express'
+import jwt from 'jsonwebtoken'
 import request from 'supertest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -34,6 +35,7 @@ vi.mock('../../db', () => ({
 }))
 
 import authRouter from '../../routes/auth'
+import { JWT_SECRET } from '../../middleware/auth'
 
 function buildAuthApp(): express.Express {
     const app = express()
@@ -55,6 +57,11 @@ function getTokenCookie(setCookieHeader: string | string[] | undefined): string 
     }
     return header
 }
+
+/** 7 days in seconds (web Max-Age) */
+const WEB_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
+/** 30 days in seconds (PWA Max-Age) */
+const PWA_MAX_AGE_SECONDS = 30 * 24 * 60 * 60
 
 describe('auth routes cookie security headers', () => {
     const originalNodeEnv = process.env.NODE_ENV
@@ -89,8 +96,111 @@ describe('auth routes cookie security headers', () => {
         const tokenCookie = getTokenCookie(response.headers['set-cookie'])
         expect(tokenCookie).toContain('HttpOnly')
         expect(tokenCookie).toContain('SameSite=None')
-        expect(tokenCookie).toContain('Max-Age=604800')
+        expect(tokenCookie).toContain(`Max-Age=${WEB_MAX_AGE_SECONDS}`)
         expect(tokenCookie).toContain('Secure')
+
+        const decoded = jwt.decode(response.body.token) as { exp: number; iat: number }
+        expect(decoded.exp - decoded.iat).toBe(WEB_MAX_AGE_SECONDS)
+    })
+
+    it('sets 30-day cookie and JWT when clientSurface is pwa', async () => {
+        process.env.NODE_ENV = 'test'
+        process.env.DEVELOPER_EMAIL = 'dev@iclub.com'
+        process.env.DEVELOPER_PASSWORD = 'dev123456'
+
+        const response = await request(buildAuthApp())
+            .post('/login')
+            .send({
+                email: 'dev@iclub.com',
+                password: 'dev123456',
+                clientSurface: 'pwa',
+            })
+
+        expect(response.status).toBe(200)
+        expect(typeof response.body.token).toBe('string')
+
+        const tokenCookie = getTokenCookie(response.headers['set-cookie'])
+        expect(tokenCookie).toContain(`Max-Age=${PWA_MAX_AGE_SECONDS}`)
+
+        const decoded = jwt.decode(response.body.token) as { exp: number; iat: number }
+        expect(decoded.exp - decoded.iat).toBe(PWA_MAX_AGE_SECONDS)
+    })
+
+    it('sets 30-day cookie when X-Client-Surface: pwa header is sent', async () => {
+        process.env.NODE_ENV = 'test'
+        process.env.DEVELOPER_EMAIL = 'dev@iclub.com'
+        process.env.DEVELOPER_PASSWORD = 'dev123456'
+
+        const response = await request(buildAuthApp())
+            .post('/login')
+            .set('X-Client-Surface', 'pwa')
+            .send({ email: 'dev@iclub.com', password: 'dev123456' })
+
+        expect(response.status).toBe(200)
+        const tokenCookie = getTokenCookie(response.headers['set-cookie'])
+        expect(tokenCookie).toContain(`Max-Age=${PWA_MAX_AGE_SECONDS}`)
+    })
+
+    it('re-issues a 30d PWA token on /me when remaining life is under 7d', async () => {
+        process.env.NODE_ENV = 'test'
+        process.env.DEVELOPER_EMAIL = 'dev@iclub.com'
+        process.env.DEVELOPER_PASSWORD = 'dev123456'
+
+        // Issue a short-lived token that mimics a near-expiry web session used in the PWA
+        const nearExpiryToken = jwt.sign(
+            {
+                userId: 0,
+                memberId: 0,
+                email: 'dev@iclub.com',
+                isDeveloper: true,
+                isSupportFormsEditor: true,
+                isFinanceViewer: true,
+            },
+            JWT_SECRET,
+            { expiresIn: '1d' },
+        )
+
+        const response = await request(buildAuthApp())
+            .get('/me')
+            .set('Authorization', `Bearer ${nearExpiryToken}`)
+            .set('X-Client-Surface', 'pwa')
+
+        expect(response.status).toBe(200)
+        expect(typeof response.body.token).toBe('string')
+        expect(response.body.token).not.toBe(nearExpiryToken)
+
+        const tokenCookie = getTokenCookie(response.headers['set-cookie'])
+        expect(tokenCookie).toContain(`Max-Age=${PWA_MAX_AGE_SECONDS}`)
+
+        const decoded = jwt.decode(response.body.token) as { exp: number; iat: number }
+        expect(decoded.exp - decoded.iat).toBe(PWA_MAX_AGE_SECONDS)
+    })
+
+    it('does not re-issue on /me for web clients near expiry', async () => {
+        process.env.NODE_ENV = 'test'
+        process.env.DEVELOPER_EMAIL = 'dev@iclub.com'
+        process.env.DEVELOPER_PASSWORD = 'dev123456'
+
+        const nearExpiryToken = jwt.sign(
+            {
+                userId: 0,
+                memberId: 0,
+                email: 'dev@iclub.com',
+                isDeveloper: true,
+                isSupportFormsEditor: true,
+                isFinanceViewer: true,
+            },
+            JWT_SECRET,
+            { expiresIn: '1d' },
+        )
+
+        const response = await request(buildAuthApp())
+            .get('/me')
+            .set('Authorization', `Bearer ${nearExpiryToken}`)
+
+        expect(response.status).toBe(200)
+        expect(response.body.token).toBeUndefined()
+        expect(response.headers['set-cookie']).toBeUndefined()
     })
 
     it('sets secure token cookie in production mode when backdoor is explicitly allowed', async () => {

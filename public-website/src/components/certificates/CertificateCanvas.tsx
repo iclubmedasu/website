@@ -8,6 +8,7 @@ import {
     useState,
     type CSSProperties,
 } from "react";
+import QRCode from "qrcode";
 import {
     publicAPI,
     type PublicCertificateBackgroundFocus,
@@ -19,17 +20,17 @@ import "./CertificateCanvas.css";
 
 interface CanvasElement {
     id: string;
-    type: "field" | "static";
+    type: "field" | "static" | "qr";
     field?: string;
     text?: string;
     x: number;
     y: number;
     width: number;
     height: number;
-    fontSize: number;
-    fontWeight: "normal" | "bold";
-    align: "left" | "center" | "right";
-    color: string;
+    fontSize?: number;
+    fontWeight?: "normal" | "bold";
+    align?: "left" | "center" | "right";
+    color?: string;
 }
 
 const DEFAULT_FOCUS: PublicCertificateBackgroundFocus = {
@@ -87,6 +88,7 @@ function fieldValueFor(
     verificationUrl: string,
     staticTextOverrides: Record<string, string>,
 ): string {
+    if (element.type === "qr") return "";
     if (element.type === "static") {
         const override = staticTextOverrides[element.id];
         if (typeof override === "string") return override;
@@ -110,6 +112,52 @@ function fieldValueFor(
         default:
             return element.field || "";
     }
+}
+
+function useQrDataUrl(value: string, pixelSize: number): string | null {
+    const [dataUrl, setDataUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        const size = Math.max(32, Math.round(pixelSize));
+        void QRCode.toDataURL(value || "SAMPLE", {
+            margin: 2,
+            width: size,
+            color: {
+                dark: "#000000",
+                light: "#ffffff",
+            },
+        })
+            .then((url) => {
+                if (!cancelled) setDataUrl(url);
+            })
+            .catch(() => {
+                if (!cancelled) setDataUrl(null);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [value, pixelSize]);
+
+    return dataUrl;
+}
+
+function CertificateQrCell({ value, size }: { value: string; size: number }) {
+    const qrUrl = useQrDataUrl(value, size);
+    if (!qrUrl) {
+        return <div className="certificate-canvas-qr-placeholder" aria-hidden />;
+    }
+    return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+            src={qrUrl}
+            alt=""
+            className="certificate-canvas-qr-img"
+            width={size}
+            height={size}
+            draggable={false}
+        />
+    );
 }
 
 function readStaticTextOverrides(fieldValues: unknown): Record<string, string> {
@@ -349,17 +397,40 @@ const CertificateCanvas = forwardRef<HTMLDivElement, CertificateCanvasProps>(fun
                         />
                     )}
                     {elements.map((element) => {
+                        if (element.type === "qr") {
+                            const size = Math.max(1, element.width);
+                            return (
+                                <div
+                                    key={element.id}
+                                    className="certificate-canvas-element certificate-canvas-element--qr"
+                                    style={{
+                                        left: element.x,
+                                        top: element.y,
+                                        width: size,
+                                        height: size,
+                                    }}
+                                    data-verify-link=""
+                                    data-verify-href={verificationUrl}
+                                >
+                                    <CertificateQrCell
+                                        value={verificationUrl}
+                                        size={size}
+                                    />
+                                </div>
+                            );
+                        }
                         const isVerifyLink =
                             element.type === "field" && element.field === "verificationUrl";
                         return (
                             <div
                                 key={element.id}
-                                className={`certificate-canvas-element certificate-canvas-element--align-${element.align}`}
+                                className={`certificate-canvas-element certificate-canvas-element--align-${element.align || "left"}`}
                                 style={{
                                     left: element.x,
                                     top: element.y,
                                     width: element.width,
-                                    height: element.height,
+                                    minHeight: element.height,
+                                    height: "auto",
                                     fontSize: element.fontSize,
                                     fontWeight: element.fontWeight,
                                     textAlign: element.align,

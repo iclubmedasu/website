@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { membersAPI, authAPI, roleHistoryAPI, getProfilePhotoUrl, notificationsAPI } from '@/services/api';
 import { certificatesAPI, type CertificateListItem } from '@/services/certificatesAPI';
+import { syncAppBadge } from '@/lib/appBadge';
 import { PhoneInput } from '@/components/PhoneInput/PhoneInput';
 import UploadPhotoModal from '@/components/UploadPhotoModal/UploadPhotoModal';
 import Toggle from '@/components/toggle/Toggle';
@@ -250,6 +251,12 @@ function UserPage() {
                         : notification,
                 ),
             );
+            try {
+                const result = await notificationsAPI.getUnreadCount();
+                syncAppBadge(Math.max(0, Number(result.unreadCount || 0)));
+            } catch {
+                // Badge is best-effort; mark-read already succeeded.
+            }
         } catch {
             setNotificationsError('Failed to mark notification as read.');
         } finally {
@@ -272,6 +279,7 @@ function UserPage() {
                     readAt: notification.readAt || new Date().toISOString(),
                 })),
             );
+            syncAppBadge(0);
         } catch {
             setNotificationsError('Failed to mark all notifications as read.');
         } finally {

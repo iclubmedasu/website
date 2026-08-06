@@ -11,6 +11,7 @@ import {
     type PDFFont,
     type RGB,
 } from 'pdf-lib';
+import QRCode from 'qrcode';
 import sharp from 'sharp';
 import { prisma } from '../db';
 import { loadCertificateBackground } from '../lib/certificateBackgroundCache';
@@ -154,17 +155,17 @@ function drawTextSafe(
 
 export type CertificateLayoutElement = {
     id: string;
-    type: 'field' | 'static';
+    type: 'field' | 'static' | 'qr';
     field?: string;
     text?: string;
     x: number;
     y: number;
     width: number;
     height: number;
-    fontSize: number;
-    fontWeight: 'normal' | 'bold';
-    align: 'left' | 'center' | 'right';
-    color: string;
+    fontSize?: number;
+    fontWeight?: 'normal' | 'bold';
+    align?: 'left' | 'center' | 'right';
+    color?: string;
 };
 
 export type BackgroundFocus = {
@@ -182,18 +183,25 @@ const DEFAULT_FOCUS: BackgroundFocus = {
 const DEFAULT_CANVAS_WIDTH = 1122;
 const DEFAULT_CANVAS_HEIGHT = 794;
 const BRAND_PURPLE = rgb(86 / 255, 23 / 255, 137 / 255);
+/** Soft rounded-rect corner radius as a fraction of QR plate size (matches DOM ~8%). */
+const QR_CORNER_RADIUS_RATIO = 0.08;
+/** Cap absolute corner radius so large QR plates stay modestly rounded. */
+const QR_CORNER_RADIUS_MAX_PX = 16;
+/** Fixed white inset around QR bitmap (matches DOM plate padding 4px). */
+const QR_PLATE_PADDING_PX = 4;
+/** Quiet-zone modules in the QR payload (slightly above library default of 1). */
+const QR_MODULE_MARGIN = 2;
 
 export function parseLayout(layout: unknown): CertificateLayoutElement[] {
     if (!Array.isArray(layout)) return [];
     return layout.filter((el): el is CertificateLayoutElement => {
         if (!el || typeof el !== 'object') return false;
         const row = el as Record<string, unknown>;
-        return typeof row.id === 'string'
-            && (row.type === 'field' || row.type === 'static')
-            && typeof row.x === 'number'
-            && typeof row.y === 'number'
-            && typeof row.width === 'number'
-            && typeof row.height === 'number';
+        if (typeof row.id !== 'string') return false;
+        if (typeof row.x !== 'number' || typeof row.y !== 'number') return false;
+        if (typeof row.width !== 'number' || typeof row.height !== 'number') return false;
+        if (row.type === 'qr') return true;
+        return row.type === 'field' || row.type === 'static';
     });
 }
 
@@ -265,6 +273,7 @@ export function fieldValueFor(
     verificationUrl: string,
     staticTextOverrides: Record<string, string>,
 ): string {
+    if (element.type === 'qr') return '';
     if (element.type === 'static') {
         const override = staticTextOverrides[element.id];
         if (typeof override === 'string') return override;
@@ -460,6 +469,53 @@ export async function renderBackgroundJpeg(
     return { bytes, width: outW, height: outH };
 }
 
+/** White-backed verification QR as a rounded-rect PNG plate for PDF embed. */
+export async function renderVerificationQrPng(
+    verificationUrl: string,
+    sizePx: number,
+): Promise<Buffer> {
+    const px = Math.max(32, Math.round(sizePx));
+    const pad = QR_PLATE_PADDING_PX;
+    const inner = Math.max(24, px - pad * 2);
+
+    const qrBuffer = await QRCode.toBuffer(verificationUrl, {
+        type: 'png',
+        width: inner,
+        margin: QR_MODULE_MARGIN,
+        color: {
+            dark: '#000000',
+            light: '#ffffff',
+        },
+    });
+
+    const radius = Math.max(1, Math.min(QR_CORNER_RADIUS_MAX_PX, Math.round(px * QR_CORNER_RADIUS_RATIO)));
+    const maskSvg = Buffer.from(
+        `<svg width="${px}" height="${px}" xmlns="http://www.w3.org/2000/svg">`
+        + `<rect x="0" y="0" width="${px}" height="${px}" rx="${radius}" ry="${radius}" fill="#fff"/>`
+        + `</svg>`,
+    );
+
+    const qrResized = await sharp(qrBuffer)
+        .resize(inner, inner, { fit: 'fill' })
+        .png()
+        .toBuffer();
+
+    return sharp({
+        create: {
+            width: px,
+            height: px,
+            channels: 4,
+            background: { r: 255, g: 255, b: 255, alpha: 1 },
+        },
+    })
+        .composite([
+            { input: qrResized, left: pad, top: pad },
+            { input: maskSvg, blend: 'dest-in' },
+        ])
+        .png()
+        .toBuffer();
+}
+
 
 async function drawTemplateCertificatePdf(input: {
     recipientName: string;
@@ -520,6 +576,32 @@ async function drawTemplateCertificatePdf(input: {
     const linkRects: Array<{ uri: string; x: number; y: number; width: number; height: number }> = [];
 
     for (const element of elements) {
+        if (element.type === 'qr') {
+            if (!verificationUrl) continue;
+            const size = Math.max(1, element.width);
+            try {
+                const qrPng = await renderVerificationQrPng(verificationUrl, size);
+                const qrImage = await pdfDoc.embedPng(qrPng);
+                const pdfY = canvasH - element.y - size;
+                page.drawImage(qrImage, {
+                    x: element.x,
+                    y: pdfY,
+                    width: size,
+                    height: size,
+                });
+                linkRects.push({
+                    uri: verificationUrl,
+                    x: element.x,
+                    y: element.y,
+                    width: size,
+                    height: size,
+                });
+            } catch (error) {
+                console.error('certificatePdfService: failed to embed verification QR', error);
+            }
+            continue;
+        }
+
         const text = fieldValueFor(
             element,
             input,
@@ -530,8 +612,8 @@ async function drawTemplateCertificatePdf(input: {
         );
         if (!text) continue;
 
-        const fontSize = Number.isFinite(element.fontSize) && element.fontSize > 0
-            ? element.fontSize
+        const fontSize = Number.isFinite(element.fontSize) && (element.fontSize ?? 0) > 0
+            ? (element.fontSize as number)
             : 14;
         const font = pickFont(fonts, text, element.fontWeight === 'bold');
         const color = parseHexColor(element.color);

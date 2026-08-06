@@ -13,6 +13,7 @@ import RevokeCertificateModal, {
     type RevokeCertificateTarget,
 } from '@/features/Certificates/modals/RevokeCertificateModal';
 import { useAutoDismissMessage } from '@/hooks/useAutoDismissMessage';
+import { useResourceChannel } from '@/hooks/useResourceChannel';
 import { buildPublicVerifyUrl } from '@/lib/publicWebsiteUrl';
 import {
     certificatesAPI,
@@ -50,6 +51,7 @@ import {
     truncateRegistrationCell,
 } from '../customFieldUtils';
 import type { CertificatesFunnelState } from '../eventExpandedFunnelState';
+import ExpandedSectionTitle from '../ExpandedSectionTitle';
 
 function buildSessionOptionLabel(label: string | null, sessionDate: string): string {
     const dateLabel = formatAttendanceDayLabel(sessionDate);
@@ -383,6 +385,20 @@ export default function EventCertificatesSection({
         void loadEligible();
     }, [isCertifiable, canManage, loadEligible]);
 
+    const reloadSection = useCallback(async () => {
+        if (!isCertifiable) return;
+        const jobs: Promise<void>[] = [loadIssued()];
+        if (canManage) jobs.push(loadEligible());
+        await Promise.all(jobs);
+    }, [canManage, isCertifiable, loadEligible, loadIssued]);
+
+    useResourceChannel({
+        resource: 'event',
+        resourceId: eventId,
+        enabled: isCertifiable,
+        onRefresh: () => { void reloadSection(); },
+    });
+
     const unifiedRows = useMemo(
         () => buildUnifiedRows(eligible, issued),
         [eligible, issued],
@@ -551,7 +567,7 @@ export default function EventCertificatesSection({
         return (
             <section className="event-expanded-panel">
                 <div className="event-expanded-header event-expanded-header--compact">
-                    <h2 className="expanded-section-title">Certificates</h2>
+                    <ExpandedSectionTitle label="Certificates" onReload={reloadSection} />
                 </div>
                 <p className="event-expanded-muted">
                     This event is not marked as certifiable. Enable it in event settings to issue certificates.
@@ -568,7 +584,7 @@ export default function EventCertificatesSection({
     return (
         <section className="event-expanded-panel">
             <div className="event-expanded-header event-expanded-header--compact">
-                <h2 className="expanded-section-title">Certificates</h2>
+                <ExpandedSectionTitle label="Certificates" onReload={reloadSection} />
             </div>
 
             {error ? <div className="error-message event-cert-message">{error}</div> : null}

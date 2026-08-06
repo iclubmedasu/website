@@ -59,6 +59,8 @@ export function useCheckInFlow({
     const [selectedTierId, setSelectedTierId] = useState('');
     const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
 
+    const [lastCheckedInRegistration, setLastCheckedInRegistration] = useState<EventRegistrationRef | null>(null);
+
     const activeCodeRef = useRef('');
     const lastProcessedRef = useRef<{ code: string; at: number } | null>(null);
 
@@ -118,6 +120,7 @@ export function useCheckInFlow({
             message: `Checked in ${checkedIn.fullName} (${checkedIn.confirmationCode}) via ${via}${dayNote}`,
         });
         playCheckInSuccessBeep();
+        setLastCheckedInRegistration(checkedIn);
         setManualCode('');
         resetFlow();
         onCheckIn();
@@ -353,6 +356,7 @@ export function useCheckInFlow({
         handleCancelRequiredFields,
         updatePendingField,
         handleManualLookup,
+        lastCheckedInRegistration,
     };
 }
 
