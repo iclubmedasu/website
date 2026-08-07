@@ -1,4 +1,4 @@
-import { CLUB_TIMEZONE, toEventDayString } from '@iclub/shared/utils';
+import { CLUB_TIMEZONE, formatSessionRange, toEventDayString } from '@iclub/shared/utils';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useResourceChannel } from '@/hooks/useResourceChannel';
 import { Download, Filter, Plus, Search, Upload } from 'lucide-react';
@@ -30,6 +30,7 @@ import {
 import CustomFieldColumnMenu from './CustomFieldColumnMenu';
 import SpecialColumnMenu from './SpecialColumnMenu';
 import CopyPublicEventLinkButton from '../../CopyPublicEventLinkButton';
+import GenerateEmbedButton from '../../GenerateEmbedButton';
 import EditableCustomFieldCell from './EditableCustomFieldCell';
 import EditableRegistrationContactCell from './EditableRegistrationContactCell';
 import EditableRegistrationTierCell from './EditableRegistrationTierCell';
@@ -77,6 +78,7 @@ interface EventRegistrationsSectionProps {
     totalRegistered?: number;
     allowWalkIns?: boolean;
     allowDirectCheckIn?: boolean;
+    trackSessionCheckOut?: boolean;
     eventDate?: string | null;
     eventEndDate?: string | null;
     eventTimezone?: string;
@@ -116,6 +118,7 @@ export default function EventRegistrationsSection({
     totalRegistered = 0,
     allowWalkIns = false,
     allowDirectCheckIn = false,
+    trackSessionCheckOut = false,
     eventDate,
     eventEndDate,
     eventTimezone = CLUB_TIMEZONE,
@@ -279,7 +282,66 @@ export default function EventRegistrationsSection({
         sessions,
         tierFieldRequired,
         sessionFieldRequired,
+        trackSessionCheckOut,
     });
+
+    const {
+        stationSessionId,
+        setStationSessionId,
+        setOpenInsideCount,
+        sortedActiveSessions,
+        handleCloseOpenAttendances,
+        closingOpen,
+        openInsideCount,
+        loading: checkInLoading,
+        showCombinedModal,
+    } = checkInFlow;
+
+    // Keep open-inside badge count in sync with loaded registrations for the station session.
+    useEffect(() => {
+        if (!trackSessionCheckOut || !stationSessionId) {
+            setOpenInsideCount(0);
+            return;
+        }
+        const count = registrations.reduce((total, registration) => {
+            const hasOpen = (registration.sessionAttendances ?? []).some(
+                (attendance) =>
+                    String(attendance.sessionId) === stationSessionId
+                    && attendance.mode === 'ONSITE'
+                    && (attendance.isOpen === true
+                        || (attendance.checkedOutAt == null && attendance.joinedAt)),
+            );
+            return total + (hasOpen ? 1 : 0);
+        }, 0);
+        setOpenInsideCount(count);
+    }, [registrations, trackSessionCheckOut, stationSessionId, setOpenInsideCount]);
+
+    const registrationHasOpenSegment = useCallback((registration: EventRegistrationRef, sessionId: string) => {
+        return (registration.sessionAttendances ?? []).some(
+            (attendance) =>
+                String(attendance.sessionId) === sessionId
+                && attendance.mode === 'ONSITE'
+                && (attendance.isOpen === true
+                    || (attendance.checkedOutAt == null && attendance.joinedAt)),
+        );
+    }, []);
+
+    const resolveDirectCheckInSessionId = useCallback((registration: EventRegistrationRef): string | null => {
+        if (stationSessionId) return stationSessionId;
+        if (activeSessionsNow.length === 1) return String(activeSessionsNow[0].id);
+        // Prefer any open segment if only one open session
+        if (trackSessionCheckOut) {
+            const openIds = (registration.sessionAttendances ?? [])
+                .filter((attendance) =>
+                    attendance.mode === 'ONSITE'
+                    && (attendance.isOpen === true || attendance.checkedOutAt == null),
+                )
+                .map((attendance) => String(attendance.sessionId));
+            const unique = Array.from(new Set(openIds));
+            if (unique.length === 1) return unique[0];
+        }
+        return null;
+    }, [activeSessionsNow, stationSessionId, trackSessionCheckOut]);
 
     const handlePublishToggle = async (nextPublished: boolean) => {
         if (!onPublishedChange || publishing) return;
@@ -514,6 +576,7 @@ export default function EventRegistrationsSection({
                 multiDayEvent,
                 fileName: eventTitle?.trim() || `event-${eventId}`,
                 eventTimezone,
+                trackSessionCheckOut,
             });
         } catch {
             window.alert('Failed to export registrations to Excel.');
@@ -694,6 +757,8 @@ export default function EventRegistrationsSection({
                         </>
                     ) : null}
                     <CopyPublicEventLinkButton eventSlug={eventSlug || String(eventId)} isPublished={isPublished} />
+                    <span className="event-expanded-header-divider" aria-hidden="true" />
+                    <GenerateEmbedButton eventSlug={eventSlug || String(eventId)} isPublished={isPublished} />
                 </div>
             </div>
             <div className="event-registrations-layout">
@@ -788,7 +853,7 @@ export default function EventRegistrationsSection({
                                         </th>
                                         {middleColumns.map((column, index) => renderMiddleColumnHeader(column, index))}
                                         <th>Code</th>
-                                        {multiDayEvent ? <th>Attendance</th> : null}
+                                        {multiDayEvent || trackSessionCheckOut ? <th>Attendance</th> : null}
                                         {/* Status column hidden */}
                                         {/* <th className="event-registrations-status-cell">Status</th> */}
                                         <th>Source</th>
@@ -822,7 +887,26 @@ export default function EventRegistrationsSection({
                                                     ? () => void checkInFlow.processConfirmationCode(registration.confirmationCode, 'table')
                                                     : undefined}
                                                 checkInDisabled={registration.status === 'CANCELLED' || checkInFlow.loading}
-                                                checkInTitle="Check in attendee"
+                                                checkInTitle={
+                                                    trackSessionCheckOut
+                                                        && (() => {
+                                                            const sid = resolveDirectCheckInSessionId(registration);
+                                                            return sid && registrationHasOpenSegment(registration, sid)
+                                                                ? 'Check out attendee'
+                                                                : 'Check in attendee';
+                                                        })()
+                                                    || 'Check in attendee'
+                                                }
+                                                checkInVariant={
+                                                    trackSessionCheckOut
+                                                        && (() => {
+                                                            const sid = resolveDirectCheckInSessionId(registration);
+                                                            return sid && registrationHasOpenSegment(registration, sid)
+                                                                ? 'checkout'
+                                                                : 'checkin';
+                                                        })()
+                                                    || 'checkin'
+                                                }
                                             />
                                             <EditableRegistrationContactCell
                                                 eventId={eventId}
@@ -843,13 +927,15 @@ export default function EventRegistrationsSection({
                                             />
                                             {middleColumns.map((column) => renderMiddleColumnCell(column, registration))}
                                             <td><code>{registration.confirmationCode}</code></td>
-                                            {multiDayEvent ? (
+                                            {multiDayEvent || trackSessionCheckOut ? (
                                                 <td>
                                                     <CollapsibleAttendanceChips
                                                         registration={registration}
                                                         sessionDateById={sessionDateById}
+                                                        sessions={sessions}
+                                                        trackSessionCheckOut={trackSessionCheckOut}
                                                         canRemoveAttendance={canRemoveAttendance}
-                                                        collapsible={multiDayEvent}
+                                                        collapsible={multiDayEvent || trackSessionCheckOut}
                                                         onRequestRemoval={setAttendanceRemovalTarget}
                                                     />
                                                 </td>
@@ -879,22 +965,78 @@ export default function EventRegistrationsSection({
                         ) : null}
                         {!isAddingAttendee ? (
                             <>
-                                <div className="event-registrations-table-footer">
-                                    {walkInsEnabled ? (
-                                        <button type="button" className="add-attendee-btn" onClick={openDraft}>
-                                            <Plus size={18} />
-                                            Add walk-in
-                                        </button>
-                                    ) : null}
-                                    {allowWalkIns && !withinEventDays ? (
-                                        <p className="event-registrations-table-footer--muted">
-                                            Walk-ins are available on event days only ({eventDurationLabel}).
-                                        </p>
-                                    ) : null}
-                                    {!allowWalkIns ? (
-                                        <p className="event-registrations-table-footer--muted">
-                                            Enable walk-ins in event settings to add attendees here.
-                                        </p>
+                                <div className="event-registrations-table-footer event-registrations-footer-bar">
+                                    <div className="event-registrations-footer-bar__left">
+                                        {walkInsEnabled ? (
+                                            <button type="button" className="add-attendee-btn" onClick={openDraft}>
+                                                <Plus size={18} />
+                                                Add walk-in
+                                            </button>
+                                        ) : null}
+                                        {allowWalkIns && !withinEventDays ? (
+                                            <p className="event-registrations-table-footer--muted">
+                                                Walk-ins are available on event days only ({eventDurationLabel}).
+                                            </p>
+                                        ) : null}
+                                        {!allowWalkIns ? (
+                                            <p className="event-registrations-table-footer--muted">
+                                                Enable walk-ins in event settings to add attendees here.
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                    {trackSessionCheckOut && sortedActiveSessions.length > 0 ? (
+                                        <div className="event-registrations-footer-bar__right">
+                                            <div className="event-registrations-footer-station">
+                                                <select
+                                                    className="form-input event-registrations-footer-station__select"
+                                                    value={stationSessionId}
+                                                    disabled={
+                                                        checkInLoading
+                                                        || showCombinedModal
+                                                        || fieldModalOpen
+                                                        || importModalOpen
+                                                        || walkInAttendanceOpen
+                                                    }
+                                                    onChange={(event) => setStationSessionId(event.target.value)}
+                                                    aria-label="Session to track at this station"
+                                                >
+                                                    <option value="">Any / ask each scan…</option>
+                                                    {sortedActiveSessions.map((session) => {
+                                                        const title = session.label?.trim() || 'Untitled session';
+                                                        const range = session.startDateTime && session.endDateTime
+                                                            ? formatSessionRange(session.startDateTime, session.endDateTime)
+                                                            : null;
+                                                        const label = [title, range].filter(Boolean).join(' · ');
+                                                        return (
+                                                            <option key={session.id} value={String(session.id)}>
+                                                                {label}
+                                                            </option>
+                                                        );
+                                                    })}
+                                                </select>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-secondary event-registrations-footer-station__close"
+                                                    disabled={
+                                                        checkInLoading
+                                                        || showCombinedModal
+                                                        || fieldModalOpen
+                                                        || importModalOpen
+                                                        || walkInAttendanceOpen
+                                                        || !stationSessionId
+                                                        || closingOpen
+                                                    }
+                                                    onClick={() => void handleCloseOpenAttendances()}
+                                                    title="Close all open check-ins for the selected session"
+                                                >
+                                                    {closingOpen
+                                                        ? 'Closing…'
+                                                        : openInsideCount > 0
+                                                            ? `Close all still inside (${openInsideCount})`
+                                                            : 'Close all still inside'}
+                                                </button>
+                                            </div>
+                                        </div>
                                     ) : null}
                                 </div>
                             </>

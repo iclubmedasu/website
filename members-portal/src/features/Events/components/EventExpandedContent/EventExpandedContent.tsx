@@ -95,6 +95,8 @@ interface EventExpandedContentProps {
 
     allowDirectCheckIn?: boolean;
 
+    trackSessionCheckOut?: boolean;
+
     eventDate?: string | null;
 
     eventEndDate?: string | null;
@@ -172,6 +174,8 @@ export default function EventExpandedContent({
     allowWalkIns = false,
 
     allowDirectCheckIn = false,
+
+    trackSessionCheckOut = false,
 
     eventDate,
 
@@ -670,6 +674,8 @@ export default function EventExpandedContent({
                         allowWalkIns={allowWalkIns}
 
                         allowDirectCheckIn={allowDirectCheckIn}
+
+                        trackSessionCheckOut={trackSessionCheckOut}
 
                         eventDate={eventDate}
 

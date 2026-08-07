@@ -1,0 +1,30 @@
+/* modal chrome: modal.css */
+
+.generate-embed-modal.modal-container {
+    max-width: 42rem;
+}
+
+.generate-embed-modal__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25rem 1rem;
+}
+
+.generate-embed-modal__full {
+    grid-column: 1 / -1;
+}
+
+.generate-embed-modal__snippet {
+    font-family: var(--font-mono);
+    min-height: 9rem;
+}
+
+@media (max-width: 640px) {
+    .generate-embed-modal__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .generate-embed-modal__full {
+        grid-column: auto;
+    }
+}

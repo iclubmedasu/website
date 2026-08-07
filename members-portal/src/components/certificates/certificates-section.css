@@ -325,6 +325,17 @@
     gap: 0.5rem;
 }
 
+.event-cert-duration-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.event-cert-duration-capped {
+    color: var(--warning-text);
+    flex-shrink: 0;
+}
+
 @media (max-width: 640px) {
     .project-cert-section .page-search-filter-label {
         display: none;

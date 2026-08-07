@@ -31,6 +31,7 @@ export interface ExportEventRegistrationsExcelOptions {
     multiDayEvent: boolean;
     fileName: string;
     eventTimezone?: string;
+    trackSessionCheckOut?: boolean;
 }
 
 export async function exportEventRegistrationsExcel({
@@ -40,6 +41,7 @@ export async function exportEventRegistrationsExcel({
     multiDayEvent,
     fileName,
     eventTimezone = CLUB_TIMEZONE,
+    trackSessionCheckOut = false,
 }: ExportEventRegistrationsExcelOptions): Promise<void> {
     const ExcelJS = await import('exceljs');
     const workbook = new ExcelJS.Workbook();
@@ -57,11 +59,15 @@ export async function exportEventRegistrationsExcel({
         multiDayEvent,
         sessionDateById,
     );
-    const memberSummaryMatrix = buildMemberSummaryMatrix(memberMetrics);
+    const memberSummaryMatrix = buildMemberSummaryMatrix(memberMetrics, { trackSessionCheckOut });
     const sessionSummaryMatrix = buildSessionSummaryMatrix(sessionMetrics);
     const tierSummaryMatrix = buildTierSummaryMatrix(tierMetrics);
-    const sessionAttendanceMatrix = buildSessionAttendanceMatrix(registrations, sessions);
-    const attendanceLogMatrix = buildAttendanceLogMatrix(registrations, sessions);
+    const sessionAttendanceMatrix = buildSessionAttendanceMatrix(registrations, sessions, {
+        trackSessionCheckOut,
+    });
+    const attendanceLogMatrix = buildAttendanceLogMatrix(registrations, sessions, {
+        trackSessionCheckOut,
+    });
 
     const overviewSheet = workbook.addWorksheet('Overview');
     styleOverviewSheet(overviewSheet, overviewMatrix);

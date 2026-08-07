@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, LogIn, Pencil, X } from 'lucide-react';
+import { Check, LogIn, LogOut, Pencil, X } from 'lucide-react';
 import { eventsAPI } from '@/services/api';
 import EmailInputWithDomainSuggestions from '@/components/EmailInputWithDomainSuggestions';
 import type { EventRegistrationRef, Id } from '@/types/backend-contracts';
@@ -30,6 +30,7 @@ interface EditableRegistrationContactCellProps {
     onCheckIn?: () => void;
     checkInDisabled?: boolean;
     checkInTitle?: string;
+    checkInVariant?: 'checkin' | 'checkout';
 }
 
 function truncateDisplay(value: string, max: number): string {
@@ -71,6 +72,7 @@ export default function EditableRegistrationContactCell({
     onCheckIn,
     checkInDisabled = false,
     checkInTitle = 'Check in',
+    checkInVariant = 'checkin',
 }: EditableRegistrationContactCellProps) {
     const storedValue = readFieldValue(registration, field);
     const [editing, setEditing] = useState(false);
@@ -221,13 +223,17 @@ export default function EditableRegistrationContactCell({
                     {onCheckIn ? (
                         <button
                             type="button"
-                            className="table-action-btn event-registrations-contact-cell__checkin"
+                            className={`table-action-btn event-registrations-contact-cell__checkin${
+                                checkInVariant === 'checkout'
+                                    ? ' event-registrations-contact-cell__checkin--out'
+                                    : ''
+                            }`}
                             onClick={onCheckIn}
                             disabled={checkInDisabled}
                             aria-label={checkInTitle}
                             title={checkInTitle}
                         >
-                            <LogIn size={12} />
+                            {checkInVariant === 'checkout' ? <LogOut size={12} /> : <LogIn size={12} />}
                         </button>
                     ) : null}
                     <button

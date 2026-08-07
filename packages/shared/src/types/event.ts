@@ -158,6 +158,24 @@ export interface EventSessionAttendanceRef {
     registrationId: Id;
     mode: "ONSITE" | "ONLINE";
     joinedAt: ISODateTime;
+    /** Null while the attendee is still inside (ONSITE visit open). ONLINE stays null. */
+    checkedOutAt?: ISODateTime | null;
+    /** Computed on the server (includes virtual end-time cap for open segments). */
+    durationMinutes?: number;
+    isOpen?: boolean;
+    wasVirtuallyCapped?: boolean;
+}
+
+export type SessionAttendanceAction = "checked_in" | "checked_out";
+
+/** Per-session aggregate for lookup / certificate filters when check-out tracking is on. */
+export interface SessionAttendanceSummary {
+    sessionId: Id;
+    totalDurationMinutes: number;
+    visitCount: number;
+    hasOpenSegment: boolean;
+    wasVirtuallyCapped: boolean;
+    openSegmentId?: Id | null;
 }
 
 export interface CreateEventSessionPayload {
@@ -220,6 +238,7 @@ export interface EventSummary extends EventTicketDesignRef, EventIdCardDesignRef
     allowWalkIns?: boolean;
     allowDirectCheckIn?: boolean;
     isCertifiable?: boolean;
+    trackSessionCheckOut?: boolean;
     status: EventStatus;
     priority?: Priority | string;
     progressStatus?: ProjectStatus | string;
@@ -327,6 +346,7 @@ export interface CreateEventPayload {
     allowWalkIns?: boolean;
     allowDirectCheckIn?: boolean;
     isCertifiable?: boolean;
+    trackSessionCheckOut?: boolean;
     status?: EventStatus;
 }
 
@@ -490,8 +510,21 @@ export interface CheckInRegistrationPayload {
     sessionIds?: Array<Id | string>;
 }
 
+/** Extended check-in response when session attendance is recorded (or checked out). */
+export interface CheckInRegistrationResult extends EventRegistrationRef {
+    sessionAction?: SessionAttendanceAction | null;
+    thisVisitDurationMinutes?: number | null;
+    totalSessionDurationMinutes?: number | null;
+    actionSessionId?: Id | null;
+}
+
 export interface RemoveRegistrationAttendancePayload {
     eventDay: string;
+}
+
+export interface CloseOpenSessionAttendancesResult {
+    closedCount: number;
+    sessionId: Id;
 }
 
 export interface EventRegistrationLookupResult {
@@ -502,6 +535,8 @@ export interface EventRegistrationLookupResult {
     alreadyCheckedInToday: boolean;
     activeSessionsNow: EventSessionRef[];
     existingSessionAttendances: EventSessionAttendanceRef[];
+    /** Present when event.trackSessionCheckOut is true. */
+    sessionAttendanceSummaries?: SessionAttendanceSummary[];
 }
 
 export interface EventTaskAssignmentRef {

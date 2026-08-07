@@ -6,6 +6,35 @@
     box-shadow: var(--shadow-sm);
 }
 
+/* Stable style hooks (embed contract + public register page). */
+.registration-form {
+    display: flex;
+    flex-direction: column;
+}
+
+.registration-field {
+    display: block;
+    margin-bottom: 1.5rem;
+}
+
+.registration-field-label {
+    /* Mirrors .form-label for host-site overrides. */
+}
+
+.registration-field-error {
+    margin-top: 0.375rem;
+    font-size: 0.8125rem;
+    color: var(--error-text);
+}
+
+.registration-header {
+    margin-bottom: 1rem;
+}
+
+.registration-submit {
+    align-self: flex-start;
+}
+
 .registration-success-banner {
     padding: 1rem 1.25rem;
     border-radius: var(--radius-md);

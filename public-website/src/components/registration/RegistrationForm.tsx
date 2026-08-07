@@ -21,6 +21,18 @@ interface RegistrationFormProps {
     eventId: number;
     eventSlug: string;
     eventTitle: string;
+    /** When true, skip full-site confirmation navigation; show in-place success (embed use case). */
+    isEmbedded?: boolean;
+}
+
+interface EmbedSuccessState {
+    confirmationCode: string;
+    fullName: string;
+    email: string;
+}
+
+function fieldWrapperClass(extra = ""): string {
+    return ["registration-field", "form-group", extra].filter(Boolean).join(" ");
 }
 
 function renderCustomFieldInput(
@@ -30,12 +42,18 @@ function renderCustomFieldInput(
     onCustomFieldChange: (fieldKey: string, value: unknown) => void,
 ) {
     const fieldKey = String(field.id);
+    const dataField = `custom-${fieldKey}`;
     const value = draft.customFieldValues[fieldKey];
     const errorClass = errors[fieldKey] ? " form-input--error" : "";
 
     if (field.type === "checkbox") {
         return (
-            <div key={field.id} className="form-group">
+            <div
+                key={field.id}
+                className={fieldWrapperClass()}
+                data-field={dataField}
+                data-field-type="checkbox"
+            >
                 <YesNoField
                     id={`field-${field.id}`}
                     label={field.label}
@@ -50,14 +68,19 @@ function renderCustomFieldInput(
 
     if (field.type === "dropdown") {
         return (
-            <div key={field.id} className="form-group">
-                <label className="form-label" htmlFor={`field-${field.id}`}>
+            <div
+                key={field.id}
+                className={fieldWrapperClass()}
+                data-field={dataField}
+                data-field-type="dropdown"
+            >
+                <label className="form-label registration-field-label" htmlFor={`field-${field.id}`}>
                     {field.label}
                     {field.required ? " *" : ""}
                 </label>
                 <select
                     id={`field-${field.id}`}
-                    className={`form-select${errorClass}`}
+                    className={`form-select registration-field-input${errorClass}`}
                     value={value == null ? "" : String(value)}
                     onChange={(event) => onCustomFieldChange(fieldKey, event.target.value || null)}
                 >
@@ -68,7 +91,9 @@ function renderCustomFieldInput(
                         </option>
                     ))}
                 </select>
-                {errors[fieldKey] ? <p className="field-error">{errors[fieldKey]}</p> : null}
+                {errors[fieldKey] ? (
+                    <p className="field-error registration-field-error">{errors[fieldKey]}</p>
+                ) : null}
             </div>
         );
     }
@@ -76,26 +101,38 @@ function renderCustomFieldInput(
     const inputType = field.type === "number" ? "number" : "text";
 
     return (
-        <div key={field.id} className="form-group">
-            <label className="form-label" htmlFor={`field-${field.id}`}>
+        <div
+            key={field.id}
+            className={fieldWrapperClass()}
+            data-field={dataField}
+            data-field-type={field.type}
+        >
+            <label className="form-label registration-field-label" htmlFor={`field-${field.id}`}>
                 {field.label}
                 {field.required ? " *" : ""}
             </label>
             <input
                 id={`field-${field.id}`}
                 type={inputType}
-                className={`form-input${errorClass}`}
+                className={`form-input registration-field-input${errorClass}`}
                 value={value == null ? "" : String(value)}
                 onChange={(event) =>
                     onCustomFieldChange(fieldKey, parseCustomFieldInputValue(field, event.target.value))
                 }
             />
-            {errors[fieldKey] ? <p className="field-error">{errors[fieldKey]}</p> : null}
+            {errors[fieldKey] ? (
+                <p className="field-error registration-field-error">{errors[fieldKey]}</p>
+            ) : null}
         </div>
     );
 }
 
-export function RegistrationForm({ eventId, eventSlug, eventTitle }: RegistrationFormProps) {
+export function RegistrationForm({
+    eventId,
+    eventSlug,
+    eventTitle,
+    isEmbedded = false,
+}: RegistrationFormProps) {
     const router = useRouter();
     const [draft, setDraft] = useState<RegistrationDraft>(emptyRegistrationDraft);
     const [tiers, setTiers] = useState<PublicEventTier[]>([]);
@@ -113,6 +150,7 @@ export function RegistrationForm({ eventId, eventSlug, eventTitle }: Registratio
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [eventTimezone, setEventTimezone] = useState<string>("Africa/Cairo");
+    const [embedSuccess, setEmbedSuccess] = useState<EmbedSuccessState | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -225,6 +263,27 @@ export function RegistrationForm({ eventId, eventSlug, eventTitle }: Registratio
                 email: draft.email.trim(),
             });
 
+            if (isEmbedded) {
+                setEmbedSuccess({
+                    confirmationCode: result.confirmationCode,
+                    fullName: draft.fullName.trim(),
+                    email: draft.email.trim(),
+                });
+                if (typeof window !== "undefined" && window.parent !== window) {
+                    window.parent.postMessage(
+                        {
+                            type: "iclub-embed-registered",
+                            source: "iclub-registration-embed",
+                            confirmationCode: result.confirmationCode,
+                            eventId,
+                            eventSlug,
+                        },
+                        "*",
+                    );
+                }
+                return;
+            }
+
             router.push(`/events/${eventSlug}/confirmation?code=${encodeURIComponent(result.confirmationCode)}`);
         } catch (error) {
             if (error instanceof ApiRequestError) {
@@ -244,26 +303,52 @@ export function RegistrationForm({ eventId, eventSlug, eventTitle }: Registratio
     const registerableSessions = sessions.filter((session) => !session.isFull && !isSessionEnded(session));
 
     if (loading) {
-        return <p className="text-sm text-slate-600">Loading registration form…</p>;
+        return (
+            <p className="registration-loading text-sm text-slate-600" data-registration="loading">
+                Loading registration form…
+            </p>
+        );
+    }
+
+    if (embedSuccess) {
+        return (
+            <div className="embed-success registration-success" data-registration="success">
+                <h2 className="embed-success-title">Registration confirmed</h2>
+                <p className="embed-success-text">
+                    Thanks, {embedSuccess.fullName}. You are registered for {eventTitle}. A ticket was sent to{" "}
+                    {embedSuccess.email}.
+                </p>
+                <p className="embed-success-code" data-field="confirmationCode">
+                    {embedSuccess.confirmationCode}
+                </p>
+            </div>
+        );
     }
 
     return (
-        <form onSubmit={handleSubmit} className="registration-panel space-y-2">
-            <div>
-                <h2 className="text-2xl font-semibold text-purple-900">Register for {eventTitle}</h2>
-                <p className="mt-2 text-sm text-slate-600">
+        <form
+            onSubmit={handleSubmit}
+            className="registration-panel registration-form space-y-0"
+            data-registration="form"
+            data-embedded={isEmbedded ? "true" : "false"}
+        >
+            <div className="registration-header" data-field="header">
+                <h2 className="registration-title text-2xl font-semibold text-purple-900">
+                    Register for {eventTitle}
+                </h2>
+                <p className="registration-subtitle mt-2 text-sm text-slate-600">
                     Complete the form below. You will receive a ticket by email after registration.
                 </p>
             </div>
 
             {formConfig.tierFieldShowOnPublic && tiers.length > 0 ? (
-                <div className="form-group">
-                    <label className="form-label" htmlFor="tierId">
+                <div className={fieldWrapperClass()} data-field="tierId" data-field-type="select">
+                    <label className="form-label registration-field-label" htmlFor="tierId">
                         Registration tier{formConfig.tierFieldRequired ? " *" : ""}
                     </label>
                     <select
                         id="tierId"
-                        className={`form-select${errors.tierId ? " form-input--error" : ""}`}
+                        className={`form-select registration-field-input${errors.tierId ? " form-input--error" : ""}`}
                         value={draft.tierId}
                         onChange={(event) => {
                             clearError("tierId");
@@ -281,18 +366,20 @@ export function RegistrationForm({ eventId, eventSlug, eventTitle }: Registratio
                         ))}
                     </select>
                     {selectedTier ? (
-                        <p className="form-hint">
+                        <p className="form-hint registration-field-hint">
                             Selected tier price: {formatTierPrice(selectedTier.price, selectedTier.currency)}
                         </p>
                     ) : null}
-                    {errors.tierId ? <p className="field-error">{errors.tierId}</p> : null}
+                    {errors.tierId ? (
+                        <p className="field-error registration-field-error">{errors.tierId}</p>
+                    ) : null}
                 </div>
             ) : null}
 
             {formConfig.sessionFieldShowOnPublic && sessions.length > 0 ? (
-                <div className="form-group">
+                <div className={fieldWrapperClass()} data-field="session" data-field-type="checkbox-group">
                     <fieldset>
-                        <legend className="form-label">
+                        <legend className="form-label registration-field-label">
                             Sessions{formConfig.sessionFieldRequired ? " *" : ""}
                         </legend>
                         <div className="registration-session-options">
@@ -309,7 +396,11 @@ export function RegistrationForm({ eventId, eventSlug, eventTitle }: Registratio
                                             ? ` (${session.spotsRemaining} left)`
                                             : "";
                                 return (
-                                    <label key={sessionId} className="registration-session-option">
+                                    <label
+                                        key={sessionId}
+                                        className="registration-session-option"
+                                        data-session-id={sessionId}
+                                    >
                                         <input
                                             type="checkbox"
                                             checked={checked}
@@ -330,71 +421,89 @@ export function RegistrationForm({ eventId, eventSlug, eventTitle }: Registratio
                             })}
                         </div>
                         {formConfig.sessionFieldRequired && registerableSessions.length === 0 ? (
-                            <p className="form-hint">No sessions are currently open for registration.</p>
+                            <p className="form-hint registration-field-hint">
+                                No sessions are currently open for registration.
+                            </p>
                         ) : null}
                     </fieldset>
-                    {errors.sessionIds ? <p className="field-error">{errors.sessionIds}</p> : null}
+                    {errors.sessionIds ? (
+                        <p className="field-error registration-field-error">{errors.sessionIds}</p>
+                    ) : null}
                 </div>
             ) : null}
 
-            <div className="form-row form-row--two">
-                <div className="form-group">
-                    <label className="form-label" htmlFor="fullName">
-                        Full name *
-                    </label>
-                    <input
-                        id="fullName"
-                        type="text"
-                        className={`form-input${errors.fullName ? " form-input--error" : ""}`}
-                        value={draft.fullName}
-                        onChange={(event) => {
-                            clearError("fullName");
-                            updateDraft({ fullName: event.target.value });
-                        }}
-                    />
-                    {errors.fullName ? <p className="field-error">{errors.fullName}</p> : null}
-                </div>
-                <div className="form-group">
-                    <label className="form-label" htmlFor="email">
-                        Email *
-                    </label>
-                    <EmailInputWithDomainSuggestions
-                        id="email"
-                        className={`form-input${errors.email ? " form-input--error" : ""}`}
-                        value={draft.email}
-                        onChange={(value) => {
-                            clearError("email");
-                            updateDraft({ email: value });
-                        }}
-                    />
-                    {errors.email ? <p className="field-error">{errors.email}</p> : null}
-                </div>
+            <div className={fieldWrapperClass()} data-field="fullName" data-field-type="text">
+                <label className="form-label registration-field-label" htmlFor="fullName">
+                    Full name *
+                </label>
+                <input
+                    id="fullName"
+                    type="text"
+                    className={`form-input registration-field-input${errors.fullName ? " form-input--error" : ""}`}
+                    value={draft.fullName}
+                    onChange={(event) => {
+                        clearError("fullName");
+                        updateDraft({ fullName: event.target.value });
+                    }}
+                />
+                {errors.fullName ? (
+                    <p className="field-error registration-field-error">{errors.fullName}</p>
+                ) : null}
             </div>
 
-            <div className="form-group">
-                <label className="form-label" htmlFor="phoneNumber">
+            <div className={fieldWrapperClass()} data-field="email" data-field-type="email">
+                <label className="form-label registration-field-label" htmlFor="email">
+                    Email *
+                </label>
+                <EmailInputWithDomainSuggestions
+                    id="email"
+                    className={`form-input registration-field-input${errors.email ? " form-input--error" : ""}`}
+                    value={draft.email}
+                    onChange={(value) => {
+                        clearError("email");
+                        updateDraft({ email: value });
+                    }}
+                />
+                {errors.email ? (
+                    <p className="field-error registration-field-error">{errors.email}</p>
+                ) : null}
+            </div>
+
+            <div className={fieldWrapperClass()} data-field="phoneNumber" data-field-type="tel">
+                <label className="form-label registration-field-label" htmlFor="phoneNumber">
                     Phone number{formConfig.phoneFieldRequired ? " *" : ""}
                 </label>
                 <input
                     id="phoneNumber"
                     type="tel"
-                    className={`form-input${errors.phoneNumber ? " form-input--error" : ""}`}
+                    className={`form-input registration-field-input${errors.phoneNumber ? " form-input--error" : ""}`}
                     value={draft.phoneNumber}
                     onChange={(event) => {
                         clearError("phoneNumber");
                         updateDraft({ phoneNumber: event.target.value });
                     }}
                 />
-                {errors.phoneNumber ? <p className="field-error">{errors.phoneNumber}</p> : null}
+                {errors.phoneNumber ? (
+                    <p className="field-error registration-field-error">{errors.phoneNumber}</p>
+                ) : null}
             </div>
 
             {customFields.map((field) =>
                 renderCustomFieldInput(field, draft, errors, onCustomFieldChange),
             )}
 
-            {formError ? <div className="registration-error-banner">{formError}</div> : null}
+            {formError ? (
+                <div className="registration-error-banner" data-registration="form-error" role="alert">
+                    {formError}
+                </div>
+            ) : null}
 
-            <button type="submit" className="btn-primary" disabled={submitting}>
+            <button
+                type="submit"
+                className="btn-primary registration-submit"
+                data-registration="submit"
+                disabled={submitting}
+            >
                 {submitting ? "Submitting..." : "Submit registration"}
             </button>
         </form>

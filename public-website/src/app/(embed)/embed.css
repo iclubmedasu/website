@@ -1,0 +1,105 @@
+.embed-body {
+    margin: 0;
+    min-height: 0;
+    background: transparent;
+    color: var(--foreground);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.embed-root {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+}
+
+.embed-root[data-layout="compact"] .registration-panel {
+    padding: 1rem;
+    box-shadow: none;
+}
+
+.embed-root[data-layout="compact"] .form-group,
+.embed-root[data-layout="compact"] .registration-field {
+    margin-bottom: 0.875rem;
+}
+
+.embed-root[data-layout="spacious"] .registration-panel {
+    padding: 2.5rem;
+}
+
+.embed-root[data-layout="spacious"] .form-group,
+.embed-root[data-layout="spacious"] .registration-field {
+    margin-bottom: 1.75rem;
+}
+
+.embed-root .registration-panel {
+    /* Embed default: full-width card without page chrome spacing. */
+    margin: 0;
+}
+
+.embed-success {
+    padding: 1.5rem;
+    border: 1px solid var(--success-border, #10c55e);
+    border-radius: var(--radius-xl, 24px);
+    background: var(--success-bg, #dcfce7);
+    color: var(--success-text, #166534);
+}
+
+.embed-success-title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.embed-success-text {
+    margin: 0.75rem 0 0;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+}
+
+.embed-success-code {
+    margin-top: 1rem;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+}
+
+/* Registration form style hooks — stable contract for Tier 2 CSS authors. */
+.registration-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.registration-field {
+    display: block;
+    margin-bottom: 1.5rem;
+}
+
+.registration-field-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-family: var(--font-heading);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--gray-800, #262626);
+}
+
+.registration-field-error {
+    margin-top: 0.375rem;
+    font-size: 0.8125rem;
+    color: var(--error-text, #991b1b);
+}
+
+.registration-submit {
+    /* Extends .btn-primary; stable hook for host stylesheets. */
+}
+
+.registration-error-banner {
+    /* Existing registration error banner styles in registration.css apply. */
+}

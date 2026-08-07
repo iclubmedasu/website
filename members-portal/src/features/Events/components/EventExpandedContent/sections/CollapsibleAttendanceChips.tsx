@@ -1,4 +1,5 @@
-import type { EventRegistrationRef, Id } from '@/types/backend-contracts';
+import type { EventRegistrationRef, EventSessionRef, Id } from '@/types/backend-contracts';
+import { formatDurationMinutes, sumSegmentDurations } from '@iclub/shared/utils';
 import { formatAttendanceDayLabel } from '../../eventDateUtils';
 import CollapsibleChipGroup, { type CollapsibleChipItem } from './CollapsibleChipGroup';
 
@@ -24,6 +25,8 @@ interface AttendanceChipItem {
 interface CollapsibleAttendanceChipsProps {
     registration: EventRegistrationRef;
     sessionDateById: Map<string, string>;
+    sessions?: EventSessionRef[];
+    trackSessionCheckOut?: boolean;
     canRemoveAttendance: boolean;
     collapsible: boolean;
     onRequestRemoval: (target: AttendanceRemovalTarget) => void;
@@ -32,6 +35,8 @@ interface CollapsibleAttendanceChipsProps {
 function buildAttendanceChips(
     registration: EventRegistrationRef,
     sessionDateById: Map<string, string>,
+    sessions: EventSessionRef[] | undefined,
+    trackSessionCheckOut: boolean,
     canRemoveAttendance: boolean,
 ): AttendanceChipItem[] {
     const chips: AttendanceChipItem[] = [];
@@ -53,6 +58,67 @@ function buildAttendanceChips(
             } : undefined,
         });
     });
+
+    if (trackSessionCheckOut) {
+        const bySession = new Map<string, NonNullable<EventRegistrationRef['sessionAttendances']>>();
+        for (const attendance of registration.sessionAttendances ?? []) {
+            const key = String(attendance.sessionId);
+            const list = bySession.get(key) ?? [];
+            list.push(attendance);
+            bySession.set(key, list);
+        }
+
+        for (const [sessionId, segments] of bySession) {
+            const sessionDate = sessionDateById.get(sessionId);
+            const session = sessions?.find((entry) => String(entry.id) === sessionId);
+            const dayLabel = sessionDate
+                ? formatAttendanceDayLabel(sessionDate)
+                : (session?.label?.trim() || 'Session');
+            const online = segments.some((segment) => segment.mode === 'ONLINE')
+                && !segments.some((segment) => segment.mode === 'ONSITE');
+            const onsiteSegments = segments.filter((segment) => segment.mode === 'ONSITE');
+            const endBySession = session?.endDateTime ?? null;
+            const agg = sumSegmentDurations(
+                onsiteSegments.map((segment) => ({
+                    joinedAt: segment.joinedAt,
+                    checkedOutAt: segment.checkedOutAt ?? null,
+                    sessionEndDateTime: endBySession,
+                })),
+            );
+            const hasOpen = onsiteSegments.some(
+                (segment) => segment.isOpen === true || segment.checkedOutAt == null,
+            );
+            const durationLabel = trackSessionCheckOut && onsiteSegments.length > 0
+                ? ` · ${formatDurationMinutes(agg.totalMinutes)}`
+                : '';
+            const insideLabel = hasOpen && !online ? ' · inside' : '';
+            const capLabel = agg.wasVirtuallyCapped ? ' · capped' : '';
+            const modeLabel = online ? 'Online' : 'Onsite';
+            const chipLabel = `${modeLabel} · ${dayLabel}${durationLabel}${insideLabel}${capLabel}`;
+            const className = [
+                'event-attendance-day-chip',
+                canRemoveAttendance ? 'event-attendance-day-chip--removable' : '',
+                online ? 'event-attendance-day-chip--online' : '',
+                hasOpen && !online ? 'event-attendance-day-chip--inside' : '',
+                agg.wasVirtuallyCapped ? 'event-attendance-day-chip--capped' : '',
+            ].filter(Boolean).join(' ');
+            // For removal, remove the most recent segment (or the open one if present)
+            const removable = onsiteSegments.find((s) => s.checkedOutAt == null)
+                ?? segments[segments.length - 1];
+            chips.push({
+                key: `session-${sessionId}`,
+                label: chipLabel,
+                className,
+                removalTarget: canRemoveAttendance && removable ? {
+                    registration,
+                    kind: 'online',
+                    sessionAttendanceId: removable.id,
+                    dayLabel: chipLabel,
+                } : undefined,
+            });
+        }
+        return chips;
+    }
 
     registration.sessionAttendances?.forEach((attendance) => {
         const sessionDate = sessionDateById.get(String(attendance.sessionId));
@@ -108,11 +174,19 @@ function renderChip(
 export default function CollapsibleAttendanceChips({
     registration,
     sessionDateById,
+    sessions,
+    trackSessionCheckOut = false,
     canRemoveAttendance,
     collapsible,
     onRequestRemoval,
 }: CollapsibleAttendanceChipsProps) {
-    const chips = buildAttendanceChips(registration, sessionDateById, canRemoveAttendance);
+    const chips = buildAttendanceChips(
+        registration,
+        sessionDateById,
+        sessions,
+        trackSessionCheckOut,
+        canRemoveAttendance,
+    );
     const collapsibleChips: CollapsibleChipItem[] = chips.map((chip) => ({
         key: chip.key,
         label: chip.label,

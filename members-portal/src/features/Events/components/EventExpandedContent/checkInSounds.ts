@@ -61,3 +61,9 @@ export function playCheckInSuccessBeep(): void {
     playTone(660, 100, 0.18);
     setTimeout(() => playTone(880, 120, 0.18), 100);
 }
+
+/** Descending two-tone when check-out completes. */
+export function playCheckOutSuccessBeep(): void {
+    playTone(880, 100, 0.18);
+    setTimeout(() => playTone(520, 140, 0.18), 100);
+}

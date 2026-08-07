@@ -75,3 +75,10 @@ export {
     type TicketPalette,
     type TicketPaletteShade,
 } from "./ticketDesign";
+export {
+    formatDurationMinutes,
+    getSegmentDuration,
+    sumSegmentDurations,
+    type SegmentDurationResult,
+    type SessionAttendanceSegmentInput,
+} from "./sessionAttendanceDuration";

@@ -95,6 +95,7 @@ export const FIELD_LABELS: Record<string, string> = {
     isCertifiable: 'Certifiable',
     allowWalkIns: 'Allow walk-ins',
     allowDirectCheckIn: 'Allow direct check-in',
+    trackSessionCheckOut: 'Track session check-out',
     showOnPublic: 'Show on public',
     isLocked: 'Locked',
     isWalkIn: 'Walk-in',

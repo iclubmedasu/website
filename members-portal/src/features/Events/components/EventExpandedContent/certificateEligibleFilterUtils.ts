@@ -52,6 +52,9 @@ export interface CertificateEligibleRow {
     sessionsAttendedCount?: number;
     attendedDays?: string[];
     attendedSessionIds?: number[];
+    totalAttendanceMinutes?: number;
+    wasVirtuallyCapped?: boolean;
+    sessionDurationMinutes?: Record<string, number>;
     taskCount?: number;
     /** ISO date string used for issue-date range filtering */
     issueDate?: string | null;
@@ -83,6 +86,7 @@ export const EVENT_ELIGIBLE_COLUMNS: CertificateEligibleColumn[] = [
     },
     { id: 'attendanceDaysCount', label: 'Days attended', kind: 'number' },
     { id: 'sessionsAttendedCount', label: 'Sessions attended', kind: 'number' },
+    { id: 'totalAttendanceMinutes', label: 'Minutes attended', kind: 'number' },
     {
         id: 'status',
         label: 'Status',
@@ -218,6 +222,9 @@ function getNumberValue(row: CertificateEligibleRow, columnId: string): number |
     if (columnId === 'sessionsAttendedCount') {
         return row.sessionsAttendedCount === undefined ? null : row.sessionsAttendedCount;
     }
+    if (columnId === 'totalAttendanceMinutes') {
+        return row.totalAttendanceMinutes === undefined ? null : row.totalAttendanceMinutes;
+    }
     if (columnId === 'taskCount') {
         return row.taskCount === undefined ? null : row.taskCount;
     }
@@ -237,6 +244,7 @@ function getIdSetValues(row: CertificateEligibleRow, columnId: string): string[]
 function isAttendanceIdentityColumn(columnId: string): boolean {
     return columnId === 'attendanceDaysCount'
         || columnId === 'sessionsAttendedCount'
+        || columnId === 'totalAttendanceMinutes'
         || columnId === 'attendedDays'
         || columnId === 'attendedSessionIds';
 }
@@ -330,6 +338,9 @@ function getSortValue(
     }
     if (columnId === 'sessionsAttendedCount') {
         return row.sessionsAttendedCount === undefined ? null : row.sessionsAttendedCount;
+    }
+    if (columnId === 'totalAttendanceMinutes') {
+        return row.totalAttendanceMinutes === undefined ? null : row.totalAttendanceMinutes;
     }
     if (columnId === 'taskCount') {
         return row.taskCount === undefined ? null : row.taskCount;

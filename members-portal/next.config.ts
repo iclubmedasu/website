@@ -8,6 +8,18 @@ const nextConfig: NextConfig = {
     images: {
         unoptimized: true,
     },
+    async headers() {
+        return [
+            {
+                // Block all embedding of members-portal pages (no embed use case).
+                source: '/:path*',
+                headers: [
+                    { key: 'X-Frame-Options', value: 'DENY' },
+                    { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+                ],
+            },
+        ]
+    },
 }
 
 const pwaConfig = withPWA({

@@ -21,6 +21,7 @@ import { useHardwareScannerCapture } from '../useHardwareScannerCapture';
 import SessionAttendanceOptions from './SessionAttendanceOptions';
 import { useAuthorizedIdCardBackground } from './IdCardDesign/useAuthorizedIdCardBackground';
 import { printIdCard } from './IdCardDesign/idCardPrint';
+import { AUTO_DISMISS_MS } from '@/hooks/useAutoDismissMessage';
 
 interface EventCheckInPanelProps {
     eventId: Id | string;
@@ -77,6 +78,8 @@ export default function EventCheckInPanel({
         handleManualLookup,
         pendingCustomValues,
         lastCheckedInRegistration,
+        trackSessionCheckOut,
+        sessionSummaries,
     } = checkInFlow;
 
     const hasBackground = Boolean(idCardDesign?.idCardBackgroundImageGithubPath);
@@ -92,6 +95,12 @@ export default function EventCheckInPanel({
         setPrintCode(lastCheckedInRegistration.confirmationCode);
         setPrintError(null);
     }, [lastCheckedInRegistration]);
+
+    useEffect(() => {
+        if (!printError) return;
+        const timer = setTimeout(() => setPrintError(null), AUTO_DISMISS_MS);
+        return () => clearTimeout(timer);
+    }, [printError]);
 
     const handleScannerCode = useCallback((raw: string) => {
         void processConfirmationCode(raw, 'scanner');
@@ -246,6 +255,21 @@ export default function EventCheckInPanel({
         ? 'Check-in details'
         : 'Complete required information';
 
+    const resultClass = result?.type === 'error'
+        ? 'error-message'
+        : result?.type === 'checkout'
+            ? 'success-message success-message--checkout'
+            : 'success-message';
+
+    const primaryButtonLabel = (() => {
+        if (loading) return 'Working…';
+        if (!trackSessionCheckOut || !selectedSessionId) return 'Complete check-in';
+        const summary = sessionSummaries.find(
+            (entry) => String(entry.sessionId) === String(selectedSessionId),
+        );
+        return summary?.hasOpenSegment ? 'Complete check-out' : 'Complete check-in';
+    })();
+
     return (
         <>
             <input ref={captureInputRef} {...captureInputProps} />
@@ -268,6 +292,7 @@ export default function EventCheckInPanel({
                         <span>{isMaximized ? 'Minimize' : 'Maximize'}</span>
                     </button>
                 </div>
+
                 <div className="event-registrations-checkin-scan">
                     <h3 className="expanded-section-title expanded-section-title--sm">Scan</h3>
                     <EventQrScanner
@@ -337,7 +362,7 @@ export default function EventCheckInPanel({
                     ) : null}
                 </div>
                 {result ? (
-                    <div className={result.type === 'error' ? 'error-message' : 'success-message'}>
+                    <div className={resultClass}>
                         {result.message}
                     </div>
                 ) : null}
@@ -366,7 +391,7 @@ export default function EventCheckInPanel({
                             className="btn btn-primary"
                             disabled={loading}
                         >
-                            {loading ? 'Checking in…' : 'Complete check-in'}
+                            {primaryButtonLabel}
                         </button>
                     </>
                 )}
@@ -403,14 +428,20 @@ export default function EventCheckInPanel({
                         <div className="team-checkbox-list" role="group" aria-label="Session selections">
                             {sortedActiveSessions.map((session) => {
                                 const sessionId = String(session.id);
+                                const fullAndUnselected = Boolean(session.isFull)
+                                    && !selectedSessionIds.includes(sessionId);
                                 return (
                                     <label key={session.id} className="team-checkbox-item">
                                         <input
                                             type="checkbox"
                                             checked={selectedSessionIds.includes(sessionId)}
+                                            disabled={loading || fullAndUnselected}
                                             onChange={() => toggleSessionSelection(sessionId)}
                                         />
-                                        <span className="team-checkbox-label">{getSessionTitle(session)}</span>
+                                        <span className="team-checkbox-label">
+                                            {getSessionTitle(session)}
+                                            {fullAndUnselected ? ' (Full)' : ''}
+                                        </span>
                                     </label>
                                 );
                             })}
@@ -430,6 +461,8 @@ export default function EventCheckInPanel({
                     onSelectSessionId={setSelectedSessionId}
                     alreadyHasDayAttendance={alreadyHasDayAttendance}
                     radioName="checkin-session"
+                    trackSessionCheckOut={trackSessionCheckOut}
+                    sessionSummaries={sessionSummaries}
                 />
             </EventStaffModal>
         </>

@@ -133,6 +133,7 @@ export default function CreateEventModal({
         allowWalkIns: initial?.allowWalkIns ?? false,
         allowDirectCheckIn: initial?.allowDirectCheckIn ?? false,
         isCertifiable: initial?.isCertifiable ?? false,
+        trackSessionCheckOut: initial?.trackSessionCheckOut ?? false,
         teamIds: buildInitialTeamIds(),
     });
 
@@ -294,6 +295,7 @@ export default function CreateEventModal({
                 allowWalkIns: form.allowWalkIns,
                 allowDirectCheckIn: form.allowDirectCheckIn,
                 isCertifiable: form.isCertifiable,
+                trackSessionCheckOut: form.trackSessionCheckOut,
             };
 
             const saved: EventDetail = isEdit && initial
@@ -546,6 +548,14 @@ export default function CreateEventModal({
                                     <span>
                                         <strong>Allow direct check-in</strong>
                                         <small>Show a check-in button on each registration row during event days.</small>
+                                    </span>
+                                </label>
+
+                                <label className="toggle-field">
+                                    <Checkbox checked={form.trackSessionCheckOut} onChange={handleChange('trackSessionCheckOut')} />
+                                    <span>
+                                        <strong>Track session check-out</strong>
+                                        <small>Log check-in and check-out times per session for attendance duration.</small>
                                     </span>
                                 </label>
                             </div>

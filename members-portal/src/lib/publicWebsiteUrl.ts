@@ -132,3 +132,67 @@ export async function buildPublicVerifyUrl(verificationCode: string): Promise<st
     const origin = await resolvePublicWebsiteOrigin();
     return `${origin}/verify/${encodeURIComponent(verificationCode)}`;
 }
+
+export async function buildPublicEmbedLoaderUrl(): Promise<string> {
+    const origin = await resolvePublicWebsiteOrigin();
+    return `${origin}/embed/loader.js`;
+}
+
+export interface EmbedSnippetOptions {
+    eventSlugOrId: number | string;
+    primaryColor?: string | null;
+    accentColor?: string | null;
+    borderRadius?: string | null;
+    fontFamily?: string | null;
+    layout?: "default" | "compact" | "spacious" | null;
+    customCssUrl?: string | null;
+}
+
+/** Ready-to-paste HTML snippet for per-event websites. */
+export async function buildRegistrationEmbedSnippet(
+    options: EmbedSnippetOptions,
+): Promise<string> {
+    const origin = await resolvePublicWebsiteOrigin();
+    const loaderUrl = `${origin}/embed/loader.js`;
+    const event = String(options.eventSlugOrId);
+
+    const attrs: string[] = [
+        'id="iclub-register"',
+        'data-iclub-register',
+        `data-event="${escapeHtmlAttr(event)}"`,
+    ];
+
+    if (options.primaryColor) {
+        attrs.push(`data-primary-color="${escapeHtmlAttr(options.primaryColor)}"`);
+    }
+    if (options.accentColor) {
+        attrs.push(`data-accent-color="${escapeHtmlAttr(options.accentColor)}"`);
+    }
+    if (options.borderRadius) {
+        attrs.push(`data-border-radius="${escapeHtmlAttr(options.borderRadius)}"`);
+    }
+    if (options.fontFamily) {
+        attrs.push(`data-font-family="${escapeHtmlAttr(options.fontFamily)}"`);
+    }
+    if (options.layout && options.layout !== "default") {
+        attrs.push(`data-layout="${escapeHtmlAttr(options.layout)}"`);
+    }
+    if (options.customCssUrl) {
+        attrs.push(`data-custom-css-url="${escapeHtmlAttr(options.customCssUrl)}"`);
+    }
+
+    return [
+        `<div`,
+        `  ${attrs.join("\n  ")}`,
+        `></div>`,
+        `<script src="${escapeHtmlAttr(loaderUrl)}" async></script>`,
+    ].join("\n");
+}
+
+function escapeHtmlAttr(value: string): string {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}

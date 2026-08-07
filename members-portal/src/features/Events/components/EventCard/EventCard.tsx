@@ -265,6 +265,7 @@ export default function EventCard({
                             initialTab={initialTab}
                             allowWalkIns={fullDetail.allowWalkIns ?? false}
                             allowDirectCheckIn={fullDetail.allowDirectCheckIn ?? false}
+                            trackSessionCheckOut={fullDetail.trackSessionCheckOut ?? false}
                             eventDate={fullDetail.eventDate}
                             eventEndDate={fullDetail.eventEndDate}
                             eventTimezone={fullDetail.timezone}

@@ -11,6 +11,7 @@ import type {
     CreateEventSessionPayload,
     CreateEventTaskPayload,
     CheckInRegistrationPayload,
+    CheckInRegistrationResult,
     RemoveRegistrationAttendancePayload,
     CreateProjectPayload,
     CreateScheduleSlotPayload,
@@ -2536,7 +2537,7 @@ export const eventsAPI = {
         eventId: Id | string,
         registrationId: Id | string,
         payload: CheckInRegistrationPayload = {},
-    ): Promise<EventRegistrationRef> => {
+    ): Promise<CheckInRegistrationResult> => {
         const safeRegistrationId = String(registrationId || 'code');
         const response = await apiFetch(`${API_BASE_URL}/events/${eventId}/registrations/${safeRegistrationId}/check-in`, {
             method: 'PATCH',
@@ -2544,7 +2545,22 @@ export const eventsAPI = {
             body: JSON.stringify(payload),
         });
 
-        return handleResponse<EventRegistrationRef>(response);
+        return handleResponse<CheckInRegistrationResult>(response);
+    },
+
+    closeOpenSessionAttendances: async (
+        eventId: Id | string,
+        sessionId: Id | string,
+    ): Promise<{ closedCount: number; sessionId: Id }> => {
+        const response = await apiFetch(
+            `${API_BASE_URL}/events/${eventId}/sessions/${sessionId}/close-open-attendances`,
+            {
+                method: 'POST',
+                headers: getEventMutationHeaders(),
+            },
+        );
+
+        return handleResponse<{ closedCount: number; sessionId: Id }>(response);
     },
 
     removeRegistrationAttendance: async (

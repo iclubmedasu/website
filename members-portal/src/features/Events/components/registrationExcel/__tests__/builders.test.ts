@@ -70,7 +70,13 @@ describe('registrationExcel builders', () => {
             registration({
                 id: 1,
                 sessionSelections: [{ sessionId: 100, sessionDate: '2026-07-20', label: 'Morning' }],
-                sessionAttendances: [{ sessionId: 100, joinedAt: '2026-07-20T09:15:00.000Z', mode: 'ONSITE' }],
+                sessionAttendances: [{
+                    id: 1,
+                    registrationId: 1,
+                    sessionId: 100,
+                    joinedAt: '2026-07-20T09:15:00.000Z',
+                    mode: 'ONSITE',
+                }],
             }),
             registration({
                 id: 2,
@@ -107,7 +113,13 @@ describe('registrationExcel builders', () => {
                     { sessionId: 100, sessionDate: '2026-07-20', label: 'Morning' },
                     { sessionId: 101, sessionDate: '2026-07-20', label: 'Afternoon' },
                 ],
-                sessionAttendances: [{ sessionId: 100, joinedAt: '2026-07-20T09:15:00.000Z', mode: 'ONSITE' }],
+                sessionAttendances: [{
+                    id: 1,
+                    registrationId: 1,
+                    sessionId: 100,
+                    joinedAt: '2026-07-20T09:15:00.000Z',
+                    mode: 'ONSITE',
+                }],
             }),
         ];
 
@@ -121,6 +133,7 @@ describe('registrationExcel builders', () => {
                 attended: 1,
                 missed: 1,
                 attendancePercent: 33,
+                totalDurationMinutes: expect.any(Number),
             },
         ]);
     });

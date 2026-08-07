@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Download, Eye, Filter, Loader2, Mail, Search } from 'lucide-react';
-import { formatDate } from '@iclub/shared/utils';
+import { AlertTriangle, Download, Eye, Filter, Loader2, Mail, Search } from 'lucide-react';
+import { formatDate, formatDurationMinutes } from '@iclub/shared/utils';
 import { Checkbox } from '@/components/checkbox';
 import CertificateStatusBadge from '@/components/certificates/CertificateStatusBadge';
 import NewCustomCertificateModal from '@/features/Certificates/modals/NewCustomCertificateModal';
@@ -118,6 +118,8 @@ interface UnifiedCertificateRow {
     category?: EventEligibleCategory;
     attendanceDaysCount?: number;
     sessionsAttendedCount?: number;
+    totalAttendanceMinutes?: number;
+    wasVirtuallyCapped?: boolean;
     attendedDays?: string[];
     attendedSessionIds?: number[];
     status: CertificateRowStatus;
@@ -232,6 +234,8 @@ function buildUnifiedRows(
             category: recipient.category,
             attendanceDaysCount: recipient.attendanceDaysCount,
             sessionsAttendedCount: recipient.sessionsAttendedCount,
+            totalAttendanceMinutes: recipient.totalAttendanceMinutes,
+            wasVirtuallyCapped: recipient.wasVirtuallyCapped,
             attendedDays: recipient.attendedDays,
             attendedSessionIds: recipient.attendedSessionIds,
             status,
@@ -665,6 +669,7 @@ export default function EventCertificatesSection({
                                         <th>Type</th>
                                         <th>Days</th>
                                         <th className="event-cert-sessions-cell">Sessions</th>
+                                        {eligible?.trackSessionCheckOut ? <th>Duration</th> : null}
                                         <th>Status</th>
                                         <th className="event-cert-issue-date-cell">Issue date</th>
                                         <th className="event-cert-sent-cell">Sent</th>
@@ -751,6 +756,28 @@ export default function EventCertificatesSection({
                                                         ? row.sessionsAttendedCount
                                                         : '—'}
                                                 </td>
+                                                {eligible?.trackSessionCheckOut ? (
+                                                    <td title={
+                                                        row.wasVirtuallyCapped
+                                                            ? 'Duration includes a virtual end-time cap (never checked out)'
+                                                            : row.totalAttendanceMinutes != null
+                                                                ? `${row.totalAttendanceMinutes} minutes`
+                                                                : undefined
+                                                    }>
+                                                        {row.totalAttendanceMinutes != null ? (
+                                                            <span className="event-cert-duration-cell">
+                                                                {formatDurationMinutes(row.totalAttendanceMinutes)}
+                                                                {row.wasVirtuallyCapped ? (
+                                                                    <AlertTriangle
+                                                                        size={14}
+                                                                        className="event-cert-duration-capped"
+                                                                        aria-label="Duration includes a virtual end-time cap (never checked out)"
+                                                                    />
+                                                                ) : null}
+                                                            </span>
+                                                        ) : '—'}
+                                                    </td>
+                                                ) : null}
                                                 <td>
                                                     <CertificateStatusBadge
                                                         status={row.status}

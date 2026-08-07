@@ -400,6 +400,7 @@ model Event {
   allowWalkIns             Boolean   @default(false)
   allowDirectCheckIn       Boolean   @default(false)
   isCertifiable            Boolean   @default(false)
+  trackSessionCheckOut     Boolean   @default(false)
   status                   String    @default("DRAFT") // DRAFT, PUBLISHED, COMPLETED, CANCELLED
   priority                 String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
   progressStatus           String    @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED, ON_HOLD, CANCELLED
@@ -594,19 +595,25 @@ model EventSession {
   @@index([startDateTime])
 }
 
+// ONSITE may have multiple segments (check-in/out visits) per session+registration.
+// At most one *open* ONSITE segment is enforced via a partial unique index in the migration SQL:
+//   UNIQUE ("sessionId", "registrationId") WHERE mode = 'ONSITE' AND "checkedOutAt" IS NULL
+// ONLINE remains one logical attendance row (no checkout tracking).
 model EventSessionAttendance {
-  id             Int      @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   sessionId      Int
   registrationId Int
-  mode           String   @default("ONSITE")
-  joinedAt       DateTime @default(now())
+  mode           String    @default("ONSITE")
+  joinedAt       DateTime  @default(now())
+  checkedOutAt   DateTime?
 
   session      EventSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   registration EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
 
-  @@unique([sessionId, registrationId, mode])
   @@index([sessionId])
   @@index([registrationId])
+  @@index([sessionId, registrationId])
+  @@index([sessionId, mode, checkedOutAt])
 }
 
 model EventSessionToken {

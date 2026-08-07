@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import { CertificateStatus, CertificateType, Prisma } from "@prisma/client";
-import { parseTemplateLayoutWording } from "@iclub/shared/utils";
+import { parseTemplateLayoutWording, sumSegmentDurations } from "@iclub/shared/utils";
 import { prisma } from "../db";
 import {
     buildAlreadyIssuedSet,
@@ -368,7 +368,14 @@ router.get("/event/:eventId/eligible", async (req: Request, res: Response) => {
                 include: {
                     member: { select: { id: true, fullName: true, email: true, phoneNumber: true } },
                     attendanceDays: { select: { eventDay: true } },
-                    sessionAttendances: { select: { sessionId: true } },
+                    sessionAttendances: {
+                        select: {
+                            sessionId: true,
+                            joinedAt: true,
+                            checkedOutAt: true,
+                            session: { select: { endDateTime: true } },
+                        },
+                    },
                 },
             }),
             prisma.eventTaskAssignment.findMany({
@@ -422,9 +429,30 @@ router.get("/event/:eventId/eligible", async (req: Request, res: Response) => {
             const attendedDays = registration.attendanceDays.map((day) =>
                 formatEventDay(day.eventDay, timeZone),
             );
-            const attendedSessionIds = registration.sessionAttendances.map(
-                (attendance) => attendance.sessionId,
+            const attendedSessionIdSet = new Set(
+                registration.sessionAttendances.map((attendance) => attendance.sessionId),
             );
+            const attendedSessionIds = Array.from(attendedSessionIdSet);
+            const durationAgg = sumSegmentDurations(
+                registration.sessionAttendances.map((attendance) => ({
+                    joinedAt: attendance.joinedAt,
+                    checkedOutAt: attendance.checkedOutAt,
+                    sessionEndDateTime: attendance.session?.endDateTime ?? null,
+                })),
+            );
+            const minutesBySession = new Map<number, number>();
+            for (const attendance of registration.sessionAttendances) {
+                const sessionId = attendance.sessionId;
+                const segment = sumSegmentDurations([{
+                    joinedAt: attendance.joinedAt,
+                    checkedOutAt: attendance.checkedOutAt,
+                    sessionEndDateTime: attendance.session?.endDateTime ?? null,
+                }]);
+                minutesBySession.set(
+                    sessionId,
+                    (minutesBySession.get(sessionId) ?? 0) + segment.totalMinutes,
+                );
+            }
             return {
                 memberId,
                 fullName: registration.member?.fullName ?? registration.fullName,
@@ -436,6 +464,11 @@ router.get("/event/:eventId/eligible", async (req: Request, res: Response) => {
                 attendedSessionIds,
                 attendanceDaysCount: attendedDays.length,
                 sessionsAttendedCount: attendedSessionIds.length,
+                totalAttendanceMinutes: durationAgg.totalMinutes,
+                wasVirtuallyCapped: durationAgg.wasVirtuallyCapped,
+                sessionDurationMinutes: Object.fromEntries(
+                    Array.from(minutesBySession.entries()).map(([id, minutes]) => [String(id), minutes]),
+                ),
                 alreadyIssued: alreadyIssued.has(certRecipientKey(memberId, type, email)),
             };
         });
@@ -486,6 +519,7 @@ router.get("/event/:eventId/eligible", async (req: Request, res: Response) => {
             sessions,
             eventTitle: event.title,
             projectTypeName: event.projectType?.name ?? null,
+            trackSessionCheckOut: event.trackSessionCheckOut,
         });
     } catch (error) {
         console.error("GET /certificates/event/:eventId/eligible error:", error);

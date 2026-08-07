@@ -123,6 +123,9 @@ export interface EventEligibleRecipient {
     attendedSessionIds?: number[];
     attendanceDaysCount?: number;
     sessionsAttendedCount?: number;
+    totalAttendanceMinutes?: number;
+    wasVirtuallyCapped?: boolean;
+    sessionDurationMinutes?: Record<string, number>;
     alreadyIssued: boolean;
 }
 
@@ -134,6 +137,7 @@ export interface EventEligibleResponse {
     sessions?: EventEligibleSessionOption[];
     eventTitle: string;
     projectTypeName: string | null;
+    trackSessionCheckOut?: boolean;
 }
 
 export interface ProjectEligibleRecipient {

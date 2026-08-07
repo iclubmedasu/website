@@ -1145,6 +1145,54 @@
     background: var(--bg-card);
 }
 
+.event-registrations-footer-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    text-align: left;
+}
+
+.event-registrations-footer-bar__left {
+    flex: 1 1 12rem;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.event-registrations-footer-bar__right {
+    flex: 1 1 12rem;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.event-registrations-footer-station {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 28rem;
+    margin-left: auto;
+}
+
+.event-registrations-footer-station__select {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+    font-size: 0.9rem;
+}
+
+.event-registrations-footer-station__close {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+}
+
 .event-registrations-table-footer--muted {
     margin: 0;
     color: var(--gray-500);
@@ -1445,8 +1493,47 @@
     gap: 0.35rem;
 }
 
+/* Layout overrides only — base error/success banners come from modal.css / errormsg. */
 .event-registrations-checkin-panel > .error-message,
 .event-registrations-checkin-panel > .success-message {
+    margin-top: 0.75rem;
+}
+
+/* Checkout is informational-warning, not error — override shared success tokens. */
+.event-registrations-checkin-panel > .success-message--checkout {
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    border-color: var(--warning-border);
+}
+
+.session-inside-dot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-left: 0.4rem;
+    border-radius: 50%;
+    background: var(--success-accent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--success-accent) 45%, transparent);
+    animation: session-inside-pulse 1.6s ease-out infinite;
+    vertical-align: middle;
+}
+
+@keyframes session-inside-pulse {
+    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success-accent) 45%, transparent); }
+    70% { box-shadow: 0 0 0 0.4rem color-mix(in srgb, var(--success-accent) 0%, transparent); }
+    100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success-accent) 0%, transparent); }
+}
+
+.event-attendance-day-chip--inside {
+    border-color: color-mix(in srgb, var(--success-accent) 45%, transparent);
+}
+
+.event-attendance-day-chip--capped {
+    opacity: 0.9;
+}
+
+.event-registrations-contact-cell__checkin--out {
+    color: var(--warning-text);
     flex-shrink: 0;
 }
 

@@ -1,6 +1,8 @@
 import {
     CLUB_TIMEZONE,
     formatDateTime,
+    formatDurationMinutes,
+    sumSegmentDurations,
     toEventDayString,
 } from '@iclub/shared/utils';
 import type { EventCustomFieldRef, EventRegistrationRef, EventSessionRef } from '@/types/backend-contracts';
@@ -40,6 +42,7 @@ export interface MemberMetricRow {
     attended: number;
     missed: number;
     attendancePercent: number;
+    totalDurationMinutes?: number;
 }
 
 export interface TierMetricRow {
@@ -114,6 +117,31 @@ function countAttendedForSession(registrations: EventRegistrationRef[], sessionI
     ).length;
 }
 
+function uniqueSessionIdsAttended(registration: EventRegistrationRef): number {
+    const ids = new Set(
+        (registration.sessionAttendances ?? [])
+            .filter((entry) => entry.joinedAt)
+            .map((entry) => String(entry.sessionId)),
+    );
+    return ids.size;
+}
+
+function totalDurationForRegistration(
+    registration: EventRegistrationRef,
+    sessions: EventSessionRef[],
+): number {
+    const endById = new Map(
+        sessions.map((session) => [String(session.id), session.endDateTime ?? null] as const),
+    );
+    return sumSegmentDurations(
+        (registration.sessionAttendances ?? []).map((entry) => ({
+            joinedAt: entry.joinedAt,
+            checkedOutAt: entry.checkedOutAt ?? null,
+            sessionEndDateTime: endById.get(String(entry.sessionId)) ?? null,
+        })),
+    ).totalMinutes;
+}
+
 export function computeSessionMetrics(
     registrations: EventRegistrationRef[],
     sessions: EventSessionRef[],
@@ -146,7 +174,7 @@ export function computeMemberMetrics(
     return getActiveRegistrations(registrations)
         .map((registration) => {
             const sessionsSelected = registration.sessionSelections?.length ?? 0;
-            const attended = (registration.sessionAttendances ?? []).filter((entry) => entry.joinedAt).length;
+            const attended = uniqueSessionIdsAttended(registration);
             const attendancePercent =
                 totalSessions <= 0 ? 0 : Math.round((attended / totalSessions) * 100);
             return {
@@ -158,6 +186,7 @@ export function computeMemberMetrics(
                 attended,
                 missed: Math.max(0, sessionsSelected - attended),
                 attendancePercent,
+                totalDurationMinutes: totalDurationForRegistration(registration, sessions),
             };
         })
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
@@ -231,12 +260,30 @@ function formatSessionColumnHeader(session: EventSessionRef): string {
 function formatSessionAttendanceExport(
     registration: EventRegistrationRef,
     session: EventSessionRef,
+    trackSessionCheckOut = false,
 ): string {
-    const attendance = (registration.sessionAttendances ?? []).find(
+    const segments = (registration.sessionAttendances ?? []).filter(
         (entry) => String(entry.sessionId) === String(session.id),
     );
-    if (!attendance) return 'Missed';
-    return fmtDateTime(attendance.joinedAt) || 'Attended';
+    if (segments.length === 0) return 'Missed';
+
+    if (!trackSessionCheckOut) {
+        const attendance = segments[0];
+        return fmtDateTime(attendance.joinedAt) || 'Attended';
+    }
+
+    const agg = sumSegmentDurations(
+        segments.map((entry) => ({
+            joinedAt: entry.joinedAt,
+            checkedOutAt: entry.checkedOutAt ?? null,
+            sessionEndDateTime: session.endDateTime ?? null,
+        })),
+    );
+    const visits = segments.length;
+    const visitLabel = `${visits} visit${visits === 1 ? '' : 's'}`;
+    const openNote = agg.hasOpen ? ', still inside' : '';
+    const capNote = agg.wasVirtuallyCapped ? ', capped' : '';
+    return `${formatDurationMinutes(agg.totalMinutes)} (${visitLabel}${openNote}${capNote})`;
 }
 
 function buildSessionLabelById(sessions: EventSessionRef[]): Map<string, string> {
@@ -293,7 +340,11 @@ export function buildSessionSummaryMatrix(metrics: SessionMetricRow[]): string[]
     ];
 }
 
-export function buildMemberSummaryMatrix(metrics: MemberMetricRow[]): string[][] {
+export function buildMemberSummaryMatrix(
+    metrics: MemberMetricRow[],
+    options?: { trackSessionCheckOut?: boolean },
+): string[][] {
+    const includeDuration = Boolean(options?.trackSessionCheckOut);
     return [
         [
             'Name',
@@ -304,6 +355,7 @@ export function buildMemberSummaryMatrix(metrics: MemberMetricRow[]): string[][]
             'Attended',
             'Missed',
             'Attendance %',
+            ...(includeDuration ? ['Total duration'] : []),
         ],
         ...metrics.map((row) => [
             row.name,
@@ -314,6 +366,9 @@ export function buildMemberSummaryMatrix(metrics: MemberMetricRow[]): string[][]
             String(row.attended),
             String(row.missed),
             formatAttendancePercent(row.attended, row.totalSessions),
+            ...(includeDuration
+                ? [formatDurationMinutes(row.totalDurationMinutes ?? 0)]
+                : []),
         ]),
     ];
 }
@@ -381,8 +436,10 @@ export function buildRegistrationMatrix(
 export function buildSessionAttendanceMatrix(
     registrations: EventRegistrationRef[],
     sessions: EventSessionRef[],
+    options?: { trackSessionCheckOut?: boolean },
 ): string[][] {
     const sortedActiveSessions = getSortedActiveSessions(sessions);
+    const trackSessionCheckOut = Boolean(options?.trackSessionCheckOut);
     const headers = [
         'Name',
         'Email',
@@ -394,7 +451,9 @@ export function buildSessionAttendanceMatrix(
         registration.fullName,
         registration.email,
         registration.confirmationCode,
-        ...sortedActiveSessions.map((session) => formatSessionAttendanceExport(registration, session)),
+        ...sortedActiveSessions.map((session) =>
+            formatSessionAttendanceExport(registration, session, trackSessionCheckOut),
+        ),
     ]);
 
     return [headers, ...rows];
@@ -403,8 +462,10 @@ export function buildSessionAttendanceMatrix(
 export function buildAttendanceLogMatrix(
     registrations: EventRegistrationRef[],
     sessions: EventSessionRef[],
+    options?: { trackSessionCheckOut?: boolean },
 ): string[][] {
     const sessionLabelById = buildSessionLabelById(sessions);
+    const trackSessionCheckOut = Boolean(options?.trackSessionCheckOut);
     const headers = ['Name', 'Email', 'Code', 'Type', 'Detail', 'Mode', 'Timestamp'];
     const rows: AttendanceLogRow[] = [];
 
@@ -425,11 +486,21 @@ export function buildAttendanceLogMatrix(
             pushAttendanceLogRow(
                 rows,
                 registration,
-                'Session attendance',
+                trackSessionCheckOut ? 'Session check-in' : 'Session attendance',
                 detail,
                 formatAttendanceMode(attendance.mode),
                 attendance.joinedAt,
             );
+            if (trackSessionCheckOut && attendance.checkedOutAt) {
+                pushAttendanceLogRow(
+                    rows,
+                    registration,
+                    'Session check-out',
+                    detail,
+                    formatAttendanceMode(attendance.mode),
+                    attendance.checkedOutAt,
+                );
+            }
         });
     });
 

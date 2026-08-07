@@ -8,7 +8,13 @@ import {
     validateRequiredCustomFieldValues,
 } from '../lib/customFields';
 import { prisma } from '../db';
-import { CLUB_TIMEZONE, isValidIanaTimezone, toEventDayString } from '@iclub/shared/utils';
+import {
+    CLUB_TIMEZONE,
+    getSegmentDuration,
+    isValidIanaTimezone,
+    sumSegmentDurations,
+    toEventDayString,
+} from '@iclub/shared/utils';
 import {
     doSessionInstantsOverlap,
     isSessionActiveAt,
@@ -187,7 +193,15 @@ const registrationInclude = {
     member: { select: { id: true, fullName: true, email: true } },
     attendanceDays: { orderBy: { eventDay: 'asc' as const } },
     sessionAttendances: {
-        select: { id: true, sessionId: true, registrationId: true, mode: true, joinedAt: true },
+        select: {
+            id: true,
+            sessionId: true,
+            registrationId: true,
+            mode: true,
+            joinedAt: true,
+            checkedOutAt: true,
+            session: { select: { endDateTime: true } },
+        },
         orderBy: { joinedAt: 'asc' as const },
     },
     sessionSelections: {
@@ -222,9 +236,85 @@ function serializeAttendanceDays(
     }));
 }
 
+type SessionAttendanceRow = {
+    id: number;
+    sessionId: number;
+    registrationId: number;
+    mode: string;
+    joinedAt: Date;
+    checkedOutAt?: Date | null;
+    session?: { endDateTime: Date | null } | null;
+};
+
+function serializeSessionAttendances(
+    attendances: SessionAttendanceRow[],
+    now: Date = new Date(),
+) {
+    return attendances.map((attendance) => {
+        const duration = getSegmentDuration({
+            joinedAt: attendance.joinedAt,
+            checkedOutAt: attendance.checkedOutAt ?? null,
+            sessionEndDateTime: attendance.session?.endDateTime ?? null,
+        }, now);
+        return {
+            id: attendance.id,
+            sessionId: attendance.sessionId,
+            registrationId: attendance.registrationId,
+            mode: attendance.mode as 'ONSITE' | 'ONLINE',
+            joinedAt: attendance.joinedAt.toISOString(),
+            checkedOutAt: attendance.checkedOutAt?.toISOString() ?? null,
+            durationMinutes: duration.durationMinutes,
+            isOpen: duration.isOpen,
+            wasVirtuallyCapped: duration.wasVirtuallyCapped,
+        };
+    });
+}
+
+function buildSessionAttendanceSummaries(
+    attendances: SessionAttendanceRow[],
+    now: Date = new Date(),
+) {
+    const bySession = new Map<number, SessionAttendanceRow[]>();
+    for (const attendance of attendances) {
+        const existing = bySession.get(attendance.sessionId) ?? [];
+        existing.push(attendance);
+        bySession.set(attendance.sessionId, existing);
+    }
+
+    return Array.from(bySession.entries()).map(([sessionId, segments]) => {
+        const aggregated = sumSegmentDurations(
+            segments.map((segment) => ({
+                joinedAt: segment.joinedAt,
+                checkedOutAt: segment.checkedOutAt ?? null,
+                sessionEndDateTime: segment.session?.endDateTime ?? null,
+            })),
+            now,
+        );
+        const open = segments.find((segment) => !segment.checkedOutAt && segment.mode === 'ONSITE');
+        return {
+            sessionId,
+            totalDurationMinutes: aggregated.totalMinutes,
+            visitCount: segments.length,
+            hasOpenSegment: aggregated.hasOpen,
+            wasVirtuallyCapped: aggregated.wasVirtuallyCapped,
+            openSegmentId: open?.id ?? null,
+        };
+    });
+}
+
 function serializeRegistration(
-    registration: RegistrationWithDays | (Omit<RegistrationWithDays, 'sessionSelections'> & {
-    sessionSelections?: Array<{
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    registration: any,
+    timeZone: string = CLUB_TIMEZONE,
+) {
+    const {
+        attendanceDays,
+        onlineAccessToken: _token,
+        sessionSelections,
+        sessionAttendances,
+        ...rest
+    } = registration;
+    const selections = ((sessionSelections ?? []) as Array<{
         sessionId: number;
         createdAt?: Date | null;
         session?: {
@@ -236,12 +326,7 @@ function serializeRegistration(
             endTime: string | null;
             mode: string;
         } | null;
-    }>;
-}),
-    timeZone: string = CLUB_TIMEZONE,
-) {
-    const { attendanceDays, onlineAccessToken: _token, sessionSelections, ...rest } = registration;
-    const selections = (sessionSelections ?? [])
+    }>)
         .map((selection) => ({
             sessionId: selection.sessionId,
             createdAt: selection.createdAt?.toISOString() ?? null,
@@ -263,6 +348,7 @@ function serializeRegistration(
     return {
         ...rest,
         attendanceDays: serializeAttendanceDays(attendanceDays ?? [], timeZone),
+        sessionAttendances: serializeSessionAttendances((sessionAttendances ?? []) as SessionAttendanceRow[]),
         sessionSelections: selections,
     };
 }
@@ -537,9 +623,17 @@ async function findOverlappingSessionAttendance(
     registrationId: number,
     target: SessionTimeWindow,
     timeZone: string = CLUB_TIMEZONE,
+    options?: { openSegmentsOnly?: boolean; excludeSessionId?: number },
 ) {
     const attendances = await prisma.eventSessionAttendance.findMany({
-        where: { registrationId, mode: 'ONSITE' },
+        where: {
+            registrationId,
+            mode: 'ONSITE',
+            ...(options?.openSegmentsOnly ? { checkedOutAt: null } : {}),
+            ...(options?.excludeSessionId
+                ? { sessionId: { not: options.excludeSessionId } }
+                : {}),
+        },
         include: {
             session: {
                 select: {
@@ -554,6 +648,29 @@ async function findOverlappingSessionAttendance(
         },
     });
     return attendances.find((attendance) => attendance.session && doSessionsOverlap(attendance.session, target, timeZone)) ?? null;
+}
+
+async function findOpenOnsiteSegment(registrationId: number, sessionId: number) {
+    return prisma.eventSessionAttendance.findFirst({
+        where: {
+            registrationId,
+            sessionId,
+            mode: 'ONSITE',
+            checkedOutAt: null,
+        },
+        orderBy: { joinedAt: 'desc' },
+    });
+}
+
+async function findAnyOnsiteSegment(registrationId: number, sessionId: number) {
+    return prisma.eventSessionAttendance.findFirst({
+        where: {
+            registrationId,
+            sessionId,
+            mode: 'ONSITE',
+        },
+        orderBy: { joinedAt: 'desc' },
+    });
 }
 
 interface ValidateSessionIdsOptions {
@@ -695,6 +812,7 @@ function eventActivitySnapshot(event: {
     allowWalkIns: boolean;
     allowDirectCheckIn: boolean;
     isCertifiable: boolean;
+    trackSessionCheckOut: boolean;
     projectId?: number | null;
     projectTypeId?: number | null;
     priority: string;
@@ -713,6 +831,7 @@ function eventActivitySnapshot(event: {
         allowWalkIns: event.allowWalkIns,
         allowDirectCheckIn: event.allowDirectCheckIn,
         isCertifiable: event.isCertifiable,
+        trackSessionCheckOut: event.trackSessionCheckOut,
         projectId: event.projectId,
         projectTypeId: event.projectTypeId,
         priority: event.priority,
@@ -733,6 +852,7 @@ const EVENT_FIELD_LABELS: Record<string, string> = {
     allowWalkIns: 'allow walk-ins',
     allowDirectCheckIn: 'allow direct check-in',
     isCertifiable: 'certifiable',
+    trackSessionCheckOut: 'track session check-out',
     projectId: 'project',
     projectTypeId: 'project type',
     priority: 'priority',
@@ -971,6 +1091,7 @@ router.post('/', authenticateToken, async (req, res) => {
                 allowWalkIns: Boolean(req.body?.allowWalkIns),
                 allowDirectCheckIn: Boolean(req.body?.allowDirectCheckIn),
                 isCertifiable: Boolean(req.body?.isCertifiable),
+                trackSessionCheckOut: Boolean(req.body?.trackSessionCheckOut),
                 projectId,
                 projectTypeId,
                 priority,
@@ -1069,6 +1190,9 @@ router.put('/:id', authenticateToken, async (req, res) => {
             allowWalkIns: req.body?.allowWalkIns !== undefined ? Boolean(req.body.allowWalkIns) : existing.allowWalkIns,
             allowDirectCheckIn: req.body?.allowDirectCheckIn !== undefined ? Boolean(req.body.allowDirectCheckIn) : existing.allowDirectCheckIn,
             isCertifiable: req.body?.isCertifiable !== undefined ? Boolean(req.body.isCertifiable) : existing.isCertifiable,
+            trackSessionCheckOut: req.body?.trackSessionCheckOut !== undefined
+                ? Boolean(req.body.trackSessionCheckOut)
+                : existing.trackSessionCheckOut,
             projectId: req.body?.projectId !== undefined ? projectId : existing.projectId,
         };
 
@@ -2178,22 +2302,24 @@ router.get('/:id/join', async (req, res) => {
             }
         }
 
-        await prisma.eventSessionAttendance.upsert({
+        const existingOnlineAttendance = await prisma.eventSessionAttendance.findFirst({
             where: {
-                sessionId_registrationId_mode: {
-                    sessionId: session.id,
-                    registrationId: sessionToken.registrationId,
-                    mode: 'ONLINE',
-                },
-            },
-            create: {
                 sessionId: session.id,
                 registrationId: sessionToken.registrationId,
                 mode: 'ONLINE',
-                joinedAt: now,
             },
-            update: {},
+            select: { id: true },
         });
+        if (!existingOnlineAttendance) {
+            await prisma.eventSessionAttendance.create({
+                data: {
+                    sessionId: session.id,
+                    registrationId: sessionToken.registrationId,
+                    mode: 'ONLINE',
+                    joinedAt: now,
+                },
+            });
+        }
 
         return sendJoinResponse(req, res, 200, {
             status: 'ready',
@@ -2572,7 +2698,12 @@ router.get('/:id/registrations/lookup', authenticateToken, async (req, res) => {
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
-            select: { eventDate: true, eventEndDate: true, timezone: true },
+            select: {
+                eventDate: true,
+                eventEndDate: true,
+                timezone: true,
+                trackSessionCheckOut: true,
+            },
         });
         if (!event) return res.status(404).json({ error: 'Event not found' });
 
@@ -2587,6 +2718,7 @@ router.get('/:id/registrations/lookup', authenticateToken, async (req, res) => {
             ? hasAttendanceOnDay(registration.attendanceDays ?? [], resolved.eventDay, tz)
             : false;
         const activeSessionsNow = await getActiveSessionsAtTime(eventId, new Date());
+        const sessionAttendances = registration.sessionAttendances ?? [];
 
         return res.json({
             registration: serializeRegistration(registration, tz),
@@ -2595,7 +2727,10 @@ router.get('/:id/registrations/lookup', authenticateToken, async (req, res) => {
             checkedInToday,
             alreadyCheckedInToday: checkedInToday,
             activeSessionsNow,
-            existingSessionAttendances: registration.sessionAttendances ?? [],
+            existingSessionAttendances: serializeSessionAttendances(sessionAttendances),
+            ...(event.trackSessionCheckOut
+                ? { sessionAttendanceSummaries: buildSessionAttendanceSummaries(sessionAttendances) }
+                : {}),
         });
     } catch (error) {
         console.error(`GET /events/${req.params.id}/registrations/lookup error:`, error);
@@ -2903,12 +3038,34 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
             }
 
             if (sessionId && targetSession) {
-                const conflict = await findOverlappingSessionAttendance(existingRegistration.id, targetSession, tz);
+                const trackCheckOut = event.trackSessionCheckOut;
+                const conflict = await findOverlappingSessionAttendance(
+                    existingRegistration.id,
+                    targetSession,
+                    tz,
+                    {
+                        openSegmentsOnly: trackCheckOut,
+                        excludeSessionId: sessionId,
+                    },
+                );
                 if (conflict) {
                     const sessionLabel = conflict.session?.label ?? 'session';
                     return res.status(409).json({
                         error: `Already checked into an overlapping session (${sessionLabel})`,
                     });
+                }
+                if (trackCheckOut) {
+                    const open = await findOpenOnsiteSegment(existingRegistration.id, sessionId);
+                    if (open) {
+                        return res.status(409).json({
+                            error: 'This person is currently checked into this session. Check them out first.',
+                        });
+                    }
+                } else {
+                    const existingSegment = await findAnyOnsiteSegment(existingRegistration.id, sessionId);
+                    if (existingSegment) {
+                        return res.status(409).json({ error: 'Already checked into this session' });
+                    }
                 }
             }
 
@@ -3384,7 +3541,14 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
 
         const event = await prisma.event.findUnique({
             where: { id: eventId },
-            select: { eventDate: true, eventEndDate: true, tierFieldRequired: true, sessionFieldRequired: true, timezone: true },
+            select: {
+                eventDate: true,
+                eventEndDate: true,
+                tierFieldRequired: true,
+                sessionFieldRequired: true,
+                timezone: true,
+                trackSessionCheckOut: true,
+            },
         });
         if (!event) return res.status(404).json({ error: 'Event not found' });
 
@@ -3414,15 +3578,93 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
             return res.status(409).json({ error: 'Check-in is only available on event days' });
         }
         const tz = eventTz(event);
-
+        const trackCheckOut = event.trackSessionCheckOut;
         const sessionId = parseId(req.body?.sessionId);
         const alreadyCheckedInForDay = hasAttendanceOnDay(activeRegistration.attendanceDays ?? [], resolvedDay.eventDay, tz);
+        const now = new Date();
+
+        // ── Pure check-out path (open segment for this session)
+        if (sessionId && trackCheckOut) {
+            const openSegment = await findOpenOnsiteSegment(activeRegistration.id, sessionId);
+            if (openSegment) {
+                const session = await prisma.eventSession.findFirst({
+                    where: { id: sessionId, eventId, isActive: true },
+                    select: {
+                        id: true,
+                        label: true,
+                        endDateTime: true,
+                    },
+                });
+                if (!session) {
+                    return res.status(400).json({ error: 'Invalid or inactive session for this event' });
+                }
+
+                await prisma.eventSessionAttendance.update({
+                    where: { id: openSegment.id },
+                    data: { checkedOutAt: now },
+                });
+
+                const updated = await prisma.eventRegistration.findFirst({
+                    where: { id: activeRegistration.id },
+                    include: registrationInclude,
+                });
+                if (!updated) return res.status(404).json({ error: 'Registration not found' });
+
+                const thisVisit = getSegmentDuration({
+                    joinedAt: openSegment.joinedAt,
+                    checkedOutAt: now,
+                    sessionEndDateTime: session.endDateTime,
+                }, now);
+
+                const sessionSegments = (updated.sessionAttendances ?? []).filter(
+                    (segment) => segment.sessionId === sessionId,
+                );
+                const total = sumSegmentDurations(
+                    sessionSegments.map((segment) => ({
+                        joinedAt: segment.joinedAt,
+                        checkedOutAt: segment.checkedOutAt,
+                        sessionEndDateTime: segment.session?.endDateTime ?? null,
+                    })),
+                    now,
+                );
+
+                await logEventActivity({
+                    eventId,
+                    memberId: req.user!.memberId!,
+                    actionType: 'CHECKED_OUT',
+                    entityType: 'REGISTRATION',
+                    oldValue: { sessionAttendanceId: openSegment.id, open: true },
+                    newValue: {
+                        sessionAttendanceId: openSegment.id,
+                        sessionId,
+                        fullName: activeRegistration.fullName,
+                        thisVisitDurationMinutes: thisVisit.durationMinutes,
+                    },
+                    description: `${activeRegistration.fullName} checked out of session${session.label ? ` (${session.label})` : ''}`,
+                });
+
+                publishEventChanged({
+                    eventId,
+                    version: updated.version,
+                    actorMemberId: req.user!.memberId!,
+                    clientInstanceId: readClientInstanceId(req),
+                });
+
+                return res.json({
+                    ...serializeRegistration(updated, tz),
+                    sessionAction: 'checked_out',
+                    thisVisitDurationMinutes: thisVisit.durationMinutes,
+                    totalSessionDurationMinutes: total.totalMinutes,
+                    actionSessionId: sessionId,
+                });
+            }
+        }
 
         if (!sessionId && alreadyCheckedInForDay) {
             return res.status(409).json({ error: 'Already checked in for this day' });
         }
 
-        let targetSession: SessionTimeWindow | null = null;
+        let targetSession: (SessionTimeWindow & { id: number; label: string | null; endDateTime: Date | null }) | null = null;
         if (sessionId) {
             const session = await prisma.eventSession.findFirst({
                 where: { id: sessionId, eventId, isActive: true },
@@ -3441,7 +3683,22 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
             }
             targetSession = session;
 
-            const conflict = await findOverlappingSessionAttendance(activeRegistration.id, session, tz);
+            if (!trackCheckOut) {
+                const existingSegment = await findAnyOnsiteSegment(activeRegistration.id, sessionId);
+                if (existingSegment) {
+                    return res.status(409).json({ error: 'Already checked into this session' });
+                }
+            }
+
+            const conflict = await findOverlappingSessionAttendance(
+                activeRegistration.id,
+                session,
+                tz,
+                {
+                    openSegmentsOnly: trackCheckOut,
+                    excludeSessionId: sessionId,
+                },
+            );
             if (conflict) {
                 const sessionLabel = conflict.session?.label ?? 'session';
                 return res.status(409).json({
@@ -3505,7 +3762,7 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
             return res.status(409).json({ error: 'At least one session must be selected', missingSessions: true });
         }
 
-        const checkedInAt = new Date();
+        const checkedInAt = now;
         const updated = await prisma.$transaction(async (tx) => {
             if (!alreadyCheckedInForDay) {
                 await tx.eventRegistrationDay.create({
@@ -3557,6 +3814,7 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
             });
         });
 
+        const sessionLabel = targetSession?.label?.trim();
         await logEventActivity({
             eventId,
             memberId: req.user!.memberId!,
@@ -3567,8 +3825,11 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
                 status: 'CHECKED_IN',
                 fullName: registration.fullName,
                 eventDay: resolvedDay.eventDay,
+                ...(sessionId ? { sessionId } : {}),
             },
-            description: `${registration.fullName} checked in for ${resolvedDay.eventDay}`,
+            description: sessionId
+                ? `${registration.fullName} checked into session${sessionLabel ? ` (${sessionLabel})` : ''}`
+                : `${registration.fullName} checked in for ${resolvedDay.eventDay}`,
         });
 
         publishEventChanged({
@@ -3578,7 +3839,28 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
             clientInstanceId: readClientInstanceId(req),
         });
 
-        return res.json(serializeRegistration(updated, tz));
+        let totalSessionDurationMinutes: number | null = null;
+        if (sessionId) {
+            const segments = (updated.sessionAttendances ?? []).filter(
+                (segment) => segment.sessionId === sessionId,
+            );
+            totalSessionDurationMinutes = sumSegmentDurations(
+                segments.map((segment) => ({
+                    joinedAt: segment.joinedAt,
+                    checkedOutAt: segment.checkedOutAt,
+                    sessionEndDateTime: segment.session?.endDateTime ?? null,
+                })),
+                now,
+            ).totalMinutes;
+        }
+
+        return res.json({
+            ...serializeRegistration(updated, tz),
+            sessionAction: sessionId ? 'checked_in' : null,
+            thisVisitDurationMinutes: null,
+            totalSessionDurationMinutes,
+            actionSessionId: sessionId ?? null,
+        });
     } catch (error) {
         const prismaConflict = respondWithPrismaConflict(
             res,
@@ -3588,6 +3870,73 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
         if (prismaConflict) return prismaConflict;
         console.error(`PATCH /events/${req.params.id}/registrations/${req.params.registrationId}/check-in error:`, error);
         return res.status(500).json({ error: 'Failed to check in registration' });
+    }
+});
+
+router.post('/:id/sessions/:sessionId/close-open-attendances', authenticateToken, async (req, res) => {
+    try {
+        const eventId = parseId(req.params.id);
+        const sessionId = parseId(req.params.sessionId);
+        if (!eventId || !sessionId) return res.status(400).json({ error: 'Invalid event or session ID' });
+        if (!(await ensureEventOperationsAccess(res, req, eventId))) return;
+
+        const event = await prisma.event.findUnique({
+            where: { id: eventId },
+            select: { trackSessionCheckOut: true },
+        });
+        if (!event) return res.status(404).json({ error: 'Event not found' });
+        if (!event.trackSessionCheckOut) {
+            return res.status(409).json({ error: 'Session check-out tracking is not enabled for this event' });
+        }
+
+        const session = await prisma.eventSession.findFirst({
+            where: { id: sessionId, eventId, isActive: true },
+            select: { id: true, label: true },
+        });
+        if (!session) return res.status(404).json({ error: 'Session not found' });
+
+        const now = new Date();
+        const result = await prisma.eventSessionAttendance.updateMany({
+            where: {
+                sessionId,
+                mode: 'ONSITE',
+                checkedOutAt: null,
+            },
+            data: { checkedOutAt: now },
+        });
+
+        if (result.count > 0) {
+            const eventVersion = await prisma.event.update({
+                where: { id: eventId },
+                data: { version: { increment: 1 } },
+                select: { version: true },
+            });
+            await logEventActivity({
+                eventId,
+                memberId: req.user!.memberId!,
+                actionType: 'ATTENDANCE_CLOSED',
+                entityType: 'SESSION',
+                newValue: {
+                    sessionId,
+                    closedCount: result.count,
+                },
+                description: `Closed ${result.count} open check-in${result.count === 1 ? '' : 's'} for session${session.label ? ` (${session.label})` : ''}`,
+            });
+            publishEventChanged({
+                eventId,
+                version: eventVersion.version,
+                actorMemberId: req.user!.memberId!,
+                clientInstanceId: readClientInstanceId(req),
+            });
+        }
+
+        return res.json({
+            closedCount: result.count,
+            sessionId,
+        });
+    } catch (error) {
+        console.error(`POST /events/${req.params.id}/sessions/${req.params.sessionId}/close-open-attendances error:`, error);
+        return res.status(500).json({ error: 'Failed to close open attendances' });
     }
 });
 
@@ -4283,10 +4632,22 @@ router.get('/:id/statistics', authenticateToken, async (req, res) => {
                 label: true,
                 sessionDate: true,
                 mode: true,
-                _count: { select: { attendances: true } },
             },
             orderBy: [{ sessionDate: 'asc' }, { order: 'asc' }],
         });
+
+        const distinctAttendanceRows = await prisma.eventSessionAttendance.findMany({
+            where: { session: { eventId, isActive: true } },
+            select: { sessionId: true, registrationId: true },
+            distinct: ['sessionId', 'registrationId'],
+        });
+        const distinctCountBySession = new Map<number, number>();
+        for (const row of distinctAttendanceRows) {
+            distinctCountBySession.set(
+                row.sessionId,
+                (distinctCountBySession.get(row.sessionId) ?? 0) + 1,
+            );
+        }
 
         const registrationsByDay = new Map<string, number>();
         for (const item of registrationTimeline) {
@@ -4319,7 +4680,7 @@ router.get('/:id/statistics', authenticateToken, async (req, res) => {
                 label: session.label,
                 sessionDate: formatEventDay(session.sessionDate, tz),
                 mode: session.mode,
-                attendances: session._count.attendances,
+                attendances: distinctCountBySession.get(session.id) ?? 0,
             })),
         });
     } catch (error) {
