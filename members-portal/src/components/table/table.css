@@ -279,6 +279,17 @@
     transform: scale(1.1);
 }
 
+/* Reorder / non-semantic utility (move up/down, etc.) */
+.table-action-btn.utility-btn {
+    color: var(--gray-600, #475569);
+}
+
+.table-action-btn.utility-btn:hover {
+    background: var(--gray-600, #475569);
+    color: white;
+    transform: scale(1.1);
+}
+
 .table-action-btn:disabled {
     opacity: 0.45;
     cursor: not-allowed;

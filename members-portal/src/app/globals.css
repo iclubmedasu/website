@@ -1,12 +1,7 @@
 /* ============================================
-   FONT IMPORTS
-   ============================================ */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Arial:wght@400;500;600;700&display=swap');
-
-
-/* ============================================
    COMPONENTS CSS 
    ============================================ */
+/* Fonts: next/font/local (committed .woff2 under src/fonts/) via app/fonts.ts — not next/font/google. */
 
 /* Component styles */
 @import '../components/buttons/buttons.css';
@@ -132,9 +127,9 @@
   --radius-lg: 20px;
   --radius-xl: 24px;
 
-  /* Typography */
-  --font-heading: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-body: 'Arial', Georgia, serif;
+  /* Typography — loaded via next/font (self-hosted); do not use system-ui / CDN @import */
+  --font-heading: var(--font-poppins), -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: var(--font-arimo), Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
@@ -147,11 +142,26 @@
   box-sizing: border-box;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--bg-subtle);
+}
+
+/* Form controls inherit app fonts (Safari/UA defaults otherwise) */
+button,
+input,
+select,
+textarea,
+optgroup {
+  font-family: inherit;
+  font-size: 100%;
 }
 
 /* All headings use Poppins */

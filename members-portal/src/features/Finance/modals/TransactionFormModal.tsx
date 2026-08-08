@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import type { FinanceAccountSummary, FinanceTransactionRow } from '@iclub/shared';
 import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
+import { DateInput } from '@/components/input/DateInput';
 import { financeAPI } from '@/services/api';
 import { FinanceModal } from '../components/FinanceModal';
 
@@ -179,10 +180,8 @@ export function TransactionFormModal({
             </div>
             <div className="form-group">
                 <label htmlFor="finance-tx-date" className="form-label">Date</label>
-                <input
+                <DateInput
                     id="finance-tx-date"
-                    type="date"
-                    className="form-input"
                     value={transactionDate}
                     onChange={(e) => setTransactionDate(e.target.value)}
                 />

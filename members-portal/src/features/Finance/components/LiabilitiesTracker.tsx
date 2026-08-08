@@ -1,6 +1,6 @@
 'use client';
 
-import { Pencil } from 'lucide-react';
+import { Pencil, Plus } from 'lucide-react';
 import type { FinanceLiabilityRow } from '@iclub/shared';
 import { formatDate } from '@iclub/shared/utils';
 import '@/components/badges/badge.css';
@@ -34,16 +34,24 @@ export default function LiabilitiesTracker({
 }: LiabilitiesTrackerProps) {
     return (
         <div className="card finance-side-card">
-            <div className="card-header card-header-with-action">
-                <div className="card-header-left">
-                    <h3 className="card-title">Liabilities</h3>
-                    <p className="card-subtitle">Outstanding obligations and payment progress</p>
+            <div className="card-header">
+                <div className="card-header-with-action">
+                    <div className="card-header-left">
+                        <h3 className="card-title">Liabilities</h3>
+                    </div>
+                    {onAdd ? (
+                        <button
+                            type="button"
+                            className="card-add-btn"
+                            onClick={onAdd}
+                            title="Add liability"
+                            aria-label="Add liability"
+                        >
+                            <Plus />
+                        </button>
+                    ) : null}
                 </div>
-                {onAdd ? (
-                    <button type="button" className="btn btn-secondary finance-card-action" onClick={onAdd}>
-                        Add liability
-                    </button>
-                ) : null}
+                <p className="card-subtitle">Outstanding obligations and payment progress</p>
             </div>
             <div className="card-body finance-liabilities-list">
                 {liabilities.length === 0 ? (

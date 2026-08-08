@@ -65,6 +65,11 @@
     opacity: 1;
     transform: translateY(0);
     pointer-events: all;
+    max-height: min(70vh, 22rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 
@@ -569,5 +574,11 @@
     .dropdown-item {
         padding: 0.875rem 1.25rem;
         font-size: 0.95rem;
+    }
+
+    /* Compact dense action panels (e.g. Gantt ⋮) so more items fit + scroll when needed */
+    .dropdown-menu.gantt-toolbar-menu-panel .dropdown-item {
+        padding: 0.65rem 1rem;
+        font-size: 0.9rem;
     }
 }

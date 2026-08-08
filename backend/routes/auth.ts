@@ -82,21 +82,29 @@ function issueAuthToken(payload: object, longLived: boolean): string {
     });
 }
 
+/**
+ * Auth cookie flags are environment-aware:
+ * - Production (HTTPS, cross-origin portal ↔ API): Secure + SameSite=None
+ * - Dev/test/LAN (plain HTTP, same host different ports): non-Secure + SameSite=Lax
+ */
+function getAuthCookieBaseOptions() {
+    const isProduction = process.env.NODE_ENV === 'production';
+    return {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
+    };
+}
+
 function setAuthCookie(res, token: string, longLived: boolean) {
     res.cookie(AUTH_COOKIE_NAME, token, {
-        httpOnly: true,
-        secure: true, // must be true when sameSite is 'none'
-        sameSite: 'none', // allows cross-domain cookies
+        ...getAuthCookieBaseOptions(),
         maxAge: longLived ? PWA_COOKIE_MAX_AGE_MS : WEB_COOKIE_MAX_AGE_MS,
     });
 }
 
 function clearAuthCookie(res) {
-    res.clearCookie(AUTH_COOKIE_NAME, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none'
-    });
+    res.clearCookie(AUTH_COOKIE_NAME, getAuthCookieBaseOptions());
 }
 
 /**

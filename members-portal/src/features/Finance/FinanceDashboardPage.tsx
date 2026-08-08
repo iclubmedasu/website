@@ -101,16 +101,18 @@ export default function FinanceDashboardPage() {
 
     return (
         <div className="members-page finance-page">
-            <div className="page-header card-header-with-action">
+            <div className="page-header">
                 <h1 className="members-page-title members-page-title-inline">Finance</h1>
-                <button
-                    type="button"
-                    className="btn btn-secondary finance-card-action"
-                    onClick={() => void handleExport()}
-                    disabled={exporting || loading}
-                >
-                    {exporting ? 'Exporting…' : 'Export Excel'}
-                </button>
+                <div className="page-header-actions">
+                    <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => void handleExport()}
+                        disabled={exporting || loading}
+                    >
+                        {exporting ? 'Exporting…' : 'Export Excel'}
+                    </button>
+                </div>
             </div>
             <hr className="title-divider" />
 

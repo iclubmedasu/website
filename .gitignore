@@ -51,4 +51,6 @@ members-portal/public/sw.js
 members-portal/public/sw.js.map
 members-portal/public/workbox-*.js
 members-portal/public/workbox-*.js.map
+members-portal/public/worker-*.js
+members-portal/public/worker-*.js.map
 members-portal/public/fallback-*.js

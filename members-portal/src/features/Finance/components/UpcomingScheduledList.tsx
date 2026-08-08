@@ -1,7 +1,7 @@
 'use client';
 
 import { isPast, parseISO } from 'date-fns';
-import { ArrowDownLeft, ArrowUpRight, Pencil } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Pencil, Plus } from 'lucide-react';
 import type { FinanceScheduledItemRow } from '@iclub/shared';
 import { formatDate } from '@iclub/shared/utils';
 
@@ -36,16 +36,24 @@ export default function UpcomingScheduledList({
 }: UpcomingScheduledListProps) {
     return (
         <div className="card finance-side-card">
-            <div className="card-header card-header-with-action">
-                <div className="card-header-left">
-                    <h3 className="card-title">Upcoming Scheduled Items</h3>
-                    <p className="card-subtitle">Expected income and expenses in the next 60 days</p>
+            <div className="card-header">
+                <div className="card-header-with-action">
+                    <div className="card-header-left">
+                        <h3 className="card-title">Upcoming Scheduled Items</h3>
+                    </div>
+                    {onAdd ? (
+                        <button
+                            type="button"
+                            className="card-add-btn"
+                            onClick={onAdd}
+                            title="Add item"
+                            aria-label="Add scheduled item"
+                        >
+                            <Plus />
+                        </button>
+                    ) : null}
                 </div>
-                {onAdd ? (
-                    <button type="button" className="btn btn-secondary finance-card-action" onClick={onAdd}>
-                        Add item
-                    </button>
-                ) : null}
+                <p className="card-subtitle">Expected income and expenses in the next 60 days</p>
             </div>
             <div className="card-body finance-scheduled-list">
                 {items.length === 0 ? (

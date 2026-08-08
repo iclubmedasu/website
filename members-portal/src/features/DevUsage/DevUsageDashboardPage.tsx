@@ -7,6 +7,7 @@ import {
     type UsageDashboardSummaryParams,
 } from '@/services/api';
 import { exportUsageExcel } from './exportUsageExcel';
+import { DateInput } from '@/components/input/DateInput';
 import '@/components/page/page.css';
 import '@/components/cards/universalcard.css';
 import '@/components/buttons/buttons.css';
@@ -219,9 +220,7 @@ export default function DevUsageDashboardPage() {
                                 <div className="finance-filters dev-usage-custom-dates">
                                     <label className="form-group">
                                         <span className="form-label">From</span>
-                                        <input
-                                            type="date"
-                                            className="form-input"
+                                        <DateInput
                                             value={customFrom}
                                             disabled={loading}
                                             onChange={(e) => onCustomFromChange(e.target.value)}
@@ -229,9 +228,7 @@ export default function DevUsageDashboardPage() {
                                     </label>
                                     <label className="form-group">
                                         <span className="form-label">To</span>
-                                        <input
-                                            type="date"
-                                            className="form-input"
+                                        <DateInput
                                             value={customTo}
                                             disabled={loading}
                                             onChange={(e) => onCustomToChange(e.target.value)}

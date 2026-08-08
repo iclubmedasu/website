@@ -81,8 +81,9 @@ html:has(.modal-backdrop) body {
 
 .modal-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
+    gap: 0.75rem;
     padding: 1.5rem;
     border-bottom: 1px solid var(--gray-200);
 }
@@ -876,7 +877,7 @@ html:has(.modal-backdrop) body {
         flex-direction: column-reverse;
     }
 
-    .btn {
+    .modal-footer .btn {
         width: 100%;
     }
 }
@@ -2413,16 +2414,7 @@ html:has(.modal-backdrop) body {
     }
 
     /* info-grid responsive: now in shared page.css */
-
-    .modal-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .modal-close-btn {
-        align-self: flex-end;
-        margin-top: -0.5rem;
-    }
+    /* Modal header stays row layout at all breakpoints — close button top-right */
 }
 
 @media (max-width: 640px) {
@@ -2440,6 +2432,18 @@ html:has(.modal-backdrop) body {
         flex-direction: column;
         align-items: flex-start;
         gap: 0.5rem;
+    }
+
+    .timeline-item {
+        gap: 0.45rem;
+    }
+
+    .timeline-marker {
+        min-width: 1.125rem;
+    }
+
+    .timeline-line {
+        width: 6px;
     }
 
     .timeline-content {

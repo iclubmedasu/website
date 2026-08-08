@@ -74,13 +74,24 @@
     z-index: 2;
 }
 
+/*
+ * Desktop: pair wrapper is transparent to flex so Select all / Clear stay equal slots.
+ * Mobile: pair becomes a real flex row of two buttons.
+ */
+.event-cert-io-bar-row--pair,
+.project-cert-io-bar-row--pair {
+    display: contents;
+}
+
 /* Equal-width slots — same visual language as .event-tickets-io-btn */
 .event-cert-io-bar > .event-cert-io-btn,
 .event-cert-io-bar > .event-cert-io-template,
 .event-cert-io-bar > .event-cert-io-issue,
+.event-cert-io-bar-row--pair > .event-cert-io-btn,
 .project-cert-io-bar > .project-cert-io-btn,
 .project-cert-io-bar > .project-cert-io-template,
-.project-cert-io-bar > .project-cert-io-issue {
+.project-cert-io-bar > .project-cert-io-issue,
+.project-cert-io-bar-row--pair > .project-cert-io-btn {
     flex: 1 1 0;
     min-width: 0;
     width: 0;
@@ -88,8 +99,10 @@
 
 .event-cert-io-bar > .event-cert-io-btn,
 .event-cert-io-bar > .event-cert-io-issue,
+.event-cert-io-bar-row--pair > .event-cert-io-btn,
 .project-cert-io-bar > .project-cert-io-btn,
-.project-cert-io-bar > .project-cert-io-issue {
+.project-cert-io-bar > .project-cert-io-issue,
+.project-cert-io-bar-row--pair > .project-cert-io-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -334,6 +347,50 @@
 .event-cert-duration-capped {
     color: var(--warning-text);
     flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+    .event-cert-io-bar,
+    .project-cert-io-bar {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 0.65rem 0.75rem;
+        align-items: stretch;
+    }
+
+    /* Select all | Clear side-by-side */
+    .event-cert-io-bar-row--pair,
+    .project-cert-io-bar-row--pair {
+        display: flex;
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 0;
+        gap: 0.5rem;
+    }
+
+    .event-cert-io-bar-row--pair > .event-cert-io-btn,
+    .project-cert-io-bar-row--pair > .project-cert-io-btn {
+        flex: 1 1 0;
+        width: auto;
+        min-width: 0;
+    }
+
+    /* Issue, template, custom — full-width rows */
+    .event-cert-io-bar > .event-cert-io-template,
+    .event-cert-io-bar > .event-cert-io-issue,
+    .event-cert-io-bar > .event-cert-io-btn,
+    .project-cert-io-bar > .project-cert-io-template,
+    .project-cert-io-bar > .project-cert-io-issue,
+    .project-cert-io-bar > .project-cert-io-btn {
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .event-cert-io-template,
+    .project-cert-io-template {
+        max-width: none;
+    }
 }
 
 @media (max-width: 640px) {

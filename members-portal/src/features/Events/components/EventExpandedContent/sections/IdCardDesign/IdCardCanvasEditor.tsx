@@ -31,6 +31,7 @@ import type {
 } from '@/types/backend-contracts';
 
 import ClampedNumberInput from '@/features/Certificates/TemplateEditor/ClampedNumberInput';
+import { createUuid } from '@/utils/createUuid';
 
 import IdCardPreview from './IdCardPreview';
 
@@ -520,7 +521,7 @@ export default function IdCardCanvasEditor({
 
         if (fieldKey !== '__static' && fieldAlreadyOnCanvas(elements, fieldKey)) return;
 
-        const id = crypto.randomUUID();
+        const id = createUuid();
 
         const base: IdCardLayoutElement = {
 
@@ -560,7 +561,7 @@ export default function IdCardCanvasEditor({
 
     const addStatic = () => {
 
-        const id = crypto.randomUUID();
+        const id = createUuid();
 
         const element: IdCardLayoutElement = {
 
@@ -604,7 +605,7 @@ export default function IdCardCanvasEditor({
 
         const size = Math.min(DEFAULT_QR_SIZE, canvasWidth - 48, canvasHeight - 48);
 
-        const id = crypto.randomUUID();
+        const id = createUuid();
 
         const element: IdCardLayoutElement = {
 

@@ -731,22 +731,24 @@ export default function ProjectCertificatesSection({
 
                     {canManage ? (
                         <div className="project-cert-io-bar">
-                            <button
-                                type="button"
-                                className="btn btn-secondary project-cert-io-btn"
-                                disabled={filteredSelectableKeys.length === 0}
-                                onClick={selectAllFiltered}
-                            >
-                                Select all
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-secondary project-cert-io-btn"
-                                disabled={selection.size === 0}
-                                onClick={clearSelection}
-                            >
-                                Clear
-                            </button>
+                            <div className="project-cert-io-bar-row project-cert-io-bar-row--pair">
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary project-cert-io-btn"
+                                    disabled={filteredSelectableKeys.length === 0}
+                                    onClick={selectAllFiltered}
+                                >
+                                    Select all
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary project-cert-io-btn"
+                                    disabled={selection.size === 0}
+                                    onClick={clearSelection}
+                                >
+                                    Clear
+                                </button>
+                            </div>
                             <div className="project-cert-io-issue">
                                 <button
                                     type="button"

@@ -18,6 +18,7 @@
     --event-tab-body-min-height: calc(
         14rem + var(--event-registrations-row-height) * 10 + var(--event-registrations-header-height)
     );
+    --event-setup-list-max-height: min(22rem, 40vh);
 }
 
 .event-expanded-tab-panel {
@@ -243,9 +244,11 @@
 }
 
 .event-expanded-tiers-list {
-    flex: 1;
+    flex: 0 1 auto;
     min-height: 0;
+    max-height: var(--event-setup-list-max-height, min(22rem, 40vh));
     overflow-y: auto;
+    overscroll-behavior: contain;
     display: grid;
     gap: 0.75rem;
     align-content: start;
@@ -868,15 +871,20 @@
 }
 
 .event-expanded-tab-panel--setup > .event-expanded-panel {
-    flex: 1 1 0;
+    flex: 0 1 auto;
     min-height: 0;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
-.event-expanded-tab-panel--setup > .event-expanded-panel > .event-expanded-tiers-list {
-    flex: 1 1 0;
+.event-expanded-tab-panel--setup .event-expanded-tiers-list,
+.event-expanded-tab-panel--setup .event-expanded-sessions-list-scroll > .event-expanded-tiers-list {
+    flex: 0 1 auto;
     min-height: 0;
+    max-height: var(--event-setup-list-max-height);
     overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .event-expanded-panel--sessions > .event-expanded-header,
@@ -886,10 +894,18 @@
 }
 
 .event-expanded-sessions-list-scroll {
-    flex: 1 1 0;
+    flex: 0 1 auto;
     min-height: 0;
+    max-height: var(--event-setup-list-max-height, min(22rem, 40vh));
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+}
+
+.event-expanded-tab-panel--setup .event-expanded-sessions-list-scroll {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: var(--event-setup-list-max-height);
     overflow: hidden;
 }
 
@@ -899,9 +915,65 @@
 }
 
 .event-expanded-sessions-list-scroll > .event-expanded-tiers-list {
-    flex: 1 1 0;
+    flex: 0 1 auto;
     min-height: 0;
+    max-height: var(--event-setup-list-max-height, min(22rem, 40vh));
     overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+/* Dual-render setup row actions (tiers / sessions) — desktop chips, phone ⋮ */
+.event-setup-row-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.event-setup-row-actions-leading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.event-setup-row-actions-inline {
+    display: flex;
+    gap: 0.35rem;
+    flex-shrink: 0;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.event-setup-row-actions-menu {
+    display: none;
+}
+
+.event-setup-row-dropdown {
+    position: relative;
+}
+
+.dropdown-menu.event-setup-row-menu-panel {
+    min-width: 10rem;
+    right: 0;
+    left: auto;
+}
+
+.event-setup-row-menu-item--danger {
+    color: #b91c1c;
+}
+
+@media (max-width: 768px) {
+    .event-setup-row-actions-inline {
+        display: none;
+    }
+
+    .event-setup-row-actions-menu {
+        display: block;
+    }
 }
 
 .event-sessions-generate-action {
@@ -925,14 +997,14 @@
 }
 
 .event-expanded-content .event-expanded-session-form-grid {
-    /* title | start | end | type | capacity | link | actions */
-    grid-template-columns:
-        minmax(220px, 1fr)
-        repeat(3, minmax(7.25rem, 9rem))
-        minmax(7rem, 9rem)
-        minmax(10rem, 1fr)
-        minmax(220px, 1fr);
+    /* Match tiers: ~3 equal columns when wide; stack on narrow via auto-fit */
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     align-items: center;
+}
+
+.event-expanded-content .event-expanded-session-form-grid > .btn,
+.event-expanded-content .event-expanded-session-form-grid > .event-expanded-tier-actions {
+    grid-column: 1 / -1;
 }
 
 .event-expanded-content .event-expanded-session-form-grid > .form-input,
@@ -1340,8 +1412,14 @@
     justify-content: center;
     gap: 0.35rem;
     flex: 1 1 12rem;
-    min-width: 10rem;
-    white-space: nowrap;
+    min-width: 0;
+    text-align: center;
+    white-space: normal;
+    line-height: 1.25;
+    height: auto;
+    min-height: 2.75rem;
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
 }
 
 .event-registrations-table tbody td.event-registrations-add-field-col {
@@ -2183,8 +2261,8 @@
     }
 }
 
-/* Landscape mobile: allow scrolling instead of clipping */
-@media (max-height: 600px) {
+/* Let the tab body grow and scroll instead of clipping — mobile portrait or landscape */
+@media (max-width: 900px), (max-height: 600px) {
     .project-card--expanded .event-expanded-content {
         max-height: none;
         overflow-y: auto;
@@ -2195,7 +2273,10 @@
         overflow: visible;
         flex: none;
     }
+}
 
+/* Landscape-only: compact pill sizing to reclaim vertical space */
+@media (max-height: 600px) {
     .event-expanded-tab-button {
         min-height: 1.875rem;
         font-size: 0.78rem;

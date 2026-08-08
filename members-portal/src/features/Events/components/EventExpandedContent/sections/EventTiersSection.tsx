@@ -10,6 +10,7 @@ import {
 } from '../../tierPriceUtils';
 import TierPriceFields from '../TierPriceFields';
 import ExpandedSectionTitle from '../ExpandedSectionTitle';
+import EventSetupRowActions from './EventSetupRowActions';
 
 interface EventTiersSectionProps {
     eventId: Id | string;
@@ -195,9 +196,11 @@ export default function EventTiersSection({ eventId, tiers, onTiersChange, canMa
                                     {tier.showOnPublic ? ' · On public form' : ''}
                                 </p>
                             </div>
-                            <div className="event-expanded-inline-actions">
-                                {canManage ? (
-                                    <>
+                            {canManage ? (
+                                <EventSetupRowActions
+                                    disabled={actionsDisabled}
+                                    ariaLabel={`Actions for ${tier.name}`}
+                                    leading={(
                                         <div className="event-expanded-tier-public-toggle" title="Show on public registration form">
                                             <span className="event-expanded-tier-public-toggle-label">Public form</span>
                                             <Toggle
@@ -208,12 +211,30 @@ export default function EventTiersSection({ eventId, tiers, onTiersChange, canMa
                                                 aria-label={`Show ${tier.name} on public registration form`}
                                             />
                                         </div>
-                                        <button type="button" onClick={() => startEdit(tier)} className="btn btn-secondary" disabled={actionsDisabled}>Edit</button>
-                                        <button type="button" onClick={() => void handleUpdateTier(tier, { isActive: !tier.isActive })} className="btn btn-secondary" disabled={actionsDisabled}>{tier.isActive === false ? 'Enable' : 'Disable'}</button>
-                                        <button type="button" onClick={() => void handleRemoveTier(Number(tier.id))} className="btn btn-danger" disabled={actionsDisabled}>Delete</button>
-                                    </>
-                                ) : null}
-                            </div>
+                                    )}
+                                    actions={[
+                                        {
+                                            id: 'edit',
+                                            label: 'Edit',
+                                            variant: 'edit',
+                                            onClick: () => startEdit(tier),
+                                        },
+                                        {
+                                            id: 'toggle-active',
+                                            label: tier.isActive === false ? 'Enable' : 'Disable',
+                                            variant: tier.isActive === false ? 'enable' : 'disable',
+                                            onClick: () => void handleUpdateTier(tier, { isActive: !tier.isActive }),
+                                        },
+                                        {
+                                            id: 'delete',
+                                            label: 'Delete',
+                                            variant: 'delete',
+                                            danger: true,
+                                            onClick: () => void handleRemoveTier(Number(tier.id)),
+                                        },
+                                    ]}
+                                />
+                            ) : null}
                         </div>
                     );
                 })}

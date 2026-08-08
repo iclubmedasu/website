@@ -35,35 +35,7 @@
     color: var(--gray-600);
 }
 
-.dashboard-notification-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 0.75rem;
-    padding-left: 0.75rem;
-    border-left: 4px solid var(--purple-700);
-    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
-}
-
-.dashboard-notification-row.is-read {
-    border-left-color: var(--gray-300);
-}
-
-.dashboard-notification-row-main {
-    min-width: 0;
-    flex: 1;
-}
-
-.dashboard-notification-time {
-    display: block;
-}
-
-.dashboard-notification-read-btn {
-    flex-shrink: 0;
-    white-space: nowrap;
-    font-size: 0.75rem;
-    padding: 0.35rem 0.65rem;
-}
+/* Notification cards: shared NotificationListItem.css */
 
 .dashboard-side-card .card-footer {
     display: flex;

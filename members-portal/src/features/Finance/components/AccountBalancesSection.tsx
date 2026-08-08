@@ -1,6 +1,6 @@
 'use client';
 
-import { Pencil } from 'lucide-react';
+import { Pencil, Plus } from 'lucide-react';
 import type { FinanceAccountSummary } from '@iclub/shared';
 
 interface AccountBalancesSectionProps {
@@ -28,18 +28,26 @@ export default function AccountBalancesSection({
 }: AccountBalancesSectionProps) {
     return (
         <div className="card">
-            <div className="card-header card-header-with-action">
-                <div className="card-header-left">
-                    <h3 className="card-title">Account Balances</h3>
-                    <p className="card-subtitle">
-                        {accounts.length} account{accounts.length === 1 ? '' : 's'}
-                    </p>
+            <div className="card-header">
+                <div className="card-header-with-action">
+                    <div className="card-header-left">
+                        <h3 className="card-title">Account Balances</h3>
+                    </div>
+                    {onAdd ? (
+                        <button
+                            type="button"
+                            className="card-add-btn"
+                            onClick={onAdd}
+                            title="Add account"
+                            aria-label="Add account"
+                        >
+                            <Plus />
+                        </button>
+                    ) : null}
                 </div>
-                {onAdd ? (
-                    <button type="button" className="btn btn-secondary finance-card-action" onClick={onAdd}>
-                        Add account
-                    </button>
-                ) : null}
+                <p className="card-subtitle">
+                    {accounts.length} account{accounts.length === 1 ? '' : 's'}
+                </p>
             </div>
             <div className="card-body">
                 <div className="finance-balance-grid">

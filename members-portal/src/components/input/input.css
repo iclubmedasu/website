@@ -30,3 +30,107 @@
     cursor: not-allowed;
     opacity: 0.6;
 }
+
+/* Date field wrapper: owns width so WebKit cannot shrink-to-fit the control. */
+.form-date-field {
+    display: block;
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.form-group > .form-date-field {
+    width: 100%;
+}
+
+/* Date/time inputs: one visual everywhere — full width, calendar icon, no native chrome.
+   Empty-state text comes from DateInput (.form-date-placeholder); native placeholder
+   on type="date" is ignored by browsers. */
+input[type='date'].form-input,
+input[type='datetime-local'].form-input,
+input[type='time'].form-input {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    min-height: 2.9rem;
+    position: relative;
+    text-align: left;
+    padding-right: 2.6rem;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237a47a3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.85rem center;
+    background-size: 1rem;
+}
+
+/* Hide native empty / value chrome under the overlay so "Select date" stays legible */
+.form-date-field.is-empty input[type='date'].form-input {
+    color: transparent;
+}
+
+.form-date-field:not(.is-empty) input[type='date'].form-input {
+    color: var(--gray-900);
+}
+
+.form-date-placeholder {
+    position: absolute;
+    left: 1rem;
+    right: 2.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--gray-400);
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    z-index: 1;
+}
+
+.form-date-field.is-empty input[type='date'].form-input:disabled + .form-date-placeholder {
+    color: var(--gray-500);
+}
+
+/* iOS Safari value alignment */
+input[type='date'].form-input::-webkit-date-and-time-value,
+input[type='datetime-local'].form-input::-webkit-date-and-time-value,
+input[type='time'].form-input::-webkit-date-and-time-value {
+    text-align: left;
+    min-height: 1.2em;
+}
+
+/* Chromium: stretch invisible native indicator over the whole field so any tap opens the picker */
+input[type='date'].form-input::-webkit-calendar-picker-indicator,
+input[type='datetime-local'].form-input::-webkit-calendar-picker-indicator {
+    position: absolute;
+    inset: 0;
+    width: auto;
+    height: auto;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+}
+
+/* Selects: remove native chrome (width varies unpredictably per browser/OS)
+   in favor of one consistent themed chevron and predictable padding. */
+select.form-input {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    padding-right: 2.6rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%237a47a3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.85rem center;
+    background-size: 0.85rem;
+    cursor: pointer;
+}
+
+select.form-input::-ms-expand {
+    display: none;
+}

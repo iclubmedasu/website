@@ -550,6 +550,74 @@
     flex-shrink: 0;
 }
 
+.file-actions-inline,
+.folder-row-header-actions-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+/* Phone: collapse multi-actions into three-dot menu (status indicators stay outside) */
+.file-actions-menu {
+    display: none;
+}
+
+/* Portaled panel (document.body) — escapes repository-list / folder scroll overflow */
+.file-actions-menu-panel {
+    min-width: 10rem;
+    padding: 0.35rem;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    box-shadow: var(--shadow-md);
+}
+
+.file-actions-menu-panel--portal {
+    position: fixed;
+    right: auto;
+    z-index: 1100;
+}
+
+.file-actions-menu-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 0.45rem 0.55rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--gray-900);
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    text-align: left;
+}
+
+.file-actions-menu-item:hover:not(:disabled) {
+    background: var(--gray-100);
+}
+
+.file-actions-menu-item:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.file-actions-menu-item--danger {
+    color: #b91c1c;
+}
+
+@media (max-width: 768px) {
+    .file-actions-inline,
+    .folder-row-header-actions-inline {
+        display: none;
+    }
+
+    .file-actions-menu {
+        display: block;
+    }
+}
+
 .file-status-done {
     color: var(--success-accent);
     display: flex;

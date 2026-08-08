@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { formatDate } from '@iclub/shared/utils';
+import { DateInput } from '@/components/input/DateInput';
 import '@/components/modal/modal.css';
 import {
     type AvailabilityMode,
@@ -163,9 +164,7 @@ export default function AnnouncementAvailabilityModal({
                                 >
                                     <label className="form-group">
                                         <span className="form-label">Start</span>
-                                        <input
-                                            type="date"
-                                            className="form-input"
+                                        <DateInput
                                             min={windowStart}
                                             max={windowEnd}
                                             value={row.start}
@@ -177,9 +176,7 @@ export default function AnnouncementAvailabilityModal({
                                     </label>
                                     <label className="form-group">
                                         <span className="form-label">End</span>
-                                        <input
-                                            type="date"
-                                            className="form-input"
+                                        <DateInput
                                             min={windowStart}
                                             max={windowEnd}
                                             value={row.end}

@@ -457,6 +457,19 @@
    ============================================ */
 
 @media (max-width: 768px) {
+    .teams-page,
+    .projects-page,
+    .events-page,
+    .members-page,
+    .certificates-page,
+    .finance-page,
+    .dev-usage-page,
+    .help-support-page,
+    .administration-page,
+    .announcements-page,
+    .documents-page {
+        padding: 1rem 0.25rem;
+    }
 
     .page-title,
     .members-page-title,
@@ -478,6 +491,20 @@
 }
 
 @media (max-width: 480px) {
+    .teams-page,
+    .projects-page,
+    .events-page,
+    .members-page,
+    .certificates-page,
+    .finance-page,
+    .dev-usage-page,
+    .help-support-page,
+    .administration-page,
+    .announcements-page,
+    .documents-page {
+        /* Shell (.protected-layout-content) supplies the horizontal gutter on phone */
+        padding: 0.75rem 0;
+    }
 
     .page-title,
     .members-page-title,
@@ -614,11 +641,15 @@
 
 .pagination-controls {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
     margin-top: 1.5rem;
     padding: 1rem 0;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .pagination-btn {
@@ -649,8 +680,12 @@
 
 .pagination-pages {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: center;
     gap: 0.25rem;
+    max-width: 100%;
+    min-width: 0;
 }
 
 .pagination-page-btn {
@@ -706,4 +741,21 @@
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--gray-500);
+}
+
+@media (max-width: 480px) {
+    .pagination-controls {
+        gap: 0.5rem;
+        padding: 0.75rem 0.25rem;
+    }
+
+    .pagination-btn {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8rem;
+    }
+
+    .pagination-page-btn {
+        min-width: 1.75rem;
+        height: 1.75rem;
+    }
 }

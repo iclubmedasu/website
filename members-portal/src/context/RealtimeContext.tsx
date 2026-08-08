@@ -12,16 +12,10 @@ import {
 } from 'react';
 import { getAuthToken, getNotificationsWebSocketUrl, setClientInstanceId } from '@/services/api';
 import type { NotificationRealtimeMessage, RealtimeSubscribeMessage } from '@/types/backend-contracts';
+import { createUuid } from '@/utils/createUuid';
 
 type RealtimeListener = (message: NotificationRealtimeMessage) => void;
 type ReconnectListener = () => void;
-
-function createClientInstanceId(): string {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID();
-    }
-    return `client-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
 
 interface RealtimeContextValue {
     subscribe: (topic: string, listener: RealtimeListener) => () => void;
@@ -39,7 +33,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     const subscribedTopicsRef = useRef<Set<string>>(new Set());
     const reconnectListenersRef = useRef<Set<ReconnectListener>>(new Set());
     const hasConnectedOnceRef = useRef(false);
-    const clientInstanceIdRef = useRef(createClientInstanceId());
+    const clientInstanceIdRef = useRef(createUuid());
 
     useEffect(() => {
         setClientInstanceId(clientInstanceIdRef.current);

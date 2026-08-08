@@ -1,4 +1,4 @@
-﻿/* ============================================
+/* ============================================
    GANTT CHART â€” Phase/Task/Subtask timeline
    ============================================ */
 
@@ -44,6 +44,112 @@
     background: var(--gray-50);
     border-bottom: 1px solid var(--gray-200);
     flex-wrap: wrap;
+    position: relative;
+    z-index: 20;
+    overflow: visible;
+}
+
+.gantt-toolbar-inline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    width: 100%;
+    min-width: 0;
+}
+
+/* Phone compact bar — hidden on desktop (dual-render) */
+.gantt-toolbar-mobile {
+    display: none;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: nowrap;
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+}
+
+.gantt-toolbar-mobile-end {
+    margin-left: auto;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    overflow: visible;
+}
+
+.gantt-tree-panel-toggle {
+    display: none;
+    flex-shrink: 0;
+}
+
+.gantt-toolbar-dropdown {
+    position: relative;
+    flex-shrink: 0;
+    z-index: 1;
+}
+
+.gantt-toolbar-dropdown:has(.dropdown-menu.open) {
+    z-index: 50;
+}
+
+.dropdown-menu.gantt-toolbar-menu-panel {
+    min-width: 11rem;
+    right: 0;
+    left: auto;
+    z-index: 1200;
+    max-height: min(60vh, 18rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Neutral rounded segmented scale (mobile; not always solid purple) */
+.gantt-mobile-scale-group {
+    display: inline-flex;
+    align-items: stretch;
+    flex-shrink: 1;
+    min-width: 0;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--bg-card, #fff);
+}
+
+.gantt-mobile-scale-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    padding: 0.28rem 0.4rem;
+    border: none;
+    border-right: 1px solid var(--gray-200);
+    background: transparent;
+    color: var(--gray-600, #475569);
+    font-family: var(--font-heading);
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.gantt-mobile-scale-seg:last-child {
+    border-right: none;
+}
+
+.gantt-mobile-scale-seg:hover {
+    background: var(--purple-50);
+    color: var(--purple-700);
+}
+
+.gantt-mobile-scale-seg.active {
+    background: var(--purple-50);
+    color: var(--purple-700);
+    font-weight: 700;
 }
 
 .gantt-toolbar-left {
@@ -1597,11 +1703,46 @@
 @media (max-width: 768px) {
     .gantt-toolbar {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: stretch;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
     }
 
-    .gantt-toolbar-right {
-        width: 100%;
+    .gantt-toolbar-inline {
+        display: none;
+    }
+
+    .gantt-toolbar-mobile {
+        display: flex;
+    }
+
+    .gantt-tree-panel-toggle {
+        display: inline-flex;
+    }
+
+    /* Purple hover for all mobile toolbar icon controls */
+    .gantt-toolbar-mobile .table-action-btn:hover:not(:disabled) {
+        background: var(--purple-50);
+        color: var(--purple-700);
+        transform: none;
+    }
+
+    .gantt-toolbar-mobile .table-action-btn.edit-btn:hover:not(:disabled),
+    .gantt-toolbar-mobile .table-action-btn.utility-btn:hover:not(:disabled),
+    .gantt-toolbar-mobile .table-action-btn.view-btn:hover:not(:disabled) {
+        background: var(--purple-50);
+        color: var(--purple-700);
+    }
+
+    .gantt-toolbar-mobile .table-action-btn:disabled:hover {
+        background: transparent;
+        color: inherit;
+        transform: none;
+    }
+
+    .gantt--tree-collapsed .gantt-tree-panel,
+    .gantt--tree-collapsed .gantt-resize-handle {
+        display: none;
     }
 
     .gantt-selection-name {

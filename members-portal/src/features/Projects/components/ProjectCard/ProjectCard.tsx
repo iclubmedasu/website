@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, type ComponentType } from 'react';
 import { Archive, Award, Calendar, Image, Paperclip, SquareCheckBig } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { phasesAPI, projectFilesAPI } from '@/services/api';
@@ -26,7 +26,17 @@ import EditPhaseModal from '../../modals/EditPhaseModal';
 import DeletePhaseTaskModal from '../../modals/DeletePhaseTaskModal';
 import { projectToCardViewModel } from './projectCardAdapter';
 import type { Id, ProjectDetail, ProjectFileRef, ProjectFolderRef, ProjectSummary } from '@/types/backend-contracts';
+import '@/components/cards/expandedSectionTabs.css';
+import './ProjectCard.css';
 
+type WorkTab = 'gantt' | 'certificates';
+type MediaTab = 'files' | 'photos';
+
+type ProjectTabDef<T extends string> = {
+    key: T;
+    label: string;
+    icon: ComponentType<{ size?: number }>;
+};
 export interface PastProjectSummary extends ProjectSummary {
     createdAt?: string | null;
     _count?: {
@@ -131,8 +141,28 @@ export default function ProjectCard({
 
     const [projectFiles, setProjectFiles] = useState<ProjectFileRef[]>([]);
     const [projectFolders, setProjectFolders] = useState<ProjectFolderRef[]>([]);
+    const [activeWorkTab, setActiveWorkTab] = useState<WorkTab>('gantt');
+    const [activeMediaTab, setActiveMediaTab] = useState<MediaTab>('files');
     const detail = archivedView ? fullDetail : localDetail;
     const detailId = detail?.id as Id | undefined;
+
+    const workTabs = useMemo((): ProjectTabDef<WorkTab>[] => [
+        { key: 'gantt', label: 'Timeline', icon: SquareCheckBig },
+        ...(canManageCertificates
+            ? [{ key: 'certificates' as const, label: 'Certificates', icon: Award }]
+            : []),
+    ], [canManageCertificates]);
+
+    const mediaTabs = useMemo((): ProjectTabDef<MediaTab>[] => [
+        { key: 'files', label: 'Files', icon: Paperclip },
+        { key: 'photos', label: 'Photos', icon: Image },
+    ], []);
+
+    useEffect(() => {
+        if (activeWorkTab === 'certificates' && !canManageCertificates) {
+            setActiveWorkTab('gantt');
+        }
+    }, [activeWorkTab, canManageCertificates]);
 
     useEffect(() => {
         if (expanded && detailId) {
@@ -310,76 +340,122 @@ export default function ProjectCard({
             ) : null}
             afterSections={detail ? (
                 <>
-                    <div className="exp-card-section exp-card-section--flush">
-                        <GanttChart
-                            phases={detail.phases || []}
-                            projectId={detail.id}
-                            projectTitle={detail.title}
-                            projectDetail={detail}
-                            projectStartDate={detail.startDate}
-                            projectDueDate={detail.dueDate}
-                            currentMemberId={archivedView ? undefined : user?.id}
-                            canEdit={archivedView ? false : canEditStructure}
-                            canEditStatus={archivedView ? false : canEditStatus}
-                            onAddPhase={archivedView ? () => { } : () => setShowAddPhase(true)}
-                            onAddTask={archivedView ? () => { } : (phase: any) => setAddTaskTarget({ phaseId: phase.id })}
-                            onAddSubtask={archivedView ? () => { } : (phase: any, parentTask: any) => setAddTaskTarget({ phaseId: phase.id, parentTask })}
-                            onEditPhase={archivedView ? () => { } : (phase: any) => setEditPhaseTarget(phase)}
-                            onEditTask={archivedView ? () => { } : (task: any) => setEditTaskTarget(task)}
-                            onOpenTaskComments={archivedView ? () => { } : (task: any) => setTaskCommentsTarget(task)}
-                            onOpenTaskScheduleSlots={archivedView ? () => { } : (task: any) => setTaskScheduleTarget(task)}
-                            onOpenTaskActivity={archivedView ? () => { } : (task: any) => setTaskActivityTarget(task)}
-                            onDeletePhase={archivedView ? () => { } : (phase: any) => setConfirmDeletePhase(phase)}
-                            onRefresh={archivedView ? () => { } : () => onRefreshDetail?.(detail.id as Id)}
-                        />
-                    </div>
-                    {canManageCertificates && (
-                        <div className="exp-card-section">
-                            <div className="exp-card-section-header">
-                                <Award size={14} className="exp-card-section-icon" />
-                                Certificates
-                            </div>
-                            <ProjectCertificatesSection
+                    <div className="exp-card-section exp-card-section--flush project-work-section">
+                        <nav className="project-expanded-tab-nav" aria-label="Project timeline tabs">
+                            {workTabs.map((tab) => {
+                                const Icon = tab.icon;
+                                return (
+                                    <button
+                                        key={tab.key}
+                                        type="button"
+                                        onClick={() => setActiveWorkTab(tab.key)}
+                                        className={`project-expanded-tab-button${
+                                            activeWorkTab === tab.key ? ' project-expanded-tab-button--active' : ''
+                                        }`}
+                                    >
+                                        <Icon size={16} />
+                                        {tab.label}
+                                    </button>
+                                );
+                            })}
+                        </nav>
+
+                        <div
+                            className="project-expanded-tab-panel project-expanded-tab-panel--gantt"
+                            hidden={activeWorkTab !== 'gantt'}
+                        >
+                            <GanttChart
+                                phases={detail.phases || []}
                                 projectId={detail.id}
                                 projectTitle={detail.title}
-                                canManage={canManageCertificates}
+                                projectDetail={detail}
+                                projectStartDate={detail.startDate}
+                                projectDueDate={detail.dueDate}
+                                currentMemberId={archivedView ? undefined : user?.id}
+                                canEdit={archivedView ? false : canEditStructure}
+                                canEditStatus={archivedView ? false : canEditStatus}
+                                onAddPhase={archivedView ? () => { } : () => setShowAddPhase(true)}
+                                onAddTask={archivedView ? () => { } : (phase: any) => setAddTaskTarget({ phaseId: phase.id })}
+                                onAddSubtask={archivedView ? () => { } : (phase: any, parentTask: any) => setAddTaskTarget({ phaseId: phase.id, parentTask })}
+                                onEditPhase={archivedView ? () => { } : (phase: any) => setEditPhaseTarget(phase)}
+                                onEditTask={archivedView ? () => { } : (task: any) => setEditTaskTarget(task)}
+                                onOpenTaskComments={archivedView ? () => { } : (task: any) => setTaskCommentsTarget(task)}
+                                onOpenTaskScheduleSlots={archivedView ? () => { } : (task: any) => setTaskScheduleTarget(task)}
+                                onOpenTaskActivity={archivedView ? () => { } : (task: any) => setTaskActivityTarget(task)}
+                                onDeletePhase={archivedView ? () => { } : (phase: any) => setConfirmDeletePhase(phase)}
+                                onRefresh={archivedView ? () => { } : () => onRefreshDetail?.(detail.id as Id)}
                             />
                         </div>
-                    )}
-                    <div className="exp-card-section">
-                        <div className="exp-card-section-header">
-                            <Paperclip size={14} className="exp-card-section-icon" />
-                            Project Files
-                        </div>
-                        <FileUploadZone
-                            entityId={detail.id}
-                            filesAPI={projectFilesAPI as EntityFilesAPI}
-                            memberId={user?.id}
-                            existingFiles={projectFiles}
-                            existingFolders={projectFolders}
-                            onFileUploaded={archivedView ? () => { } : (newFile, replaced) => setProjectFiles((prev) =>
-                                replaced
-                                    ? prev.map((f) => f.id === newFile.id ? newFile as ProjectFileRef : f)
-                                    : [newFile as ProjectFileRef, ...prev]
-                            )}
-                            onFileRemoved={archivedView ? () => { } : (fileId) => setProjectFiles((prev) => prev.filter((f) => f.id !== fileId))}
-                            onFileRenamed={archivedView ? () => { } : (updated) => setProjectFiles((prev) =>
-                                prev.map((f) => f.id === updated.id ? { ...f, fileName: updated.fileName } : f)
-                            )}
-                            disabled={archivedView || !canUpload}
-                        />
+
+                        {canManageCertificates ? (
+                            <div
+                                className="project-expanded-tab-panel project-expanded-tab-panel--padded"
+                                hidden={activeWorkTab !== 'certificates'}
+                            >
+                                <ProjectCertificatesSection
+                                    projectId={detail.id}
+                                    projectTitle={detail.title}
+                                    canManage={canManageCertificates}
+                                />
+                            </div>
+                        ) : null}
                     </div>
-                    <div className="exp-card-section">
-                        <div className="exp-card-section-header">
-                            <Image size={14} className="exp-card-section-icon" />
-                            Project Photos
+
+                    <div className="exp-card-section project-media-section">
+                        <nav className="project-expanded-tab-nav" aria-label="Project files and photos">
+                            {mediaTabs.map((tab) => {
+                                const Icon = tab.icon;
+                                return (
+                                    <button
+                                        key={tab.key}
+                                        type="button"
+                                        onClick={() => setActiveMediaTab(tab.key)}
+                                        className={`project-expanded-tab-button${
+                                            activeMediaTab === tab.key ? ' project-expanded-tab-button--active' : ''
+                                        }`}
+                                    >
+                                        <Icon size={16} />
+                                        {tab.label}
+                                    </button>
+                                );
+                            })}
+                        </nav>
+
+                        <div
+                            className="project-expanded-tab-panel"
+                            hidden={activeMediaTab !== 'files'}
+                        >
+                            <FileUploadZone
+                                entityId={detail.id}
+                                filesAPI={projectFilesAPI as EntityFilesAPI}
+                                memberId={user?.id}
+                                existingFiles={projectFiles}
+                                existingFolders={projectFolders}
+                                onFileUploaded={archivedView ? () => { } : (newFile, replaced) => setProjectFiles((prev) =>
+                                    replaced
+                                        ? prev.map((f) => f.id === newFile.id ? newFile as ProjectFileRef : f)
+                                        : [newFile as ProjectFileRef, ...prev]
+                                )}
+                                onFileRemoved={archivedView ? () => { } : (fileId) => setProjectFiles((prev) => prev.filter((f) => f.id !== fileId))}
+                                onFileRenamed={archivedView ? () => { } : (updated) => setProjectFiles((prev) =>
+                                    prev.map((f) => f.id === updated.id ? { ...f, fileName: updated.fileName } : f)
+                                )}
+                                disabled={archivedView || !canUpload}
+                            />
                         </div>
-                        <ProjectPhotosSection
-                            projectId={detail.id}
-                            memberId={user?.id}
-                            disabled={!user?.id}
-                        />
+
+                        <div
+                            className="project-expanded-tab-panel"
+                            hidden={activeMediaTab !== 'photos'}
+                        >
+                            <ProjectPhotosSection
+                                projectId={detail.id}
+                                memberId={user?.id}
+                                disabled={!user?.id}
+                            />
+                        </div>
                     </div>
+
                     {!archivedView && editPhaseTarget && (
                         <EditPhaseModal
                             phase={editPhaseTarget}

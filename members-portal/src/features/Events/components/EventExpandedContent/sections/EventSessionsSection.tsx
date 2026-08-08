@@ -14,6 +14,7 @@ import type {
     Id,
     UpdateEventSessionPayload,
 } from '@/types/backend-contracts';
+import EventSetupRowActions from './EventSetupRowActions';
 
 interface EventSessionsSectionProps {
     eventId: Id | string;
@@ -478,24 +479,25 @@ export default function EventSessionsSection({
                                 ) : null}
                             </div>
                             {canManage ? (
-                                <div className="event-expanded-inline-actions">
-                                    <button
-                                        type="button"
-                                        onClick={() => startEdit(session)}
-                                        className="btn btn-secondary"
-                                        disabled={actionsDisabled}
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => void handleRemove(Number(session.id))}
-                                        className="btn btn-danger"
-                                        disabled={actionsDisabled}
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
+                                <EventSetupRowActions
+                                    disabled={actionsDisabled}
+                                    ariaLabel={`Actions for ${session.label || 'session'}`}
+                                    actions={[
+                                        {
+                                            id: 'edit',
+                                            label: 'Edit',
+                                            variant: 'edit',
+                                            onClick: () => startEdit(session),
+                                        },
+                                        {
+                                            id: 'delete',
+                                            label: 'Delete',
+                                            variant: 'delete',
+                                            danger: true,
+                                            onClick: () => void handleRemove(Number(session.id)),
+                                        },
+                                    ]}
+                                />
                             ) : null}
                         </div>
                     );

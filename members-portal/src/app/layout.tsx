@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from 'next'
 import { AuthProvider } from '@/components/providers/AuthProvider'
+import { DevServiceWorkerCleanup } from '@/components/DevServiceWorkerCleanup/DevServiceWorkerCleanup'
 import { OfflineBanner } from '@/components/OfflineBanner/OfflineBanner'
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt/PWAInstallPrompt'
+import { arimo, poppins } from './fonts'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -62,9 +64,14 @@ export default function RootLayout({
     children: React.ReactNode
 }) {
     return (
-        <html lang="en">
-            <body>
+        <html
+            lang="en"
+            className={`${poppins.variable} ${arimo.variable}`}
+            suppressHydrationWarning
+        >
+            <body suppressHydrationWarning>
                 <AuthProvider>
+                    <DevServiceWorkerCleanup />
                     <OfflineBanner />
                     {children}
                     <PWAInstallPrompt />

@@ -15,6 +15,7 @@ import {
     certificatesAPI,
     type BackgroundFocus,
 } from '@/services/certificatesAPI';
+import { createUuid } from '@/utils/createUuid';
 import ClampedNumberInput from './ClampedNumberInput';
 import { textFitsInBox } from './textFitsInBox';
 import './TemplateEditor.css';
@@ -537,7 +538,7 @@ export default function TemplateEditor({
             return;
         }
 
-        const id = crypto.randomUUID();
+        const id = createUuid();
         const isVerificationUrl = fieldKey === 'verificationUrl';
         const base: CanvasElement = {
             id,
@@ -570,7 +571,7 @@ export default function TemplateEditor({
         if (hasQrOnCanvas(elements)) return;
         const size = Math.min(DEFAULT_QR_SIZE, canvasWidth - 40, canvasHeight - 40);
         if (size < MIN_ELEMENT_SIZE) return;
-        const id = crypto.randomUUID();
+        const id = createUuid();
         const element: CanvasElement = {
             id,
             type: 'qr',

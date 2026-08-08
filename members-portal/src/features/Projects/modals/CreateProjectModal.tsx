@@ -3,6 +3,7 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { X } from 'lucide-react';
 import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
+import { DateInput } from '@/components/input/DateInput';
 import SearchableBadgePicker from '@/components/SearchableBadgePicker/SearchableBadgePicker';
 import { projectsAPI, projectTypesAPI } from '../../../services/api';
 import { toTitleCase } from '../../../utils/titleCase';
@@ -342,11 +343,11 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                         <div className="form-row">
                             <div className="form-group">
                                 <label className="form-label" htmlFor="create-project-start-date">Start Date</label>
-                                <input id="create-project-start-date" title="Project start date" type="date" className="form-input" value={form.startDate} onChange={setField('startDate')} />
+                                <DateInput id="create-project-start-date" title="Project start date" value={form.startDate} onChange={setField('startDate')} />
                             </div>
                             <div className="form-group">
                                 <label className="form-label" htmlFor="create-project-due-date">Due Date</label>
-                                <input id="create-project-due-date" title="Project due date" type="date" className="form-input" value={form.dueDate} onChange={setField('dueDate')} />
+                                <DateInput id="create-project-due-date" title="Project due date" value={form.dueDate} onChange={setField('dueDate')} />
                             </div>
                         </div>
                     </div>

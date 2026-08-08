@@ -1,15 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Poppins } from "next/font/google";
 import { Footer } from "@/components/layout/Footer";
 import { Navbar } from "@/components/layout/Navbar";
 import { siteConfig } from "@/lib/site";
+import { arimo, poppins } from "../fonts";
 import "../globals.css";
-
-const poppins = Poppins({
-    subsets: ["latin"],
-    weight: ["400", "500", "600", "700"],
-    variable: "--font-poppins",
-});
 
 export const metadata: Metadata = {
     title: {
@@ -39,8 +33,12 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en" className={poppins.variable}>
-            <body className="flex min-h-screen flex-col">
+        <html
+            lang="en"
+            className={`${poppins.variable} ${arimo.variable}`}
+            suppressHydrationWarning
+        >
+            <body className="flex min-h-screen flex-col" suppressHydrationWarning>
                 <Navbar />
                 <main className="site-main">{children}</main>
                 <Footer />

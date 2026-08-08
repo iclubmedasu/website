@@ -2,6 +2,7 @@
 
 import type { EditorIncidentReportForm, IncidentReportDetail } from '@iclub/shared';
 import { Eye } from 'lucide-react';
+import '@/components/table/table.css';
 
 function formatCellValue(value: unknown): string {
     if (value === null || value === undefined || value === '') return '—';
@@ -92,15 +93,18 @@ export function SupportFormSubmissionsTable({
                                         </td>
                                     ))}
                                     <td className="site-content-submissions-actions-col">
-                                        <button
-                                            type="button"
-                                            className="btn btn-secondary btn-icon"
-                                            onClick={() => onViewReport(report)}
-                                            disabled={busy}
-                                            aria-label={`View report #${report.id}`}
-                                        >
-                                            <Eye size={16} />
-                                        </button>
+                                        <div className="action-buttons">
+                                            <button
+                                                type="button"
+                                                className="table-action-btn view-btn"
+                                                onClick={() => onViewReport(report)}
+                                                disabled={busy}
+                                                aria-label={`View report #${report.id}`}
+                                                title="View report"
+                                            >
+                                                <Eye size={16} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             );

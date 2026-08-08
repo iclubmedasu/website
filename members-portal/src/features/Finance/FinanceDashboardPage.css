@@ -75,6 +75,11 @@
     min-height: 15rem;
 }
 
+.finance-page .card-header > .card-subtitle {
+    margin-top: 0.5rem;
+}
+
+/* Dev usage reuses .finance-filters for date pickers */
 .finance-filters {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(11.25rem, 1fr));
@@ -304,8 +309,10 @@
     color: var(--error-text);
 }
 
+/* Used by DevUsage (and any non-add CTAs on finance-style cards) */
 .finance-card-action {
     flex-shrink: 0;
+    width: auto;
 }
 
 .finance-modal-container {

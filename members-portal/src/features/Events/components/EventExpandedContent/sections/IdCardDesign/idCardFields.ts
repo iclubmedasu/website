@@ -6,6 +6,7 @@ import type {
     IdCardBackgroundFocus,
     IdCardLayoutElement,
 } from '@/types/backend-contracts';
+import { createUuid } from '@/utils/createUuid';
 import { getCustomFieldValue } from '../../customFieldUtils';
 
 export const DEFAULT_ID_CARD_CANVAS_WIDTH = 384;
@@ -183,7 +184,7 @@ export function createStarterIdCardLayout(): IdCardLayoutElement[] {
     const qrX = Math.round((canvasWidth - qrSize) / 2);
     return [
         {
-            id: crypto.randomUUID(),
+            id: createUuid(),
             type: 'qr',
             x: qrX,
             y: 48,
@@ -191,7 +192,7 @@ export function createStarterIdCardLayout(): IdCardLayoutElement[] {
             height: qrSize,
         },
         {
-            id: crypto.randomUUID(),
+            id: createUuid(),
             type: 'field',
             field: 'fullName',
             x: 24,
@@ -204,7 +205,7 @@ export function createStarterIdCardLayout(): IdCardLayoutElement[] {
             color: '#111827',
         },
         {
-            id: crypto.randomUUID(),
+            id: createUuid(),
             type: 'field',
             field: 'tierName',
             x: 24,
@@ -236,7 +237,7 @@ export function normalizeIdCardLayout(layout: unknown): IdCardLayoutElement[] | 
         if (![x, y, width, height].every(Number.isFinite)) continue;
 
         const element: IdCardLayoutElement = {
-            id: typeof item.id === 'string' && item.id ? item.id : crypto.randomUUID(),
+            id: typeof item.id === 'string' && item.id ? item.id : createUuid(),
             type,
             x,
             y,

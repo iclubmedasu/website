@@ -1,8 +1,9 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { toDateInputValue } from '@iclub/shared/utils';
+import { DateInput } from '@/components/input/DateInput';
 import { toTitleCase } from '../../../../utils/titleCase';
 
 interface TeamFormData {
@@ -166,11 +167,10 @@ const EditTeamModal = ({ isOpen, onClose, onSubmit, team }: EditTeamModalProps) 
                             <label htmlFor="establishedDate" className="form-label">
                                 Established Date *
                             </label>
-                            <input
-                                type="date"
+                            <DateInput
                                 id="establishedDate"
                                 name="establishedDate"
-                                className={`form-input ${errors.establishedDate ? 'error' : ''}`}
+                                className={errors.establishedDate ? 'error' : undefined}
                                 value={formData.establishedDate}
                                 onChange={handleChange}
                                 disabled={isSubmitting}

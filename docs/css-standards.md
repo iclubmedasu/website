@@ -305,9 +305,18 @@ Reconciling `--radius-lg` and shadow tints across apps is out of scope until del
 
 | Token | Value | Usage |
 |---|---|---|
-| `--font-heading` | `'Poppins', -apple-system, BlinkMacSystemFont, sans-serif` | Headings, labels, buttons, nav, badges |
-| `--font-body` | `'Arial', Georgia, serif` | Body text, descriptions, hints, error messages |
+| `--font-heading` | `var(--font-poppins), …sans-serif` (self-hosted Poppins via `next/font/local`) | Headings, labels, buttons, nav, badges |
+| `--font-body` | `var(--font-arimo), Helvetica, Arial, sans-serif` (self-hosted Arimo via `next/font/local`) | Body text, descriptions, hints, error messages |
 | `--font-mono` | `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace` | Monospace/code/path text (certificate codes, explorer path bars) — *members-portal* |
+
+**Binding rule — self-hosted local fonts only:**
+
+- Load web fonts **only** via `next/font/local` against committed `.woff2` files under each app’s `src/fonts/` (wired from `src/app/fonts.ts`). Fonts are bundled at build time; no network fetch at build or runtime for family identity.
+- **`next/font/google` is disallowed** in this monorepo — build/dev must not depend on `fonts.googleapis.com` / `fonts.gstatic.com` (timeouts fall back to system fonts and break cross-browser consistency).
+- **Never** set primary body/heading stacks to OS UI families (`system-ui`, `ui-sans-serif`, `-apple-system` as the primary face). Soft fallbacks after the self-hosted face are fine.
+- **Never** load fonts with a CSS `@import` (or `<link>`) to Google Fonts / other CDNs — ad blockers, tracking protection, and offline modes make that inconsistent across browsers/accounts.
+- Body face is **Arimo** (Arial-metric compatible) so metrics stay stable; head face is **Poppins**.
+- Root `<html>` / `<body>` should use `suppressHydrationWarning` so browser extensions (e.g. Dark Reader attribute injection) do not spam hydration mismatches.
 
 ---
 
@@ -611,8 +620,81 @@ Transient success banners and soft validation hints (e.g. “Select a template f
 | Name | Max-width | Usage |
 |---|---|---|
 | Mobile | `640px` | Modal full-width buttons, stacked footers |
-| Tablet | `768px` | Login side-by-side → stacked, form-row → 1 col, page header stacks |
+| Tablet | `768px` | Login side-by-side → stacked, form-row → 1 col, page header stacks; **page container gutters shrink** |
 | Small Desktop | `900px` | Project grid 2-col → 1-col |
+
+### Page container gutters
+
+Shared page roots (`.teams-page`, `.members-page`, `.projects-page`, …) use `padding: 2rem` on desktop. On phone/tablet this **must shrink** so the protected shell is the main horizontal margin—do **not** re-add large horizontal padding in feature CSS on mobile.
+
+| Breakpoint | Page multi-selector padding |
+|---|---|
+| Default (desktop) | `2rem` |
+| `max-width: 768px` | `1rem 0.25rem` |
+| `max-width: 480px` | `0.75rem 0` (horizontal from `.protected-layout-content` only) |
+
+Rules live only in `components/page/page.css`. Profile also tightens `.user-page-tab-panel` / `.user-page-section-card` on ≤768px.
+
+### Mobile full-width buttons
+
+Do **not** set global `.btn { width: 100% }` on mobile — that overflows card headers and icon action rows. Full-width stacking is **only** for modal footers:
+
+```css
+@media (max-width: 768px) {
+    .modal-footer .btn { width: 100%; }
+}
+```
+
+Certificate bulk-action bars (`.project-cert-io-bar` / `.event-cert-io-bar`) wrap on ≤768: Select all | Clear share a row; Issue selected, template select, and Issue custom stack full width. Do not force five equal nowrap columns on phone.
+
+Card headers use `.card-header-with-action` (wrap + `min-width: 0` on title + `width: auto` on header CTAs) in `universalcard.css`. Prefer **`card-add-btn`** (green `+`) for card-level create actions and **`card-edit-btn`** (blue pencil, same 36×36 outlined chip: white bg, colored border/icon, invert fill + scale on hover) for card-level / page-header edit — not long secondary labels. Put `.card-subtitle` / captions **under** the title+action row (not beside the control).
+
+Row and table actions use **`table-action-btn`** with type modifiers: **`view-btn`** (purple eye), **`edit-btn`** (blue pencil icon, not the outlined header chip), **`deactivate-btn`** (red trash/delete), **`utility-btn`** (dark gray for reorder move up/down and other non-semantic utilities—same invert hover as the rest). About / Contact / Support list rows use these table tokens; only header-level edit uses `card-edit-btn`.
+
+### Search + Advanced Filters
+
+List and table search uses `.page-search-field` (`.page-search-field--full` when row-width) + `.page-search-filter-btn` / `--active` + `.page-search-filter-label`. Advanced criteria live in a filters modal (Apply / Cancel / Clear), not inline control rows. Finance transactions follow this pattern.
+
+### Action menus (two styles)
+
+The members portal has **two distinct menu systems**. Do not mix them—hover, radius, motion, and overlay behavior differ on purpose.
+
+#### 1. App chrome menus (default)
+
+**Use for:** page / feature chrome—Teams (title + manage dropdowns), About / Contact / Support row actions (`SiteContentRowActions`), filter/select comboboxes, and any non-file list or settings UI.
+
+**Look & feel:** shared [`dropdown.css`](members-portal/src/components/dropdown/dropdown.css) — `.dropdown-menu` / `.dropdown-item` (and manage-* variants): larger padding, `--radius-lg`, `--shadow-xl`, purple-tinted border, open animation, **gradient hover / white label** on items. Open menus use **`max-height` + `overflow-y: auto`** so long action lists (e.g. Gantt ⋮) stay fully reachable instead of clipping.
+
+**Trigger pattern:** often dual-render at ≤768px (icons on desktop → three-dot + `Dropdown` on phone). Prefer the shared `Dropdown` component.
+
+**Do not** reintroduce four side-by-side action `.btn` icons on phone for multi-action app rows (see `SiteContentRowActions`).
+
+#### 2. Repository / media menus (files, folders, photos)
+
+**Use for:** Documents explorer, `FileUploadZone` file/folder actions, and future photo or attachment UIs—anything that acts on a **stored media/repo entity**.
+
+**Look & feel:** compact panel—`documents-doc-menu` / `file-actions-menu-panel` style: tighter padding (`~0.35rem` container, `~0.45rem` items), `--radius-md`, `--shadow-md`, plain border, **neutral gray hover** (no purple gradient wash), simple text (optional icon + label). Match existing documents / uploader item classes; do not restyle these with `.dropdown-item` gradient hovers.
+
+**Overlay:** menus must **not** be clipped by overflow parents (`.repository-list`, scrollable folder bodies, explorer scroll). Prefer **`createPortal` + `position: fixed`** pinned to the trigger (documents: `.documents-doc-menu--portal`; file uploader: `.file-actions-menu-panel--portal`, `z-index: 1100`), reposition on scroll/resize, flip when near the viewport bottom.
+
+**Density:** desktop may keep a short icon row; phone collapses secondary actions into the kebab. In the uploader, status chrome (checkmark, progress, failed/retry, cancel while uploading) stays **outside** the menu.
+
+| Context | Menu system |
+| --- | --- |
+| Teams, About, Contact, Support, filters, page title / manage dropdowns | App chrome (`.dropdown-*`) |
+| Documents, file uploader, photos / attachments | Repository / media (compact + portal when needed) |
+
+### Projects Gantt (phone ≤768)
+
+On mobile, the Project Gantt uses dual-render: desktop keeps the full toolbar and resizable tree. Phone uses a compact bar with a **neutral rounded segmented scale** (Qtr/Mo/Wk/Day — soft purple only when active/hover), icon controls with **purple hover**, collapsible tree (chevron), and a right cluster **download · maximize · ⋮** (far right; ⋮ = edit actions when allowed). Tighter horizontal toolbar padding (`0.5rem`) for control space.
+
+### Pagination
+
+`.pagination-controls` / `.pagination-pages` in `page.css` use `flex-wrap` and `max-width: 100%` so Prev/pages/Next stay inside cards on all list pages. Compact padding at ≤480px. Do not copy pagination CSS per feature.
+
+### Vertical timeline (phone)
+
+Shared `.vertical-timeline` (History, Achievements, activity timelines) uses a wide marker column on desktop (`min-width: 50px`, `gap: 1rem`). On **`max-width: 640px` only**, `modal.css` shrinks `.timeline-marker` / item `gap` / `.timeline-line` so content cards reclaim width — do **not** re-widen the rail in feature CSS.
 
 ### Standard Media Query Pattern
 
@@ -660,7 +742,7 @@ Transient success banners and soft validation hints (e.g. “Select a template f
 3. **Component prefix** for reusable components: `.card-*`, `.btn-*`, `.badge-*`, `.modal-*`
 4. **State modifiers** as chained classes: `.active`, `.open`, `.error`, `.disabled`, `.expanded`
 5. **Variant modifiers** with descriptive suffixes: `.btn-primary`, `.btn-danger`, `.card-lg`, `.card-sm`
-6. **Action-type modifiers** with chained classes: `.view-btn`, `.edit-btn`, `.deactivate-btn`
+6. **Action-type modifiers** with chained classes: `.view-btn`, `.edit-btn`, `.deactivate-btn`, `.utility-btn`
 
 ### 9.2 Do NOT
 
@@ -719,22 +801,23 @@ Patterns introduced by recent features. Prefer reusing these shapes; if a **thir
 ### 10.1 Import Structure (`app.css`)
 
 ```
-app.css
-├── @import font (Google Fonts)
+app.css / globals.css
+├── (fonts: next/font/local + src/fonts/*.woff2 via app/fonts.ts — never next/font/google)
 ├── @import component CSS files
 │   ├── buttons/buttons.css         ← Button variants
 │   ├── cards/universalcard.css     ← Card base + variants
 │   ├── errormsg/errormsg.css       ← Error message styling
 │   ├── form/form.css               ← Form layout + labels
 │   ├── header/header.css           ← Top navigation bar
-│   ├── input/input.css             ← Global input styling
+│   ├── input/input.css             ← Global input + DateInput styles
+│   ├── input/DateInput.tsx         ← Full-width date control + empty placeholder
 │   ├── scrollbar/scrollbar.css     ← Global scrollbar styling
 │   ├── page/page.css               ← Page containers, titles, headers, info display, empty states
 │   ├── modal/modal.css             ← All shared modal + modal-form styles (1400+ lines)
 │   ├── toggle/toggle.css           ← Toggle switch component
 │   └── sidebar/sidebar.css         ← Sidebar navigation
 ├── :root (all CSS variables)
-├── Base reset (* { margin, padding, box-sizing })
+├── Base reset (* { margin, padding, box-sizing }; text-size-adjust; form control font inherit)
 ├── Body & heading font assignments
 ├── App layout (.app-container, .app-body, .main-content)
 ├── Page layout (.page)
@@ -852,16 +935,24 @@ src/
    - `.form-group` + `.form-label` + `.form-input` for forms
    - `.btn-primary` / `.btn-secondary` / `.btn-danger` for buttons
 4. **Header content:** title (`.modal-title`) + optional subtitle (`.modal-subtitle`) + close button only. **Do not** add decorative header icons / logos (`.modal-icon-*`, Lucide icons in the header). Legacy lifecycle confirm modals elsewhere may still use `.modal-icon-*`; do not introduce that pattern on new form, list, detail, or history modals.
-5. **Boolean on/off fields** MUST use `Toggle` from `@/components/toggle/Toggle` (`role="switch"`), never raw `<input type="checkbox">`. Use `FormToggleRow` from `@/components/toggle/FormToggleRow` for label + switch layout (`.form-toggle-row`). Import `@/components/toggle/toggle.css`.
-6. **Multi-section modal bodies** MUST wrap each logical block in `.form-section`:
+   - **Header layout (all breakpoints):** keep the row layout — title block left, `.modal-close-btn` top-right. Do **not** stack `.modal-header` into a column on mobile (that pushes the close button below the title). Base styles use `align-items: flex-start` + `gap` so multi-line subtitles stay top-aligned with the X.
+5. **Date inputs:** use `DateInput` from `@/components/input/DateInput` (not a bare `<input type="date">`). Styles live in `components/input/input.css` (`.form-date-field`, calendar icon, full width). **Never** restyle date inputs per modal.
+   - Browser `placeholder` is **ignored** for `type="date"`. Empty-state text comes from `DateInput` (`emptyLabel`, default **"Select date"**).
+   - `appearance: none` is intentional for all engines so width stays full-width (WebKit otherwise shrink-to-fits) with our calendar icon.
+   - Chromium: transparent `::-webkit-calendar-picker-indicator` is stretched over the field so any tap opens the picker.
+   - Prefer stacking From/To (or Start/End) full-width on narrow screens when space is tight rather than leaving half-width date cells.
+6. **`select.form-input`:** themed purple chevron + `appearance: none` live centrally in `components/input/input.css`. **Never** add per-modal `appearance: none` + chevron background duplicates — reuse the shared rule; only override `background-position` / `padding` if a specific select needs a different size.
+7. **`datetime-local` / `time`:** still use `type` + `.form-input`; global icon/min-height rules apply in `input.css`. Prefer wrapping new occurrences in a similar empty-label pattern if empty fields look blank.
+8. **Boolean on/off fields** MUST use `Toggle` from `@/components/toggle/Toggle` (`role="switch"`), never raw `<input type="checkbox">`. Use `FormToggleRow` from `@/components/toggle/FormToggleRow` for label + switch layout (`.form-toggle-row`). Import `@/components/toggle/toggle.css`.
+9. **Multi-section modal bodies** MUST wrap each logical block in `.form-section`:
    - Optional `.form-section-title`, then optional `.form-hint-text` caption, then fields/controls
    - Dividers come from `.form-section` `border-bottom` — do not invent per-modal divider classes
    - Captions/hints that sit **above** controls use `.form-hint-text` (space below). After-field helpers use `.form-hint`
    - The last `.form-section` has no bottom border (`:last-of-type`)
    - Single-purpose modals (one field / one confirm message) do not need multiple sections
-7. If the modal needs a unique width: `.my-modal .modal-container { max-width: 500px; }`
-8. Do NOT redefine any base modal classes — import from `modal.css` (already in `app.css`)
-9. Page scroll behind the modal is locked automatically via `html:has(.modal-backdrop)` rules in `modal.css` (see §7.5.1)
+10. If the modal needs a unique width: `.my-modal .modal-container { max-width: 500px; }`
+11. Do NOT redefine any base modal classes — import from `modal.css` (already in `app.css`)
+12. Page scroll behind the modal is locked automatically via `html:has(.modal-backdrop)` rules in `modal.css` (see §7.5.1)
 
 ### 11.4 When Adding a New UI Component
 

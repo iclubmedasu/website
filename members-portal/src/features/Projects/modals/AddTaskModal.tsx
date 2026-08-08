@@ -3,6 +3,7 @@
 import { useMemo, useState, type ChangeEvent, type ReactNode } from 'react';
 import { AlertTriangle, Check, X } from 'lucide-react';
 import { fromDateInputValue } from '@iclub/shared/utils';
+import { DateInput } from '@/components/input/DateInput';
 import { tasksAPI } from '../../../services/api';
 import { toTitleCase } from '../../../utils/titleCase';
 import {
@@ -299,22 +300,18 @@ export default function AddTaskModal({
                         <div className="form-row">
                             <div className="form-group">
                                 <label className="form-label" htmlFor="add-task-start-date">Start Date</label>
-                                <input
+                                <DateInput
                                     id="add-task-start-date"
-                                    type="date"
                                     title="Task start date"
-                                    className="form-input"
                                     value={form.startDate}
                                     onChange={setField('startDate')}
                                 />
                             </div>
                             <div className="form-group">
                                 <label className="form-label" htmlFor="add-task-due-date">Due Date</label>
-                                <input
+                                <DateInput
                                     id="add-task-due-date"
-                                    type="date"
                                     title="Task due date"
-                                    className="form-input"
                                     value={form.dueDate}
                                     onChange={setField('dueDate')}
                                 />

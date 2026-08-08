@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { DateInput } from '@/components/input/DateInput';
 import type { CertificateStatus, CertificateType } from '@/services/certificatesAPI';
 import '../../Events/modals/EventFiltersModal.css';
 
@@ -197,14 +198,12 @@ export default function CertificatesFiltersModal({
                                 >
                                     From
                                 </label>
-                                <input
+                                <DateInput
                                     id={
                                         isCertificates
                                             ? 'certificates-filter-date-from'
                                             : 'templates-filter-date-from'
                                     }
-                                    type="date"
-                                    className="form-input"
                                     value={draftDateFrom}
                                     onChange={(event) => setDraftDateFrom(event.target.value)}
                                 />
@@ -220,14 +219,12 @@ export default function CertificatesFiltersModal({
                                 >
                                     To
                                 </label>
-                                <input
+                                <DateInput
                                     id={
                                         isCertificates
                                             ? 'certificates-filter-date-to'
                                             : 'templates-filter-date-to'
                                     }
-                                    type="date"
-                                    className="form-input"
                                     value={draftDateTo}
                                     onChange={(event) => setDraftDateTo(event.target.value)}
                                 />

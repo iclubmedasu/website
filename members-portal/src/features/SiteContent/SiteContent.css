@@ -132,6 +132,41 @@
     display: flex;
     gap: 0.35rem;
     flex-shrink: 0;
+    align-items: center;
+}
+
+.site-content-row-actions-inline {
+    display: flex;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+.site-content-row-actions-menu {
+    display: none;
+}
+
+.site-content-row-dropdown {
+    position: relative;
+}
+
+.dropdown-menu.site-content-row-menu-panel {
+    min-width: 10rem;
+    right: 0;
+    left: auto;
+}
+
+.site-content-row-menu-item--danger {
+    color: #b91c1c;
+}
+
+@media (max-width: 768px) {
+    .site-content-row-actions-inline {
+        display: none;
+    }
+
+    .site-content-row-actions-menu {
+        display: block;
+    }
 }
 
 .site-content-empty {
@@ -190,11 +225,6 @@
 .site-content-type-option span {
     color: #64748b;
     font-size: 0.85rem;
-}
-
-.site-content-card-action.btn {
-    width: auto;
-    flex: 0 0 auto;
 }
 
 .site-content-modal-wide {
@@ -284,19 +314,19 @@
 
 .site-content-form-fields-header {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.35rem;
 }
 
 .site-content-form-fields-title {
-    margin: 0 0 0.25rem;
+    margin: 0;
     font-size: 1rem;
 }
 
 .site-content-form-fields-subtitle {
-    margin: 0;
+    margin: 0 0 0.75rem;
     color: #64748b;
     font-size: 0.85rem;
 }

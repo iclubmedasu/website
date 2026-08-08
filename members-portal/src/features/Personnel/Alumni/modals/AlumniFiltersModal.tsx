@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { DateInput } from '@/components/input/DateInput';
 import type { TeamRef } from '@/types/backend-contracts';
 
 export interface AlumniFiltersState {
@@ -71,20 +72,16 @@ export default function AlumniFiltersModal({
                         <div className="form-row">
                             <div className="form-group">
                                 <label className="form-label" htmlFor="alumni-filter-date-from">From</label>
-                                <input
+                                <DateInput
                                     id="alumni-filter-date-from"
-                                    type="date"
-                                    className="form-input"
                                     value={draftDateFrom}
                                     onChange={(event) => setDraftDateFrom(event.target.value)}
                                 />
                             </div>
                             <div className="form-group">
                                 <label className="form-label" htmlFor="alumni-filter-date-to">To</label>
-                                <input
+                                <DateInput
                                     id="alumni-filter-date-to"
-                                    type="date"
-                                    className="form-input"
                                     value={draftDateTo}
                                     onChange={(event) => setDraftDateTo(event.target.value)}
                                 />

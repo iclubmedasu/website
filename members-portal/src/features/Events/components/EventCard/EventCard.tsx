@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import { Archive, Calendar, Image, Paperclip, Users } from 'lucide-react';
 import LifecycleCardView, {
     getArchiveOutcomeBadge,
@@ -18,6 +18,14 @@ import EventPhotosSection from './EventPhotosSection';
 import EventExpandedContent from '../EventExpandedContent/EventExpandedContent';
 import { formatEventDuration } from '../eventDateUtils';
 import type { EventTabKey } from '../eventUtils';
+import '@/components/cards/expandedSectionTabs.css';
+
+type MediaTab = 'files' | 'photos';
+
+const MEDIA_TABS: Array<{ key: MediaTab; label: string; icon: ComponentType<{ size?: number }> }> = [
+    { key: 'files', label: 'Files', icon: Paperclip },
+    { key: 'photos', label: 'Photos', icon: Image },
+];
 
 export interface EventCardProps {
     event: EventSummary;
@@ -81,6 +89,7 @@ export default function EventCard({
     const { user } = useAuth();
     const [eventFiles, setEventFiles] = useState<EventFileRef[]>([]);
     const [eventFolders, setEventFolders] = useState<EventFolderRef[]>([]);
+    const [activeMediaTab, setActiveMediaTab] = useState<MediaTab>('files');
     const detailId = fullDetail?.id as Id | undefined;
 
     useEffect(() => {
@@ -314,42 +323,62 @@ export default function EventCard({
                             onReload={() => onReloadDetail?.()}
                         />
                     </div>
-                    <div className="exp-card-section">
-                        <div className="exp-card-section-header">
-                            <Paperclip size={14} className="exp-card-section-icon" />
-                            Event Files
+                    <div className="exp-card-section event-media-section">
+                        <nav className="project-expanded-tab-nav" aria-label="Event files and photos">
+                            {MEDIA_TABS.map((tab) => {
+                                const Icon = tab.icon;
+                                return (
+                                    <button
+                                        key={tab.key}
+                                        type="button"
+                                        onClick={() => setActiveMediaTab(tab.key)}
+                                        className={`project-expanded-tab-button${
+                                            activeMediaTab === tab.key ? ' project-expanded-tab-button--active' : ''
+                                        }`}
+                                    >
+                                        <Icon size={16} />
+                                        {tab.label}
+                                    </button>
+                                );
+                            })}
+                        </nav>
+
+                        <div
+                            className="project-expanded-tab-panel"
+                            hidden={activeMediaTab !== 'files'}
+                        >
+                            <FileUploadZone
+                                entityId={fullDetail.id}
+                                filesAPI={eventFilesAPI as EntityFilesAPI}
+                                memberId={user?.id}
+                                existingFiles={eventFiles}
+                                existingFolders={eventFolders}
+                                onFileUploaded={archivedView ? () => { } : (newFile, replaced) => setEventFiles((prev) =>
+                                    replaced
+                                        ? prev.map((f) => f.id === newFile.id ? newFile as EventFileRef : f)
+                                        : [newFile as EventFileRef, ...prev]
+                                )}
+                                onFileRemoved={archivedView ? () => { } : (fileId) => setEventFiles((prev) => prev.filter((f) => f.id !== fileId))}
+                                onFileRenamed={archivedView ? () => { } : (updated) => setEventFiles((prev) =>
+                                    prev.map((f) => f.id === updated.id ? { ...f, fileName: updated.fileName } : f)
+                                )}
+                                disabled={archivedView || !canUpload}
+                            />
                         </div>
-                        <FileUploadZone
-                            entityId={fullDetail.id}
-                            filesAPI={eventFilesAPI as EntityFilesAPI}
-                            memberId={user?.id}
-                            existingFiles={eventFiles}
-                            existingFolders={eventFolders}
-                            onFileUploaded={archivedView ? () => { } : (newFile, replaced) => setEventFiles((prev) =>
-                                replaced
-                                    ? prev.map((f) => f.id === newFile.id ? newFile as EventFileRef : f)
-                                    : [newFile as EventFileRef, ...prev]
-                            )}
-                            onFileRemoved={archivedView ? () => { } : (fileId) => setEventFiles((prev) => prev.filter((f) => f.id !== fileId))}
-                            onFileRenamed={archivedView ? () => { } : (updated) => setEventFiles((prev) =>
-                                prev.map((f) => f.id === updated.id ? { ...f, fileName: updated.fileName } : f)
-                            )}
-                            disabled={archivedView || !canUpload}
-                        />
-                    </div>
-                    <div className="exp-card-section">
-                        <div className="exp-card-section-header">
-                            <Image size={14} className="exp-card-section-icon" />
-                            Event Photos
+
+                        <div
+                            className="project-expanded-tab-panel"
+                            hidden={activeMediaTab !== 'photos'}
+                        >
+                            <EventPhotosSection
+                                eventId={fullDetail.id}
+                                eventDate={fullDetail.eventDate}
+                                eventEndDate={fullDetail.eventEndDate}
+                                timezone={fullDetail.timezone}
+                                memberId={user?.id}
+                                disabled={archivedView || !canUpload}
+                            />
                         </div>
-                        <EventPhotosSection
-                            eventId={fullDetail.id}
-                            eventDate={fullDetail.eventDate}
-                            eventEndDate={fullDetail.eventEndDate}
-                            timezone={fullDetail.timezone}
-                            memberId={user?.id}
-                            disabled={archivedView || !canUpload}
-                        />
                     </div>
                 </>
             ) : null}

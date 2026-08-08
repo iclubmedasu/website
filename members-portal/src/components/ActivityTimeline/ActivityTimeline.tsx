@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Calendar, User } from 'lucide-react';
 import { formatDateTime } from '@iclub/shared/utils';
+import { DateInput } from '@/components/input/DateInput';
 import { getProfilePhotoUrl } from '@/services/api';
 import {
     collectReadableChanges,
@@ -171,10 +172,8 @@ export default function ActivityTimeline({
 
                         <div className="modal-form-group timeline-filter-field">
                             <label className="modal-label" htmlFor="timeline-filter-from">From</label>
-                            <input
+                            <DateInput
                                 id="timeline-filter-from"
-                                type="date"
-                                className="modal-input"
                                 value={dateFrom}
                                 onChange={(e) => setDateFrom(e.target.value)}
                                 max={dateTo || undefined}
@@ -183,10 +182,8 @@ export default function ActivityTimeline({
 
                         <div className="modal-form-group timeline-filter-field">
                             <label className="modal-label" htmlFor="timeline-filter-to">To</label>
-                            <input
+                            <DateInput
                                 id="timeline-filter-to"
-                                type="date"
-                                className="modal-input"
                                 value={dateTo}
                                 onChange={(e) => setDateTo(e.target.value)}
                                 min={dateFrom || undefined}

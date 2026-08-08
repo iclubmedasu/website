@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { DateInput } from '@/components/input/DateInput';
 import type { ProjectStatus, TeamRef } from '@/types/backend-contracts';
 
 const WORK_STATUSES: ProjectStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD', 'CANCELLED'];
@@ -162,20 +163,16 @@ export default function ProjectFiltersModal({
                         <div className="form-row">
                             <div className="form-group">
                                 <label className="form-label" htmlFor="project-filter-date-from">From</label>
-                                <input
+                                <DateInput
                                     id="project-filter-date-from"
-                                    type="date"
-                                    className="form-input"
                                     value={draftDateFrom}
                                     onChange={(event) => setDraftDateFrom(event.target.value)}
                                 />
                             </div>
                             <div className="form-group">
                                 <label className="form-label" htmlFor="project-filter-date-to">To</label>
-                                <input
+                                <DateInput
                                     id="project-filter-date-to"
-                                    type="date"
-                                    className="form-input"
                                     value={draftDateTo}
                                     onChange={(event) => setDraftDateTo(event.target.value)}
                                 />

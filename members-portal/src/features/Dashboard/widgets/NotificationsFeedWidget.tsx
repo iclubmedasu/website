@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { formatDistanceToNow, parseISO } from 'date-fns';
 import type { Id, NotificationItem } from '@iclub/shared';
 import { notificationsAPI } from '@/services/api';
+import { NotificationListItem } from '@/features/Notifications/NotificationListItem';
 
 export interface NotificationsFeedWidgetProps {
     notifications?: NotificationItem[] | null;
@@ -106,40 +106,15 @@ export default function NotificationsFeedWidget({
                 ) : notifications.length === 0 ? (
                     <p className="empty-message">No notifications yet.</p>
                 ) : (
-                    <div className="dashboard-list">
+                    <div className="notification-list">
                         {notifications.map((notification) => (
-                            <div
+                            <NotificationListItem
                                 key={notification.id}
-                                className={`dashboard-list-row dashboard-notification-row${notification.isRead ? ' is-read' : ''}`}
-                            >
-                                <div className="dashboard-notification-row-main">
-                                    <h4 className="dashboard-list-row-title">{notification.title}</h4>
-                                    <p className="dashboard-list-row-meta">{notification.body}</p>
-                                    <time
-                                        className="dashboard-list-row-meta dashboard-notification-time"
-                                        dateTime={notification.createdAt}
-                                    >
-                                        {formatDistanceToNow(parseISO(notification.createdAt), {
-                                            addSuffix: true,
-                                        })}
-                                    </time>
-                                </div>
-                                {!notification.isRead ? (
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary dashboard-notification-read-btn"
-                                        disabled={markingIds.has(notification.id)}
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            void handleMarkRead(notification.id);
-                                        }}
-                                    >
-                                        {markingIds.has(notification.id)
-                                            ? 'Saving...'
-                                            : 'Mark as read'}
-                                    </button>
-                                ) : null}
-                            </div>
+                                notification={notification}
+                                timeMode="relative"
+                                marking={markingIds.has(notification.id)}
+                                onMarkRead={(id) => void handleMarkRead(id)}
+                            />
                         ))}
                     </div>
                 )}

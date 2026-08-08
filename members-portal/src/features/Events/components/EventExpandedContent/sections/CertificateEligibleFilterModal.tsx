@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Plus, X } from 'lucide-react';
+import { DateInput } from '@/components/input/DateInput';
 import {
     createDefaultCertificateEligibleFilter,
     DEFAULT_CERTIFICATE_ELIGIBLE_SORT,
@@ -368,10 +369,8 @@ export default function CertificateEligibleFilterModal({
                                 <label className="form-label" htmlFor="cert-unified-date-from">
                                     Issued from
                                 </label>
-                                <input
+                                <DateInput
                                     id="cert-unified-date-from"
-                                    type="date"
-                                    className="form-input"
                                     value={draftDateFrom}
                                     onChange={(event) => setDraftDateFrom(event.target.value)}
                                 />
@@ -380,10 +379,8 @@ export default function CertificateEligibleFilterModal({
                                 <label className="form-label" htmlFor="cert-unified-date-to">
                                     Issued to
                                 </label>
-                                <input
+                                <DateInput
                                     id="cert-unified-date-to"
-                                    type="date"
-                                    className="form-input"
                                     value={draftDateTo}
                                     onChange={(event) => setDraftDateTo(event.target.value)}
                                 />

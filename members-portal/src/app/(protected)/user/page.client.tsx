@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
-import { formatDate, formatDateTime } from '@iclub/shared/utils';
+import { formatDate } from '@iclub/shared/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useAutoDismissMessage } from '@/hooks/useAutoDismissMessage';
 import {
@@ -31,6 +31,7 @@ import { PhoneInput } from '@/components/PhoneInput/PhoneInput';
 import UploadPhotoModal from '@/components/UploadPhotoModal/UploadPhotoModal';
 import Toggle from '@/components/toggle/Toggle';
 import { MemberAchievements } from '@/components/MemberAchievements/MemberAchievements';
+import { NotificationListItem } from '@/features/Notifications/NotificationListItem';
 import { normalizePhoneDisplay, sanitizePhoneForStorage } from '@/utils/countryCodes';
 import '@/components/modal/modal.css';
 import type { Id, NotificationItem, MemberContactVisibility } from '@/types/backend-contracts';
@@ -1123,34 +1124,15 @@ function UserPage() {
                                     </p>
                                 </div>
                             ) : (
-                                <div className="user-notifications-list">
+                                <div className="user-notifications-list notification-list">
                                     {notifications.map((notification) => (
-                                        <article
+                                        <NotificationListItem
                                             key={notification.id}
-                                            className={`user-notification-item${notification.isRead ? ' is-read' : ''}`}
-                                        >
-                                            <div className="user-notification-content">
-                                                <div className="user-notification-meta">
-                                                    <span className="user-notification-event">{notification.eventType.replaceAll('_', ' ')}</span>
-                                                    <span className="user-notification-time">
-                                                        {formatDateTime(notification.createdAt)}
-                                                    </span>
-                                                </div>
-                                                <h4 className="user-notification-item-title">{notification.title}</h4>
-                                                <p className="user-notification-item-body">{notification.body}</p>
-                                            </div>
-
-                                            {!notification.isRead && (
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-secondary user-notification-read-btn"
-                                                    disabled={markingIds.has(notification.id)}
-                                                    onClick={() => void handleMarkNotificationRead(notification.id)}
-                                                >
-                                                    {markingIds.has(notification.id) ? 'Saving...' : 'Mark as read'}
-                                                </button>
-                                            )}
-                                        </article>
+                                            notification={notification}
+                                            timeMode="absolute"
+                                            marking={markingIds.has(notification.id)}
+                                            onMarkRead={(id) => void handleMarkNotificationRead(id)}
+                                        />
                                     ))}
                                 </div>
                             )}

@@ -58,6 +58,28 @@ function getTokenCookie(setCookieHeader: string | string[] | undefined): string 
     return header
 }
 
+function cookieAttributeFlags(setCookieHeader: string): string[] {
+    // Drop name=value segment; remaining pieces are cookie attributes (HttpOnly, Secure, …).
+    return setCookieHeader
+        .split(';')
+        .slice(1)
+        .map((part) => part.trim().split('=')[0]!.toLowerCase())
+}
+
+function expectNonProdAuthCookieAttrs(tokenCookie: string) {
+    const flags = cookieAttributeFlags(tokenCookie)
+    expect(tokenCookie).toContain('HttpOnly')
+    expect(tokenCookie).toContain('SameSite=Lax')
+    expect(flags).not.toContain('secure')
+}
+
+function expectProdAuthCookieAttrs(tokenCookie: string) {
+    const flags = cookieAttributeFlags(tokenCookie)
+    expect(tokenCookie).toContain('HttpOnly')
+    expect(tokenCookie).toContain('SameSite=None')
+    expect(flags).toContain('secure')
+}
+
 /** 7 days in seconds (web Max-Age) */
 const WEB_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
 /** 30 days in seconds (PWA Max-Age) */
@@ -94,10 +116,8 @@ describe('auth routes cookie security headers', () => {
         expect(response.body.token.length).toBeGreaterThan(0)
 
         const tokenCookie = getTokenCookie(response.headers['set-cookie'])
-        expect(tokenCookie).toContain('HttpOnly')
-        expect(tokenCookie).toContain('SameSite=None')
+        expectNonProdAuthCookieAttrs(tokenCookie)
         expect(tokenCookie).toContain(`Max-Age=${WEB_MAX_AGE_SECONDS}`)
-        expect(tokenCookie).toContain('Secure')
 
         const decoded = jwt.decode(response.body.token) as { exp: number; iat: number }
         expect(decoded.exp - decoded.iat).toBe(WEB_MAX_AGE_SECONDS)
@@ -217,9 +237,7 @@ describe('auth routes cookie security headers', () => {
         expect(typeof response.body.token).toBe('string')
 
         const tokenCookie = getTokenCookie(response.headers['set-cookie'])
-        expect(tokenCookie).toContain('HttpOnly')
-        expect(tokenCookie).toContain('SameSite=None')
-        expect(tokenCookie).toContain('Secure')
+        expectProdAuthCookieAttrs(tokenCookie)
     })
 
     it('clears token cookie with httpOnly attributes on logout', async () => {
@@ -233,8 +251,7 @@ describe('auth routes cookie security headers', () => {
 
         const tokenCookie = getTokenCookie(response.headers['set-cookie'])
         expect(tokenCookie).toContain('token=;')
-        expect(tokenCookie).toContain('HttpOnly')
-        expect(tokenCookie).toContain('SameSite=None')
+        expectNonProdAuthCookieAttrs(tokenCookie)
         expect(tokenCookie).toContain('Expires=Thu, 01 Jan 1970')
     })
 })

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Plus } from 'lucide-react';
 import type {
     EditorIncidentReportForm,
     EditorSupportNoticeBlock,
@@ -9,16 +10,17 @@ import type {
     IncidentReportDetail,
     SitePageHeader,
 } from '@iclub/shared';
-import { ArrowDown, ArrowUp, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { supportContentAPI } from '@/services/api';
 import { PageHeaderEditor } from './components/PageHeaderEditor';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
+import { SiteContentRowActions } from './components/SiteContentRowActions';
 import { SupportFormSubmissionsTable } from './components/SupportFormSubmissionsTable';
 import { IncidentReportDetailModal } from './modals/IncidentReportDetailModal';
 import { AddFormModal, EditFormModal, EditSupportNoticeModal } from './modals/SupportContentModals';
 import './SiteContent.css';
 import '@/components/modal/modal.css';
+import '@/components/table/table.css';
 
 function getErrorMessage(error: unknown, fallback: string): string {
     return error instanceof Error && error.message ? error.message : fallback;
@@ -57,44 +59,19 @@ function renderFormRow(
                 </p>
             </div>
             {options.canEdit ? (
-                <div className="site-content-row-actions">
-                    <button
-                        type="button"
-                        className="btn btn-secondary btn-icon"
-                        onClick={() => options.onMove(index, -1)}
-                        disabled={options.busy || index === 0}
-                        aria-label="Move up"
-                    >
-                        <ArrowUp size={16} />
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-secondary btn-icon"
-                        onClick={() => options.onMove(index, 1)}
-                        disabled={options.busy || index === forms.length - 1}
-                        aria-label="Move down"
-                    >
-                        <ArrowDown size={16} />
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-secondary btn-icon"
-                        onClick={() => options.onEdit(form)}
-                        disabled={options.busy}
-                        aria-label="Edit form"
-                    >
-                        <Pencil size={16} />
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-danger btn-icon"
-                        onClick={() => options.onDelete(form)}
-                        disabled={options.busy || form.isSystem}
-                        aria-label="Delete form"
-                    >
-                        <Trash2 size={16} />
-                    </button>
-                </div>
+                <SiteContentRowActions
+                    busy={options.busy}
+                    canMoveUp={index > 0}
+                    canMoveDown={index < forms.length - 1}
+                    onMoveUp={() => options.onMove(index, -1)}
+                    onMoveDown={() => options.onMove(index, 1)}
+                    onEdit={() => options.onEdit(form)}
+                    onDelete={() => options.onDelete(form)}
+                    deleteDisabled={form.isSystem}
+                    ariaLabel={`Actions for ${form.label}`}
+                    editLabel="Edit form"
+                    deleteLabel="Delete form"
+                />
             ) : null}
         </div>
     );
@@ -282,21 +259,25 @@ export default function SupportEditorPage() {
 
                     {canEditPageContent ? (
                     <div className="card site-content-sections-card">
-                        <div className="card-header card-header-with-action">
-                            <div className="card-header-left">
-                                <h3 className="card-title">Guidance blocks</h3>
-                                <p className="card-subtitle">Bilingual instructions shown above the incident report form.</p>
+                        <div className="card-header">
+                            <div className="card-header-with-action">
+                                <div className="card-header-left">
+                                    <h3 className="card-title">Guidance blocks</h3>
+                                </div>
+                                {canEditPageContent ? (
+                                    <button
+                                        type="button"
+                                        className="card-add-btn"
+                                        onClick={() => setShowNoticeModal(true)}
+                                        disabled={busy}
+                                        title="Add block"
+                                        aria-label="Add guidance block"
+                                    >
+                                        <Plus />
+                                    </button>
+                                ) : null}
                             </div>
-                            {canEditPageContent ? (
-                                <button
-                                    type="button"
-                                    className="btn btn-secondary site-content-card-action"
-                                    onClick={() => setShowNoticeModal(true)}
-                                    disabled={busy}
-                                >
-                                    Add block
-                                </button>
-                            ) : null}
+                            <p className="card-subtitle">Bilingual instructions shown above the incident report form.</p>
                         </div>
                         <div className="card-body site-content-section-list">
                             {page.notices.map((notice, index) => (
@@ -308,26 +289,24 @@ export default function SupportEditorPage() {
                                         </p>
                                     </div>
                                     {canEditPageContent ? (
-                                        <div className="site-content-row-actions">
-                                            <button type="button" className="btn btn-secondary btn-icon" onClick={() => moveItem(page.notices, index, -1, supportContentAPI.reorderNotices)} disabled={busy || index === 0} aria-label="Move up">
-                                                <ArrowUp size={16} />
-                                            </button>
-                                            <button type="button" className="btn btn-secondary btn-icon" onClick={() => moveItem(page.notices, index, 1, supportContentAPI.reorderNotices)} disabled={busy || index === page.notices.length - 1} aria-label="Move down">
-                                                <ArrowDown size={16} />
-                                            </button>
-                                            <button type="button" className="btn btn-secondary btn-icon" onClick={() => setEditingNotice(notice)} disabled={busy} aria-label="Edit block">
-                                                <Pencil size={16} />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="btn btn-danger btn-icon"
-                                                onClick={() => setDeleteTarget({ kind: 'notice', id: notice.id, label: notice.locale })}
-                                                disabled={busy}
-                                                aria-label="Delete block"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
+                                        <SiteContentRowActions
+                                            busy={busy}
+                                            canMoveUp={index > 0}
+                                            canMoveDown={index < page.notices.length - 1}
+                                            onMoveUp={() =>
+                                                moveItem(page.notices, index, -1, supportContentAPI.reorderNotices)
+                                            }
+                                            onMoveDown={() =>
+                                                moveItem(page.notices, index, 1, supportContentAPI.reorderNotices)
+                                            }
+                                            onEdit={() => setEditingNotice(notice)}
+                                            onDelete={() =>
+                                                setDeleteTarget({ kind: 'notice', id: notice.id, label: notice.locale })
+                                            }
+                                            ariaLabel={`Actions for guidance block ${notice.locale}`}
+                                            editLabel="Edit block"
+                                            deleteLabel="Delete block"
+                                        />
                                     ) : null}
                                 </div>
                             ))}
@@ -337,23 +316,27 @@ export default function SupportEditorPage() {
 
                     {canEditForms ? (
                     <div className="card site-content-sections-card">
-                        <div className="card-header card-header-with-action">
-                            <div className="card-header-left">
-                                <h3 className="card-title">Forms</h3>
-                                <p className="card-subtitle">
-                                    General, Personal, and Request are protected. Add custom forms and manage their fields.
-                                </p>
+                        <div className="card-header">
+                            <div className="card-header-with-action">
+                                <div className="card-header-left">
+                                    <h3 className="card-title">Forms</h3>
+                                </div>
+                                {canEditForms ? (
+                                    <button
+                                        type="button"
+                                        className="card-add-btn"
+                                        onClick={() => setShowFormModal(true)}
+                                        disabled={busy}
+                                        title="Add form"
+                                        aria-label="Add form"
+                                    >
+                                        <Plus />
+                                    </button>
+                                ) : null}
                             </div>
-                            {canEditForms ? (
-                                <button
-                                    type="button"
-                                    className="btn btn-secondary site-content-card-action"
-                                    onClick={() => setShowFormModal(true)}
-                                    disabled={busy}
-                                >
-                                    Add form
-                                </button>
-                            ) : null}
+                            <p className="card-subtitle">
+                                General, Personal, and Request are protected. Add custom forms and manage their fields.
+                            </p>
                         </div>
                         <div className="card-body site-content-section-list">
                             {systemForms.map((form) => {
@@ -392,11 +375,11 @@ export default function SupportEditorPage() {
                             <div className="card-header">
                                 <div className="card-header-left">
                                     <h3 className="card-title">Submissions</h3>
-                                    <p className="card-subtitle">
-                                        Incident reports submitted from the portal or public website.
-                                        {totalSubmissions > 0 ? ` ${totalSubmissions} total.` : ''}
-                                    </p>
                                 </div>
+                                <p className="card-subtitle">
+                                    Incident reports submitted from the portal or public website.
+                                    {totalSubmissions > 0 ? ` ${totalSubmissions} total.` : ''}
+                                </p>
                             </div>
                             <div className="card-body">
                                 {page.forms.map((form) => {

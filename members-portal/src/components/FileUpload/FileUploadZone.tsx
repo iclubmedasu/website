@@ -1,6 +1,38 @@
 'use client';
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { FileText, Image, File, Folder, FolderOpen, Upload, Check, X, RotateCcw, Trash2, Loader, Download, AlertTriangle, History, ArchiveRestore, Pencil, ChevronDown, ChevronRight, Plus, MessageCircle } from 'lucide-react';
+import {
+    useState,
+    useRef,
+    useEffect,
+    useLayoutEffect,
+    useCallback,
+    useMemo,
+    type CSSProperties,
+    type ReactNode,
+} from 'react';
+import { createPortal } from 'react-dom';
+import {
+    FileText,
+    Image,
+    File,
+    Folder,
+    FolderOpen,
+    Upload,
+    Check,
+    X,
+    RotateCcw,
+    Trash2,
+    Loader,
+    Download,
+    AlertTriangle,
+    History,
+    ArchiveRestore,
+    Pencil,
+    ChevronDown,
+    ChevronRight,
+    Plus,
+    MessageCircle,
+    MoreVertical,
+} from 'lucide-react';
 import { formatDateTime } from '@iclub/shared/utils';
 import FileCommentsModal from './FileCommentsModal';
 import '@/components/modal/modal.css';
@@ -53,6 +85,157 @@ type DuplicateConfirmState = {
 function getErrorMessage(error: unknown, fallback: string): string {
     if (error instanceof Error && error.message) return error.message;
     return fallback;
+}
+
+type MenuCoords = { top: number; left: number };
+
+function computeMenuPosition(
+    trigger: HTMLElement,
+    menuEl: HTMLElement | null,
+): MenuCoords {
+    const rect = trigger.getBoundingClientRect();
+    const menuWidth = menuEl?.offsetWidth ?? 160;
+    const menuHeight = menuEl?.offsetHeight ?? 220;
+    const gap = 4;
+    const left = Math.max(
+        8,
+        Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8),
+    );
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const flipUp = spaceBelow < menuHeight + gap + 8;
+    const top = flipUp
+        ? Math.max(8, rect.top - menuHeight - gap)
+        : rect.bottom + gap;
+    return { top, left };
+}
+
+function FileActionMenuItem({
+    label,
+    onClick,
+    disabled = false,
+    danger = false,
+}: {
+    label: string;
+    onClick: () => void;
+    disabled?: boolean;
+    danger?: boolean;
+}) {
+    return (
+        <button
+            type="button"
+            className={`file-actions-menu-item${danger ? ' file-actions-menu-item--danger' : ''}`}
+            role="menuitem"
+            disabled={disabled}
+            onClick={onClick}
+        >
+            {label}
+        </button>
+    );
+}
+
+function FileActionsDropdown({
+    ariaLabel,
+    children,
+}: {
+    ariaLabel: string;
+    children: (args: { closeMenu: () => void }) => ReactNode;
+}) {
+    const [open, setOpen] = useState(false);
+    const [menuCoords, setMenuCoords] = useState<MenuCoords | null>(null);
+    const [mounted, setMounted] = useState(false);
+    const triggerRef = useRef<HTMLButtonElement | null>(null);
+    const menuRef = useRef<HTMLDivElement | null>(null);
+
+    const closeMenu = useCallback(() => {
+        setOpen(false);
+        setMenuCoords(null);
+    }, []);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    useLayoutEffect(() => {
+        if (!open) {
+            setMenuCoords(null);
+            return;
+        }
+
+        const updatePosition = () => {
+            const trigger = triggerRef.current;
+            if (!trigger) return;
+            setMenuCoords(computeMenuPosition(trigger, menuRef.current));
+        };
+
+        updatePosition();
+        const raf = requestAnimationFrame(updatePosition);
+
+        window.addEventListener('scroll', updatePosition, true);
+        window.addEventListener('resize', updatePosition);
+        return () => {
+            cancelAnimationFrame(raf);
+            window.removeEventListener('scroll', updatePosition, true);
+            window.removeEventListener('resize', updatePosition);
+        };
+    }, [open]);
+
+    useEffect(() => {
+        if (!open) return;
+
+        const handlePointerDown = (event: MouseEvent) => {
+            const target = event.target as Node;
+            if (menuRef.current?.contains(target)) return;
+            if (triggerRef.current?.contains(target)) return;
+            closeMenu();
+        };
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') closeMenu();
+        };
+
+        document.addEventListener('mousedown', handlePointerDown);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handlePointerDown);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [open, closeMenu]);
+
+    const menuStyle: CSSProperties = menuCoords
+        ? { top: menuCoords.top, left: menuCoords.left }
+        : { visibility: 'hidden', top: 0, left: 0 };
+
+    const portalMenu =
+        open && mounted
+            ? createPortal(
+                  <div
+                      ref={menuRef}
+                      className="file-actions-menu-panel file-actions-menu-panel--portal"
+                      role="menu"
+                      style={menuStyle}
+                  >
+                      {children({ closeMenu })}
+                  </div>,
+                  document.body,
+              )
+            : null;
+
+    return (
+        <div className="file-actions-menu">
+            <button
+                type="button"
+                ref={triggerRef}
+                className="file-history-btn file-actions-menu-trigger"
+                aria-label={ariaLabel}
+                aria-expanded={open}
+                aria-haspopup="menu"
+                onClick={() => setOpen((prev) => !prev)}
+            >
+                <MoreVertical size={14} />
+            </button>
+            {portalMenu}
+        </div>
+    );
 }
 
 /** Human-readable file size */
@@ -674,31 +857,83 @@ export default function FileUploadZone({ entityId, filesAPI, memberId, onFileUpl
                     {!f.failed && !f.done && !f.processing && (
                         <span className="file-status-uploading">{f.progress}%</span>
                     )}
-                    {f.done && (
-                        <button className="file-comment-btn" title="Comments" onClick={() => openComments(f)}>
-                            <MessageCircle size={12} />
-                        </button>
-                    )}
-                    {f.done && (
-                        <button type="button" className="file-download-btn" title="Download" onClick={() => { void handleDownloadFile(f); }}>
-                            <Download size={14} />
-                        </button>
-                    )}
-                    {!disabled && f.done && (
-                        <button className="file-rename-btn" title="Rename" onClick={() => openRename(f)}>
-                            <Pencil size={14} />
-                        </button>
-                    )}
-                    {!disabled && (
+                    {/* Cancel / remove while incomplete — always visible (in-flight) */}
+                    {!disabled && !f.done && (
                         <button className="file-delete-btn" title="Remove" onClick={() => requestDelete(f)}>
-                            {f.done ? <Trash2 size={14} /> : <X size={14} />}
+                            <X size={14} />
                         </button>
                     )}
-                    {f.done && (
-                        <button className="file-history-btn" title="Version history" onClick={() => openHistory(f)}>
-                            <History size={14} />
-                        </button>
-                    )}
+                    {f.done ? (
+                        <>
+                            <div className="file-actions-inline">
+                                <button className="file-comment-btn" title="Comments" onClick={() => openComments(f)}>
+                                    <MessageCircle size={12} />
+                                </button>
+                                <button type="button" className="file-download-btn" title="Download" onClick={() => { void handleDownloadFile(f); }}>
+                                    <Download size={14} />
+                                </button>
+                                {!disabled ? (
+                                    <button className="file-rename-btn" title="Rename" onClick={() => openRename(f)}>
+                                        <Pencil size={14} />
+                                    </button>
+                                ) : null}
+                                {!disabled ? (
+                                    <button className="file-delete-btn" title="Remove" onClick={() => requestDelete(f)}>
+                                        <Trash2 size={14} />
+                                    </button>
+                                ) : null}
+                                <button className="file-history-btn" title="Version history" onClick={() => openHistory(f)}>
+                                    <History size={14} />
+                                </button>
+                            </div>
+                            <FileActionsDropdown ariaLabel={`Actions for ${f.name}`}>
+                                {({ closeMenu }) => (
+                                    <>
+                                        <FileActionMenuItem
+                                            label="Comments"
+                                            onClick={() => {
+                                                openComments(f);
+                                                closeMenu();
+                                            }}
+                                        />
+                                        <FileActionMenuItem
+                                            label="Download"
+                                            onClick={() => {
+                                                void handleDownloadFile(f);
+                                                closeMenu();
+                                            }}
+                                        />
+                                        {!disabled ? (
+                                            <FileActionMenuItem
+                                                label="Rename"
+                                                onClick={() => {
+                                                    openRename(f);
+                                                    closeMenu();
+                                                }}
+                                            />
+                                        ) : null}
+                                        {!disabled ? (
+                                            <FileActionMenuItem
+                                                label="Delete"
+                                                danger
+                                                onClick={() => {
+                                                    requestDelete(f);
+                                                    closeMenu();
+                                                }}
+                                            />
+                                        ) : null}
+                                        <FileActionMenuItem
+                                            label="Version history"
+                                            onClick={() => {
+                                                openHistory(f);
+                                                closeMenu();
+                                            }}
+                                        />
+                                    </>
+                                )}
+                            </FileActionsDropdown>
+                        </>
+                    ) : null}
                 </div>
             </div>
         );
@@ -747,25 +982,72 @@ export default function FileUploadZone({ entityId, filesAPI, memberId, onFileUpl
                     <div className="folder-row-header-actions">
                         {!disabled && folder.isActive ? (
                             <>
-                                <button type="button" className="folder-upload-btn" title="Upload to this folder" onClick={() => { setTargetFolderId(String(folder.id)); fileInputRef.current?.click(); }}>
-                                    <Upload size={14} />
-                                </button>
-                                <button type="button" className="file-rename-btn" title="Rename folder" onClick={() => openFolderRename(folder)}>
-                                    <Pencil size={14} />
-                                </button>
-                                <button type="button" className="file-delete-btn" title="Delete folder" onClick={() => openFolderAction('delete', folder)}>
-                                    <Trash2 size={14} />
-                                </button>
+                                <div className="folder-row-header-actions-inline">
+                                    <button type="button" className="folder-upload-btn" title="Upload to this folder" onClick={() => { setTargetFolderId(String(folder.id)); fileInputRef.current?.click(); }}>
+                                        <Upload size={14} />
+                                    </button>
+                                    <button type="button" className="file-rename-btn" title="Rename folder" onClick={() => openFolderRename(folder)}>
+                                        <Pencil size={14} />
+                                    </button>
+                                    <button type="button" className="file-delete-btn" title="Delete folder" onClick={() => openFolderAction('delete', folder)}>
+                                        <Trash2 size={14} />
+                                    </button>
+                                    <button type="button" className="file-history-btn" title="Folder history" onClick={() => openFolderHistory(folder)}>
+                                        <History size={14} />
+                                    </button>
+                                </div>
+                                <FileActionsDropdown ariaLabel={`Actions for folder ${folder.folderName}`}>
+                                    {({ closeMenu }) => (
+                                        <>
+                                            <FileActionMenuItem
+                                                label="Upload files"
+                                                onClick={() => {
+                                                    setTargetFolderId(String(folder.id));
+                                                    fileInputRef.current?.click();
+                                                    closeMenu();
+                                                }}
+                                            />
+                                            <FileActionMenuItem
+                                                label="Rename"
+                                                onClick={() => {
+                                                    openFolderRename(folder);
+                                                    closeMenu();
+                                                }}
+                                            />
+                                            <FileActionMenuItem
+                                                label="Delete"
+                                                danger
+                                                onClick={() => {
+                                                    openFolderAction('delete', folder);
+                                                    closeMenu();
+                                                }}
+                                            />
+                                            <FileActionMenuItem
+                                                label="Folder history"
+                                                onClick={() => {
+                                                    openFolderHistory(folder);
+                                                    closeMenu();
+                                                }}
+                                            />
+                                        </>
+                                    )}
+                                </FileActionsDropdown>
                             </>
                         ) : !disabled ? (
-                            <button type="button" className="file-restore-btn" title="Restore folder" onClick={() => openFolderAction('restore', folder)}>
-                                <ArchiveRestore size={14} />
-                                Restore
+                            <>
+                                <button type="button" className="file-restore-btn" title="Restore folder" onClick={() => openFolderAction('restore', folder)}>
+                                    <ArchiveRestore size={14} />
+                                    Restore
+                                </button>
+                                <button type="button" className="file-history-btn" title="Folder history" onClick={() => openFolderHistory(folder)}>
+                                    <History size={14} />
+                                </button>
+                            </>
+                        ) : (
+                            <button type="button" className="file-history-btn" title="Folder history" onClick={() => openFolderHistory(folder)}>
+                                <History size={14} />
                             </button>
-                        ) : null}
-                        <button type="button" className="file-history-btn" title="Folder history" onClick={() => openFolderHistory(folder)}>
-                            <History size={14} />
-                        </button>
+                        )}
                     </div>
                 </div>
                 {isExpanded && (

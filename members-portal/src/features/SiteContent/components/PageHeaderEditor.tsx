@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Pencil } from 'lucide-react';
 import type { SitePageHeader } from '@iclub/shared';
 import { SiteContentModal } from './SiteContentModal';
 
@@ -37,21 +38,25 @@ export function PageHeaderEditor({ header, canEdit, busy, description, onSave }:
     return (
         <>
             <div className="card site-content-header-card">
-                <div className="card-header card-header-with-action">
-                    <div className="card-header-left">
-                        <h3 className="card-title">Page header</h3>
-                        <p className="card-subtitle">{description}</p>
+                <div className="card-header">
+                    <div className="card-header-with-action">
+                        <div className="card-header-left">
+                            <h3 className="card-title">Page header</h3>
+                        </div>
+                        {canEdit ? (
+                            <button
+                                type="button"
+                                className="card-edit-btn"
+                                onClick={startEditing}
+                                disabled={busy}
+                                title="Edit page header"
+                                aria-label="Edit page header"
+                            >
+                                <Pencil size={16} />
+                            </button>
+                        ) : null}
                     </div>
-                    {canEdit ? (
-                        <button
-                            type="button"
-                            className="btn btn-secondary site-content-card-action"
-                            onClick={startEditing}
-                            disabled={busy}
-                        >
-                            Edit header
-                        </button>
-                    ) : null}
+                    <p className="card-subtitle">{description}</p>
                 </div>
                 <div className="card-body site-content-form">
                     <p className="site-content-preview-eyebrow">{header.eyebrow}</p>

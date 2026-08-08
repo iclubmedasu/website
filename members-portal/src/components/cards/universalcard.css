@@ -72,12 +72,32 @@
 
 .card-header-with-action {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
+    gap: 0.75rem;
+    min-width: 0;
 }
 
 .card-header-left {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.card-header-with-action > .btn {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 100%;
+}
+
+@media (max-width: 480px) {
+    .card-header-with-action {
+        align-items: stretch;
+    }
+
+    .card-header-with-action > .btn {
+        align-self: flex-start;
+    }
 }
 
 .card-add-btn {
@@ -104,6 +124,61 @@
     color: white;
     transform: scale(1.1);
     box-shadow: var(--shadow-md);
+}
+
+.card-add-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.card-add-btn:disabled:hover {
+    background: white;
+    color: #16a34a;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Header-level edit — same geometry as .card-add-btn, blue (matches table edit-btn) */
+.card-edit-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    border: 2px solid #2563eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    background: white;
+    color: #2563eb;
+}
+
+.card-edit-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+.card-edit-btn:hover {
+    background: #2563eb;
+    color: white;
+    transform: scale(1.1);
+    box-shadow: var(--shadow-md);
+}
+
+.card-edit-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.card-edit-btn:disabled:hover {
+    background: white;
+    color: #2563eb;
+    transform: none;
+    box-shadow: none;
 }
 
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowDown, ArrowUp, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import type {
     EditorIncidentReportField,
     EditorIncidentReportForm,
@@ -12,6 +12,7 @@ import { supportContentAPI } from '@/services/api';
 import Toggle from '@/components/toggle/Toggle';
 import { SiteContentModal } from '../components/SiteContentModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
+import { SiteContentRowActions } from '../components/SiteContentRowActions';
 
 export const INCIDENT_FIELD_TYPES = ['text', 'dropdown', 'checkbox', 'number'] as const;
 
@@ -404,19 +405,21 @@ export function EditFormModal({ form, onClose, onSaved }: EditFormModalProps) {
                     <div className="site-content-form-fields-header">
                         <div>
                             <h3 className="site-content-form-fields-title">Fields</h3>
-                            <p className="site-content-form-fields-subtitle">
-                                Additional questions for this form beyond the fixed contact and description fields.
-                            </p>
                         </div>
                         <button
                             type="button"
-                            className="btn btn-secondary"
+                            className="card-add-btn"
                             onClick={() => setShowFieldModal(true)}
                             disabled={busy}
+                            title="Add field"
+                            aria-label="Add field"
                         >
-                            Add field
+                            <Plus />
                         </button>
                     </div>
+                    <p className="card-subtitle site-content-form-fields-subtitle">
+                        Additional questions for this form beyond the fixed contact and description fields.
+                    </p>
                     <div className="site-content-section-list">
                         {fields.length ? (
                             fields.map((field, index) => (
@@ -429,44 +432,18 @@ export function EditFormModal({ form, onClose, onSaved }: EditFormModalProps) {
                                             {!field.isActive ? ' · Hidden' : ''}
                                         </p>
                                     </div>
-                                    <div className="site-content-row-actions">
-                                        <button
-                                            type="button"
-                                            className="btn btn-secondary btn-icon"
-                                            onClick={() => void moveField(index, -1)}
-                                            disabled={busy || index === 0}
-                                            aria-label="Move up"
-                                        >
-                                            <ArrowUp size={16} />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn btn-secondary btn-icon"
-                                            onClick={() => void moveField(index, 1)}
-                                            disabled={busy || index === fields.length - 1}
-                                            aria-label="Move down"
-                                        >
-                                            <ArrowDown size={16} />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn btn-secondary btn-icon"
-                                            onClick={() => setEditingField(field)}
-                                            disabled={busy}
-                                            aria-label="Edit field"
-                                        >
-                                            <Pencil size={16} />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn btn-danger btn-icon"
-                                            onClick={() => setDeleteFieldTarget(field)}
-                                            disabled={busy}
-                                            aria-label="Delete field"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
+                                    <SiteContentRowActions
+                                        busy={busy}
+                                        canMoveUp={index > 0}
+                                        canMoveDown={index < fields.length - 1}
+                                        onMoveUp={() => void moveField(index, -1)}
+                                        onMoveDown={() => void moveField(index, 1)}
+                                        onEdit={() => setEditingField(field)}
+                                        onDelete={() => setDeleteFieldTarget(field)}
+                                        ariaLabel={`Actions for field ${field.label}`}
+                                        editLabel="Edit field"
+                                        deleteLabel="Delete field"
+                                    />
                                 </div>
                             ))
                         ) : (

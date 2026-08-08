@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Plus } from 'lucide-react';
 import type { EditorAboutPage, EditorAboutSection, SitePageHeader } from '@iclub/shared';
-import { ArrowDown, ArrowUp, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { siteContentAPI } from '@/services/api';
 import { PageHeaderEditor } from './components/PageHeaderEditor';
+import { SiteContentRowActions } from './components/SiteContentRowActions';
 import { EditAboutSectionModal } from './modals/EditAboutSectionModal';
 import { AddAboutSectionModal } from './modals/AddAboutSectionModal';
 import './SiteContent.css';
 import '@/components/modal/modal.css';
+import '@/components/table/table.css';
 
 function sectionTypeLabel(type: EditorAboutSection['type']): string {
     if (type === 'TWO_COLUMN') return 'Two-column';
@@ -156,21 +158,25 @@ export default function AboutEditorPage() {
                     />
 
                     <div className="card site-content-sections-card">
-                        <div className="card-header card-header-with-action">
-                            <div className="card-header-left">
-                                <h3 className="card-title">Sections</h3>
-                                <p className="card-subtitle">Sections alternate white and purple on the public site.</p>
+                        <div className="card-header">
+                            <div className="card-header-with-action">
+                                <div className="card-header-left">
+                                    <h3 className="card-title">Sections</h3>
+                                </div>
+                                {canEdit ? (
+                                    <button
+                                        type="button"
+                                        className="card-add-btn"
+                                        onClick={() => setShowAddModal(true)}
+                                        disabled={busy}
+                                        title="Add section"
+                                        aria-label="Add section"
+                                    >
+                                        <Plus />
+                                    </button>
+                                ) : null}
                             </div>
-                            {canEdit ? (
-                                <button
-                                    type="button"
-                                    className="btn btn-secondary site-content-card-action"
-                                    onClick={() => setShowAddModal(true)}
-                                    disabled={busy}
-                                >
-                                    Add section
-                                </button>
-                            ) : null}
+                            <p className="card-subtitle">Sections alternate white and purple on the public site.</p>
                         </div>
 
                         <div className="card-body site-content-section-list">
@@ -184,44 +190,18 @@ export default function AboutEditorPage() {
                                             <h4 className="site-content-section-title">{section.title}</h4>
                                         </div>
                                         {canEdit ? (
-                                            <div className="site-content-row-actions">
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-secondary btn-icon"
-                                                    onClick={() => moveSection(index, -1)}
-                                                    disabled={busy || index === 0}
-                                                    aria-label="Move up"
-                                                >
-                                                    <ArrowUp size={16} />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-secondary btn-icon"
-                                                    onClick={() => moveSection(index, 1)}
-                                                    disabled={busy || index === page.sections.length - 1}
-                                                    aria-label="Move down"
-                                                >
-                                                    <ArrowDown size={16} />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-secondary btn-icon"
-                                                    onClick={() => setEditingSection(section)}
-                                                    disabled={busy}
-                                                    aria-label="Edit section"
-                                                >
-                                                    <Pencil size={16} />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-danger btn-icon"
-                                                    onClick={() => deleteSection(section.id)}
-                                                    disabled={busy}
-                                                    aria-label="Delete section"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
+                                            <SiteContentRowActions
+                                                busy={busy}
+                                                canMoveUp={index > 0}
+                                                canMoveDown={index < page.sections.length - 1}
+                                                onMoveUp={() => moveSection(index, -1)}
+                                                onMoveDown={() => moveSection(index, 1)}
+                                                onEdit={() => setEditingSection(section)}
+                                                onDelete={() => deleteSection(section.id)}
+                                                ariaLabel={`Actions for ${section.title}`}
+                                                editLabel="Edit section"
+                                                deleteLabel="Delete section"
+                                            />
                                         ) : null}
                                     </div>
                                 ))

@@ -1,14 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Poppins } from "next/font/google";
 import { siteConfig } from "@/lib/site";
+import { arimo, poppins } from "../fonts";
 import "../globals.css";
 import "./embed.css";
-
-const poppins = Poppins({
-    subsets: ["latin"],
-    weight: ["400", "500", "600", "700"],
-    variable: "--font-poppins",
-});
 
 export const metadata: Metadata = {
     title: {
@@ -32,8 +26,14 @@ export default function EmbedRootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en" className={poppins.variable}>
-            <body className="embed-body">{children}</body>
+        <html
+            lang="en"
+            className={`${poppins.variable} ${arimo.variable}`}
+            suppressHydrationWarning
+        >
+            <body className="embed-body" suppressHydrationWarning>
+                {children}
+            </body>
         </html>
     );
 }

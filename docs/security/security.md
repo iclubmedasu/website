@@ -163,7 +163,7 @@ Registered **only when** `NODE_ENV !== "production"`. Production builds must not
 - Prefer `Authorization: Bearer` then httpOnly `token` cookie.
 - Query-string `?token=` is **opt-in** (`allowQueryToken: true`) for documented cases only (WebSocket upgrade fallback; some file download/`<a href>` navigations).
 
-Login still sets an httpOnly cookie (`sameSite: 'none'`, `secure: true`) for cross-origin HF Spaces — see `backend/routes/auth.ts`.
+Login sets an httpOnly `token` cookie via `backend/routes/auth.ts`. **Production** uses `SameSite=None` + `Secure` for cross-origin HTTPS portal ↔ API (e.g. HF Spaces). **Non-production** uses `SameSite=Lax` + non-`Secure` so cookies work on plain HTTP LAN mobile testing (`http://192.168…`); do not deploy non-production cookie flags to production HTTPS hosts.
 
 ### Residual risks (still open)
 

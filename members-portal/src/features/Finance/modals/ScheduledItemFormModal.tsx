@@ -8,6 +8,7 @@ import {
     FinanceScheduledRecurrence,
 } from '@iclub/shared';
 import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
+import { DateInput } from '@/components/input/DateInput';
 import { financeAPI } from '@/services/api';
 import { FormToggleRow } from '@/components/toggle/FormToggleRow';
 import { FinanceModal } from '../components/FinanceModal';
@@ -139,10 +140,8 @@ export function ScheduledItemFormModal({ item, accounts, onClose, onSaved }: Sch
             </div>
             <div className="form-group">
                 <label htmlFor="finance-scheduled-due" className="form-label">Due date</label>
-                <input
+                <DateInput
                     id="finance-scheduled-due"
-                    type="date"
-                    className="form-input"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
                 />

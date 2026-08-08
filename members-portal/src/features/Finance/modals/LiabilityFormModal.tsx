@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { FinanceAccountSummary, FinanceLiabilityRow, FinanceLiabilityStatus } from '@iclub/shared';
 import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
+import { DateInput } from '@/components/input/DateInput';
 import { financeAPI } from '@/services/api';
 import { FinanceModal } from '../components/FinanceModal';
 
@@ -155,10 +156,8 @@ export function LiabilityFormModal({ liability, accounts, onClose, onSaved }: Li
             </div>
             <div className="form-group">
                 <label htmlFor="finance-liability-due" className="form-label">Due date</label>
-                <input
+                <DateInput
                     id="finance-liability-due"
-                    type="date"
-                    className="form-input"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
                 />

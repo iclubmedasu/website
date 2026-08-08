@@ -20,8 +20,8 @@
   --color-purple-300: #d6c8e5;
   --color-purple-50: #f5f3ff;
 
-  --font-heading: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
-  --font-body: ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-poppins), Helvetica, Arial, sans-serif;
+  --font-body: var(--font-arimo), Helvetica, Arial, sans-serif;
 }
 
 :root {
@@ -88,6 +88,8 @@
 
 html {
   height: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 html,

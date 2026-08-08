@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Pencil } from 'lucide-react';
+import { Filter, Pencil, Plus, Search } from 'lucide-react';
 import {
     createColumnHelper,
     flexRender,
@@ -18,7 +18,13 @@ import type {
 } from '@iclub/shared';
 import { formatDate } from '@iclub/shared/utils';
 import { financeAPI } from '@/services/api';
+import TransactionFiltersModal, {
+    type TransactionFiltersState,
+} from '../modals/TransactionFiltersModal';
 import '@/features/Projects/ProjectsPage.css';
+import '@/components/SearchField/SearchField.css';
+import '@/components/modal/modal.css';
+import '@/components/input/input.css';
 
 interface TransactionLogTableProps {
     accounts: FinanceAccountSummary[];
@@ -73,6 +79,9 @@ export default function TransactionLogTable({
     const [search, setSearch] = useState('');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
+    const [filtersOpen, setFiltersOpen] = useState(false);
+
+    const hasActiveFilters = Boolean(accountId || type || category || dateFrom || dateTo);
 
     const filters = useMemo<FinanceTransactionFilters>(() => ({
         accountId: accountId ? Number(accountId) : undefined,
@@ -84,6 +93,26 @@ export default function TransactionLogTable({
         page,
         pageSize: ROWS_PER_PAGE,
     }), [accountId, type, category, search, dateFrom, dateTo, page]);
+
+    const handleApplyFilters = (next: TransactionFiltersState) => {
+        setAccountId(next.accountId);
+        setType(next.type);
+        setCategory(next.category);
+        setDateFrom(next.dateFrom);
+        setDateTo(next.dateTo);
+        setPage(1);
+        setFiltersOpen(false);
+    };
+
+    const handleClearFilters = () => {
+        setAccountId('');
+        setType('');
+        setCategory('');
+        setDateFrom('');
+        setDateTo('');
+        setPage(1);
+        setFiltersOpen(false);
+    };
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
@@ -176,89 +205,48 @@ export default function TransactionLogTable({
 
     return (
         <div className="card members-table-card">
-            <div className="card-header card-header-with-action">
-                <div className="card-header-left">
-                    <h3 className="card-title">Transactions</h3>
-                    <p className="card-subtitle">{total} total</p>
+            <div className="card-header">
+                <div className="card-header-with-action">
+                    <div className="card-header-left">
+                        <h3 className="card-title">Transactions</h3>
+                    </div>
+                    {onAdd ? (
+                        <button
+                            type="button"
+                            className="card-add-btn"
+                            onClick={onAdd}
+                            title="Add transaction"
+                            aria-label="Add transaction"
+                        >
+                            <Plus />
+                        </button>
+                    ) : null}
                 </div>
-                {onAdd ? (
-                    <button type="button" className="btn btn-secondary finance-card-action" onClick={onAdd}>
-                        Add transaction
-                    </button>
-                ) : null}
+                <p className="card-subtitle">{total} total</p>
             </div>
             <div className="card-body">
-                <div className="finance-filters">
-                    <input
-                        className="form-input"
-                        placeholder="Search description, category, reference"
-                        value={search}
-                        onChange={(e) => {
-                            setPage(1);
-                            setSearch(e.target.value);
-                        }}
-                    />
-                    <select
-                        aria-label="Filter by account"
-                        className="form-input"
-                        value={accountId}
-                        onChange={(e) => {
-                            setPage(1);
-                            setAccountId(e.target.value);
-                        }}
-                    >
-                        <option value="">All accounts</option>
-                        {accounts.map((account) => (
-                            <option key={account.id} value={account.id}>{account.name}</option>
-                        ))}
-                    </select>
-                    <select
-                        aria-label="Filter by type"
-                        className="form-input"
-                        value={type}
-                        onChange={(e) => {
-                            setPage(1);
-                            setType(e.target.value);
-                        }}
-                    >
-                        <option value="">All types</option>
-                        <option value="INCOME">Income</option>
-                        <option value="EXPENSE">Expense</option>
-                    </select>
-                    <select
-                        aria-label="Filter by category"
-                        className="form-input"
-                        value={category}
-                        onChange={(e) => {
-                            setPage(1);
-                            setCategory(e.target.value);
-                        }}
-                    >
-                        <option value="">All categories</option>
-                        {categories.map((item) => (
-                            <option key={item} value={item}>{item}</option>
-                        ))}
-                    </select>
-                    <input
-                        aria-label="Date from"
-                        type="date"
-                        className="form-input"
-                        value={dateFrom}
-                        onChange={(e) => {
-                            setPage(1);
-                            setDateFrom(e.target.value);
-                        }}
-                    />
-                    <input
-                        aria-label="Date to"
-                        type="date"
-                        className="form-input"
-                        value={dateTo}
-                        onChange={(e) => {
-                            setPage(1);
-                            setDateTo(e.target.value);
-                        }}
-                    />
+                <div className="page-search-row">
+                    <div className="page-search-field page-search-field--full">
+                        <Search className="page-search-icon" size={16} />
+                        <input
+                            className="page-search-input"
+                            placeholder="Search description, category, reference"
+                            value={search}
+                            onChange={(e) => {
+                                setPage(1);
+                                setSearch(e.target.value);
+                            }}
+                            aria-label="Search transactions"
+                        />
+                        <button
+                            type="button"
+                            className={`page-search-filter-btn${hasActiveFilters ? ' page-search-filter-btn--active' : ''}`}
+                            onClick={() => setFiltersOpen(true)}
+                        >
+                            <Filter size={16} />
+                            <span className="page-search-filter-label">Advanced Filters</span>
+                        </button>
+                    </div>
                 </div>
 
                 {error ? <p className="error-message">{error}</p> : null}
@@ -349,6 +337,21 @@ export default function TransactionLogTable({
                     </div>
                 )}
             </div>
+
+            {filtersOpen ? (
+                <TransactionFiltersModal
+                    accountId={accountId}
+                    type={type}
+                    category={category}
+                    dateFrom={dateFrom}
+                    dateTo={dateTo}
+                    accounts={accounts}
+                    categories={categories}
+                    onClose={() => setFiltersOpen(false)}
+                    onApply={handleApplyFilters}
+                    onClear={handleClearFilters}
+                />
+            ) : null}
         </div>
     );
 }

@@ -5,6 +5,7 @@ import { flushSync } from 'react-dom';
 import {
     ChevronRight,
     ChevronDown,
+    ChevronLeft,
     Plus,
     Pencil,
     Trash2,
@@ -24,6 +25,7 @@ import {
     Maximize2,
     Minimize2,
     Calendar,
+    MoreVertical,
 } from 'lucide-react';
 import { tasksAPI, phasesAPI, getProfilePhotoUrl } from '../../../../services/api';
 import {
@@ -33,6 +35,7 @@ import {
     formatMonthYear,
     toLocalDayKey,
 } from '@iclub/shared/utils';
+import Dropdown from '@/components/dropdown/dropdown';
 import DeletePhaseTaskModal from '../../modals/DeletePhaseTaskModal';
 import ScheduleTimetable from '../ScheduleTimetable/ScheduleTimetable';
 import {
@@ -40,6 +43,7 @@ import {
     collectScheduleTimelineSlots,
 } from './scheduleTimelineExport';
 import { generateXlsxBlob } from '@/utils/generateXlsxBlob';
+import '@/components/table/table.css';
 import './GanttChart.css';
 
 type ScaleKey = 'quarter' | 'month' | 'week' | 'day';
@@ -151,6 +155,24 @@ const ASSIGNEE_VIEWER_PADDING = 12;
 const ASSIGNEE_VIEWER_ESTIMATED_HEIGHT = 240;
 
 const EXPANDED_STATE_BY_PROJECT = new Map<string, { phases: Set<any>; tasks: Set<any> }>();
+
+function GanttMenuItem({
+    label,
+    onClick,
+    disabled = false,
+}: {
+    label: string;
+    onClick: () => void;
+    disabled?: boolean;
+}) {
+    return (
+        <div className="dropdown-item-wrapper">
+            <button type="button" className="dropdown-item" disabled={disabled} onClick={onClick}>
+                <span className="dropdown-item-label">{label}</span>
+            </button>
+        </div>
+    );
+}
 
 function persistExpandedState(projectId: any, expandedPhases: Set<any>, expandedTasks: Set<any>) {
     if (projectId == null) return;
@@ -1230,6 +1252,8 @@ export default function GanttChart({
 
     // ── Resizable tree panel ──
     const [treeWidth, setTreeWidth] = useState<number>(DEFAULT_TREE_WIDTH);
+    /** Mobile only: hide phases/tasks tree so timeline can expand (CSS ignores this ≥769) */
+    const [treePanelCollapsed, setTreePanelCollapsed] = useState(false);
     const isResizingRef = useRef(false);
     const resizeStartXRef = useRef(0);
     const resizeStartWidthRef = useRef(DEFAULT_TREE_WIDTH);
@@ -3053,7 +3077,7 @@ export default function GanttChart({
     }
 
     return (
-        <div className={`gantt${isMaximized ? ' gantt--maximized' : ''}`}>
+        <div className={`gantt${isMaximized ? ' gantt--maximized' : ''}${treePanelCollapsed ? ' gantt--tree-collapsed' : ''}`}>
             {mobileRotateHint}
             {/* ── Confirm delete modal ── */}
             {confirmDelete && (
@@ -3073,6 +3097,8 @@ export default function GanttChart({
 
             {/* ── Toolbar ── */}
             <div className="gantt-toolbar">
+                {/* Desktop: full control clusters */}
+                <div className="gantt-toolbar-inline">
                 {/* Left: utility buttons (closer to tree panel) */}
                 <div className="gantt-toolbar-left">
                     {(canEdit || canEditStatus) && (
@@ -3188,37 +3214,6 @@ export default function GanttChart({
                                     ))}
                                 </div>
                             </div>
-
-                            {/* Baseline controls */}
-                            {/*         <div className="gantt-utility-group">
-                                <button
-                                    className="gantt-utility-btn"
-                                    title="Set baseline (snapshot current dates)"
-                                    onClick={handleSetBaseline}
-                                    style={{ width: 'auto', padding: '0 0.45rem', gap: '0.25rem' }}
-                                >
-                                    <Milestone size={13} />
-                                    <span style={{ fontSize: '0.66rem', fontWeight: 600 }}>Set</span>
-                                </button>
-                                {hasBaseline && (
-                                    <button
-                                        className={`gantt-utility-btn${showBaselines ? ' gantt-utility-btn--active' : ''}`}
-                                        title="Toggle baseline bars"
-                                        onClick={() => setShowBaselines((v) => !v)}
-                                    >
-                                        <Milestone size={13} />
-                                    </button>
-                                )}
-                                {hasBaseline && (
-                                    <button
-                                        className="gantt-utility-btn"
-                                        title="Clear baseline"
-                                        onClick={handleClearBaseline}
-                                    >
-                                        <Trash2 size={12} />
-                                    </button>
-                                )}
-                            </div> */}
                         </>
                     )}
                 </div>
@@ -3279,6 +3274,114 @@ export default function GanttChart({
                             {isMaximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
                             <span>{isMaximized ? 'Minimize' : 'Maximize'}</span>
                         </button>
+                    </div>
+                </div>
+                </div>
+
+                {/* Phone ≤768: compact bar + app-chrome menus (CSS dual-render) */}
+                <div className="gantt-toolbar-mobile">
+                    <button
+                        type="button"
+                        className="gantt-tree-panel-toggle table-action-btn utility-btn"
+                        title={treePanelCollapsed ? 'Show task tree' : 'Hide task tree'}
+                        aria-label={treePanelCollapsed ? 'Show task tree' : 'Hide task tree'}
+                        aria-expanded={!treePanelCollapsed}
+                        onClick={() => setTreePanelCollapsed((v) => !v)}
+                    >
+                        {treePanelCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                    </button>
+
+                    <div className="gantt-mobile-scale-group" role="group" aria-label="Time scale">
+                        {SCALES.map((s) => (
+                            <button
+                                key={s}
+                                type="button"
+                                className={`gantt-mobile-scale-seg${s === scale ? ' active' : ''}`}
+                                onClick={() => setScale(s)}
+                                aria-pressed={s === scale}
+                            >
+                                {s === 'quarter' ? 'Qtr' : s === 'month' ? 'Mo' : s === 'week' ? 'Wk' : 'Day'}
+                            </button>
+                        ))}
+                    </div>
+
+                    <button
+                        type="button"
+                        className="table-action-btn utility-btn"
+                        onClick={scrollToToday}
+                        title="Scroll to today"
+                        aria-label="Scroll to today"
+                    >
+                        <Crosshair size={16} />
+                    </button>
+
+                    <div className="gantt-toolbar-mobile-end">
+                        <Dropdown
+                            wrapperClassName="gantt-toolbar-dropdown"
+                            menuClassName="dropdown-menu gantt-toolbar-menu-panel"
+                            openClassName="open"
+                            hoverOpen={false}
+                            button={
+                                <button type="button" className="table-action-btn utility-btn" title="Export" aria-label="Export">
+                                    <Download size={16} />
+                                </button>
+                            }
+                        >
+                            {({ closeMenu }) => (
+                                <>
+                                    <GanttMenuItem
+                                        label={exportingFormat === 'png' ? 'Exporting PNG…' : 'Export PNG'}
+                                        disabled={!!exportingFormat}
+                                        onClick={() => { exportAsPng(); closeMenu(); }}
+                                    />
+                                    <GanttMenuItem
+                                        label={exportingFormat === 'xlsx' ? 'Exporting Excel…' : 'Export Excel'}
+                                        disabled={!!exportingFormat}
+                                        onClick={() => { exportAsExcel(); closeMenu(); }}
+                                    />
+                                </>
+                            )}
+                        </Dropdown>
+
+                        <button
+                            type="button"
+                            className="table-action-btn utility-btn"
+                            onClick={toggleMaximize}
+                            title={isMaximized ? 'Minimize gantt chart' : 'Maximize gantt chart'}
+                            aria-label={isMaximized ? 'Minimize gantt chart' : 'Maximize gantt chart'}
+                        >
+                            {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                        </button>
+
+                        {canEdit ? (
+                            <Dropdown
+                                wrapperClassName="gantt-toolbar-dropdown"
+                                menuClassName="dropdown-menu gantt-toolbar-menu-panel"
+                                openClassName="open"
+                                hoverOpen={false}
+                                button={
+                                    <button type="button" className="table-action-btn edit-btn" title="Edit actions" aria-label="Edit actions">
+                                        <MoreVertical size={16} />
+                                    </button>
+                                }
+                            >
+                                {({ closeMenu }) => (
+                                    <>
+                                        <GanttMenuItem label="Undo" disabled={!hasUndo} onClick={() => { handleUndo(); closeMenu(); }} />
+                                        <GanttMenuItem label="Redo" disabled={!hasRedo} onClick={() => { handleRedo(); closeMenu(); }} />
+                                        <GanttMenuItem label="Move up" disabled={!canMoveUp} onClick={() => { handleMoveUp(); closeMenu(); }} />
+                                        <GanttMenuItem label="Move down" disabled={!canMoveDown} onClick={() => { handleMoveDown(); closeMenu(); }} />
+                                        <GanttMenuItem label="Copy" disabled={!selected} onClick={() => { handleCopy(); closeMenu(); }} />
+                                        <GanttMenuItem label="Cut" disabled={!selected} onClick={() => { handleCut(); closeMenu(); }} />
+                                        <GanttMenuItem
+                                            label={clipboard ? `Paste "${clipboard.data?.title || ''}"` : 'Paste'}
+                                            disabled={!canPaste}
+                                            onClick={() => { handlePaste(); closeMenu(); }}
+                                        />
+                                    </>
+                                )}
+                            </Dropdown>
+                        ) : null}
                     </div>
                 </div>
             </div>
