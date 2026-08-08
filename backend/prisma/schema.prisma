@@ -81,6 +81,7 @@ model Member {
   documentCategoryAccessRequests         DocumentCategoryAccessRequest[] @relation("DocumentCategoryRequestMember")
   documentCategoryAccessRequestsReviewed DocumentCategoryAccessRequest[] @relation("DocumentCategoryRequestReviewedBy")
   pushSubscriptions                      PushSubscription[]
+  usageEvents                            UsageEvent[]
 }
 
 // ============================================
@@ -1792,4 +1793,20 @@ model AnnouncementResponsePeriod {
 
   @@index([responseId])
   @@index([responseId, startDate, endDate])
+}
+
+// ============================================
+// USAGE ANALYTICS - Lightweight product usage counts (no PII)
+// ============================================
+model UsageEvent {
+  id         Int      @id @default(autoincrement())
+  memberId   Int?
+  member     Member?  @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  actionType String // EVENT_CREATED | CERTIFICATE_ISSUED | CHECK_IN_SCANNED | REGISTRATION_CREATED | DATA_EXPORTED | LOGIN
+  entityType String? // e.g. "Event", "Certificate", "EventRegistration"
+  entityId   Int?
+  createdAt  DateTime @default(now())
+
+  @@index([actionType, createdAt])
+  @@index([memberId])
 }

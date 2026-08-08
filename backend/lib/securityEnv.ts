@@ -4,8 +4,26 @@
 
 const DEV_ONLY_JWT_FALLBACK = "dev-only-insecure-jwt-secret-change-me";
 
+const ALLOWED_NODE_ENVS = new Set(["development", "test", "production"]);
+
 export function isProductionEnv(): boolean {
     return process.env.NODE_ENV === "production";
+}
+
+/**
+ * Fail closed when NODE_ENV is set to an unrecognized value (e.g. "Production", "prod").
+ * Unset remains valid for local defaults. Allowed: development | test | production.
+ */
+export function assertValidNodeEnv(): void {
+    const nodeEnv = process.env.NODE_ENV;
+    if (nodeEnv === undefined) {
+        return;
+    }
+    if (!ALLOWED_NODE_ENVS.has(nodeEnv)) {
+        throw new Error(
+            `FATAL: NODE_ENV must be "development", "test", or "production" (got ${JSON.stringify(nodeEnv)})`,
+        );
+    }
 }
 
 /**

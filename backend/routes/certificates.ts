@@ -16,6 +16,7 @@ import { certificateEmailResendLimiter } from "../middleware/rateLimit";
 import { queueCertificateEmail, sendCertificateEmail } from "../services/certificateEmailService";
 import { generateCertificatePdfBuffer } from "../services/certificatePdfService";
 import { formatEventDay, getEventDayRange } from "../services/eventDates";
+import { recordUsageEvent, USAGE_ACTION_TYPES } from "../services/usageEventService";
 import type { RequestUser } from "../types/auth";
 
 /** Inclusive YYYY-MM-DD day list between two ISO day strings. */
@@ -612,6 +613,12 @@ router.post("/event/:eventId/issue-bulk", async (req: Request, res: Response) =>
 
             created += 1;
             certificateIds.push(certificate.id);
+            await recordUsageEvent({
+                memberId: req.user?.memberId ?? null,
+                actionType: USAGE_ACTION_TYPES.CERTIFICATE_ISSUED,
+                entityType: "Certificate",
+                entityId: certificate.id,
+            });
         }
 
         if (issueImmediately) {
@@ -797,6 +804,12 @@ router.post("/project/:projectId/issue-bulk", async (req: Request, res: Response
 
             created += 1;
             certificateIds.push(certificate.id);
+            await recordUsageEvent({
+                memberId: req.user?.memberId ?? null,
+                actionType: USAGE_ACTION_TYPES.CERTIFICATE_ISSUED,
+                entityType: "Certificate",
+                entityId: certificate.id,
+            });
         }
 
         if (issueImmediately) {
@@ -945,6 +958,12 @@ router.post("/", async (req: Request, res: Response) => {
             },
         });
         queueCertificateEmail(certificate.id, "custom-create");
+        await recordUsageEvent({
+            memberId: req.user?.memberId ?? null,
+            actionType: USAGE_ACTION_TYPES.CERTIFICATE_ISSUED,
+            entityType: "Certificate",
+            entityId: certificate.id,
+        });
         return res.status(201).json(certificate);
     } catch (error) {
         console.error("POST /certificates error:", error);

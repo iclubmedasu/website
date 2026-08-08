@@ -83,12 +83,14 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         const connect = () => {
             if (disposed) return;
 
-            const token = getAuthToken();
+            // Prefer cookie on upgrade. A memory/localStorage token is only required
+            // for the query-string fallback (mainly standalone PWA when cookies fail).
             const baseUrl = getNotificationsWebSocketUrl();
-            if (!token || !baseUrl) return;
+            if (!baseUrl) return;
 
+            const token = getAuthToken();
             const url = new URL(baseUrl);
-            if (allowQueryTokenFallback) {
+            if (allowQueryTokenFallback && token) {
                 url.searchParams.set('token', token);
             }
 
@@ -123,8 +125,9 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
                 setIsConnected(false);
                 socketRef.current = null;
                 if (disposed) return;
-                // First failure without query token → retry once with ?token= fallback.
-                if (!allowQueryTokenFallback) {
+                // First failure without query token → retry once with ?token= if we have one
+                // (PWA / same-tab memory). Web tabs without a bearer token keep cookie-only reconnects.
+                if (!allowQueryTokenFallback && getAuthToken()) {
                     allowQueryTokenFallback = true;
                     connect();
                     return;

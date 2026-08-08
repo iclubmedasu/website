@@ -169,14 +169,14 @@ Login still sets an httpOnly cookie (`sameSite: 'none'`, `secure: true`) for cro
 
 | Risk | Why it matters | Notes |
 |------|----------------|-------|
-| **JWT in `localStorage`** | XSS can steal the token even if cookies exist | Members portal still stores `auth_token` in `localStorage` ([`members-portal/src/services/api.ts`](../members-portal/src/services/api.ts)). Prefer cookie-only sessions long-term. |
-| **Query-string tokens** | Leak via Referer, logs, screenshots | Still used as WS / download fallback. Prefer cookie on WS upgrade when possible ([`RealtimeContext.tsx`](../members-portal/src/context/RealtimeContext.tsx)). |
+| **JWT in `localStorage` (PWA only)** | XSS can still steal a bearer token when the installed PWA rehydrates `auth_token` | **Regular browser tabs** no longer read/write `localStorage` or send `Authorization: Bearer`; they rely on the httpOnly cookie only ([`members-portal/src/services/api.ts`](../members-portal/src/services/api.ts)). **Installed standalone PWA** still keeps a bearer copy because `SameSite=None` cookies are unreliable in some iOS standalone contexts — deliberate tradeoff, not full cookie-only. Prefer cookie-only for PWA too once device-verified. |
+| **Query-string tokens** | Leak via Referer, logs, screenshots | Still used as WS / download fallback when a bearer token is available. Prefer cookie on WS upgrade when possible ([`RealtimeContext.tsx`](../members-portal/src/context/RealtimeContext.tsx)). |
 | **Certificate template GitHub paths** | Privileged users can set `backgroundImagePath` via `PATCH .../background` without prefix allowlist | Upload path is server-built (`certificates/templates/{id}/background…`), but PATCH accepts client-supplied path/SHA — constrain to expected prefix / owned objects before trusting downloads. |
 | **Public HF + public source** | Attackers know routes and auth design | Mitigate with authz tests and Phase 2 staging scans, not obscurity. |
 | **Verbose 500 messages** | Error middleware may return `err.message` to clients | Prefer generic messages in production. |
 | **AI pentest not yet run** | Unknown PoCs remain | Complete Phase 2 when Docker + LLM keys are available. |
 
-Architecture docs that say “JWT only in httpOnly cookie” are aspirational relative to current portal `localStorage` usage — treat residual risks above as source of truth until cookie-only is finished.
+Portal sessions: **web = cookie-only**; **installed PWA = cookie + localStorage/Bearer** for reliability. Treat the residual risks above as source of truth until the PWA surface is cookie-only as well.
 
 ---
 
@@ -273,7 +273,7 @@ Full checklists: [security-pentest.md — Phase 3](./security-pentest.md#phase-3
 - Keep `FRONTEND_URL` / `FRONTEND_ORIGINS` as exact production origins (already required; no `*.hf.space` wildcard in current code).
 - Add edge WAF / rate limits in front of the API when you can.
 - Keep Helmet; consider frontend CSP separately.
-- Prefer httpOnly-only sessions over dual `localStorage` + cookie.
+- Prefer httpOnly-only sessions where possible; portal web tabs are cookie-only, installed PWA still dual-stores bearer intentionally (see residual risks).
 
 ### Supabase RLS (short)
 
@@ -328,7 +328,7 @@ Out of scope (typical): production HF/Supabase, social engineering, volumetric D
 
 - [ ] One focused Strix (or Shannon) staging pass even if no major feature launch
 - [ ] Review Supabase policies and HF Space variable leakage (logs)
-- [ ] Revisit residual risks table (localStorage, query tokens, cert paths)
+- [ ] Revisit residual risks table (PWA localStorage/Bearer, query tokens, cert paths)
 
 ---
 

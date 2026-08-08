@@ -75,6 +75,11 @@ function parseCanvasDim(value: unknown): number | null {
     return n;
 }
 
+/** Only allow the canonical storage path produced by the upload-background flow. */
+function isValidTemplateBackgroundPath(templateId: number, path: string): boolean {
+    return path === templateBackgroundWebpPath(templateId);
+}
+
 const templateIssuedCountSelect = {
     _count: {
         select: {
@@ -387,7 +392,15 @@ router.put("/:id", async (req: Request, res: Response) => {
                 data.backgroundImagePath = null;
                 data.backgroundImageSha = null;
             } else if (typeof req.body.backgroundImagePath === "string") {
-                data.backgroundImagePath = req.body.backgroundImagePath.trim() || null;
+                const trimmed = req.body.backgroundImagePath.trim();
+                if (!trimmed) {
+                    data.backgroundImagePath = null;
+                    data.backgroundImageSha = null;
+                } else if (!isValidTemplateBackgroundPath(id, trimmed)) {
+                    return res.status(400).json({ error: "Invalid backgroundImagePath" });
+                } else {
+                    data.backgroundImagePath = trimmed;
+                }
             } else {
                 return res.status(400).json({ error: "Invalid backgroundImagePath" });
             }
@@ -557,6 +570,11 @@ router.patch("/:id/background", async (req: Request, res: Response) => {
         return res.status(400).json({ error: "backgroundImageSha is required" });
     }
 
+    const trimmedPath = backgroundImagePath.trim();
+    if (!isValidTemplateBackgroundPath(id, trimmedPath)) {
+        return res.status(400).json({ error: "Invalid backgroundImagePath" });
+    }
+
     try {
         const existing = await prisma.certificateTemplate.findUnique({ where: { id } });
         if (!existing) return res.status(404).json({ error: "Template not found" });
@@ -564,7 +582,7 @@ router.patch("/:id/background", async (req: Request, res: Response) => {
         const template = await prisma.certificateTemplate.update({
             where: { id },
             data: {
-                backgroundImagePath: backgroundImagePath.trim(),
+                backgroundImagePath: trimmedPath,
                 backgroundImageSha: backgroundImageSha.trim(),
             },
         });

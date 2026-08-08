@@ -35,6 +35,7 @@ import supportContentRoutes from "./supportContent";
 import financeRoutes from "./finance";
 import certificateTemplatesRoutes from "./certificateTemplates";
 import certificatesRoutes from "./certificates";
+import usageDashboardRoutes from "./usageDashboard";
 
 import { downloadProfilePhoto } from "../services/githubStorage";
 
@@ -158,6 +159,8 @@ router.use("/certificates", (req, res, next) => {
     return authenticateToken(req, res, next);
 }, certificatesRoutes);
 
+router.use("/usage-dashboard", authenticateToken, usageDashboardRoutes);
+
 router.get("/", (_req: Request, res: Response) => {
     res.json({
         message: "iClub Management API",
@@ -191,6 +194,7 @@ router.get("/", (_req: Request, res: Response) => {
             finance: "/api/finance",
             certificateTemplates: "/api/certificate-templates",
             certificates: "/api/certificates",
+            usageDashboard: "/api/usage-dashboard",
             public: "/api/public",
         },
     });

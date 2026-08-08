@@ -5,10 +5,11 @@ import express, { NextFunction, Request, Response } from "express";
 import helmet from "helmet";
 import routes from "./routes";
 import { prisma } from "./db";
-import { resolveJwtSecret } from "./lib/securityEnv";
+import { assertValidNodeEnv, resolveJwtSecret } from "./lib/securityEnv";
 import { attachNotificationsWebSocketServer } from "./services/notificationsRealtime";
 
-// Fail closed early if production is missing required secrets.
+// Fail closed early on invalid NODE_ENV or missing production secrets.
+assertValidNodeEnv();
 resolveJwtSecret();
 
 const app = express();
@@ -123,7 +124,9 @@ if (isDevelopment) {
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     void _next;
     console.error("Error:", err);
-    const message = err instanceof Error ? err.message : "Internal server error";
+    // Never expose internal error details to clients in production.
+    const message =
+        isDevelopment && err instanceof Error ? err.message : "Internal server error";
     res.status(500).json({ error: message });
 });
 

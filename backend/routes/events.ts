@@ -45,6 +45,7 @@ import {
     logEventActivity,
     summarizeChanges,
 } from '../services/activityLogService';
+import { recordUsageEvent, USAGE_ACTION_TYPES } from '../services/usageEventService';
 import {
     buildAssignedDescription,
     buildAssignmentActivityValue,
@@ -1123,6 +1124,13 @@ router.post('/', authenticateToken, async (req, res) => {
                 eventDate: created.eventDate,
             },
             description: `Event "${created.title}" created`,
+        });
+
+        await recordUsageEvent({
+            memberId,
+            actionType: USAGE_ACTION_TYPES.EVENT_CREATED,
+            entityType: 'Event',
+            entityId: created.id,
         });
 
         return res.status(201).json(created);
@@ -2930,6 +2938,13 @@ router.post('/:id/registrations', registrationPostLimiter, optionalAuthenticateT
                 : `Public registration: ${registration.fullName} (${registration.email})`,
         });
 
+        await recordUsageEvent({
+            memberId: req.user?.memberId ?? registration.memberId ?? null,
+            actionType: USAGE_ACTION_TYPES.REGISTRATION_CREATED,
+            entityType: 'EventRegistration',
+            entityId: registration.id,
+        });
+
         if (!isManager) {
             queueTicketEmail(registration.id, 'public-registration');
         }
@@ -3263,6 +3278,13 @@ router.post('/:id/registrations/walk-in', authenticateToken, async (req, res) =>
             description: `Walk-in registration for ${registration.fullName} (${registration.email})`,
         });
 
+        await recordUsageEvent({
+            memberId: req.user!.memberId!,
+            actionType: USAGE_ACTION_TYPES.REGISTRATION_CREATED,
+            entityType: 'EventRegistration',
+            entityId: registration.id,
+        });
+
         if (shouldSendWalkInTicket(event.eventDate, event.eventEndDate, walkInCheckedInAt, eventTz(event))) {
             queueTicketEmail(registration.id, 'walk-in');
         }
@@ -3495,6 +3517,13 @@ router.post('/:id/registrations/import', authenticateToken, async (req, res) => 
             });
 
             queueRegistrationTokenGeneration(createdRegistration.id, 'import-create');
+
+            await recordUsageEvent({
+                memberId: req.user?.memberId ?? memberId ?? null,
+                actionType: USAGE_ACTION_TYPES.REGISTRATION_CREATED,
+                entityType: 'EventRegistration',
+                entityId: createdRegistration.id,
+            });
 
             registrationCount += 1;
             result.created += 1;
@@ -3830,6 +3859,13 @@ router.patch('/:id/registrations/:registrationId/check-in', authenticateToken, a
             description: sessionId
                 ? `${registration.fullName} checked into session${sessionLabel ? ` (${sessionLabel})` : ''}`
                 : `${registration.fullName} checked in for ${resolvedDay.eventDay}`,
+        });
+
+        await recordUsageEvent({
+            memberId: req.user!.memberId!,
+            actionType: USAGE_ACTION_TYPES.CHECK_IN_SCANNED,
+            entityType: 'EventRegistration',
+            entityId: registration.id,
         });
 
         publishEventChanged({

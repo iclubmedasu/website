@@ -17,6 +17,7 @@ import {
 import { getFinanceExportData } from "../lib/financeExport";
 import type { FinanceTransactionType } from "@iclub/shared";
 import { requireFinanceViewer } from "../middleware/auth";
+import { recordUsageEvent, USAGE_ACTION_TYPES } from "../services/usageEventService";
 
 const router = express.Router();
 
@@ -47,9 +48,15 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
     }
 });
 
-router.get("/export", async (_req: Request, res: Response) => {
+router.get("/export", async (req: Request, res: Response) => {
     try {
         const payload = await getFinanceExportData();
+        await recordUsageEvent({
+            memberId: req.user?.memberId ?? null,
+            actionType: USAGE_ACTION_TYPES.DATA_EXPORTED,
+            entityType: "FinanceExport",
+            entityId: null,
+        });
         return res.json(payload);
     } catch (error) {
         return handleFinanceError(error, res, "GET /finance/export error:", "Failed to export finance data");

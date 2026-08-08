@@ -175,13 +175,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const [isAlumni, setIsAlumni] = useState(false);
 
     useEffect(() => {
-        // Restore token from storage before checking session
-        const token = initToken();
-        if (!token) {
-            setUser(null);
-            setLoading(false);
-            return;
-        }
+        // PWA: rehydrate bearer from localStorage. Web: no localStorage token —
+        // still hit /auth/me so the httpOnly cookie can restore the session.
+        initToken();
         void checkAuth();
     }, []);
 

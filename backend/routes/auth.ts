@@ -18,6 +18,7 @@ import {
 } from '../lib/phoneUtils';
 import { computeAuthorityFlags } from '../lib/authorityFlags';
 import { sendPasswordResetEmail } from '../services/passwordResetEmailService';
+import { recordUsageEvent, USAGE_ACTION_TYPES } from '../services/usageEventService';
 
 const RESET_TOKEN_EXPIRY_MS = 60 * 60 * 1000;
 const FORGOT_PASSWORD_SUCCESS_MESSAGE =
@@ -1039,6 +1040,13 @@ router.post('/login', authPostLimiter, async (req, res) => {
         await prisma.user.update({
             where: { id: member.user.id },
             data: { lastLogin: new Date() }
+        });
+
+        await recordUsageEvent({
+            memberId: member.id,
+            actionType: USAGE_ACTION_TYPES.LOGIN,
+            entityType: 'User',
+            entityId: member.user.id,
         });
 
         // Compute authority flags before generating token

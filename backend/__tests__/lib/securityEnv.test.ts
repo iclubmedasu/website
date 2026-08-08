@@ -66,4 +66,42 @@ describe("securityEnv", () => {
             password: "strong-pass",
         });
     });
+
+    describe("assertValidNodeEnv", () => {
+        it.each(["development", "test", "production"] as const)(
+            "allows NODE_ENV=%s",
+            async (nodeEnv) => {
+                vi.stubEnv("NODE_ENV", nodeEnv);
+                const { assertValidNodeEnv } = await import("../../lib/securityEnv");
+                expect(() => assertValidNodeEnv()).not.toThrow();
+            },
+        );
+
+        it("allows unset NODE_ENV", async () => {
+            const previous = process.env.NODE_ENV;
+            delete process.env.NODE_ENV;
+            try {
+                const { assertValidNodeEnv } = await import("../../lib/securityEnv");
+                expect(() => assertValidNodeEnv()).not.toThrow();
+            } finally {
+                if (previous === undefined) {
+                    delete process.env.NODE_ENV;
+                } else {
+                    process.env.NODE_ENV = previous;
+                }
+            }
+        });
+
+        it("fails closed on misspelled NODE_ENV", async () => {
+            vi.stubEnv("NODE_ENV", "Production");
+            const { assertValidNodeEnv } = await import("../../lib/securityEnv");
+            expect(() => assertValidNodeEnv()).toThrow(/FATAL: NODE_ENV/);
+        });
+
+        it("fails closed on unrecognized NODE_ENV values", async () => {
+            vi.stubEnv("NODE_ENV", "prod");
+            const { assertValidNodeEnv } = await import("../../lib/securityEnv");
+            expect(() => assertValidNodeEnv()).toThrow(/FATAL: NODE_ENV/);
+        });
+    });
 });

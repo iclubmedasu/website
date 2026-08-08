@@ -123,16 +123,14 @@ function resolveApiBaseUrl(): string {
 
 export const API_BASE_URL = resolveApiBaseUrl();
 
+/**
+ * Whether fetch/XHR should send cookies to the API.
+ * Always true in the browser: portal and API are often different origins in production
+ * (HF Spaces / custom domains), and auth cookies are SameSite=None;Secure for that case.
+ * Backend CORS allowlists origins and permits credentials.
+ */
 export function shouldSendCredentials(): boolean {
-    if (typeof window === 'undefined') return false;
-    try {
-        const api = new URL(API_BASE_URL, window.location.origin);
-        const page = new URL(window.location.href);
-        if (api.origin === page.origin) return true;
-        return isLoopbackHost(api.hostname) && isLoopbackHost(page.hostname);
-    } catch {
-        return false;
-    }
+    return typeof window !== 'undefined';
 }
 
 export { ConflictError, isConflictError } from './conflictError';
@@ -155,14 +153,32 @@ type JsonHeaders = Record<string, string>;
 
 
 // Auth token management
+//
+// Split by client surface (deliberate tradeoff — see docs/security/security.md):
+// - Regular browser tabs: httpOnly cookie only (no localStorage, no Authorization header).
+// - Installed standalone PWA: also keep a Bearer token (localStorage + memory) because
+//   SameSite=None cookies are unreliable in some iOS standalone contexts.
 let authToken: string | null = null;
+
+/** True when this tab should use localStorage + Authorization: Bearer (standalone PWA only). */
+function shouldUseBearerAuth(): boolean {
+    return isStandalonePwa();
+}
 
 export function getAuthToken(): string | null {
     return authToken;
 }
 
+/** Memory token for Bearer/WS only when the surface is the installed PWA. */
+function getBearerTokenIfAllowed(): string | null {
+    return shouldUseBearerAuth() ? authToken : null;
+}
+
 export function setToken(token: string) {
     authToken = token;
+    // Always keep in-memory token so the current tab can use WS fallback after login;
+    // only persist to localStorage for the installed PWA (rehydrate across restarts).
+    if (!shouldUseBearerAuth()) return;
     try {
         localStorage.setItem('auth_token', token);
     } catch { }
@@ -176,6 +192,11 @@ export function clearToken() {
 }
 
 export function initToken() {
+    // Web tabs must not rehydrate a XSS-readable token; they rely on the httpOnly cookie.
+    if (!shouldUseBearerAuth()) {
+        authToken = null;
+        return null;
+    }
     try {
         const stored = localStorage.getItem('auth_token');
         if (stored) authToken = stored;
@@ -196,13 +217,14 @@ export function getClientInstanceId(): string | null {
     return clientInstanceId;
 }
 
-// Base fetch function that always includes the token
+// Base fetch: cookie credentials for all surfaces; Bearer only for installed PWA.
 export const apiFetch = (input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> => {
     const headers: Record<string, string> = {
         ...(init.headers as Record<string, string>),
     };
-    if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
+    const bearer = getBearerTokenIfAllowed();
+    if (bearer) {
+        headers['Authorization'] = `Bearer ${bearer}`;
     }
     // Let GET /auth/me re-issue longer tokens when the installed PWA calls authenticated APIs.
     if (isStandalonePwa() && !headers['X-Client-Surface'] && !headers['x-client-surface']) {
@@ -1663,7 +1685,7 @@ export const projectFilesAPI = {
             xhr.onerror = () => reject(new Error('Network error during upload'));
 
             xhr.open('POST', `${API_BASE_URL}/project-files/upload`);
-            const token = getAuthToken();
+            const token = getBearerTokenIfAllowed();
             if (token) {
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`);
             }
@@ -1816,7 +1838,7 @@ export const projectPhotosAPI = {
             xhr.onerror = () => reject(new Error('Network error during upload'));
 
             xhr.open('POST', `${API_BASE_URL}/project-photos/upload`);
-            const token = getAuthToken();
+            const token = getBearerTokenIfAllowed();
             if (token) {
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`);
             }
@@ -1960,7 +1982,7 @@ export const eventFilesAPI = {
             xhr.onerror = () => reject(new Error('Network error during upload'));
 
             xhr.open('POST', `${API_BASE_URL}/event-files/upload`);
-            const token = getAuthToken();
+            const token = getBearerTokenIfAllowed();
             if (token) {
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`);
             }
@@ -2108,7 +2130,7 @@ export const eventPhotosAPI = {
             xhr.onerror = () => reject(new Error('Network error during upload'));
 
             xhr.open('POST', `${API_BASE_URL}/event-photos/upload`);
-            const token = getAuthToken();
+            const token = getBearerTokenIfAllowed();
             if (token) {
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`);
             }
@@ -3338,5 +3360,42 @@ export const financeAPI = {
             headers: getAuthHeaders(),
         });
         return handleResponse<import('@iclub/shared').FinanceExportResponse>(response);
+    },
+};
+
+export type UsageDashboardSummary = {
+    windowDays: number;
+    since: string;
+    until: string;
+    counts: {
+        eventsCreated: number;
+        certificatesIssued: number;
+        checkInsScanned: number;
+        registrationsCreated: number;
+        dataExports: number;
+        logins: number;
+        activeMembers: number;
+    };
+};
+
+export type UsageDashboardSummaryParams =
+    | { days: number }
+    | { from: string; to: string };
+
+export const usageDashboardAPI = {
+    getSummary: async (params?: UsageDashboardSummaryParams) => {
+        const searchParams = new URLSearchParams();
+        if (params && "from" in params) {
+            searchParams.set("from", params.from);
+            searchParams.set("to", params.to);
+        } else if (params && "days" in params) {
+            searchParams.set("days", String(params.days));
+        }
+        const query = searchParams.toString();
+        const response = await apiFetch(
+            `${API_BASE_URL}/usage-dashboard/summary${query ? `?${query}` : ""}`,
+            { headers: getAuthHeaders() },
+        );
+        return handleResponse<UsageDashboardSummary>(response);
     },
 };

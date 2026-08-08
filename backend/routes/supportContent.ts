@@ -20,6 +20,7 @@ import {
     requireSupportFormsEditor,
     requireSupportPageEditor,
 } from "../middleware/auth";
+import { recordUsageEvent, USAGE_ACTION_TYPES } from "../services/usageEventService";
 
 const router = express.Router();
 
@@ -475,6 +476,12 @@ router.get("/forms/:formId/reports/export", requireSupportFormsEditor, async (re
         }
 
         const { buffer, fileName } = await exportFormSubmissionsExcel(formId);
+        await recordUsageEvent({
+            memberId: req.user?.memberId ?? null,
+            actionType: USAGE_ACTION_TYPES.DATA_EXPORTED,
+            entityType: "IncidentReportExport",
+            entityId: formId,
+        });
         res.setHeader(
             "Content-Type",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

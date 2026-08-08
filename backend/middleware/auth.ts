@@ -202,6 +202,18 @@ const requireFinanceViewer = async (
     return res.status(403).json({ error: "Finance viewer access required" });
 };
 
+/** Strict developer-only access (not officers/admins). Used for internal usage analytics. */
+const requireDeveloperOnly = (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+): Response | void => {
+    if (req.user?.isDeveloper) {
+        return next();
+    }
+    return res.status(403).json({ error: "Developer access required" });
+};
+
 export {
     authenticateToken,
     optionalAuthenticateToken,
@@ -210,6 +222,7 @@ export {
     requireSupportPageEditor,
     requireSupportFormsEditor,
     requireFinanceViewer,
+    requireDeveloperOnly,
     JWT_SECRET,
     extractAuthToken,
 };
