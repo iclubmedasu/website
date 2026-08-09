@@ -273,7 +273,7 @@ If users still see favicon errors after deploy, unregister the old service worke
 4. Next.js runs in `standalone` output mode on port 7860 (required by HF Spaces). Production builds use `next build --webpack` (Turbopack rejects some PNG assets on HF).
 5. Space config is in [`public-website/README.hf.md`](../public-website/README.hf.md) (copied to `README.md` during deploy).
 6. Set backend `PUBLIC_WEBSITE_URL` = `https://iclubmedasu-public-website.hf.space` in the backend HF Space so ticket confirmation emails link to the live site.
-7. Binary assets (PNG, etc.) are stored via Xet — see root [`.gitattributes`](../.gitattributes) (`filter=xet`). CI uses `huggingface_hub[hf_xet]` when uploading to Spaces. HF may store uploaded PNGs as pointer stubs; CI runs [`materialize-public-images.mjs`](../public-website/scripts/materialize-public-images.mjs) **before upload** (using `GITHUB_TOKEN` + retries) so real PNG bytes are in the Space. The Dockerfile runs the same script as a safety net during the Space build.
+7. Binary assets are plain files in this monorepo (GitHub). Deploy installs `huggingface_hub[hf_xet]` and does **not** upload monorepo `.gitattributes` claiming `filter=xet` (that caused HF to reject raw binaries). CI runs [`materialize-public-images.mjs`](../public-website/scripts/materialize-public-images.mjs) **before upload** (using `GITHUB_TOKEN` + retries) so real PNG bytes are in the Space when GitHub LFS/Xet pointers appear. The Dockerfile runs the same script as a safety net during the Space build.
 
 ### Post-deploy health and static asset check (Public Website)
 

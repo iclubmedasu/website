@@ -727,7 +727,6 @@ website/
 │   └── datetime-audit.mjs
 ├── .dockerignore
 ├── .editorconfig
-├── .gitattributes
 ├── .gitignore
 ├── .prettierignore
 ├── .prettierrc

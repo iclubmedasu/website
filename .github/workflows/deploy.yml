@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+# Shared HF ignore list: monorepo is hosted on GitHub with raw binaries.
+# Never upload monorepo .gitattributes (must not claim filter=xet for raw blobs).
+# huggingface_hub[hf_xet] handles large files on upload without Git filter attributes.
+
 jobs:
   # ─────────────────────────────────────────────────────────────
   # JOB 1 — Run Prisma migrations against Supabase
@@ -29,7 +33,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
 
       - name: Install backend dependencies
@@ -49,9 +53,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   # ─────────────────────────────────────────────────────────────
-  # JOB 2 — Upload to Hugging Face Space
-  # Uses huggingface_hub with Xet support — handles binary files
-  # correctly and skips all frontend/asset files automatically.
+  # JOB 2 — Upload backend to Hugging Face Space
   #
   # Required GitHub secrets:
   #   HF_TOKEN  — Hugging Face User Access Token (write access)
@@ -76,26 +78,22 @@ jobs:
 
       - name: Clean workspace before upload
         run: |
-          # Remove frontend packages — not needed by HF
-          # NOTE: packages/shared is kept — Dockerfile depends on it
+          # Frontend packages not needed (packages/shared is kept — Dockerfile depends on it)
           rm -rf members-portal public-website
-
-          # Backend tests are not needed in the HF Docker image
           rm -rf backend/__tests__
+          rm -rf docs e2e
 
-          # Remove all node_modules and cache folders
+          # Junk / local artifacts that must never land on HF
+          rm -f .gitattributes
+          rm -f audit*.txt audit.json test-out.txt
+          rm -f ./*.pdf
+          find . -name '*.tsbuildinfo' -type f -delete 2>/dev/null || true
+
           find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name ".cache" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
-          # Remove binary assets — backend doesn't need them
-          find . -type f \( \
-            -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \
-            -o -name "*.gif" -o -name "*.ico" -o -name "*.webp" \
-            -o -name "*.pdf" \
-          \) -delete
-
-          # Remove test and build output
+          # Keep backend/assets (email logos + fonts) for runtime
           find . -type d -name "dist" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name "coverage" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name "playwright-report" -exec rm -rf {} + 2>/dev/null || true
@@ -110,7 +108,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install huggingface_hub with Xet support
-        run: pip install "huggingface_hub[hf_xet]"
+        run: pip install "huggingface_hub[hf_xet]==0.32.1"
 
       - name: Upload to Hugging Face Space
         env:
@@ -124,7 +122,6 @@ jobs:
           api = HfApi(token=os.environ["HF_TOKEN"])
           repo_id = os.environ["HF_SPACE"]
 
-          # Spaces are created manually on HF (Docker Spaces require PRO to create via API).
           api.upload_folder(
               folder_path=".",
               repo_id=repo_id,
@@ -132,10 +129,19 @@ jobs:
               ignore_patterns=[
                   ".git",
                   ".github",
+                  ".gitattributes",
+                  ".gitignore",
                   ".env",
                   ".env.*",
                   "*.log",
                   "*.tsbuildinfo",
+                  "audit*",
+                  "test-out*",
+                  "docs/**",
+                  "e2e/**",
+                  "**/*.pdf",
+                  ".semgrepignore",
+                  ".gitleaksignore",
               ],
               delete_patterns=[
                   "backend/__tests__/**",
@@ -189,15 +195,12 @@ jobs:
           git worktree add "$REVERT_DIR" "$GOOD_SHA"
           cd "$REVERT_DIR"
 
-          rm -rf members-portal public-website backend/__tests__
+          rm -rf members-portal public-website backend/__tests__ docs e2e
+          rm -f .gitattributes audit*.txt audit.json test-out.txt ./*.pdf
+          find . -name '*.tsbuildinfo' -type f -delete 2>/dev/null || true
           find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name ".cache" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-          find . -type f \( \
-            -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \
-            -o -name "*.gif" -o -name "*.ico" -o -name "*.webp" \
-            -o -name "*.pdf" \
-          \) -delete
           find . -type d -name "dist" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name "coverage" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name "playwright-report" -exec rm -rf {} + 2>/dev/null || true
@@ -219,10 +222,19 @@ jobs:
               ignore_patterns=[
                   ".git",
                   ".github",
+                  ".gitattributes",
+                  ".gitignore",
                   ".env",
                   ".env.*",
                   "*.log",
                   "*.tsbuildinfo",
+                  "audit*",
+                  "test-out*",
+                  "docs/**",
+                  "e2e/**",
+                  "**/*.pdf",
+                  ".semgrepignore",
+                  ".gitleaksignore",
               ],
               delete_patterns=[
                   "backend/__tests__/**",
@@ -278,15 +290,15 @@ jobs:
 
       - name: Clean workspace before upload
         run: |
-          # Backend and public-website are not needed by the frontend HF Space
-          rm -rf backend public-website
+          rm -rf backend public-website docs e2e
+          rm -f .gitattributes
+          rm -f audit*.txt audit.json test-out.txt
+          rm -f ./*.pdf
+          find . -name '*.tsbuildinfo' -type f -delete 2>/dev/null || true
 
-          # Remove all node_modules and cache folders
           find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name ".next" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name ".cache" -exec rm -rf {} + 2>/dev/null || true
-
-          # Remove test and build output
           find . -type d -name "coverage" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name "playwright-report" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name "test-results" -exec rm -rf {} + 2>/dev/null || true
@@ -300,7 +312,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install huggingface_hub with Xet support
-        run: pip install "huggingface_hub[hf_xet]"
+        run: pip install "huggingface_hub[hf_xet]==0.32.1"
 
       - name: Upload to Hugging Face Space
         env:
@@ -321,10 +333,19 @@ jobs:
               ignore_patterns=[
                   ".git",
                   ".github",
+                  ".gitattributes",
+                  ".gitignore",
                   ".env",
                   ".env.*",
                   "*.log",
                   "*.tsbuildinfo",
+                  "audit*",
+                  "test-out*",
+                  "docs/**",
+                  "e2e/**",
+                  "**/*.pdf",
+                  ".semgrepignore",
+                  ".gitleaksignore",
               ],
               delete_patterns=[
                   "backend/**",
@@ -380,7 +401,9 @@ jobs:
 
           cp members-portal/Dockerfile Dockerfile
           cp members-portal/README.hf.md README.md
-          rm -rf backend public-website
+          rm -rf backend public-website docs e2e
+          rm -f .gitattributes audit*.txt audit.json test-out.txt ./*.pdf
+          find . -name '*.tsbuildinfo' -type f -delete 2>/dev/null || true
           find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name ".next" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name ".cache" -exec rm -rf {} + 2>/dev/null || true
@@ -404,10 +427,19 @@ jobs:
               ignore_patterns=[
                   ".git",
                   ".github",
+                  ".gitattributes",
+                  ".gitignore",
                   ".env",
                   ".env.*",
                   "*.log",
                   "*.tsbuildinfo",
+                  "audit*",
+                  "test-out*",
+                  "docs/**",
+                  "e2e/**",
+                  "**/*.pdf",
+                  ".semgrepignore",
+                  ".gitleaksignore",
               ],
               delete_patterns=[
                   "backend/**",
@@ -469,15 +501,15 @@ jobs:
 
       - name: Clean workspace before upload
         run: |
-          # Backend and members-portal are not needed by the public website HF Space
-          rm -rf backend members-portal
+          rm -rf backend members-portal docs e2e
+          rm -f .gitattributes
+          rm -f audit*.txt audit.json test-out.txt
+          rm -f ./*.pdf
+          find . -name '*.tsbuildinfo' -type f -delete 2>/dev/null || true
 
-          # Remove all node_modules and cache folders
           find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name ".next" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name ".cache" -exec rm -rf {} + 2>/dev/null || true
-
-          # Remove test and build output
           find . -type d -name "coverage" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name "playwright-report" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name "test-results" -exec rm -rf {} + 2>/dev/null || true
@@ -491,7 +523,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install huggingface_hub with Xet support
-        run: pip install "huggingface_hub[hf_xet]"
+        run: pip install "huggingface_hub[hf_xet]==0.32.1"
 
       - name: Upload to Hugging Face Space
         env:
@@ -512,10 +544,19 @@ jobs:
               ignore_patterns=[
                   ".git",
                   ".github",
+                  ".gitattributes",
+                  ".gitignore",
                   ".env",
                   ".env.*",
                   "*.log",
                   "*.tsbuildinfo",
+                  "audit*",
+                  "test-out*",
+                  "docs/**",
+                  "e2e/**",
+                  "**/*.pdf",
+                  ".semgrepignore",
+                  ".gitleaksignore",
               ],
               delete_patterns=[
                   "backend/**",
@@ -574,13 +615,14 @@ jobs:
           cp public-website/README.hf.md README.md
           echo "${GOOD_SHA}" > public-website/SOURCE_GIT_REF
 
-          # Materialize images for the restored revision (auth may still rate-limit)
           export SOURCE_GIT_REF="${GOOD_SHA}"
           node public-website/scripts/materialize-public-images.mjs || {
             echo "WARN: materialize failed during revert; continuing with tree as checked out"
           }
 
-          rm -rf backend members-portal
+          rm -rf backend members-portal docs e2e
+          rm -f .gitattributes audit*.txt audit.json test-out.txt ./*.pdf
+          find . -name '*.tsbuildinfo' -type f -delete 2>/dev/null || true
           find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name ".next" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name ".cache" -exec rm -rf {} + 2>/dev/null || true
@@ -604,10 +646,19 @@ jobs:
               ignore_patterns=[
                   ".git",
                   ".github",
+                  ".gitattributes",
+                  ".gitignore",
                   ".env",
                   ".env.*",
                   "*.log",
                   "*.tsbuildinfo",
+                  "audit*",
+                  "test-out*",
+                  "docs/**",
+                  "e2e/**",
+                  "**/*.pdf",
+                  ".semgrepignore",
+                  ".gitleaksignore",
               ],
               delete_patterns=[
                   "backend/**",

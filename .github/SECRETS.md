@@ -30,9 +30,10 @@ Add the following secrets:
 These run in GitHub Actions and do **not** require paid GitHub Advanced Security. Existing deploy workflows are unchanged.
 
 ### Dependabot (dependency updates)
-- Config: [`.github/dependabot.yml`](dependabot.yml) — weekly PRs for npm/pnpm (workspace root) and GitHub Actions.
+- Config: [`.github/dependabot.yml`](dependabot.yml) — **monthly** grouped minor/patch PRs for npm/pnpm (workspace root) and GitHub Actions (`open-pull-requests-limit: 3`).
 - Enable: once the file is on the default branch, Dependabot starts automatically. Optionally confirm under **Settings → Code security → Dependabot**.
 - Alerts: enable **Dependabot alerts** and **Dependabot security updates** in the same settings page if not already on.
+- When open PRs lag a large security/CI land on `main`, **close them** and let the next monthly run open fresh groups. Treat Prisma major/minor bumps as review-only (never auto-land without migrate confidence).
 
 ### Semgrep CE (SAST)
 - Workflow: [`.github/workflows/semgrep.yml`](workflows/semgrep.yml) — pinned Semgrep image + `p/typescript` / `p/javascript` / `p/nodejs` / `p/react` on PRs and pushes to `main`/`develop`.

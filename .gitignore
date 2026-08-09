@@ -26,6 +26,12 @@ out/
 
 *.log
 
+# Local audit / test tool output (never commit)
+audit*.txt
+audit.json
+test-out.txt
+**/*.tsbuildinfo
+
 # Docker
 docker-compose.override.yml
 .DS_Store

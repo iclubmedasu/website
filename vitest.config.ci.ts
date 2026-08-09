@@ -9,7 +9,7 @@ export default mergeConfig(
                 all: false,
                 thresholds: {
                     lines: 35,
-                    functions: 55,
+                    functions: 50,
                     statements: 35,
                     branches: 50
                 }

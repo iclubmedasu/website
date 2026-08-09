@@ -8,3 +8,16 @@ playwright-report/
 test-results/
 **/*.min.js
 pnpm-lock.yaml
+
+# Local / tooling dumps
+audit*
+test-out*
+**/*.tsbuildinfo
+
+# Binary assets (not source)
+**/*.{png,jpg,jpeg,gif,webp,pdf,ttf,woff,woff2,ico,zip,mp4,mp3}
+
+# Large non-SAST trees
+docs/**
+e2e/**
+**/*.md
