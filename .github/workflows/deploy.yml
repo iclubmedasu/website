@@ -76,6 +76,12 @@ jobs:
           echo "Known-good tags:"
           git tag -l 'deployed-*' || true
 
+      - name: Prepare backend Space files
+        run: |
+          # HF Docker Space root expects Dockerfile + README.md with YAML frontmatter
+          cp backend/Dockerfile Dockerfile
+          cp backend/README.hf.md README.md
+
       - name: Clean workspace before upload
         run: |
           # Frontend packages not needed (packages/shared is kept — Dockerfile depends on it)
@@ -98,6 +104,10 @@ jobs:
           find . -type d -name "coverage" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name "playwright-report" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name "test-results" -exec rm -rf {} + 2>/dev/null || true
+
+          # Re-assert HF entrypoints after clean (in case anything touched them)
+          cp backend/Dockerfile Dockerfile
+          cp backend/README.hf.md README.md
 
           echo "Workspace cleaned. Remaining files:"
           find . -not -path "./.git/*" -type f | head -50
@@ -203,6 +213,15 @@ jobs:
           find . -type d -name "coverage" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name "playwright-report" -exec rm -rf {} + 2>/dev/null || true
           find . -type d -name "test-results" -exec rm -rf {} + 2>/dev/null || true
+
+          # HF Space root needs Docker SDK README + Dockerfile even on auto-revert
+          if [ -f backend/README.hf.md ]; then
+            cp backend/Dockerfile Dockerfile
+            cp backend/README.hf.md README.md
+          else
+            echo "WARN: backend/README.hf.md missing on $GOOD_SHA — Space may fail HF config check"
+            cp backend/Dockerfile Dockerfile
+          fi
 
           export GOOD_SHA
           python - <<'EOF'
