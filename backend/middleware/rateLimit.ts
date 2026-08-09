@@ -15,12 +15,36 @@ function createLimiter(options: {
     });
 }
 
-/** Login / credential-check endpoints — tighter to slow brute force. */
-export const authPostLimiter = createLimiter({
-    windowMs: 15 * 60 * 1000,
-    max: 30,
-    message: "Too many authentication attempts. Please try again later.",
+/**
+ * Read-only identity checks (typing during sign-in / setup).
+ * Separate from credential POSTs so checks never starve login.
+ */
+export const identityCheckLimiter = createLimiter({
+    windowMs: 5 * 60 * 1000,
+    max: 60,
+    message: "Too many lookup attempts. Please wait a few minutes and try again.",
 });
+
+/**
+ * Login and account-setup credential POSTs.
+ */
+export const credentialPostLimiter = createLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 40,
+    message: "Too many authentication attempts. Please wait a few minutes and try again.",
+});
+
+/**
+ * Password reset endpoints (costly email sends) — isolated bucket.
+ */
+export const passwordResetLimiter = createLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: "Too many password reset attempts. Please wait a few minutes and try again.",
+});
+
+/** @deprecated Prefer the tiered limiters above; alias kept for any external imports. */
+export const authPostLimiter = credentialPostLimiter;
 
 /** Public contact form. */
 export const contactPostLimiter = createLimiter({

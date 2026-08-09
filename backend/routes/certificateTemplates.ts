@@ -319,8 +319,9 @@ router.post("/", async (req: Request, res: Response) => {
                 layout,
                 canvasWidth: canvasWidth ?? undefined,
                 canvasHeight: canvasHeight ?? undefined,
-                backgroundImagePath: req.body?.backgroundImagePath ?? null,
-                backgroundImageSha: req.body?.backgroundImageSha ?? null,
+                // Background assets are assigned only after create via validated PATCH/PUT.
+                backgroundImagePath: null,
+                backgroundImageSha: null,
                 backgroundFocus: toBackgroundFocusInput(backgroundFocus),
             },
         });

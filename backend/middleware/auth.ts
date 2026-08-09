@@ -7,11 +7,12 @@ import {
     isHrHeadOrVice,
 } from "../lib/supportPermissions";
 import { canViewFinance, isFrHeadOrVice } from "../lib/financePermissions";
-import { resolveJwtSecret } from "../lib/securityEnv";
+import { isProductionEnv, resolveJwtSecret } from "../lib/securityEnv";
 import type { RequestUser } from "../types/auth";
 
 const JWT_SECRET = resolveJwtSecret();
 const ADMINISTRATION_TEAM_NAME = "Administration";
+const JWT_VERIFY_OPTS = { algorithms: ["HS256"] as jwt.Algorithm[] };
 
 /**
  * Query-string JWT (`?token=`) is opt-in only.
@@ -97,7 +98,7 @@ const authenticateToken = (req: Request, res: Response, next: NextFunction): Res
         return res.status(401).json({ error: "Authentication required" });
     }
 
-    jwt.verify(token, JWT_SECRET, (err, user) => {
+    jwt.verify(token, JWT_SECRET, JWT_VERIFY_OPTS, (err, user) => {
         if (err) {
             return res.status(403).json({ error: "Invalid or expired token" });
         }
@@ -115,7 +116,7 @@ const optionalAuthenticateToken = (req: Request, res: Response, next: NextFuncti
         return next();
     }
 
-    jwt.verify(token, JWT_SECRET, (err, user) => {
+    jwt.verify(token, JWT_SECRET, JWT_VERIFY_OPTS, (err, user) => {
         if (err) {
             return res.status(403).json({ error: "Invalid or expired token" });
         }
@@ -125,9 +126,24 @@ const optionalAuthenticateToken = (req: Request, res: Response, next: NextFuncti
     });
 };
 
+/**
+ * Developer JWT privileges only stick while the backdoor is still allowed.
+ * Production requires ALLOW_DEVELOPER_BACKDOOR=true (same gate as login).
+ */
+function isDeveloperBackdoorCurrentlyAllowed(): boolean {
+    if (isProductionEnv() && process.env.ALLOW_DEVELOPER_BACKDOOR !== "true") {
+        return false;
+    }
+    return true;
+}
+
+function hasActiveDeveloperClaim(user: RequestUser | undefined): boolean {
+    return Boolean(user?.isDeveloper && isDeveloperBackdoorCurrentlyAllowed());
+}
+
 /** Require user to be developer or in Administration team. Use after authenticateToken. */
 const requireAdmin = async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
-    if (req.user?.isDeveloper) {
+    if (hasActiveDeveloperClaim(req.user)) {
         return next();
     }
 
@@ -152,7 +168,7 @@ const requireAdmin = async (req: Request, res: Response, next: NextFunction): Pr
 
 /** Officers, Administration, or developers may edit public site content. */
 const requireSiteContentEditor = (req: Request, res: Response, next: NextFunction): Response | void => {
-    if (req.user?.isDeveloper || req.user?.isOfficer || req.user?.isAdmin) {
+    if (hasActiveDeveloperClaim(req.user) || req.user?.isOfficer || req.user?.isAdmin) {
         return next();
     }
 
@@ -208,7 +224,7 @@ const requireDeveloperOnly = (
     res: Response,
     next: NextFunction,
 ): Response | void => {
-    if (req.user?.isDeveloper) {
+    if (hasActiveDeveloperClaim(req.user)) {
         return next();
     }
     return res.status(403).json({ error: "Developer access required" });

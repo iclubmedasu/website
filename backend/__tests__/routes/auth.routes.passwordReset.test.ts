@@ -153,7 +153,7 @@ describe('auth forgot / reset password routes', () => {
             expect(hashResetToken(emailArgs.rawToken)).toBe(updateArgs.data.resetToken)
         })
 
-        it('returns 500 when email send fails after token write', async () => {
+        it('returns generic success when email send fails after token write', async () => {
             prismaMocks.memberFindFirst.mockResolvedValue({
                 id: 4,
                 email: 'member@med.asu.edu.eg',
@@ -171,8 +171,11 @@ describe('auth forgot / reset password routes', () => {
                 .post('/forgot-password')
                 .send({ email: 'member@med.asu.edu.eg' })
 
-            expect(response.status).toBe(500)
-            expect(response.body.error).toMatch(/Failed to send password reset email/i)
+            expect(response.status).toBe(200)
+            expect(response.body).toEqual({
+                success: true,
+                message: GENERIC_MESSAGE,
+            })
             expect(prismaMocks.userUpdate).toHaveBeenCalledTimes(1)
             expect(emailMocks.sendPasswordResetEmail).toHaveBeenCalledTimes(1)
         })

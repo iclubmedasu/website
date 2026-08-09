@@ -1,13 +1,21 @@
 name: Deploy — Supabase + Hugging Face
 
+# Deploys after CI succeeds (workflow_run), or on manual workflow_dispatch.
+# Create a "production" GitHub Environment (Settings → Environments) if you want
+# required reviewers before migrate/upload jobs run.
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: ["CI — Lint, Type Check & Build"]
+    types: [completed]
   workflow_dispatch:
 
 # contents:write — push/move last-known-good deploy tags after a healthy deploy
 permissions:
   contents: write
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
 
 # Shared HF ignore list: monorepo is hosted on GitHub with raw binaries.
 # Never upload monorepo .gitattributes (must not claim filter=xet for raw blobs).
@@ -20,10 +28,34 @@ jobs:
   migrate:
     name: Run Database Migrations
     runs-on: ubuntu-latest
+    environment: production
+    env:
+      DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
     steps:
+      - name: Require successful CI (workflow_run only)
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+              echo "Skipping deploy: CI conclusion was ${{ github.event.workflow_run.conclusion }}"
+              exit 1
+            fi
+            # Auto-deploy only CI pushes to main (not PR CI / other branches).
+            # Manual workflow_dispatch remains unrestricted.
+            if [ "${{ github.event.workflow_run.event }}" != "push" ] || [ "${{ github.event.workflow_run.head_branch }}" != "main" ]; then
+              echo "Skipping deploy: CI was not a successful push to main (event=${{ github.event.workflow_run.event }}, branch=${{ github.event.workflow_run.head_branch }})"
+              exit 1
+            fi
+            echo "CI succeeded on main — deploying ${DEPLOY_SHA}"
+          else
+            echo "Manual workflow_dispatch — deploying ${DEPLOY_SHA}"
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -63,11 +95,15 @@ jobs:
     name: Deploy Backend to Hugging Face
     runs-on: ubuntu-latest
     needs: migrate
+    environment: production
+    env:
+      DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 0
 
       - name: Fetch known-good deploy tags
@@ -164,8 +200,9 @@ jobs:
       - name: Verify backend health endpoint
         id: health
         run: |
-          HEALTH_URL="https://iclubmedasu-backend.hf.space/health"
-          echo "Waiting for Hugging Face Space to rebuild..."
+          HEALTH_URL="${{ vars.BACKEND_HEALTH_URL }}"
+          HEALTH_URL="${HEALTH_URL:-https://iclubmedasu-backend.hf.space/health}"
+          echo "Waiting for Hugging Face Space to rebuild at $HEALTH_URL..."
           sleep 90
           for i in 1 2 3 4 5 6; do
             if curl -fsS "$HEALTH_URL"; then
@@ -192,7 +229,7 @@ jobs:
             exit 1
           fi
           GOOD_SHA=$(git rev-parse "$TAG")
-          if [ "$GOOD_SHA" = "$GITHUB_SHA" ]; then
+          if [ "$GOOD_SHA" = "$DEPLOY_SHA" ]; then
             echo "Last known-good equals current SHA — cannot auto-revert. Fix the Space manually."
             exit 1
           fi
@@ -259,6 +296,24 @@ jobs:
           print(f"Auto-revert upload complete (restored monorepo {good_sha})")
           EOF
 
+          HEALTH_URL="${{ vars.BACKEND_HEALTH_URL }}"
+          HEALTH_URL="${HEALTH_URL:-https://iclubmedasu-backend.hf.space/health}"
+          echo "Re-checking health after auto-revert at $HEALTH_URL..."
+          sleep 30
+          ok=0
+          for i in 1 2 3; do
+            if curl -fsS "$HEALTH_URL"; then
+              echo ""
+              echo "Auto-revert health check passed (Space restored)"
+              ok=1
+              break
+            fi
+            echo "Post-revert attempt $i failed, retrying in 20s..."
+            sleep 20
+          done
+          if [ "$ok" != "1" ]; then
+            echo "WARN: auto-revert uploaded but health still failing — manual intervention may be required"
+          fi
           echo "Auto-revert finished. Failing this job so GitHub emails the failure notification."
           exit 1
 
@@ -268,9 +323,9 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -f deployed-backend "${GITHUB_SHA}"
+          git tag -f deployed-backend "${DEPLOY_SHA}"
           git push origin "refs/tags/deployed-backend" --force
-          echo "Recorded known-good backend deploy at ${GITHUB_SHA}"
+          echo "Recorded known-good backend deploy at ${DEPLOY_SHA}"
 
   # ─────────────────────────────────────────────────────────────
   # JOB 3 — Deploy frontend to Hugging Face Space
@@ -283,11 +338,15 @@ jobs:
     name: Deploy Frontend to Hugging Face
     runs-on: ubuntu-latest
     needs: migrate
+    environment: production
+    env:
+      DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 0
 
       - name: Fetch known-good deploy tags
@@ -369,8 +428,9 @@ jobs:
       - name: Verify members-portal health endpoint
         id: health
         run: |
-          HEALTH_URL="https://iclubmedasu-members-portal.hf.space/api/health"
-          echo "Waiting for members-portal Space to rebuild..."
+          HEALTH_URL="${{ vars.FRONTEND_HEALTH_URL }}"
+          HEALTH_URL="${HEALTH_URL:-https://iclubmedasu-members-portal.hf.space/api/health}"
+          echo "Waiting for members-portal Space to rebuild at $HEALTH_URL..."
           # Next.js Docker builds on HF often take several minutes; avoid false-positive reverts.
           sleep 180
           for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
@@ -398,7 +458,7 @@ jobs:
             exit 1
           fi
           GOOD_SHA=$(git rev-parse "$TAG")
-          if [ "$GOOD_SHA" = "$GITHUB_SHA" ]; then
+          if [ "$GOOD_SHA" = "$DEPLOY_SHA" ]; then
             echo "Last known-good equals current SHA — cannot auto-revert. Fix the Space manually."
             exit 1
           fi
@@ -457,6 +517,24 @@ jobs:
           print(f"Auto-revert upload complete (restored monorepo {good_sha})")
           EOF
 
+          HEALTH_URL="${{ vars.FRONTEND_HEALTH_URL }}"
+          HEALTH_URL="${HEALTH_URL:-https://iclubmedasu-members-portal.hf.space/api/health}"
+          echo "Re-checking health after auto-revert at $HEALTH_URL..."
+          sleep 30
+          ok=0
+          for i in 1 2 3; do
+            if curl -fsS "$HEALTH_URL"; then
+              echo ""
+              echo "Auto-revert health check passed (Space restored)"
+              ok=1
+              break
+            fi
+            echo "Post-revert attempt $i failed, retrying in 20s..."
+            sleep 20
+          done
+          if [ "$ok" != "1" ]; then
+            echo "WARN: auto-revert uploaded but health still failing — manual intervention may be required"
+          fi
           echo "Auto-revert finished. Failing this job so GitHub emails the failure notification."
           exit 1
 
@@ -466,9 +544,9 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -f deployed-frontend "${GITHUB_SHA}"
+          git tag -f deployed-frontend "${DEPLOY_SHA}"
           git push origin "refs/tags/deployed-frontend" --force
-          echo "Recorded known-good members-portal deploy at ${GITHUB_SHA}"
+          echo "Recorded known-good members-portal deploy at ${DEPLOY_SHA}"
 
   # ─────────────────────────────────────────────────────────────
   # JOB 4 — Deploy public website to Hugging Face Space
@@ -481,11 +559,15 @@ jobs:
     name: Deploy Public Website to Hugging Face
     runs-on: ubuntu-latest
     needs: migrate
+    environment: production
+    env:
+      DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 0
 
       - name: Fetch known-good deploy tags
@@ -498,11 +580,16 @@ jobs:
         run: |
           cp public-website/Dockerfile Dockerfile
           cp public-website/README.hf.md README.md
-          echo "${GITHUB_SHA}" > public-website/SOURCE_GIT_REF
+          echo "${DEPLOY_SHA}" > public-website/SOURCE_GIT_REF
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
 
       - name: Materialize public website images
         env:
-          SOURCE_GIT_REF: ${{ github.sha }}
+          SOURCE_GIT_REF: ${{ env.DEPLOY_SHA }}
           GITHUB_TOKEN: ${{ github.token }}
         run: node public-website/scripts/materialize-public-images.mjs
 
@@ -575,8 +662,9 @@ jobs:
       - name: Verify public-website health endpoint
         id: health
         run: |
-          HEALTH_URL="https://iclubmedasu-public-website.hf.space/api/health"
-          echo "Waiting for public-website Space Docker rebuild (often 8–15+ minutes)..."
+          HEALTH_URL="${{ vars.PUBLIC_HEALTH_URL }}"
+          HEALTH_URL="${HEALTH_URL:-https://iclubmedasu-public-website.hf.space/api/health}"
+          echo "Waiting for public-website Space Docker rebuild (often 8–15+ minutes) at $HEALTH_URL..."
           # Next.js + sharp on HF Spaces routinely exceeds 3–5 minutes cold rebuild.
           sleep 300
           for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
@@ -606,7 +694,7 @@ jobs:
             exit 1
           fi
           GOOD_SHA=$(git rev-parse "$TAG")
-          if [ "$GOOD_SHA" = "$GITHUB_SHA" ]; then
+          if [ "$GOOD_SHA" = "$DEPLOY_SHA" ]; then
             echo "Last known-good equals current SHA — cannot auto-revert. Fix the Space manually."
             exit 1
           fi
@@ -672,6 +760,24 @@ jobs:
           print(f"Auto-revert upload complete (restored monorepo {good_sha})")
           EOF
 
+          HEALTH_URL="${{ vars.PUBLIC_HEALTH_URL }}"
+          HEALTH_URL="${HEALTH_URL:-https://iclubmedasu-public-website.hf.space/api/health}"
+          echo "Re-checking health after auto-revert at $HEALTH_URL..."
+          sleep 30
+          ok=0
+          for i in 1 2 3; do
+            if curl -fsS "$HEALTH_URL"; then
+              echo ""
+              echo "Auto-revert health check passed (Space restored)"
+              ok=1
+              break
+            fi
+            echo "Post-revert attempt $i failed, retrying in 20s..."
+            sleep 20
+          done
+          if [ "$ok" != "1" ]; then
+            echo "WARN: auto-revert uploaded but health still failing — manual intervention may be required"
+          fi
           echo "Auto-revert finished. Failing this job so GitHub emails the failure notification."
           exit 1
 
@@ -681,6 +787,6 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -f deployed-public "${GITHUB_SHA}"
+          git tag -f deployed-public "${DEPLOY_SHA}"
           git push origin "refs/tags/deployed-public" --force
-          echo "Recorded known-good public-website deploy at ${GITHUB_SHA}"
+          echo "Recorded known-good public-website deploy at ${DEPLOY_SHA}"

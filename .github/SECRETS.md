@@ -36,7 +36,7 @@ These run in GitHub Actions and do **not** require paid GitHub Advanced Security
 - When open PRs lag a large security/CI land on `main`, **close them** and let the next monthly run open fresh groups. Treat Prisma major/minor bumps as review-only (never auto-land without migrate confidence).
 
 ### Semgrep CE (SAST)
-- Workflow: [`.github/workflows/semgrep.yml`](workflows/semgrep.yml) — pinned Semgrep image + `p/typescript` / `p/javascript` / `p/nodejs` / `p/react` on PRs and pushes to `main`/`develop`.
+- Workflow: [`.github/workflows/semgrep.yml`](workflows/semgrep.yml) — installs pinned Semgrep via `pip install "semgrep==1.127.1"` and runs `p/typescript` / `p/javascript` / `p/nodejs` / `p/react` on PRs and pushes to `main`/`develop`.
 - **Why not CodeQL?** CodeQL code scanning on **private** repos needs GitHub Code Security / Advanced Security (paid). Semgrep Community Edition does not.
 - Optional later: if the repo is public, or you buy Code Security, add GitHub’s CodeQL workflow and keep or drop Semgrep.
 - Optional: add `SEMGREP_APP_TOKEN` only if you adopt Semgrep AppSec Platform (not required for CE).

@@ -6,6 +6,7 @@ import { templateBackgroundWebpPath } from "../../lib/optimizeCertificateBackgro
 const prismaMocks = vi.hoisted(() => ({
     certificateTemplateFindUnique: vi.fn(),
     certificateTemplateUpdate: vi.fn(),
+    certificateTemplateCreate: vi.fn(),
 }));
 
 vi.mock("../../db", () => ({
@@ -13,6 +14,7 @@ vi.mock("../../db", () => ({
         certificateTemplate: {
             findUnique: prismaMocks.certificateTemplateFindUnique,
             update: prismaMocks.certificateTemplateUpdate,
+            create: prismaMocks.certificateTemplateCreate,
         },
     },
 }));
@@ -149,6 +151,34 @@ describe("certificateTemplates backgroundImagePath validation (B5)", () => {
                 where: { id: 7 },
                 data: { backgroundImagePath: path },
             });
+        });
+    });
+
+    describe("POST /", () => {
+        it("ignores client-supplied backgroundImagePath and sha on create", async () => {
+            prismaMocks.certificateTemplateCreate.mockResolvedValue({
+                id: 99,
+                name: "New template",
+                layout: [],
+                backgroundImagePath: null,
+                backgroundImageSha: null,
+                _count: { certificates: 0 },
+            });
+
+            const response = await request(buildRouteApp(certificateTemplatesRouter, manager))
+                .post("/")
+                .send({
+                    name: "New template",
+                    layout: [],
+                    backgroundImagePath: "certificates/evil/other.webp",
+                    backgroundImageSha: "abc123",
+                });
+
+            expect(response.status).toBe(201);
+            expect(prismaMocks.certificateTemplateCreate).toHaveBeenCalled();
+            const createData = prismaMocks.certificateTemplateCreate.mock.calls[0][0].data;
+            expect(createData.backgroundImagePath).toBeNull();
+            expect(createData.backgroundImageSha).toBeNull();
         });
     });
 });

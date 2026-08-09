@@ -137,7 +137,9 @@ Env documentation: [`backend/.env.example`](../backend/.env.example), [deploymen
 
 | Limiter | Window | Max | Applied on |
 |---------|--------|-----|------------|
-| `authPostLimiter` | 15 min | 30 | Auth POSTs including `/login`, setup/complete-profile, check-* |
+| `identityCheckLimiter` | 5 min | 60 | `check-email`, `check-student-id`, `check-officer-identifier` |
+| `credentialPostLimiter` | 15 min | 40 | `/login`, setup/complete-profile, update-invited-profile |
+| `passwordResetLimiter` | 15 min | 10 | `/forgot-password`, `/reset-password` |
 | `contactPostLimiter` | 1 h | 10 | `POST /api/public/contact` |
 | `incidentReportPostLimiter` | 1 h | 10 | `POST /api/public/support/incident-reports` |
 | `registrationPostLimiter` | 1 h | 30 | Event registration writes |
@@ -172,9 +174,10 @@ Login sets an httpOnly `token` cookie via `backend/routes/auth.ts`. **Production
 |------|----------------|-------|
 | **JWT in `localStorage` (PWA only)** | XSS can still steal a bearer token when the installed PWA rehydrates `auth_token` | **Regular browser tabs** no longer read/write `localStorage` or send `Authorization: Bearer`; they rely on the httpOnly cookie only ([`members-portal/src/services/api.ts`](../members-portal/src/services/api.ts)). **Installed standalone PWA** still keeps a bearer copy because `SameSite=None` cookies are unreliable in some iOS standalone contexts — deliberate tradeoff, not full cookie-only. Prefer cookie-only for PWA too once device-verified. |
 | **Query-string tokens** | Leak via Referer, logs, screenshots | Still used as WS / download fallback when a bearer token is available. Prefer cookie on WS upgrade when possible ([`RealtimeContext.tsx`](../members-portal/src/context/RealtimeContext.tsx)). |
-| **Certificate template GitHub paths** | Privileged users can set `backgroundImagePath` via `PATCH .../background` without prefix allowlist | Upload path is server-built (`certificates/templates/{id}/background…`), but PATCH accepts client-supplied path/SHA — constrain to expected prefix / owned objects before trusting downloads. |
+| **Certificate template GitHub paths** | Privileged users could point a **new** template at an arbitrary path if create accepted `backgroundImagePath` | **CREATE** now always stores `null` background path/SHA; assignment only via allowlisted `PATCH`/`PUT` (`isValidTemplateBackgroundPath`). |
+| **Developer backdoor JWT lifetime** | A token issued when the backdoor was enabled carries `isDeveloper` until expiry | Privilege gates (`requireDeveloperOnly`, developer short-circuits on admin/site-content) re-check `ALLOW_DEVELOPER_BACKDOOR` in production so disabling the flag revokes developer elevation immediately. |
 | **Public HF + public source** | Attackers know routes and auth design | Mitigate with authz tests and Phase 2 staging scans, not obscurity. |
-| **Verbose 500 messages** | Error middleware may return `err.message` to clients | Prefer generic messages in production. |
+| **Verbose 500 messages** | Some route handlers may still return `err.message` to clients | Global middleware is generic in production; prefer the same in remaining route catch blocks. |
 | **AI pentest not yet run** | Unknown PoCs remain | Complete Phase 2 when Docker + LLM keys are available. |
 
 Portal sessions: **web = cookie-only**; **installed PWA = cookie + localStorage/Bearer** for reliability. Treat the residual risks above as source of truth until the PWA surface is cookie-only as well.

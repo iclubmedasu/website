@@ -6,7 +6,11 @@ import { prisma } from '../db';
 import { computeIsSupportFormsEditor } from '../lib/supportPermissions';
 import { computeIsFinanceViewer } from '../lib/financePermissions';
 import { JWT_SECRET, authenticateToken } from '../middleware/auth';
-import { authPostLimiter } from '../middleware/rateLimit';
+import {
+    credentialPostLimiter,
+    identityCheckLimiter,
+    passwordResetLimiter,
+} from '../middleware/rateLimit';
 import { resolveDeveloperCredentials } from '../lib/securityEnv';
 import type { RequestUser } from '../types/auth';
 import {
@@ -80,6 +84,7 @@ function isPwaClient(req: { body?: { clientSurface?: unknown }; headers?: Record
 
 function issueAuthToken(payload: object, longLived: boolean): string {
     return jwt.sign(payload, JWT_SECRET, {
+        algorithm: 'HS256',
         expiresIn: longLived ? PWA_SESSION_TTL : WEB_SESSION_TTL,
     });
 }
@@ -256,7 +261,7 @@ async function findMemberByEmail(email) {
 }
 
 // Setup password - Member completes registration (email can be primary, email2, or email3)
-router.post('/setup-password', authPostLimiter, async (req, res) => {
+router.post('/setup-password', credentialPostLimiter, async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -336,7 +341,7 @@ router.post('/setup-password', authPostLimiter, async (req, res) => {
 
 // Check if email or student ID exists and needs password setup
 // Accepts either official email (e.g. 213256@med.asu.edu.eg) or student ID (e.g. 213256) – both identify the same member
-router.post('/check-email', authPostLimiter, async (req, res) => {
+router.post('/check-email', identityCheckLimiter, async (req, res) => {
     try {
         const input = (req.body.email ?? '').toString().trim();
 
@@ -424,7 +429,7 @@ router.post('/check-email', authPostLimiter, async (req, res) => {
 });
 
 // Update profile for invited member (no password yet): name, phone, optional phone2, email2/email3
-router.post('/update-invited-profile', authPostLimiter, async (req, res) => {
+router.post('/update-invited-profile', credentialPostLimiter, async (req, res) => {
     try {
         const { email, fullName, phoneNumber, phoneNumber2, email2, email3 } = req.body;
         if (!email || !email.trim()) {
@@ -505,7 +510,7 @@ router.post('/update-invited-profile', authPostLimiter, async (req, res) => {
 });
 
 // Check if student ID can set up account (member exists, no user yet, has placeholder data)
-router.post('/check-student-id', authPostLimiter, async (req, res) => {
+router.post('/check-student-id', identityCheckLimiter, async (req, res) => {
     try {
         const { studentId } = req.body;
         if (studentId === undefined || studentId === null || studentId === '') {
@@ -551,7 +556,7 @@ router.post('/check-student-id', authPostLimiter, async (req, res) => {
 
 // Complete profile and create account (for placeholder members: fullName, phone, optional phone2, email2/email3, password)
 // Primary email stays official (studentId@med.asu.edu.eg)
-router.post('/complete-profile', authPostLimiter, async (req, res) => {
+router.post('/complete-profile', credentialPostLimiter, async (req, res) => {
     try {
         const { studentId, fullName, phoneNumber, phoneNumber2, password, email2, email3 } = req.body;
 
@@ -714,7 +719,7 @@ router.post('/complete-profile', authPostLimiter, async (req, res) => {
 });
 
 // Check officer identifier (email or phone) — Task 1.1 step 3
-router.post('/check-officer-identifier', authPostLimiter, async (req, res) => {
+router.post('/check-officer-identifier', identityCheckLimiter, async (req, res) => {
     try {
         const identifier = (req.body.identifier ?? '').toString().trim();
         if (!identifier) {
@@ -776,7 +781,7 @@ router.post('/check-officer-identifier', authPostLimiter, async (req, res) => {
 });
 
 // Complete officer profile — Task 1.1 step 4
-router.post('/complete-officer-profile', authPostLimiter, async (req, res) => {
+router.post('/complete-officer-profile', credentialPostLimiter, async (req, res) => {
     try {
         const { identifier, fullName, phoneNumber, phoneNumber2, email2, email3, officerEmail, password, confirmPassword } = req.body;
 
@@ -964,7 +969,7 @@ router.post('/complete-officer-profile', authPostLimiter, async (req, res) => {
 });
 
 // Login endpoint
-router.post('/login', authPostLimiter, async (req, res) => {
+router.post('/login', credentialPostLimiter, async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -1114,7 +1119,7 @@ router.get('/me', async (req, res) => {
             return res.status(401).json({ error: 'No token provided' });
         }
 
-        const decoded = jwt.verify(token, JWT_SECRET) as RequestUser & { iat?: number; exp?: number };
+        const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as RequestUser & { iat?: number; exp?: number };
         const longLived = isPwaClient(req);
         const reissue = shouldReissuePwaToken(decoded, longLived);
 
@@ -1246,13 +1251,14 @@ router.get('/ws-ticket', async (req, res) => {
             return res.status(401).json({ error: 'No token provided' });
         }
 
-        const decoded = jwt.verify(sessionToken, JWT_SECRET) as RequestUser & {
+        const decoded = jwt.verify(sessionToken, JWT_SECRET, { algorithms: ['HS256'] }) as RequestUser & {
             iat?: number;
             exp?: number;
         };
 
         if (decoded.isDeveloper) {
             const ticket = jwt.sign(sessionPayloadFromDecoded(decoded), JWT_SECRET, {
+                algorithm: 'HS256',
                 expiresIn: WS_TICKET_TTL,
             });
             return res.json({ token: ticket });
@@ -1299,7 +1305,7 @@ router.get('/ws-ticket', async (req, res) => {
                 ...authority,
             },
             JWT_SECRET,
-            { expiresIn: WS_TICKET_TTL },
+            { algorithm: 'HS256', expiresIn: WS_TICKET_TTL },
         );
 
         return res.json({ token: ticket });
@@ -1323,7 +1329,7 @@ router.post('/logout', (_req, res) => {
 // ============================================
 // FORGOT / RESET PASSWORD
 // ============================================
-router.post('/forgot-password', authPostLimiter, async (req, res) => {
+router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
     try {
         const email = (req.body.email ?? '').toString().trim();
         if (!email || !isValidEmail(email)) {
@@ -1362,8 +1368,10 @@ router.post('/forgot-password', authPostLimiter, async (req, res) => {
             });
         } catch (emailError) {
             console.error('Forgot password email error:', emailError);
-            return res.status(500).json({
-                error: 'Failed to send password reset email. Please try again later.',
+            // Same generic success as unknown email to avoid account enumeration
+            return res.json({
+                success: true,
+                message: FORGOT_PASSWORD_SUCCESS_MESSAGE,
             });
         }
 
@@ -1377,7 +1385,7 @@ router.post('/forgot-password', authPostLimiter, async (req, res) => {
     }
 });
 
-router.post('/reset-password', authPostLimiter, async (req, res) => {
+router.post('/reset-password', passwordResetLimiter, async (req, res) => {
     try {
         const { token, password, confirmPassword } = req.body;
 

@@ -17,15 +17,20 @@ Custom website hostnames (`iclubmedasu.com`, `members-portal.…`) are **deferre
 
 ## Deployment Flow
 
-1. **GitHub Actions**: CI/CD pipeline builds and deploys the backend, members portal, and public website on push to main.
-2. **Backend**: Deployed as a Hugging Face Space (Docker container). API and health endpoints:
-	- [API](https://iclubmedasu-backend.hf.space/api)
-	- [Health check](https://iclubmedasu-backend.hf.space/health)
-3. **Database**: Managed by Supabase. Connection string is set via environment variables.
-4. **Frontend (Members Portal)**: Deployed as a Hugging Face Space (Docker container):
-	- [Live site](https://iclubmedasu-members-portal.hf.space)
-5. **Public Website**: Deployed as a Hugging Face Space (Docker container):
-	- [Live site](https://iclubmedasu-public-website.hf.space)
+1. **CI**: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on push/PR to `main` and `develop` (lint, typecheck, tests, builds). Backend build failures fail CI.
+2. **Deploy**: [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) runs after CI **completes successfully** (`workflow_run` on `main`’s CI, or manual `workflow_dispatch`). Concurrency group `production-deploy` prevents overlapping production deploys. Jobs use the GitHub **`production`** environment (add required reviewers under Settings → Environments if you want a human pause before migrate/upload).
+3. **Database**: Managed by Supabase. Prisma migrations + support-content seed run **first** against `DATABASE_URL`.
+4. **Backend**: Hugging Face Docker Space upload + health check (+ optional auto-revert).
+5. **Members portal / public website**: Same pattern for their Spaces.
+
+Health check URLs default to the `iclubmedasu-*.hf.space` paths below; override with repository variables `BACKEND_HEALTH_URL`, `FRONTEND_HEALTH_URL`, or `PUBLIC_HEALTH_URL` if Spaces move.
+
+### Rollback and migration safety
+
+- **Space auto-revert** restores only **code** from movable `deployed-*` tags when a post-upload **health** check fails. It does **not** reverse Prisma migrations or seeds.
+- Migrations are **forward-only**. Prefer additive schema (new columns/tables) so old and new app versions can share the expanded schema. Destructive changes need a deliberate multi-step release and, if rolled back in the app, a **manual compensating migration** on Supabase — CI will not do it for you.
+- The `production` environment approval gate (when configured) is the intended human checkpoint before a risky migrate+deploy lands.
+- **HF cold starts:** after idle scale-to-zero or a rebuild, the first requests may receive HTML or temporary 429 interstitials instead of JSON. The members portal parses API bodies defensively and shows a short “try again” message rather than a raw JSON parse error.
 
 ### Hugging Face Spaces — CI upload only (no `create_repo`)
 
@@ -37,7 +42,7 @@ Docker Spaces must be **created once manually** on Hugging Face (Settings → Ne
 
 1. Create three Docker Spaces on HF: `backend`, `members-portal`, `public-website` (under your org e.g. `iclubmedasu/`).
 2. Set GitHub secrets `HF_SPACE`, `HF_FRONTEND_SPACE`, `HF_PUBLIC_SPACE` to those paths.
-3. Push to `main` — CI uploads code and HF rebuilds each Space.
+3. Push to `main` so CI can go green, then deploy runs (or use **workflow_dispatch** once secrets are set).
 
 **If deploy fails with 402:** Your Spaces already exist; ensure the workflow does not call `create_repo` (upload-only). If you need a **new** Docker Space, create it in the HF web UI or subscribe to PRO.
 

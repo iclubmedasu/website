@@ -78,7 +78,7 @@ function getMemberIdFromRequest(req: IncomingMessage): number | null {
         const token = extractAuthToken(req, { allowQueryToken: true });
         if (!token) return null;
 
-        const decoded = jwt.verify(token, JWT_SECRET) as RequestUser;
+        const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] }) as RequestUser;
         if (!decoded?.memberId || Number.isNaN(Number(decoded.memberId))) {
             return null;
         }

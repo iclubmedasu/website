@@ -1,6 +1,6 @@
 'use client'
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { setToken, clearToken as clearTokenUtil, initToken, shouldSendCredentials } from '../services/api';
+import { setToken, clearToken as clearTokenUtil, initToken, shouldSendCredentials, safeParseJsonResponse } from '../services/api';
 import { apiFetch } from '../services/api';
 import type {
     ApiErrorResponse,
@@ -143,6 +143,35 @@ function isNetworkFetchError(error: unknown): boolean {
     );
 }
 
+function readRetryAfterMessage(response: Response, fallback: string): string {
+    const retryAfter = response.headers.get("Retry-After");
+    if (retryAfter) {
+        const seconds = Number.parseInt(retryAfter, 10);
+        if (Number.isFinite(seconds) && seconds > 0) {
+            return `Too many attempts — try again in ${seconds}s`;
+        }
+    }
+    return fallback;
+}
+
+async function parseJsonBody<T>(response: Response): Promise<T> {
+    const parsed = await safeParseJsonResponse<T>(response);
+    if (!parsed.ok) {
+        throw new Error(
+            response.status === 429
+                ? readRetryAfterMessage(response, parsed.error)
+                : parsed.error,
+        );
+    }
+    if (response.status === 429) {
+        const err = parsed.data as { error?: string };
+        throw new Error(
+            readRetryAfterMessage(response, err.error || "Too many attempts. Please wait a few minutes and try again."),
+        );
+    }
+    return parsed.data;
+}
+
 function logAuthNetworkOrError(label: string, error: unknown): void {
     if (isNetworkFetchError(error)) {
         console.error(`${label}: Backend unreachable at ${API_URL}`);
@@ -172,16 +201,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
             const response = await apiFetch(`${API_URL}/auth/me`);
 
             if (response.ok) {
-                const data = (await response.json()) as AuthMeResponse;
+                const data = await parseJsonBody<AuthMeResponse>(response);
                 applyMeResponse(data);
                 setUser(data.user);
                 setIsAlumni(false);
             } else if (response.status === 403) {
-                const data = (await response.json().catch(() => ({}))) as unknown;
-                if (isAlumniAccess(data)) {
-                    setIsAlumni(true);
-                    setUser(null);
-                } else {
+                try {
+                    const data = await parseJsonBody<unknown>(response);
+                    if (isAlumniAccess(data)) {
+                        setIsAlumni(true);
+                        setUser(null);
+                    } else {
+                        setIsAlumni(false);
+                        setUser(null);
+                    }
+                } catch {
                     setIsAlumni(false);
                     setUser(null);
                 }
@@ -207,15 +241,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
             const response = await apiFetch(`${API_URL}/auth/me`);
 
             if (response.ok) {
-                const data = (await response.json()) as AuthMeResponse;
+                const data = await parseJsonBody<AuthMeResponse>(response);
                 applyMeResponse(data);
                 setUser(data.user);
                 setIsAlumni(false);
             } else if (response.status === 403) {
-                const data = (await response.json().catch(() => ({}))) as unknown;
-                if (isAlumniAccess(data)) {
-                    setIsAlumni(true);
-                    setUser(null);
+                try {
+                    const data = await parseJsonBody<unknown>(response);
+                    if (isAlumniAccess(data)) {
+                        setIsAlumni(true);
+                        setUser(null);
+                    }
+                } catch {
+                    // ignore non-JSON body
                 }
             }
         } catch (error) {
@@ -234,7 +272,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 body: JSON.stringify({ email }),
             });
 
-            const data = (await response.json()) as CheckEmailResponse;
+            const data = await parseJsonBody<CheckEmailResponse & ApiErrorResponse>(response);
+            if (!response.ok) {
+                return {
+                    success: false,
+                    error: readApiError(data, "Failed to check identifier"),
+                    data: { exists: false, needsSetup: false },
+                };
+            }
             return { success: true, data };
         } catch (error) {
             return {
@@ -256,7 +301,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 body: JSON.stringify({ studentId: String(studentId).trim() }),
             });
 
-            const data = (await response.json()) as CheckStudentIdResponse & ApiErrorResponse;
+            const data = await parseJsonBody<CheckStudentIdResponse & ApiErrorResponse>(response);
             if (!response.ok) {
                 return {
                     success: false,
@@ -300,7 +345,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 })),
             });
 
-            const data = (await response.json()) as { user: AuthUser, token?: string } & ApiErrorResponse;
+            const data = await parseJsonBody<{ user: AuthUser, token?: string } & ApiErrorResponse>(response);
             if (!response.ok) {
                 throw new Error(readApiError(data, "Failed to complete profile"));
             }
@@ -345,7 +390,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 })),
             });
 
-            const data = (await response.json()) as { user: AuthUser, token?: string } & ApiErrorResponse;
+            const data = await parseJsonBody<{ user: AuthUser, token?: string } & ApiErrorResponse>(response);
             if (!response.ok) {
                 throw new Error(readApiError(data, "Failed to complete officer profile"));
             }
@@ -386,7 +431,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 }),
             });
 
-            const data = (await response.json()) as ApiErrorResponse;
+            const data = await parseJsonBody<ApiErrorResponse>(response);
             if (!response.ok) {
                 throw new Error(readApiError(data, "Failed to update profile"));
             }
@@ -409,7 +454,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 body: JSON.stringify(withClientSurface({ email, password })),
             });
 
-            const data = (await response.json()) as { user: AuthUser, token?: string } & ApiErrorResponse;
+            const data = await parseJsonBody<{ user: AuthUser, token?: string } & ApiErrorResponse>(response);
             if (!response.ok) {
                 throw new Error(readApiError(data, "Setup failed"));
             }
@@ -439,7 +484,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 body: JSON.stringify(body),
             });
 
-            const data = (await response.json()) as ForgotPasswordResponse & ApiErrorResponse;
+            const data = await parseJsonBody<ForgotPasswordResponse & ApiErrorResponse>(response);
             if (!response.ok) {
                 throw new Error(readApiError(data, "Failed to send reset email"));
             }
@@ -473,7 +518,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 body: JSON.stringify(body),
             });
 
-            const data = (await response.json()) as ResetPasswordResponse & ApiErrorResponse;
+            const data = await parseJsonBody<ResetPasswordResponse & ApiErrorResponse>(response);
             if (!response.ok) {
                 throw new Error(readApiError(data, "Failed to reset password"));
             }
@@ -500,7 +545,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 body: JSON.stringify(withClientSurface({ email, password })),
             });
 
-            const data = (await response.json()) as { user: AuthUser, token?: string } & ApiErrorResponse;
+            const data = await parseJsonBody<{ user: AuthUser, token?: string } & ApiErrorResponse>(response);
             if (!response.ok) {
                 if (response.status === 403 && isAlumniAccess(data)) {
                     setIsAlumni(true);

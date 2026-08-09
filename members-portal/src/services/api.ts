@@ -327,16 +327,74 @@ const getAuthOnlyHeaders = (): JsonHeaders => {
     return {};
 };
 
+const STARTING_UP_MESSAGE = 'Server is starting up — please try again in a few seconds.';
+
+/**
+ * Parse JSON body safely. HF cold-starts / proxies sometimes return HTML
+ * (e.g. 429 interstitials) that must not throw a bare SyntaxError.
+ */
+export async function safeParseJsonResponse<T = unknown>(
+    response: Response,
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+    const contentType = response.headers.get('content-type') || '';
+    const text = await response.text();
+
+    if (!text) {
+        return { ok: true, data: {} as T };
+    }
+
+    const looksJson =
+        contentType.includes('application/json') ||
+        text.trimStart().startsWith('{') ||
+        text.trimStart().startsWith('[');
+
+    if (!looksJson) {
+        return { ok: false, error: STARTING_UP_MESSAGE };
+    }
+
+    try {
+        return { ok: true, data: JSON.parse(text) as T };
+    } catch {
+        return { ok: false, error: STARTING_UP_MESSAGE };
+    }
+}
+
+function formatRateLimitMessage(response: Response, fallback: string): string {
+    const retryAfter = response.headers.get('Retry-After');
+    if (retryAfter) {
+        const seconds = Number.parseInt(retryAfter, 10);
+        if (Number.isFinite(seconds) && seconds > 0) {
+            return `Too many attempts — try again in ${seconds}s`;
+        }
+    }
+    return fallback || 'Too many attempts. Please wait a few minutes and try again.';
+}
+
 // Helper function to handle API responses
 export const handleResponse = async <T = unknown>(response: Response): Promise<T> => {
+    const parsed = await safeParseJsonResponse<ApiErrorResponse & ConflictErrorResponse & T>(response);
+
     if (!response.ok) {
-        const error = (await response.json().catch(() => ({ error: 'An error occurred' }))) as ApiErrorResponse & ConflictErrorResponse;
+        if (!parsed.ok) {
+            if (response.status === 429) {
+                throw new Error(formatRateLimitMessage(response, parsed.error));
+            }
+            throw new Error(parsed.error || `HTTP error! status: ${response.status}`);
+        }
+        const error = parsed.data;
         if (response.status === 409 && error.code) {
             throw new ConflictError(error);
         }
+        if (response.status === 429) {
+            throw new Error(formatRateLimitMessage(response, error.error || ''));
+        }
         throw new Error(error.error || `HTTP error! status: ${response.status}`);
     }
-    return (await response.json()) as T;
+
+    if (!parsed.ok) {
+        throw new Error(parsed.error);
+    }
+    return parsed.data as T;
 };
 
 // ============================================
