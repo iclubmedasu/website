@@ -137,13 +137,16 @@ Env documentation: [`backend/.env.example`](../backend/.env.example), [deploymen
 
 | Limiter | Window | Max | Applied on |
 |---------|--------|-----|------------|
-| `identityCheckLimiter` | 5 min | 60 | `check-email`, `check-student-id`, `check-officer-identifier` |
-| `credentialPostLimiter` | 15 min | 40 | `/login`, setup/complete-profile, update-invited-profile |
-| `passwordResetLimiter` | 15 min | 10 | `/forgot-password`, `/reset-password` |
-| `contactPostLimiter` | 1 h | 10 | `POST /api/public/contact` |
-| `incidentReportPostLimiter` | 1 h | 10 | `POST /api/public/support/incident-reports` |
-| `registrationPostLimiter` | 1 h | 30 | Event registration writes |
-| `publicCertificateReadLimiter` | 15 min | 60 | Unauthenticated certificate list/verify reads |
+| `identityCheckLimiter` | 15 min | 300 | `check-email`, `check-student-id`, `check-officer-identifier` |
+| `credentialPostLimiter` | 15 min | 120 | `/login`, setup/complete-profile, update-invited-profile |
+| `passwordResetLimiter` | 15 min | 30 | `/forgot-password`, `/reset-password` |
+| `contactPostLimiter` | 1 h | 15 | `POST /api/public/contact` |
+| `incidentReportPostLimiter` | 1 h | 20 | `POST /api/public/support/incident-reports` |
+| `registrationPostLimiter` | 15 min | 250 | Public event registration writes; **skipped for authenticated portal users** |
+| `publicCertificateReadLimiter` | 15 min | 200 | Unauthenticated certificate list/verify reads |
+| `certificateEmailResendLimiter` | 15 min | 150 | Staff certificate email resend |
+
+**Member portal browsing is not rate-limited.** Limits apply only to the listed endpoints (mostly auth, public forms, and public registration). Staff juggling events/pages uses normal authenticated APIs without these middleware caps.
 
 ### Helmet and CORS
 

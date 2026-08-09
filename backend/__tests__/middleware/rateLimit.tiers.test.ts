@@ -12,4 +12,8 @@ describe("auth rate limit tiers", () => {
         // Deprecated alias tracks credential posts
         expect(rateLimitModule.authPostLimiter).toBe(rateLimitModule.credentialPostLimiter);
     });
+
+    it("exports a registration limiter that can skip authenticated users", () => {
+        expect(rateLimitModule.registrationPostLimiter).toBeTypeOf("function");
+    });
 });

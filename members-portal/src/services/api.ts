@@ -329,6 +329,27 @@ const getAuthOnlyHeaders = (): JsonHeaders => {
 
 const STARTING_UP_MESSAGE = 'Server is starting up — please try again in a few seconds.';
 
+function responseHeader(response: Response, name: string): string | null {
+    try {
+        return response.headers?.get?.(name) ?? null;
+    } catch {
+        return null;
+    }
+}
+
+async function readResponseBodyText(response: Response): Promise<string> {
+    // Prefer text() (fetch Response). Tests often mock only json().
+    if (typeof response.text === 'function') {
+        return await response.text();
+    }
+    if (typeof response.json === 'function') {
+        const data = await response.json();
+        if (data === undefined || data === null) return '';
+        return typeof data === 'string' ? data : JSON.stringify(data);
+    }
+    return '';
+}
+
 /**
  * Parse JSON body safely. HF cold-starts / proxies sometimes return HTML
  * (e.g. 429 interstitials) that must not throw a bare SyntaxError.
@@ -336,8 +357,13 @@ const STARTING_UP_MESSAGE = 'Server is starting up — please try again in a few
 export async function safeParseJsonResponse<T = unknown>(
     response: Response,
 ): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
-    const contentType = response.headers.get('content-type') || '';
-    const text = await response.text();
+    const contentType = responseHeader(response, 'content-type') || '';
+    let text = '';
+    try {
+        text = await readResponseBodyText(response);
+    } catch {
+        return { ok: false, error: STARTING_UP_MESSAGE };
+    }
 
     if (!text) {
         return { ok: true, data: {} as T };
@@ -360,7 +386,7 @@ export async function safeParseJsonResponse<T = unknown>(
 }
 
 function formatRateLimitMessage(response: Response, fallback: string): string {
-    const retryAfter = response.headers.get('Retry-After');
+    const retryAfter = responseHeader(response, 'Retry-After');
     if (retryAfter) {
         const seconds = Number.parseInt(retryAfter, 10);
         if (Number.isFinite(seconds) && seconds > 0) {

@@ -144,7 +144,12 @@ function isNetworkFetchError(error: unknown): boolean {
 }
 
 function readRetryAfterMessage(response: Response, fallback: string): string {
-    const retryAfter = response.headers.get("Retry-After");
+    let retryAfter: string | null = null;
+    try {
+        retryAfter = response.headers?.get?.('Retry-After') ?? null;
+    } catch {
+        retryAfter = null;
+    }
     if (retryAfter) {
         const seconds = Number.parseInt(retryAfter, 10);
         if (Number.isFinite(seconds) && seconds > 0) {

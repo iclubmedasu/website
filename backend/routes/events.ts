@@ -2767,7 +2767,7 @@ router.get('/:id/registrations/:registrationId', authenticateToken, async (req, 
     }
 });
 
-router.post('/:id/registrations', registrationPostLimiter, optionalAuthenticateToken, async (req, res) => {
+router.post('/:id/registrations', optionalAuthenticateToken, registrationPostLimiter, async (req, res) => {
     try {
         const resolved = await resolveEventByIdOrSlug(String(req.params.id || ''));
         if (!resolved) return res.status(400).json({ error: 'Invalid event ID' });
