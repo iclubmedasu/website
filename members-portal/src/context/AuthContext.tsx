@@ -185,6 +185,44 @@ function logAuthNetworkOrError(label: string, error: unknown): void {
     console.error(`${label}:`, error);
 }
 
+const AUTH_ME_RETRY_DELAYS_MS = [400, 900];
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * GET /auth/me with short retries on transient failures (network blips, backend-api
+ * proxy 502s, momentary 5xx, or an HF cold-start interstitial). A definitive 401/403
+ * or a successful response returns immediately — only ambiguous failures are retried,
+ * so a single hiccup doesn't get treated the same as "not logged in".
+ */
+async function fetchAuthMeWithRetry(): Promise<Response | null> {
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt <= AUTH_ME_RETRY_DELAYS_MS.length; attempt++) {
+        try {
+            const response = await apiFetch(`${API_URL}/auth/me`);
+            if (response.ok || response.status === 401 || response.status === 403) {
+                return response;
+            }
+            lastError = null;
+            if (attempt < AUTH_ME_RETRY_DELAYS_MS.length) {
+                await sleep(AUTH_ME_RETRY_DELAYS_MS[attempt]);
+                continue;
+            }
+            return response;
+        } catch (error) {
+            lastError = error;
+            if (attempt < AUTH_ME_RETRY_DELAYS_MS.length) {
+                await sleep(AUTH_ME_RETRY_DELAYS_MS[attempt]);
+                continue;
+            }
+        }
+    }
+    if (lastError) throw lastError;
+    return null;
+}
+
 interface AuthProviderProps {
     children: ReactNode;
 }
@@ -203,7 +241,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const checkAuth = async (): Promise<void> => {
         try {
-            const response = await apiFetch(`${API_URL}/auth/me`);
+            const response = await fetchAuthMeWithRetry();
+            if (!response) {
+                setUser(null);
+                setIsAlumni(false);
+                return;
+            }
 
             if (response.ok) {
                 const data = await parseJsonBody<AuthMeResponse>(response);
@@ -229,6 +272,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 setIsAlumni(false);
                 setUser(null);
             } else {
+                // Transient failure that survived retries (e.g. backend still down) —
+                // treat as logged out, but this is no longer a single-blip trigger.
                 setIsAlumni(false);
                 setUser(null);
             }
