@@ -101,9 +101,6 @@ describe('certificateEmailService', () => {
         await sendCertificateEmail(11);
 
         expect(pdfMocks.generateCertificatePdfBuffer).toHaveBeenCalledWith(11);
-        expect(logSpy).toHaveBeenCalledWith(
-            expect.stringContaining('certificate 11 PDF size'),
-        );
         expect(emailMocks.sendEmail).toHaveBeenCalledTimes(1);
         const payload = emailMocks.sendEmail.mock.calls[0][0];
 

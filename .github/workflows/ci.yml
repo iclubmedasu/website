@@ -23,7 +23,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
 
       - name: Install dependencies
@@ -31,6 +31,9 @@ jobs:
 
       - name: Generate Prisma client (backend)
         run: pnpm --filter backend prisma:generate
+
+      - name: Build shared package
+        run: pnpm --filter @iclub/shared build
 
       - name: Type check backend
         run: pnpm --filter backend typecheck
@@ -61,7 +64,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
 
       - name: Install dependencies
@@ -69,6 +72,9 @@ jobs:
 
       - name: Generate Prisma client (backend)
         run: pnpm --filter backend prisma:generate
+
+      - name: Build shared package
+        run: pnpm --filter @iclub/shared build
 
       - name: Run unit tests
         run: pnpm test:run
@@ -100,7 +106,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
 
       - name: Install dependencies
@@ -108,6 +114,9 @@ jobs:
 
       - name: Generate Prisma client (backend)
         run: pnpm --filter backend prisma:generate
+
+      - name: Build shared package
+        run: pnpm --filter @iclub/shared build
 
       - name: Build members portal
         run: pnpm --filter members-portal build
@@ -136,11 +145,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install
+
+      - name: Generate Prisma client (backend)
+        run: pnpm --filter backend prisma:generate
+
+      - name: Build shared package
+        run: pnpm --filter @iclub/shared build
 
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
@@ -174,6 +189,12 @@ jobs:
         uses: pnpm/action-setup@v3
         with:
           version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install

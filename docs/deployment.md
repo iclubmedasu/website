@@ -41,6 +41,61 @@ Docker Spaces must be **created once manually** on Hugging Face (Settings → Ne
 
 **If deploy fails with 402:** Your Spaces already exist; ensure the workflow does not call `create_repo` (upload-only). If you need a **new** Docker Space, create it in the HF web UI or subscribe to PRO.
 
+## Deploy safety net (health check + auto-revert)
+
+After each Space upload, [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) waits for the container to rebuild and checks a health endpoint:
+
+| Target | Health URL |
+|--------|------------|
+| Backend | `https://iclubmedasu-backend.hf.space/health` |
+| Members portal | `https://iclubmedasu-members-portal.hf.space/api/health` |
+| Public website | `https://iclubmedasu-public-website.hf.space/api/health` |
+
+**On success:** the workflow force-moves a git tag for that target to the current monorepo commit:
+
+- `deployed-backend`
+- `deployed-frontend`
+- `deployed-public`
+
+That tag is the **last known-good** monorepo SHA for that Space.
+
+**On health-check failure:** the job re-uploads the file tree from the last known-good tag (same prepare/upload steps as a normal deploy) as a new HF Space commit titled `Auto-revert: …`, then **exits with failure** so you get notified. Hugging Face has no native “rollback API”; the restore is a normal non-destructive new commit.
+
+### What auto-revert does **not** do (database)
+
+- Auto-revert **only** restores **Space code**. It never rolls back Supabase / Prisma migrations.
+- Migrations still run **first** (`migrate` job), before the three deploy jobs. Keep migrations **additive only** (new tables/columns; do not rename/drop columns that old code still needs in the same release). Old and new app versions can then share one expanded schema.
+- If you must ship a **destructive** schema change, do it in a planned multi-step release (expand → migrate app → contract later). Do not rely on auto-revert; fix by hand and treat the failed job as a loud alarm.
+
+### Notifications (GitHub failure email)
+
+There is no custom Slack/Resend step. A failed deploy (including after a successful auto-revert of the Space) fails the Actions job so GitHub can email you.
+
+**Confirm once on your account:**
+
+1. GitHub → avatar → **Settings** → **Notifications** → **Actions** — enable email for workflow failures (or “Failed workflows that I start / that affect me”, depending on current UI labels).
+2. For the repo: ensure you **Watch** it (or are an owner) and that notification email is verified.
+3. Optional: repo **Settings** → **Notifications** / personal **Custom routing** if org mail goes elsewhere.
+
+### First successful run after enabling this workflow
+
+Until each `deployed-*` tag exists, a failed health check **cannot** auto-revert (it fails loudly and asks for a manual fix). After the first **healthy** deploy of each job, tags are created and auto-revert works on later failures.
+
+### How to deliberately test auto-revert (before trusting it)
+
+Do this only when you can watch Actions and the Spaces for a few minutes:
+
+1. Confirm tags already exist after at least one green full deploy: `git ls-remote --tags origin 'deployed-*'`.
+2. On a short-lived branch (or a one-line PR to `main` you control): make **one** health route fail — e.g. temporary `return new Response('fail', { status: 503 })` in `backend/server.ts` `/health` **or** `members-portal/src/app/api/health/route.ts` — not all three at once.
+3. Merge to `main` (or push to `main` if that is your process). Watch the corresponding deploy job:
+   - Health step fails after retries.
+   - Auto-revert step uploads the previous tag’s tree.
+   - Job still ends **failed** (email if notifications are on).
+4. Manually hit that Space’s health URL until the previous behavior returns.
+5. Immediately ship a fix that restores the health route, get a green deploy, and confirm tags advanced to the fixed SHA.
+
+Do **not** combine a deliberate break with a destructive migration.
+
 ## Production now: email branding only
 
 Sites and API stay on Hugging Face URLs. Outbound mail uses your verified Resend domain.
@@ -179,6 +234,7 @@ The members portal previously deployed to Netlify. If you have not already:
 	- [Health check](https://iclubmedasu-backend.hf.space/health)
 5. **Keep-alive Monitoring:**
 	- The Hugging Face Space is kept alive using [UptimeRobot](https://dashboard.uptimerobot.com/monitors/802817894), which regularly pings the health endpoint to prevent the space from sleeping.
+6. **Post-deploy health + auto-revert:** see [Deploy safety net](#deploy-safety-net-health-check--auto-revert). CI also fails the job if `/health` never returns 200 after the rebuild wait.
 
 ## Database (Supabase)
 
@@ -188,6 +244,7 @@ The members portal previously deployed to Netlify. If you have not already:
 4. The deploy workflow also runs `seed:support-content` after migrations so the support page CMS rows exist in production (migrations create tables only; default notice blocks are seeded separately).
 5. The Prisma migration set enables Row-Level Security on every app table so Supabase's public REST API cannot read or modify data directly.
 6. If you need to edit data manually as the project owner, use the Supabase SQL editor or dashboard with a privileged account rather than the public anon API.
+7. **Migrations are not auto-reverted.** Prefer additive schema changes. See [Deploy safety net](#deploy-safety-net-health-check--auto-revert).
 
 ## Frontend Deployment (Members Portal — Hugging Face Spaces)
 
@@ -197,9 +254,11 @@ The members portal previously deployed to Netlify. If you have not already:
 4. Next.js runs in `standalone` output mode on port 7860 (required by HF Spaces). The runner stage uses `--chown=nextjs:nodejs` so ISR cache writes do not hit `EACCES` at runtime.
 5. Space config is in [`members-portal/README.hf.md`](../members-portal/README.hf.md) (copied to `README.md` during deploy).
 
-### Post-deploy static asset check (Members Portal)
+### Post-deploy health and static asset check (Members Portal)
 
-Verify these return HTTP 200:
+CI health endpoint: `https://iclubmedasu-members-portal.hf.space/api/health` (must return HTTP 200 after deploy).
+
+Also verify these return HTTP 200:
 
 - `https://iclubmedasu-members-portal.hf.space/favicon.ico`
 - `https://iclubmedasu-members-portal.hf.space/icons/icon-192x192.png`
@@ -216,9 +275,11 @@ If users still see favicon errors after deploy, unregister the old service worke
 6. Set backend `PUBLIC_WEBSITE_URL` = `https://iclubmedasu-public-website.hf.space` in the backend HF Space so ticket confirmation emails link to the live site.
 7. Binary assets (PNG, etc.) are stored via Xet — see root [`.gitattributes`](../.gitattributes) (`filter=xet`). CI uses `huggingface_hub[hf_xet]` when uploading to Spaces. HF may store uploaded PNGs as pointer stubs; CI runs [`materialize-public-images.mjs`](../public-website/scripts/materialize-public-images.mjs) **before upload** (using `GITHUB_TOKEN` + retries) so real PNG bytes are in the Space. The Dockerfile runs the same script as a safety net during the Space build.
 
-### Post-deploy static asset check (Public Website)
+### Post-deploy health and static asset check (Public Website)
 
-Verify these return HTTP 200 with real PNG bytes (Content-Length well over 1 KB, not ~131-byte pointer stubs):
+CI health endpoint: `https://iclubmedasu-public-website.hf.space/api/health` (must return HTTP 200 after deploy).
+
+Also verify these return HTTP 200 with real PNG bytes (Content-Length well over 1 KB, not ~131-byte pointer stubs):
 
 - `https://iclubmedasu-public-website.hf.space/favicon.ico`
 - `https://iclubmedasu-public-website.hf.space/images/iclub_full_colored_transparent_outlined_logo.png`
@@ -290,8 +351,12 @@ docker build -f public-website/Dockerfile \
 - [ ] Database migrations ran successfully
 - [ ] Environment variables set correctly
 - [ ] API health endpoint returns 200 ([check here](https://iclubmedasu-backend.hf.space/health))
+- [ ] Members portal health returns 200 (`https://iclubmedasu-members-portal.hf.space/api/health`)
+- [ ] Public website health returns 200 (`https://iclubmedasu-public-website.hf.space/api/health`)
 - [ ] Members portal loads ([check here](https://iclubmedasu-members-portal.hf.space))
 - [ ] Public website loads ([check here](https://iclubmedasu-public-website.hf.space))
+- [ ] Deploy Actions jobs green (or failed only after a deliberate/auto-revert — check HF Space is healthy either way)
+- [ ] Known-good tags present after first green deploys: `deployed-backend`, `deployed-frontend`, `deployed-public`
 - [ ] Backend `PUBLIC_WEBSITE_URL` set to `https://iclubmedasu-public-website.hf.space` on the backend HF Space
 - [ ] Public website `NEXT_PUBLIC_API_URL` = `https://iclubmedasu-backend.hf.space/api` in HF Space **Variables** (rebuild after change)
 - [ ] Public API smoke test: `https://iclubmedasu-backend.hf.space/api/public/events?limit=5&upcoming=false` returns JSON

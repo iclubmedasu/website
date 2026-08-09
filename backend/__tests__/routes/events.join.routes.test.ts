@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const prismaMocks = vi.hoisted(() => ({
     eventSessionTokenFindFirst: vi.fn(),
     eventSessionAttendanceUpsert: vi.fn(),
+    eventSessionAttendanceFindFirst: vi.fn(),
+    eventSessionAttendanceCreate: vi.fn(),
     eventSessionFindMany: vi.fn(),
     eventFindUnique: vi.fn(),
 }))
@@ -16,9 +18,14 @@ vi.mock('../../db', () => ({
         },
         eventSessionAttendance: {
             upsert: prismaMocks.eventSessionAttendanceUpsert,
+            findFirst: prismaMocks.eventSessionAttendanceFindFirst,
+            create: prismaMocks.eventSessionAttendanceCreate,
         },
         eventSession: {
             findMany: prismaMocks.eventSessionFindMany,
+        },
+        usageEvent: {
+            create: vi.fn().mockResolvedValue({}),
         },
         event: {
             findMany: vi.fn(),
@@ -143,9 +150,13 @@ describe('GET /events/:id/join', () => {
     beforeEach(() => {
         prismaMocks.eventSessionTokenFindFirst.mockReset()
         prismaMocks.eventSessionAttendanceUpsert.mockReset()
+        prismaMocks.eventSessionAttendanceFindFirst.mockReset()
+        prismaMocks.eventSessionAttendanceCreate.mockReset()
         prismaMocks.eventSessionFindMany.mockReset()
         prismaMocks.eventFindUnique.mockReset()
         prismaMocks.eventSessionAttendanceUpsert.mockResolvedValue({})
+        prismaMocks.eventSessionAttendanceFindFirst.mockResolvedValue(null)
+        prismaMocks.eventSessionAttendanceCreate.mockResolvedValue({})
         prismaMocks.eventSessionFindMany.mockResolvedValue([])
         prismaMocks.eventFindUnique.mockResolvedValue({ id: 42, slug: 'abcdefghjkmn' })
     })
@@ -170,7 +181,7 @@ describe('GET /events/:id/join', () => {
             eventTitle: 'Launch Night',
             sessionLabel: 'Morning Workshop',
         })
-        expect(prismaMocks.eventSessionAttendanceUpsert).toHaveBeenCalledOnce()
+        expect(prismaMocks.eventSessionAttendanceCreate).toHaveBeenCalledOnce()
     })
 
     it('returns 401 when join is behind strict JWT auth (pre-fix behaviour)', async () => {
@@ -200,7 +211,7 @@ describe('GET /events/:id/join', () => {
         expect(response.body.status).toBe('not_started')
         expect(response.body.startsAt).toBe(startsAt.toISOString())
         expect(response.body.endsAt).toBe(endsAt.toISOString())
-        expect(prismaMocks.eventSessionAttendanceUpsert).not.toHaveBeenCalled()
+        expect(prismaMocks.eventSessionAttendanceCreate).not.toHaveBeenCalled()
     })
 
     it('returns ended when the session window is over', async () => {
@@ -217,7 +228,7 @@ describe('GET /events/:id/join', () => {
 
         expect(response.status).toBe(409)
         expect(response.body.status).toBe('ended')
-        expect(prismaMocks.eventSessionAttendanceUpsert).not.toHaveBeenCalled()
+        expect(prismaMocks.eventSessionAttendanceCreate).not.toHaveBeenCalled()
     })
 
     it('returns invalid_link when the token is unknown', async () => {
@@ -269,6 +280,6 @@ describe('GET /events/:id/join', () => {
 
         expect(response.status).toBe(200)
         expect(response.body.status).toBe('ready')
-        expect(prismaMocks.eventSessionAttendanceUpsert).toHaveBeenCalledOnce()
+        expect(prismaMocks.eventSessionAttendanceCreate).toHaveBeenCalledOnce()
     })
 })

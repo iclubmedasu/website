@@ -1,0 +1,6 @@
+# Historical false-positive ignore for Gitleaks (full git-history scan).
+# Fingerprint format: commit:path:rule:line
+#
+# This was a sample JWT_SECRET in a deleted azure-deployment-notes.md file.
+# If that value was ever used in production, rotate JWT_SECRET on the HF backend Space.
+2230c24b320a2dca607a82c8948b01cc2792d00b:backend/azure-deployment-notes.md:generic-api-key:88

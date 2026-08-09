@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# contents:write — push/move last-known-good deploy tags after a healthy deploy
+permissions:
+  contents: write
+
 jobs:
   # ─────────────────────────────────────────────────────────────
   # JOB 1 — Run Prisma migrations against Supabase
@@ -61,6 +65,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch known-good deploy tags
+        run: |
+          git fetch origin 'refs/tags/deployed-*:refs/tags/deployed-*' 2>/dev/null || true
+          echo "Known-good tags:"
+          git tag -l 'deployed-*' || true
 
       - name: Clean workspace before upload
         run: |
@@ -136,11 +148,13 @@ jobs:
           EOF
 
       - name: Verify backend health endpoint
+        id: health
         run: |
+          HEALTH_URL="https://iclubmedasu-backend.hf.space/health"
           echo "Waiting for Hugging Face Space to rebuild..."
           sleep 90
           for i in 1 2 3 4 5 6; do
-            if curl -fsS "https://iclubmedasu-backend.hf.space/health"; then
+            if curl -fsS "$HEALTH_URL"; then
               echo ""
               echo "Backend health check passed"
               exit 0
@@ -150,6 +164,88 @@ jobs:
           done
           echo "Backend health check failed after deploy — check HF Space logs"
           exit 1
+
+      - name: Auto-revert Space to last known-good commit
+        if: failure() && steps.health.outcome == 'failure'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ secrets.HF_SPACE }}
+        run: |
+          set -euo pipefail
+          TAG=deployed-backend
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "No tag $TAG found — cannot auto-revert. Fix the Space manually."
+            exit 1
+          fi
+          GOOD_SHA=$(git rev-parse "$TAG")
+          if [ "$GOOD_SHA" = "$GITHUB_SHA" ]; then
+            echo "Last known-good equals current SHA — cannot auto-revert. Fix the Space manually."
+            exit 1
+          fi
+          echo "Reverting backend Space to monorepo commit $GOOD_SHA"
+
+          REVERT_DIR=/tmp/revert-backend
+          rm -rf "$REVERT_DIR"
+          git worktree add "$REVERT_DIR" "$GOOD_SHA"
+          cd "$REVERT_DIR"
+
+          rm -rf members-portal public-website backend/__tests__
+          find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name ".cache" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find . -type f \( \
+            -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" \
+            -o -name "*.gif" -o -name "*.ico" -o -name "*.webp" \
+            -o -name "*.pdf" \
+          \) -delete
+          find . -type d -name "dist" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "coverage" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "playwright-report" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "test-results" -exec rm -rf {} + 2>/dev/null || true
+
+          export GOOD_SHA
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo_id = os.environ["HF_SPACE"]
+          good_sha = os.environ["GOOD_SHA"]
+
+          api.upload_folder(
+              folder_path=".",
+              repo_id=repo_id,
+              repo_type="space",
+              ignore_patterns=[
+                  ".git",
+                  ".github",
+                  ".env",
+                  ".env.*",
+                  "*.log",
+                  "*.tsbuildinfo",
+              ],
+              delete_patterns=[
+                  "backend/__tests__/**",
+                  "members-portal/**",
+                  "public-website/**",
+              ],
+              commit_message=f"Auto-revert: backend deploy failed health check, restoring {good_sha[:12]}",
+          )
+          print(f"Auto-revert upload complete (restored monorepo {good_sha})")
+          EOF
+
+          echo "Auto-revert finished. Failing this job so GitHub emails the failure notification."
+          exit 1
+
+      - name: Record known-good deploy tag
+        if: success()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f deployed-backend "${GITHUB_SHA}"
+          git push origin "refs/tags/deployed-backend" --force
+          echo "Recorded known-good backend deploy at ${GITHUB_SHA}"
 
   # ─────────────────────────────────────────────────────────────
   # JOB 3 — Deploy frontend to Hugging Face Space
@@ -166,6 +262,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch known-good deploy tags
+        run: |
+          git fetch origin 'refs/tags/deployed-*:refs/tags/deployed-*' 2>/dev/null || true
+          echo "Known-good tags:"
+          git tag -l 'deployed-*' || true
 
       - name: Prepare frontend Space files
         run: |
@@ -231,6 +335,102 @@ jobs:
           print("Frontend upload complete")
           EOF
 
+      - name: Verify members-portal health endpoint
+        id: health
+        run: |
+          HEALTH_URL="https://iclubmedasu-members-portal.hf.space/api/health"
+          echo "Waiting for members-portal Space to rebuild..."
+          # Next.js Docker builds on HF often take several minutes; avoid false-positive reverts.
+          sleep 180
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            if curl -fsS "$HEALTH_URL"; then
+              echo ""
+              echo "Members-portal health check passed"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 30s..."
+            sleep 30
+          done
+          echo "Members-portal health check failed after deploy — check HF Space logs"
+          exit 1
+
+      - name: Auto-revert Space to last known-good commit
+        if: failure() && steps.health.outcome == 'failure'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_FRONTEND_SPACE: ${{ secrets.HF_FRONTEND_SPACE }}
+        run: |
+          set -euo pipefail
+          TAG=deployed-frontend
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "No tag $TAG found — cannot auto-revert. Fix the Space manually."
+            exit 1
+          fi
+          GOOD_SHA=$(git rev-parse "$TAG")
+          if [ "$GOOD_SHA" = "$GITHUB_SHA" ]; then
+            echo "Last known-good equals current SHA — cannot auto-revert. Fix the Space manually."
+            exit 1
+          fi
+          echo "Reverting members-portal Space to monorepo commit $GOOD_SHA"
+
+          REVERT_DIR=/tmp/revert-frontend
+          rm -rf "$REVERT_DIR"
+          git worktree add "$REVERT_DIR" "$GOOD_SHA"
+          cd "$REVERT_DIR"
+
+          cp members-portal/Dockerfile Dockerfile
+          cp members-portal/README.hf.md README.md
+          rm -rf backend public-website
+          find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name ".next" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name ".cache" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "coverage" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "playwright-report" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "test-results" -exec rm -rf {} + 2>/dev/null || true
+
+          export GOOD_SHA
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo_id = os.environ["HF_FRONTEND_SPACE"]
+          good_sha = os.environ["GOOD_SHA"]
+
+          api.upload_folder(
+              folder_path=".",
+              repo_id=repo_id,
+              repo_type="space",
+              ignore_patterns=[
+                  ".git",
+                  ".github",
+                  ".env",
+                  ".env.*",
+                  "*.log",
+                  "*.tsbuildinfo",
+              ],
+              delete_patterns=[
+                  "backend/**",
+                  "public-website/**",
+              ],
+              commit_message=f"Auto-revert: members-portal deploy failed health check, restoring {good_sha[:12]}",
+          )
+          print(f"Auto-revert upload complete (restored monorepo {good_sha})")
+          EOF
+
+          echo "Auto-revert finished. Failing this job so GitHub emails the failure notification."
+          exit 1
+
+      - name: Record known-good deploy tag
+        if: success()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f deployed-frontend "${GITHUB_SHA}"
+          git push origin "refs/tags/deployed-frontend" --force
+          echo "Recorded known-good members-portal deploy at ${GITHUB_SHA}"
+
   # ─────────────────────────────────────────────────────────────
   # JOB 4 — Deploy public website to Hugging Face Space
   #
@@ -246,6 +446,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch known-good deploy tags
+        run: |
+          git fetch origin 'refs/tags/deployed-*:refs/tags/deployed-*' 2>/dev/null || true
+          echo "Known-good tags:"
+          git tag -l 'deployed-*' || true
 
       - name: Prepare public website Space files
         run: |
@@ -317,3 +525,108 @@ jobs:
           )
           print("Public website upload complete")
           EOF
+
+      - name: Verify public-website health endpoint
+        id: health
+        run: |
+          HEALTH_URL="https://iclubmedasu-public-website.hf.space/api/health"
+          echo "Waiting for public-website Space to rebuild..."
+          # Next.js Docker builds on HF often take several minutes; avoid false-positive reverts.
+          sleep 180
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            if curl -fsS "$HEALTH_URL"; then
+              echo ""
+              echo "Public-website health check passed"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 30s..."
+            sleep 30
+          done
+          echo "Public-website health check failed after deploy — check HF Space logs"
+          exit 1
+
+      - name: Auto-revert Space to last known-good commit
+        if: failure() && steps.health.outcome == 'failure'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_PUBLIC_SPACE: ${{ secrets.HF_PUBLIC_SPACE }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=deployed-public
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "No tag $TAG found — cannot auto-revert. Fix the Space manually."
+            exit 1
+          fi
+          GOOD_SHA=$(git rev-parse "$TAG")
+          if [ "$GOOD_SHA" = "$GITHUB_SHA" ]; then
+            echo "Last known-good equals current SHA — cannot auto-revert. Fix the Space manually."
+            exit 1
+          fi
+          echo "Reverting public-website Space to monorepo commit $GOOD_SHA"
+
+          REVERT_DIR=/tmp/revert-public
+          rm -rf "$REVERT_DIR"
+          git worktree add "$REVERT_DIR" "$GOOD_SHA"
+          cd "$REVERT_DIR"
+
+          cp public-website/Dockerfile Dockerfile
+          cp public-website/README.hf.md README.md
+          echo "${GOOD_SHA}" > public-website/SOURCE_GIT_REF
+
+          # Materialize images for the restored revision (auth may still rate-limit)
+          export SOURCE_GIT_REF="${GOOD_SHA}"
+          node public-website/scripts/materialize-public-images.mjs || {
+            echo "WARN: materialize failed during revert; continuing with tree as checked out"
+          }
+
+          rm -rf backend members-portal
+          find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name ".next" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name ".cache" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "coverage" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "playwright-report" -exec rm -rf {} + 2>/dev/null || true
+          find . -type d -name "test-results" -exec rm -rf {} + 2>/dev/null || true
+
+          export GOOD_SHA
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo_id = os.environ["HF_PUBLIC_SPACE"]
+          good_sha = os.environ["GOOD_SHA"]
+
+          api.upload_folder(
+              folder_path=".",
+              repo_id=repo_id,
+              repo_type="space",
+              ignore_patterns=[
+                  ".git",
+                  ".github",
+                  ".env",
+                  ".env.*",
+                  "*.log",
+                  "*.tsbuildinfo",
+              ],
+              delete_patterns=[
+                  "backend/**",
+                  "members-portal/**",
+              ],
+              commit_message=f"Auto-revert: public-website deploy failed health check, restoring {good_sha[:12]}",
+          )
+          print(f"Auto-revert upload complete (restored monorepo {good_sha})")
+          EOF
+
+          echo "Auto-revert finished. Failing this job so GitHub emails the failure notification."
+          exit 1
+
+      - name: Record known-good deploy tag
+        if: success()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f deployed-public "${GITHUB_SHA}"
+          git push origin "refs/tags/deployed-public" --force
+          echo "Recorded known-good public-website deploy at ${GITHUB_SHA}"

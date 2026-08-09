@@ -35,7 +35,7 @@ These run in GitHub Actions and do **not** require paid GitHub Advanced Security
 - Alerts: enable **Dependabot alerts** and **Dependabot security updates** in the same settings page if not already on.
 
 ### Semgrep CE (SAST)
-- Workflow: [`.github/workflows/semgrep.yml`](workflows/semgrep.yml) — OSS rules (`semgrep scan --config auto`) on PRs and pushes to `main`/`develop`.
+- Workflow: [`.github/workflows/semgrep.yml`](workflows/semgrep.yml) — pinned Semgrep image + `p/typescript` / `p/javascript` / `p/nodejs` / `p/react` on PRs and pushes to `main`/`develop`.
 - **Why not CodeQL?** CodeQL code scanning on **private** repos needs GitHub Code Security / Advanced Security (paid). Semgrep Community Edition does not.
 - Optional later: if the repo is public, or you buy Code Security, add GitHub’s CodeQL workflow and keep or drop Semgrep.
 - Optional: add `SEMGREP_APP_TOKEN` only if you adopt Semgrep AppSec Platform (not required for CE).
@@ -46,8 +46,9 @@ These run in GitHub Actions and do **not** require paid GitHub Advanced Security
    - **Private repos:** requires GitHub Secret Protection / Advanced Security (paid).  
    - Path: **Settings → Code security → Secret scanning** → Enable (when available).
 2. **Gitleaks in CI (works on free/private)**  
-   - Workflow: [`.github/workflows/gitleaks.yml`](workflows/gitleaks.yml) — scans the checkout on PRs/pushes with no org license.  
+   - Workflow: [`.github/workflows/gitleaks.yml`](workflows/gitleaks.yml) — scans full git history on PRs/pushes with no org license.  
    - Uses the Gitleaks Docker image directly (not `gitleaks-action`, which requires a license for GitHub Organizations).
+   - [`.gitleaksignore`](../.gitleaksignore) allowlists one historical fingerprint; rotate production `JWT_SECRET` if that old sample was ever used live.
 
 ### Existing
 - `pnpm audit` remains in [`.github/workflows/ci.yml`](workflows/ci.yml) (`Security Audit` job).

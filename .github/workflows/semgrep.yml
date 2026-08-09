@@ -25,11 +25,19 @@ jobs:
     if: github.actor != 'dependabot[bot]'
 
     container:
-      image: semgrep/semgrep
+      # Pin image — floating latest has had exit-code-2 failures without findings.
+      image: semgrep/semgrep:1.127.1
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Run Semgrep (OSS rules)
-        run: semgrep scan --config auto --error --metrics=off
+        run: >
+          semgrep scan
+          --config p/typescript
+          --config p/javascript
+          --config p/nodejs
+          --config p/react
+          --error
+          --metrics=off

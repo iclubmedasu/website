@@ -15,10 +15,23 @@ vi.mock('../../db', () => ({
             findUnique: prismaMocks.eventRegistrationFindUnique,
             update: prismaMocks.eventRegistrationUpdate,
         },
+        eventSession: {
+            findMany: vi.fn().mockResolvedValue([]),
+        },
+        eventRegistrationSession: {
+            findMany: vi.fn().mockResolvedValue([]),
+        },
+        usageEvent: {
+            create: vi.fn().mockResolvedValue({}),
+        },
     },
 }));
 
 vi.mock('../../services/emailService', () => emailMocks);
+vi.mock('../../services/sessionTokenService', () => ({
+    generateTokensForRegistration: vi.fn().mockResolvedValue(0),
+    getSessionTokensForRegistration: vi.fn().mockResolvedValue(new Map()),
+}));
 
 import {
     ICLUB_AVATAR_CID,
@@ -37,6 +50,7 @@ const registrationFixture = {
     status: 'REGISTERED',
     event: {
         id: 42,
+        slug: '42',
         title: 'Summit',
         venue: 'Hall A',
         eventDate: new Date('2026-06-20T10:00:00.000Z'),

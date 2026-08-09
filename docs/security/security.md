@@ -193,19 +193,22 @@ Configs live under [`.github/`](../.github/). Enablement notes: [.github/SECRETS
 ### Semgrep CE (SAST)
 
 - Workflow: [`.github/workflows/semgrep.yml`](../.github/workflows/semgrep.yml)
-- `semgrep scan --config auto --error` on PRs and pushes to `main` / `develop`.
+- Pinned image `semgrep/semgrep:1.127.1`; rulesets `p/typescript`, `p/javascript`, `p/nodejs`, `p/react` (not `auto`).
+- Ignore paths: [`.semgrepignore`](../.semgrepignore).
 - **Why not CodeQL by default?** CodeQL code scanning on **private** repos needs GitHub Code Security / Advanced Security (paid). Semgrep Community Edition does not.
 - Optional: `SEMGREP_APP_TOKEN` only if adopting Semgrep AppSec Platform (not required for CE).
 
 ### Gitleaks (secret scanning in CI)
 
 - Workflow: [`.github/workflows/gitleaks.yml`](../.github/workflows/gitleaks.yml)
-- Runs Gitleaks Docker image on checkout (no org license required — avoids `gitleaks-action` org licensing).
+- Runs Gitleaks Docker image on full git history (no org license required — avoids `gitleaks-action` org licensing).
+- Historical allowlist: [`.gitleaksignore`](../.gitleaksignore) — only for a deleted sample `JWT_SECRET` under `backend/azure-deployment-notes.md`. If that value was ever used in production, **rotate `JWT_SECRET`** on the backend HF Space; allowlisting only silences CI.
 - Also enable **GitHub secret scanning** in repo settings when available (public: usually on; private: may need Secret Protection / Advanced Security).
 
 ### Existing audit
 
-- `pnpm audit` remains in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) (`Security Audit` job).
+- `pnpm audit --audit-level moderate` remains in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) (`Security Audit` job).
+- Unfixable community `xlsx` advisories may be listed under root `pnpm.auditConfig.ignoreGhsas` when no free patched release exists; prefer replacing `xlsx` later if export allows.
 
 ### After CI fails
 

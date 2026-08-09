@@ -37,11 +37,12 @@ function buildCorsHeaders(origin: string | null) {
 async function mockAuthApi(page: Page): Promise<MockAuthState> {
     const state: MockAuthState = { authenticated: false }
     const user = buildMockUser(TEST_EMAIL)
+    const mockToken = 'e2e-mock-token'
 
     await page.route('**/api/auth/**', async (route) => {
         const request = route.request()
         const method = request.method()
-        const pathname = new URL(request.url()).pathname
+        const pathname = new URL(request.url()).pathname.replace(/\/$/, '')
         const origin = await request.headerValue('origin')
 
         if (method === 'OPTIONS') {
@@ -92,8 +93,11 @@ async function mockAuthApi(page: Page): Promise<MockAuthState> {
                 state.authenticated = true
                 await route.fulfill({
                     status: 200,
-                    headers: buildCorsHeaders(origin),
-                    body: JSON.stringify({ user })
+                    headers: {
+                        ...buildCorsHeaders(origin),
+                        'set-cookie': `token=${mockToken}; Path=/; HttpOnly; SameSite=Lax`,
+                    },
+                    body: JSON.stringify({ user, token: mockToken })
                 })
                 return
             }
@@ -133,7 +137,11 @@ async function mockAuthApi(page: Page): Promise<MockAuthState> {
             return
         }
 
-        await route.fallback()
+        await route.fulfill({
+            status: 404,
+            headers: buildCorsHeaders(origin),
+            body: JSON.stringify({ error: `Unhandled mock auth route: ${method} ${pathname}` })
+        })
     })
 
     return state
@@ -150,7 +158,10 @@ async function signIn(page: Page, email: string, password: string) {
     await expect(page.getByRole('heading', { name: 'Welcome Back' })).toBeVisible()
     await expect(page.getByPlaceholder('••••••••')).toBeVisible()
     await page.getByPlaceholder('••••••••').fill(password)
-    await page.getByRole('button', { name: 'Sign In' }).click()
+    await Promise.all([
+        page.waitForURL(/\/dashboard/, { timeout: 15000 }),
+        page.getByRole('button', { name: 'Sign In' }).click(),
+    ])
 }
 
 test('anonymous user lands on login surface', async ({ page }) => {
@@ -172,7 +183,11 @@ test('valid login redirects to dashboard using test credentials', async ({ page 
 
 test('invalid login shows error message', async ({ page }) => {
     await mockAuthApi(page)
-    await signIn(page, TEST_EMAIL, 'wrong-password')
+    await page.goto('/login')
+    await submitIdentifier(page, TEST_EMAIL)
+    await expect(page.getByRole('heading', { name: 'Welcome Back' })).toBeVisible()
+    await page.getByPlaceholder('••••••••').fill('wrong-password')
+    await page.getByRole('button', { name: 'Sign In' }).click()
 
     await expect(page).toHaveURL(/\/login/)
     await expect(page.locator('.error-message')).toContainText('Invalid credentials')
@@ -208,8 +223,12 @@ test('mobile navigation opens, expands submenu, and auto-closes after route clic
     await openMenuButton.click()
     await expect(page.getByRole('button', { name: 'Close navigation menu' })).toBeVisible()
 
-    await page.getByRole('button', { name: 'Personnel' }).click()
-    await page.getByRole('link', { name: 'Members' }).click()
+    const mobileSidebar = page.locator('#protected-mobile-sidebar')
+    await mobileSidebar.getByRole('button', { name: 'Personnel' }).click()
+    await Promise.all([
+        page.waitForURL(/\/members/, { timeout: 15000 }),
+        mobileSidebar.getByRole('link', { name: 'Members' }).click(),
+    ])
 
     await expect(page).toHaveURL(/\/members/)
     await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeVisible()

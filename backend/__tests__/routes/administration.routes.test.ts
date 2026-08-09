@@ -7,6 +7,8 @@ const prismaMocks = vi.hoisted(() => ({
     teamFindUnique: vi.fn(),
     teamRoleFindFirst: vi.fn(),
     teamRoleFindUnique: vi.fn(),
+    teamRoleCreate: vi.fn(),
+    teamRoleUpdate: vi.fn(),
     memberFindFirst: vi.fn(),
     memberFindUnique: vi.fn(),
     memberCreate: vi.fn(),
@@ -32,6 +34,8 @@ vi.mock('../../db', () => ({
         teamRole: {
             findFirst: prismaMocks.teamRoleFindFirst,
             findUnique: prismaMocks.teamRoleFindUnique,
+            create: prismaMocks.teamRoleCreate,
+            update: prismaMocks.teamRoleUpdate,
         },
         member: {
             findFirst: prismaMocks.memberFindFirst,
@@ -53,6 +57,9 @@ vi.mock('../../db', () => ({
         },
         alumni: {
             create: prismaMocks.alumniCreate,
+        },
+        usageEvent: {
+            create: vi.fn().mockResolvedValue({}),
         },
         $transaction: prismaMocks.transaction,
     },
@@ -134,6 +141,8 @@ describe('administration routes', () => {
             roleName: where.id === 41 ? 'Coordinator' : 'Officer',
             isActive: true,
         }))
+        prismaMocks.teamRoleCreate.mockResolvedValue({ id: 99, teamId: 1, roleName: 'Officer', isActive: true })
+        prismaMocks.teamRoleUpdate.mockResolvedValue({ id: 11, teamId: 1, roleName: 'Officer', isActive: true })
         prismaMocks.teamFindUnique.mockImplementation(async ({ where }: { where: { id: number } }) => (
             where.id === administrationTeamWithoutOfficer.id
                 ? administrationTeamWithoutOfficer

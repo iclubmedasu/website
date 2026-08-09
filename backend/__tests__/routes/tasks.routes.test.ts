@@ -66,10 +66,12 @@ vi.mock('../../db', () => ({
             findFirst: prismaMocks.taskFindFirst,
             create: prismaMocks.taskCreate,
             update: prismaMocks.taskUpdate,
+            updateMany: vi.fn().mockResolvedValue({ count: 1 }),
             delete: prismaMocks.taskDelete
         },
         taskAssignment: {
             findFirst: prismaMocks.taskAssignmentFindFirst,
+            findUnique: vi.fn().mockResolvedValue(null),
             createMany: prismaMocks.taskAssignmentCreateMany,
             deleteMany: prismaMocks.taskAssignmentDeleteMany,
             upsert: prismaMocks.taskAssignmentUpsert,
@@ -98,7 +100,10 @@ vi.mock('../../db', () => ({
         taskDependency: {
             upsert: prismaMocks.taskDependencyUpsert,
             delete: prismaMocks.taskDependencyDelete
-        }
+        },
+        usageEvent: {
+            create: vi.fn().mockResolvedValue({}),
+        },
     }
 }))
 
@@ -291,6 +296,31 @@ describe('tasks routes integration', () => {
     })
 
     it('updates task leader independently of assignees', async () => {
+        const updatedTask = {
+            id: 77,
+            title: 'Task With Leader Change',
+            description: null,
+            type: 'TASK',
+            priority: 'MEDIUM',
+            status: 'NOT_STARTED',
+            difficulty: 'MEDIUM',
+            phaseId: null,
+            parentTaskId: null,
+            order: 1,
+            leaderId: 14,
+            leader: { id: 14, fullName: 'Lead Member', profilePhotoUrl: null },
+            startDate: null,
+            dueDate: null,
+            completedDate: null,
+            estimatedHours: null,
+            actualHours: null,
+            version: 1,
+            projectId: 22,
+            project: { id: 22, title: 'Project A' },
+            taskTeams: [],
+            assignments: [],
+            tags: []
+        }
         prismaMocks.taskFindUnique
             .mockResolvedValueOnce({
                 title: 'Task With Leader Change',
@@ -314,29 +344,8 @@ describe('tasks routes integration', () => {
             .mockResolvedValueOnce({ parentTaskId: null })
         prismaMocks.projectTeamFindMany.mockResolvedValueOnce([{ teamId: 5 }])
         prismaMocks.teamMemberFindMany.mockResolvedValueOnce([{ memberId: 14 }])
-        prismaMocks.taskUpdate.mockResolvedValueOnce({
-            id: 77,
-            title: 'Task With Leader Change',
-            description: null,
-            type: 'TASK',
-            priority: 'MEDIUM',
-            status: 'NOT_STARTED',
-            difficulty: 'MEDIUM',
-            phaseId: null,
-            parentTaskId: null,
-            order: 1,
-            leaderId: 14,
-            leader: { id: 14, fullName: 'Lead Member', profilePhotoUrl: null },
-            startDate: null,
-            dueDate: null,
-            completedDate: null,
-            estimatedHours: null,
-            actualHours: null,
-            project: { id: 22, title: 'Project A' },
-            taskTeams: [],
-            assignments: [],
-            tags: []
-        })
+        prismaMocks.taskUpdate.mockResolvedValueOnce(updatedTask)
+        prismaMocks.taskFindFirst.mockResolvedValueOnce(updatedTask)
 
         const response = await request(buildRouteApp(tasksRouter, { memberId: 3, isOfficer: true }))
             .put('/77')
@@ -368,33 +377,40 @@ describe('tasks routes integration', () => {
     })
 
     it('does not copy task leader when duplicating a task', async () => {
+        prismaMocks.taskFindUnique
+            .mockResolvedValueOnce({
+                id: 77,
+                projectId: 22,
+                parentTaskId: null,
+                phaseId: null,
+                title: 'Leader Template',
+                description: 'Template task',
+                type: 'TASK',
+                status: 'IN_PROGRESS',
+                difficulty: 'MEDIUM',
+                priority: 'HIGH',
+                startDate: null,
+                dueDate: null,
+                estimatedHours: null,
+                leaderId: 14,
+                subtasks: [],
+                taskTeams: [{ teamId: 5, canEdit: true }],
+            })
+            .mockResolvedValueOnce({ projectId: 22, parentTaskId: null })
+            .mockResolvedValueOnce({
+                id: 78,
+                title: 'Leader Template (Copy)',
+                projectId: 22,
+                taskTeams: [],
+                assignments: [],
+                tags: []
+            })
         prismaMocks.taskFindFirst.mockResolvedValueOnce({ order: 2 })
-        prismaMocks.taskFindUnique.mockResolvedValueOnce({
-            id: 77,
-            projectId: 22,
-            parentTaskId: null,
-            phaseId: null,
-            title: 'Leader Template',
-            description: 'Template task',
-            type: 'TASK',
-            status: 'IN_PROGRESS',
-            difficulty: 'MEDIUM',
-            priority: 'HIGH',
-            startDate: null,
-            dueDate: null,
-            estimatedHours: null,
-            leaderId: 14,
-            subtasks: [],
-            taskTeams: [{ teamId: 5, canEdit: true }],
-        })
         prismaMocks.taskTeamCreate.mockResolvedValueOnce({})
         prismaMocks.taskCreate.mockResolvedValueOnce({
             id: 78,
             title: 'Leader Template (Copy)',
             projectId: 22,
-            taskTeams: [],
-            assignments: [],
-            tags: []
         })
 
         const response = await request(buildRouteApp(tasksRouter, { memberId: 3, isOfficer: true }))
@@ -421,10 +437,11 @@ describe('tasks routes integration', () => {
     it('allows assigned member to change task status', async () => {
         prismaMocks.taskAssignmentFindFirst.mockResolvedValueOnce({ id: 1 })
         prismaMocks.taskFindUnique
-            .mockResolvedValueOnce({ status: 'NOT_STARTED' })
+            .mockResolvedValueOnce({ status: 'NOT_STARTED', title: 'Task', projectId: 44 })
             .mockResolvedValueOnce({ projectId: 44, parentTaskId: null })
             .mockResolvedValueOnce({ parentTaskId: null })
-        prismaMocks.taskUpdate.mockResolvedValueOnce({ id: 55, status: 'COMPLETED' })
+        prismaMocks.taskFindFirst.mockResolvedValueOnce({ id: 55, status: 'COMPLETED', projectId: 44, version: 1 })
+        prismaMocks.taskUpdate.mockResolvedValueOnce({ id: 55, status: 'COMPLETED', version: 1, projectId: 44 })
 
         const response = await request(buildRouteApp(tasksRouter, { memberId: 7 }))
             .patch('/55/status')
@@ -528,6 +545,32 @@ describe('tasks routes integration', () => {
     })
 
     it('emits TASK_ASSIGNED when PUT update adds new assignees', async () => {
+        const updatedTask = {
+            id: 77,
+            title: 'Task With New Assignee',
+            description: null,
+            type: 'TASK',
+            priority: 'MEDIUM',
+            status: 'NOT_STARTED',
+            difficulty: 'MEDIUM',
+            phaseId: null,
+            parentTaskId: null,
+            order: 1,
+            startDate: null,
+            dueDate: null,
+            completedDate: null,
+            estimatedHours: null,
+            actualHours: null,
+            version: 1,
+            projectId: 22,
+            project: { id: 22, title: 'Project A' },
+            taskTeams: [],
+            assignments: [
+                { memberId: 10, member: { id: 10, fullName: 'Existing Member', profilePhotoUrl: null } },
+                { memberId: 99, member: { id: 99, fullName: 'New Member', profilePhotoUrl: null } }
+            ],
+            tags: []
+        }
         prismaMocks.taskFindUnique
             .mockResolvedValueOnce({
                 title: 'Task With New Assignee',
@@ -550,30 +593,8 @@ describe('tasks routes integration', () => {
             .mockResolvedValueOnce({ parentTaskId: null })
         prismaMocks.projectTeamFindMany.mockResolvedValueOnce([{ teamId: 5 }])
         prismaMocks.teamMemberFindMany.mockResolvedValueOnce([{ memberId: 10 }, { memberId: 99 }])
-        prismaMocks.taskUpdate.mockResolvedValueOnce({
-            id: 77,
-            title: 'Task With New Assignee',
-            description: null,
-            type: 'TASK',
-            priority: 'MEDIUM',
-            status: 'NOT_STARTED',
-            difficulty: 'MEDIUM',
-            phaseId: null,
-            parentTaskId: null,
-            order: 1,
-            startDate: null,
-            dueDate: null,
-            completedDate: null,
-            estimatedHours: null,
-            actualHours: null,
-            project: { id: 22, title: 'Project A' },
-            taskTeams: [],
-            assignments: [
-                { memberId: 10, member: { id: 10, fullName: 'Existing Member', profilePhotoUrl: null } },
-                { memberId: 99, member: { id: 99, fullName: 'New Member', profilePhotoUrl: null } }
-            ],
-            tags: []
-        })
+        prismaMocks.taskUpdate.mockResolvedValueOnce(updatedTask)
+        prismaMocks.taskFindFirst.mockResolvedValueOnce(updatedTask)
 
         const response = await request(buildRouteApp(tasksRouter, { memberId: 3, isOfficer: true }))
             .put('/77')
@@ -593,6 +614,32 @@ describe('tasks routes integration', () => {
     })
 
     it('does not emit TASK_ASSIGNED when PUT update assignees are unchanged', async () => {
+        const updatedTask = {
+            id: 77,
+            title: 'Task Without Assignee Delta',
+            description: null,
+            type: 'TASK',
+            priority: 'MEDIUM',
+            status: 'NOT_STARTED',
+            difficulty: 'MEDIUM',
+            phaseId: null,
+            parentTaskId: null,
+            order: 1,
+            startDate: null,
+            dueDate: null,
+            completedDate: null,
+            estimatedHours: null,
+            actualHours: null,
+            version: 1,
+            projectId: 22,
+            project: { id: 22, title: 'Project A' },
+            taskTeams: [],
+            assignments: [
+                { memberId: 10, member: { id: 10, fullName: 'Existing Member', profilePhotoUrl: null } },
+                { memberId: 99, member: { id: 99, fullName: 'Existing Member Two', profilePhotoUrl: null } }
+            ],
+            tags: []
+        }
         prismaMocks.taskFindUnique
             .mockResolvedValueOnce({
                 title: 'Task Without Assignee Delta',
@@ -615,30 +662,8 @@ describe('tasks routes integration', () => {
             .mockResolvedValueOnce({ parentTaskId: null })
         prismaMocks.projectTeamFindMany.mockResolvedValueOnce([{ teamId: 5 }])
         prismaMocks.teamMemberFindMany.mockResolvedValueOnce([{ memberId: 10 }, { memberId: 99 }])
-        prismaMocks.taskUpdate.mockResolvedValueOnce({
-            id: 77,
-            title: 'Task Without Assignee Delta',
-            description: null,
-            type: 'TASK',
-            priority: 'MEDIUM',
-            status: 'NOT_STARTED',
-            difficulty: 'MEDIUM',
-            phaseId: null,
-            parentTaskId: null,
-            order: 1,
-            startDate: null,
-            dueDate: null,
-            completedDate: null,
-            estimatedHours: null,
-            actualHours: null,
-            project: { id: 22, title: 'Project A' },
-            taskTeams: [],
-            assignments: [
-                { memberId: 10, member: { id: 10, fullName: 'Existing Member', profilePhotoUrl: null } },
-                { memberId: 99, member: { id: 99, fullName: 'Existing Member Two', profilePhotoUrl: null } }
-            ],
-            tags: []
-        })
+        prismaMocks.taskUpdate.mockResolvedValueOnce(updatedTask)
+        prismaMocks.taskFindFirst.mockResolvedValueOnce(updatedTask)
 
         const response = await request(buildRouteApp(tasksRouter, { memberId: 3, isOfficer: true }))
             .put('/77')

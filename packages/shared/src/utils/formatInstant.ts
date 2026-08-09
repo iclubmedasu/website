@@ -1,4 +1,4 @@
-import { CLUB_TIMEZONE, CLUB_TIMEZONE_LABEL } from "./constants";
+import { CLUB_TIMEZONE } from "./constants";
 import { getTimezoneLabel } from "./eventLocal";
 
 function parseInstant(value: string | Date): Date | null {

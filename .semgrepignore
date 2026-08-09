@@ -1,0 +1,10 @@
+# Paths excluded from Semgrep CE (CI and local).
+node_modules/
+**/node_modules/
+**/dist/
+**/.next/
+coverage/
+playwright-report/
+test-results/
+**/*.min.js
+pnpm-lock.yaml

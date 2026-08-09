@@ -38,6 +38,21 @@ vi.mock('../../db', () => ({
             deleteMany: prismaMocks.eventTaskAssignmentDeleteMany,
             createMany: prismaMocks.eventTaskAssignmentCreateMany,
         },
+        eventTeam: {
+            findMany: vi.fn().mockResolvedValue([{ teamId: 1 }]),
+        },
+        teamMember: {
+            findMany: vi.fn().mockImplementation(async ({ where }: { where: { memberId?: { in?: number[] } } }) => {
+                const ids = where?.memberId?.in ?? [5, 7, 12]
+                return ids.map((memberId: number) => ({ memberId }))
+            }),
+        },
+        eventSession: {
+            findMany: vi.fn().mockResolvedValue([]),
+        },
+        usageEvent: {
+            create: vi.fn().mockResolvedValue({}),
+        },
         $transaction: prismaMocks.transaction,
     },
 }))

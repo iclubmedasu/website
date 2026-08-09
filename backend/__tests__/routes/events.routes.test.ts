@@ -54,6 +54,7 @@ vi.mock('../../db', () => ({
             findFirst: prismaMocks.eventRegistrationFindFirst,
             findMany: prismaMocks.eventRegistrationFindMany,
             update: prismaMocks.eventRegistrationUpdate,
+            updateMany: vi.fn().mockResolvedValue({ count: 1 }),
             findUniqueOrThrow: prismaMocks.eventRegistrationFindUniqueOrThrow,
             count: prismaMocks.eventRegistrationCount,
         },
@@ -1285,20 +1286,7 @@ describe('events routes auth wiring', () => {
     })
 
     it('updates registration tier when a valid tierId is provided', async () => {
-        prismaMocks.eventFindUnique.mockResolvedValueOnce({ id: 120, isArchived: false })
-        prismaMocks.eventRegistrationFindFirst.mockResolvedValueOnce({
-            id: 20,
-            eventId: 120,
-            fullName: 'Alex',
-            email: 'alex@example.com',
-            tierId: null,
-            phoneNumber: null,
-            notes: null,
-            customFieldValues: null,
-        })
-        prismaMocks.eventTierFindFirst.mockResolvedValueOnce({ id: 5, maxCapacity: 100 })
-        prismaMocks.eventRegistrationCount.mockResolvedValueOnce(10)
-        prismaMocks.eventRegistrationUpdate.mockResolvedValueOnce({
+        const updatedRegistration = {
             id: 20,
             eventId: 120,
             fullName: 'Alex',
@@ -1307,7 +1295,29 @@ describe('events routes auth wiring', () => {
             tier: { id: 5, name: 'VIP' },
             member: null,
             attendanceDays: [],
-        })
+            version: 1,
+        }
+        const existingRegistration = {
+            id: 20,
+            eventId: 120,
+            fullName: 'Alex',
+            email: 'alex@example.com',
+            tierId: null,
+            phoneNumber: null,
+            notes: null,
+            customFieldValues: null,
+            version: 0,
+        }
+        prismaMocks.eventFindUnique
+            .mockResolvedValueOnce({ id: 120, isArchived: false })
+            .mockResolvedValueOnce({ timezone: 'UTC' })
+        prismaMocks.eventRegistrationFindFirst
+            .mockResolvedValueOnce(existingRegistration)
+            .mockResolvedValueOnce(updatedRegistration)
+            .mockResolvedValueOnce(updatedRegistration)
+        prismaMocks.eventTierFindFirst.mockResolvedValueOnce({ id: 5, maxCapacity: 100 })
+        prismaMocks.eventRegistrationCount.mockResolvedValueOnce(10)
+        prismaMocks.eventRegistrationUpdate.mockResolvedValueOnce(updatedRegistration)
         activityMocks.collectChangedFields.mockReturnValueOnce([{ field: 'tierId', oldValue: null, newValue: 5 }])
 
         const token = createToken({ memberId: 12, isDeveloper: true })
@@ -1326,7 +1336,9 @@ describe('events routes auth wiring', () => {
     })
 
     it('returns 400 when updating registration with an unknown tier', async () => {
-        prismaMocks.eventFindUnique.mockResolvedValueOnce({ id: 121, isArchived: false })
+        prismaMocks.eventFindUnique
+            .mockResolvedValueOnce({ id: 121, isArchived: false })
+            .mockResolvedValueOnce({ timezone: 'UTC' })
         prismaMocks.eventRegistrationFindFirst.mockResolvedValueOnce({
             id: 21,
             eventId: 121,
@@ -1352,7 +1364,9 @@ describe('events routes auth wiring', () => {
     })
 
     it('returns 409 when updating registration to a full tier', async () => {
-        prismaMocks.eventFindUnique.mockResolvedValueOnce({ id: 122, isArchived: false })
+        prismaMocks.eventFindUnique
+            .mockResolvedValueOnce({ id: 122, isArchived: false })
+            .mockResolvedValueOnce({ timezone: 'UTC' })
         prismaMocks.eventRegistrationFindFirst.mockResolvedValueOnce({
             id: 22,
             eventId: 122,
@@ -1374,7 +1388,10 @@ describe('events routes auth wiring', () => {
             .send({ tierId: 6 })
 
         expect(response.status).toBe(409)
-        expect(response.body).toEqual({ error: 'Selected tier is at capacity' })
+        expect(response.body).toEqual({
+            error: 'Selected tier is at capacity',
+            code: 'CAPACITY_REACHED',
+        })
         expect(prismaMocks.eventRegistrationUpdate).not.toHaveBeenCalled()
     })
 })

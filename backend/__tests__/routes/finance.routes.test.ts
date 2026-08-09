@@ -58,15 +58,26 @@ vi.mock("../../db", () => ({
         teamMember: {
             findMany: prismaMocks.teamMemberFindMany,
         },
+        usageEvent: {
+            create: vi.fn().mockResolvedValue({}),
+        },
         $transaction: vi.fn(async (callback: (tx: {
             financeLiability: { update: typeof prismaMocks.financeLiabilityUpdate };
-            financeTransaction: { create: typeof prismaMocks.financeTransactionCreate };
+            financeTransaction: {
+                create: typeof prismaMocks.financeTransactionCreate;
+                findMany: typeof prismaMocks.financeTransactionFindMany;
+                update: typeof prismaMocks.financeTransactionUpdate;
+                deleteMany: ReturnType<typeof vi.fn>;
+            };
         }) => Promise<unknown>) => callback({
             financeLiability: {
                 update: prismaMocks.financeLiabilityUpdate,
             },
             financeTransaction: {
                 create: prismaMocks.financeTransactionCreate,
+                findMany: prismaMocks.financeTransactionFindMany,
+                update: prismaMocks.financeTransactionUpdate,
+                deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
             },
         })),
     },
@@ -156,10 +167,12 @@ describe("finance routes", () => {
             return Promise.resolve(mockLiability);
         });
         prismaMocks.financeLiabilityCreate.mockResolvedValue({ ...mockLiability, id: 2, creditor: "New Vendor" });
-        prismaMocks.financeLiabilityUpdate.mockResolvedValue({ ...mockLiability, creditor: "Updated Vendor" });
-
-        prismaMocks.financeLiabilityCreate.mockResolvedValue({ ...mockLiability, id: 2, creditor: "New Vendor" });
-        prismaMocks.financeLiabilityUpdate.mockResolvedValue({ ...mockLiability, creditor: "Updated Vendor" });
+        prismaMocks.financeLiabilityUpdate.mockResolvedValue({
+            ...mockLiability,
+            creditor: "Updated Vendor",
+            account: { name: mockAccount.name },
+        });
+        prismaMocks.financeTransactionFindMany.mockResolvedValue([]);
 
         prismaMocks.financeScheduledItemFindMany.mockImplementation((args?: {
             where?: { isCompleted?: boolean; dueDate?: { lte?: Date } };
