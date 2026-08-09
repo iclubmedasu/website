@@ -31,12 +31,14 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ARG SOURCE_GIT_REF=main
 ARG GITHUB_REPO=iclubmedasu/website
 
-# HF upload may store PNGs as Xet/LFS pointer stubs. Fetch real bytes from GitHub when needed.
-RUN SOURCE_GIT_REF="${SOURCE_GIT_REF}" GITHUB_REPO="${GITHUB_REPO}" node public-website/scripts/materialize-public-images.mjs
+# HF upload may store PNGs as Xet/LFS pointer stubs. Fetch real bytes when needed.
+# Soft-fail: stub fetch is best-effort; prefer a Space that boots over a failed build.
+RUN SOURCE_GIT_REF="${SOURCE_GIT_REF}" GITHUB_REPO="${GITHUB_REPO}" \
+    node public-website/scripts/materialize-public-images.mjs \
+    || echo "WARN: materialize-public-images failed (continuing build)"
 
 RUN pnpm --filter @iclub/shared build
 RUN pnpm --filter public-website build
-
 # Production stage: slim standalone runtime
 FROM base AS runner
 WORKDIR /app

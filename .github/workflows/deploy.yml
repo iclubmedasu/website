@@ -571,17 +571,17 @@ jobs:
         id: health
         run: |
           HEALTH_URL="https://iclubmedasu-public-website.hf.space/api/health"
-          echo "Waiting for public-website Space to rebuild..."
-          # Next.js Docker builds on HF often take several minutes; avoid false-positive reverts.
-          sleep 180
-          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+          echo "Waiting for public-website Space Docker rebuild (often 8–15+ minutes)..."
+          # Next.js + sharp on HF Spaces routinely exceeds 3–5 minutes cold rebuild.
+          sleep 300
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
             if curl -fsS "$HEALTH_URL"; then
               echo ""
               echo "Public-website health check passed"
               exit 0
             fi
-            echo "Attempt $i failed, retrying in 30s..."
-            sleep 30
+            echo "Attempt $i failed, retrying in 45s..."
+            sleep 45
           done
           echo "Public-website health check failed after deploy — check HF Space logs"
           exit 1
@@ -596,7 +596,8 @@ jobs:
           set -euo pipefail
           TAG=deployed-public
           if ! git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "No tag $TAG found — cannot auto-revert. Fix the Space manually."
+            echo "No tag $TAG found — first successful deploy has not recorded a known-good yet."
+            echo "Skipping auto-revert (nothing to restore). Inspect HF Space logs for the failed build."
             exit 1
           fi
           GOOD_SHA=$(git rev-parse "$TAG")

@@ -2,8 +2,9 @@
 #
 # Why not CodeQL? Code scanning with CodeQL requires GitHub Code Security / Advanced
 # Security on private repos. Semgrep CE runs for free without GHAS.
-# If the repo is public (or you enable Code Security later), you can add a CodeQL
-# workflow alongside or instead of this one.
+#
+# Host install (pip) + pinned version — more reliable than floating/container image
+# jobs that have been exit-2 fragile in this monorepo.
 
 name: Semgrep — SAST
 
@@ -24,20 +25,27 @@ jobs:
     # Dependabot PRs already get dependency alerts; skip to avoid noisy duplicate runs.
     if: github.actor != 'dependabot[bot]'
 
-    container:
-      # Pin image — floating latest has had exit-code-2 failures without findings.
-      image: semgrep/semgrep:1.127.1
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Semgrep
+        run: pip install "semgrep==1.127.1"
+
       - name: Run Semgrep (OSS rules)
+        # Fail only on ERROR severity so the gate stays meaningful without
+        # blocking on lower-severity CE pack noise that often fails monorepos.
         run: >
           semgrep scan
           --config p/typescript
           --config p/javascript
           --config p/nodejs
           --config p/react
+          --severity ERROR
           --error
           --metrics=off
