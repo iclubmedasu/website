@@ -30,6 +30,7 @@ out/
 audit*.txt
 audit.json
 test-out.txt
+*.body.txt
 **/*.tsbuildinfo
 
 # Docker
