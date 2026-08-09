@@ -89,45 +89,32 @@ import type {
     ResetPasswordResponse,
 } from "../types/backend-contracts";
 import { ConflictError } from './conflictError';
+import {
+    resolveApiBaseUrl as resolvePortalApiBaseUrl,
+    resolveBackendOriginForWebSocket,
+} from '../lib/apiBaseUrl';
 import { isStandalonePwa } from '../lib/standalonePwa';
 
-function isLoopbackHost(hostname: string): boolean {
-    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
-}
-
 function resolveApiBaseUrl(): string {
-    const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-    if (configuredApiUrl) {
-        if (typeof window !== 'undefined') {
-            try {
-                const parsed = new URL(configuredApiUrl);
-                if (isLoopbackHost(parsed.hostname) && !isLoopbackHost(window.location.hostname)) {
-                    parsed.hostname = window.location.hostname;
-                    return parsed.toString();
-                }
-            } catch {
-                // Keep configured value when it's not an absolute URL.
-            }
-        }
-
-        return configuredApiUrl;
-    }
-
     if (typeof window !== 'undefined') {
-        return `${window.location.protocol}//${window.location.hostname}:3000/api`;
+        return resolvePortalApiBaseUrl({
+            configuredApiUrl: process.env.NEXT_PUBLIC_API_URL,
+            pageOrigin: window.location.origin,
+            pageHostname: window.location.hostname,
+        });
     }
 
-    return 'http://localhost:3000/api';
+    return resolvePortalApiBaseUrl({
+        configuredApiUrl: process.env.NEXT_PUBLIC_API_URL,
+    });
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();
 
 /**
  * Whether fetch/XHR should send cookies to the API.
- * Always true in the browser: portal and API are often different origins in production
- * (HF Spaces / custom domains), and auth cookies are SameSite=None;Secure for that case.
- * Backend CORS allowlists origins and permits credentials.
+ * Always true in the browser. On HF, API traffic is same-origin via /backend-api
+ * so cookies stick to the portal host; credentials still required for cookie auth.
  */
 export function shouldSendCredentials(): boolean {
     return typeof window !== 'undefined';
@@ -140,11 +127,13 @@ export function getNotificationsWebSocketUrl(): string {
         return '';
     }
 
-    const parsed = new URL(API_BASE_URL, window.location.origin);
+    // WS is not proxied by Next; connect to the backend origin with query-token auth.
+    const origin = resolveBackendOriginForWebSocket({
+        pageOrigin: window.location.origin,
+        configuredApiUrl: process.env.NEXT_PUBLIC_API_URL,
+    });
+    const parsed = new URL('/api/notifications/ws', origin);
     parsed.protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
-    parsed.pathname = `${parsed.pathname.replace(/\/$/, '')}/notifications/ws`;
-    parsed.search = '';
-    parsed.hash = '';
     return parsed.toString();
 }
 
@@ -236,6 +225,21 @@ export const apiFetch = (input: RequestInfo | URL, init: RequestInit = {}): Prom
         headers,
     });
 };
+
+/** Short-lived JWT from backend for direct WebSocket connects to the backend host. */
+export async function fetchWsTicket(): Promise<string | null> {
+    if (typeof window === 'undefined') return null;
+    try {
+        const response = await apiFetch(`${API_BASE_URL}/auth/ws-ticket`, {
+            method: 'GET',
+        });
+        if (!response.ok) return null;
+        const data = (await response.json()) as { token?: string };
+        return typeof data.token === 'string' && data.token.length > 0 ? data.token : null;
+    } catch {
+        return null;
+    }
+}
 
 async function getDownloadFileName(response: Response, fallbackName: string): Promise<string> {
     const contentDisposition = response.headers.get('content-disposition');

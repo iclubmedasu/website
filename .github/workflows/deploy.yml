@@ -143,11 +143,9 @@ jobs:
                   ".semgrepignore",
                   ".gitleaksignore",
               ],
-              delete_patterns=[
-                  "backend/__tests__/**",
-                  "members-portal/**",
-                  "public-website/**",
-              ],
+              # Full sync: drop any remote path not in the local upload tree
+              # (prevents ghost files after renames/moves).
+              delete_patterns=["**"],
               commit_message="Deploy from GitHub Actions",
           )
           print("Upload complete")
@@ -236,11 +234,7 @@ jobs:
                   ".semgrepignore",
                   ".gitleaksignore",
               ],
-              delete_patterns=[
-                  "backend/__tests__/**",
-                  "members-portal/**",
-                  "public-website/**",
-              ],
+              delete_patterns=["**"],
               commit_message=f"Auto-revert: backend deploy failed health check, restoring {good_sha[:12]}",
           )
           print(f"Auto-revert upload complete (restored monorepo {good_sha})")
@@ -347,10 +341,7 @@ jobs:
                   ".semgrepignore",
                   ".gitleaksignore",
               ],
-              delete_patterns=[
-                  "backend/**",
-                  "public-website/**",
-              ],
+              delete_patterns=["**"],
               commit_message="Deploy frontend from GitHub Actions",
           )
           print("Frontend upload complete")
@@ -441,10 +432,7 @@ jobs:
                   ".semgrepignore",
                   ".gitleaksignore",
               ],
-              delete_patterns=[
-                  "backend/**",
-                  "public-website/**",
-              ],
+              delete_patterns=["**"],
               commit_message=f"Auto-revert: members-portal deploy failed health check, restoring {good_sha[:12]}",
           )
           print(f"Auto-revert upload complete (restored monorepo {good_sha})")
@@ -558,10 +546,8 @@ jobs:
                   ".semgrepignore",
                   ".gitleaksignore",
               ],
-              delete_patterns=[
-                  "backend/**",
-                  "members-portal/**",
-              ],
+              # Full sync: removes stale routes (e.g. bare /about after move to (site)/about).
+              delete_patterns=["**"],
               commit_message="Deploy public website from GitHub Actions",
           )
           print("Public website upload complete")
@@ -661,10 +647,7 @@ jobs:
                   ".semgrepignore",
                   ".gitleaksignore",
               ],
-              delete_patterns=[
-                  "backend/**",
-                  "members-portal/**",
-              ],
+              delete_patterns=["**"],
               commit_message=f"Auto-revert: public-website deploy failed health check, restoring {good_sha[:12]}",
           )
           print(f"Auto-revert upload complete (restored monorepo {good_sha})")

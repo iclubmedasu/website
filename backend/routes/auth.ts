@@ -61,6 +61,8 @@ const officialEmail = (studentId) => `${studentId}${OFFICIAL_EMAIL_DOMAIN}`;
 const AUTH_COOKIE_NAME = 'token';
 const WEB_SESSION_TTL = '7d';
 const PWA_SESSION_TTL = '30d';
+/** Short-lived JWT for WebSocket upgrades when portal cookies are not sent cross-host. */
+const WS_TICKET_TTL = '2m';
 const WEB_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const PWA_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 /** Re-issue a 30d PWA token when remaining JWT life is under this threshold. */
@@ -1226,6 +1228,90 @@ router.get('/me', async (req, res) => {
         }
         console.error('Get user error:', error);
         res.status(401).json({ error: 'Invalid token' });
+    }
+});
+
+/**
+ * Mint a short-lived JWT for WebSocket connect to the backend host.
+ * Used when the browser auth cookie is same-origin on the members portal (BFF proxy)
+ * and cannot be sent on the cross-host WS upgrade.
+ */
+router.get('/ws-ticket', async (req, res) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const bearerToken = typeof authHeader === 'string' ? authHeader.replace('Bearer ', '') : undefined;
+        const sessionToken = req.cookies?.token || bearerToken;
+
+        if (!sessionToken) {
+            return res.status(401).json({ error: 'No token provided' });
+        }
+
+        const decoded = jwt.verify(sessionToken, JWT_SECRET) as RequestUser & {
+            iat?: number;
+            exp?: number;
+        };
+
+        if (decoded.isDeveloper) {
+            const ticket = jwt.sign(sessionPayloadFromDecoded(decoded), JWT_SECRET, {
+                expiresIn: WS_TICKET_TTL,
+            });
+            return res.json({ token: ticket });
+        }
+
+        if (!decoded.memberId) {
+            return res.status(401).json({ error: 'Invalid token' });
+        }
+
+        const member = await prisma.member.findUnique({
+            where: { id: decoded.memberId },
+            select: {
+                id: true,
+                email: true,
+                isActive: true,
+                assignmentStatus: true,
+                teamMemberships: {
+                    where: { isActive: true },
+                    select: {
+                        teamId: true,
+                        role: { select: { roleName: true, roleType: true, systemRoleKey: true } },
+                    },
+                },
+            },
+        });
+
+        if (!member || !member.isActive) {
+            return res.status(401).json({ error: 'Invalid token' });
+        }
+
+        if (member.assignmentStatus === 'ALUMNI') {
+            return res.status(403).json({
+                error: 'Your account has been moved to alumni status.',
+                code: 'ALUMNI_ACCESS',
+            });
+        }
+
+        const authority = buildSessionAuthority(member.teamMemberships, false);
+        const ticket = jwt.sign(
+            {
+                userId: decoded.userId,
+                memberId: member.id,
+                email: member.email,
+                ...authority,
+            },
+            JWT_SECRET,
+            { expiresIn: WS_TICKET_TTL },
+        );
+
+        return res.json({ token: ticket });
+    } catch (error) {
+        if (error instanceof jwt.TokenExpiredError) {
+            return res.status(401).json({ error: 'Token expired', code: 'TOKEN_EXPIRED' });
+        }
+        if (error instanceof jwt.JsonWebTokenError) {
+            return res.status(401).json({ error: 'Invalid token', code: 'INVALID_TOKEN' });
+        }
+        console.error('WS ticket error:', error);
+        return res.status(401).json({ error: 'Invalid token' });
     }
 });
 

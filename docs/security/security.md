@@ -150,7 +150,8 @@ Env documentation: [`backend/.env.example`](../backend/.env.example), [deploymen
 - **Helmet** enabled (CSP left to frontends; `crossOriginResourcePolicy: cross-origin` for API file downloads).
 - **CORS** is an explicit allowlist: localhost portal/web ports, hardcoded production HF portal/web origins, plus `FRONTEND_URL` and comma-separated `FRONTEND_ORIGINS`.
 - Production no longer allows arbitrary `*.hf.space`. Dev-only: private LAN origins for mobile testing.
-- `credentials: true` for cookie-based auth across portal ↔ API hosts.
+- Members portal on HF uses same-origin `/backend-api` BFF proxy (server → backend) because Spaces edge OPTIONS often omit `Access-Control-Allow-Credentials`.
+- `credentials: true` for cookie-based auth across portal ↔ API hosts (direct CORS still required for non-proxied clients).
 
 ### Debug `/test-db`
 

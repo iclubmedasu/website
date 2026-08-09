@@ -92,8 +92,8 @@ const pwaConfig = withPWA({
             },
         },
         {
-            // Profile photos — cache with revalidation
-            urlPattern: /\/api\/members\/\d+\/profile-photo/,
+            // Profile photos — cache with revalidation (direct or BFF path)
+            urlPattern: /\/(api|backend-api)\/members\/\d+\/profile-photo/,
             handler: 'StaleWhileRevalidate',
             options: {
                 cacheName: 'profile-photos',
@@ -109,6 +109,14 @@ const pwaConfig = withPWA({
             handler: 'NetworkOnly',
             options: {
                 cacheName: 'api-cache',
+            },
+        },
+        {
+            // Same-origin BFF proxy to backend — never cache
+            urlPattern: /\/backend-api\/.*/,
+            handler: 'NetworkOnly',
+            options: {
+                cacheName: 'backend-api-cache',
             },
         },
     ],

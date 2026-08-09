@@ -120,7 +120,7 @@ Sites and API stay on Hugging Face URLs. Outbound mail uses your verified Resend
 | `PUBLIC_WEBSITE_URL` | `https://iclubmedasu-public-website.hf.space` |
 | `API_PUBLIC_URL` | `https://iclubmedasu-backend.hf.space/api` |
 
-Restart the backend Space. Frontends keep `NEXT_PUBLIC_API_URL=https://iclubmedasu-backend.hf.space/api`.
+Restart the backend Space. Members portal browser calls use same-origin `/backend-api` (BFF) when `NEXT_PUBLIC_API_URL` points at a different host; set portal Space runtime `BACKEND_API_URL=https://iclubmedasu-backend.hf.space`. Public website keeps direct `NEXT_PUBLIC_API_URL=https://iclubmedasu-backend.hf.space/api`.
 
 ### Smoke test
 
@@ -175,12 +175,16 @@ Set these in your backend Hugging Face Space → Settings → Variables and secr
 | PUBLIC_WEBSITE_URL        | `https://iclubmedasu-public-website.hf.space`. Local: `http://localhost:3002` |
 
 ### Hugging Face Space Settings (Members Portal)
-Set these in the members portal Hugging Face Space → Settings → **Variables** (not Secrets — build-time vars must be Variables). Rebuild after any change.
+Set these in the members portal Hugging Face Space → Settings → **Variables** (not Secrets). Rebuild after changing any `NEXT_PUBLIC_*` value.
 
 | Variable                        | Value |
 |---------------------------------|-------|
-| NEXT_PUBLIC_API_URL             | `https://iclubmedasu-backend.hf.space/api` |
+| BACKEND_API_URL                 | **Runtime.** Backend origin for the BFF proxy: `https://iclubmedasu-backend.hf.space` (no `/api`). Default if unset. |
+| NEXT_PUBLIC_API_URL             | Build-time. `https://iclubmedasu-backend.hf.space/api` (browser remaps to same-origin `/backend-api` on HF) or set `/backend-api` explicitly |
+| NEXT_PUBLIC_BACKEND_ORIGIN      | Optional build-time WS host: `https://iclubmedasu-backend.hf.space` |
 | NEXT_PUBLIC_PUBLIC_WEBSITE_URL  | Optional: `https://iclubmedasu-public-website.hf.space` |
+
+Credentialed login goes through **same-origin** `/backend-api/*` so it is not blocked by Hugging Face Spaces OPTIONS CORS (preflight without `Access-Control-Allow-Credentials`).
 
 ### Hugging Face Space Settings (Public Website)
 Set these in the public website Hugging Face Space → Settings → **Variables** (not Secrets — build-time vars must be Variables). Rebuild after any change.

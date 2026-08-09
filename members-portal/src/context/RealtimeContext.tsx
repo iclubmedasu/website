@@ -10,7 +10,7 @@ import {
     useState,
     type ReactNode,
 } from 'react';
-import { getAuthToken, getNotificationsWebSocketUrl, setClientInstanceId } from '@/services/api';
+import { fetchWsTicket, getAuthToken, getNotificationsWebSocketUrl, setClientInstanceId } from '@/services/api';
 import type { NotificationRealtimeMessage, RealtimeSubscribeMessage } from '@/types/backend-contracts';
 import { createUuid } from '@/utils/createUuid';
 
@@ -71,66 +71,70 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         let disposed = false;
         let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-        // Prefer httpOnly cookie on the WS upgrade; only put JWT in the query string if cookie auth fails.
-        let allowQueryTokenFallback = false;
+        let connecting = false;
 
-        const connect = () => {
-            if (disposed) return;
+        const connect = async () => {
+            if (disposed || connecting) return;
+            connecting = true;
 
-            // Prefer cookie on upgrade. A memory/localStorage token is only required
-            // for the query-string fallback (mainly standalone PWA when cookies fail).
-            const baseUrl = getNotificationsWebSocketUrl();
-            if (!baseUrl) return;
+            try {
+                const baseUrl = getNotificationsWebSocketUrl();
+                if (!baseUrl) return;
 
-            const token = getAuthToken();
-            const url = new URL(baseUrl);
-            if (allowQueryTokenFallback && token) {
-                url.searchParams.set('token', token);
+                // Prefer short-lived ticket (cookie lives on portal after BFF proxy);
+                // fall back to in-memory PWA/login token for ?token=.
+                let ticket = await fetchWsTicket();
+                if (disposed) return;
+                if (!ticket) {
+                    ticket = getAuthToken();
+                }
+
+                const url = new URL(baseUrl);
+                if (ticket) {
+                    url.searchParams.set('token', ticket);
+                }
+
+                const socket = new WebSocket(url.toString());
+                socketRef.current = socket;
+
+                socket.onopen = () => {
+                    if (disposed) return;
+                    setIsConnected(true);
+                    resubscribeAllTopics();
+                    if (hasConnectedOnceRef.current) {
+                        notifyReconnect();
+                    } else {
+                        hasConnectedOnceRef.current = true;
+                    }
+                };
+
+                socket.onmessage = (event) => {
+                    try {
+                        const payload = JSON.parse(String(event.data)) as NotificationRealtimeMessage;
+                        dispatchMessage(payload);
+                    } catch {
+                        // Ignore malformed payloads.
+                    }
+                };
+
+                socket.onerror = () => {
+                    socket.close();
+                };
+
+                socket.onclose = () => {
+                    setIsConnected(false);
+                    socketRef.current = null;
+                    if (disposed) return;
+                    reconnectTimer = setTimeout(() => {
+                        void connect();
+                    }, 2000);
+                };
+            } finally {
+                connecting = false;
             }
-
-            const socket = new WebSocket(url.toString());
-            socketRef.current = socket;
-
-            socket.onopen = () => {
-                if (disposed) return;
-                setIsConnected(true);
-                resubscribeAllTopics();
-                if (hasConnectedOnceRef.current) {
-                    notifyReconnect();
-                } else {
-                    hasConnectedOnceRef.current = true;
-                }
-            };
-
-            socket.onmessage = (event) => {
-                try {
-                    const payload = JSON.parse(String(event.data)) as NotificationRealtimeMessage;
-                    dispatchMessage(payload);
-                } catch {
-                    // Ignore malformed payloads.
-                }
-            };
-
-            socket.onerror = () => {
-                socket.close();
-            };
-
-            socket.onclose = () => {
-                setIsConnected(false);
-                socketRef.current = null;
-                if (disposed) return;
-                // First failure without query token → retry once with ?token= if we have one
-                // (PWA / same-tab memory). Web tabs without a bearer token keep cookie-only reconnects.
-                if (!allowQueryTokenFallback && getAuthToken()) {
-                    allowQueryTokenFallback = true;
-                    connect();
-                    return;
-                }
-                reconnectTimer = setTimeout(connect, 2000);
-            };
         };
 
-        connect();
+        void connect();
 
         return () => {
             disposed = true;

@@ -123,6 +123,28 @@ if (isDevelopment) {
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     void _next;
+
+    // body-parser / express.json(): bad client body (probes, scanners, typos).
+    // Status is 400 — do not promote to 500 or dump a stack as a server failure.
+    const parseFailed =
+        typeof err === "object" &&
+        err !== null &&
+        ("type" in err) &&
+        (err as { type?: string }).type === "entity.parse.failed";
+    const clientBadRequest =
+        parseFailed ||
+        (err instanceof SyntaxError &&
+            typeof err === "object" &&
+            err !== null &&
+            (("status" in err && (err as { status?: number }).status === 400) ||
+                ("statusCode" in err && (err as { statusCode?: number }).statusCode === 400)));
+
+    if (clientBadRequest) {
+        console.warn("Invalid JSON body rejected");
+        res.status(400).json({ error: "Invalid JSON body" });
+        return;
+    }
+
     console.error("Error:", err);
     // Never expose internal error details to clients in production.
     const message =
