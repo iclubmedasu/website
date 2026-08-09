@@ -3,8 +3,8 @@
 # Built for Hugging Face Spaces (port 7860)
 # ============================================
 
-FROM node:20-alpine AS base
-RUN npm install -g pnpm
+FROM node:22-alpine AS base
+RUN npm install -g pnpm@10
 
 # Build stage: install + build together so every workspace's
 # node_modules (incl. packages/shared/.bin/tsc) stays intact.
@@ -26,13 +26,13 @@ COPY packages/shared ./packages/shared
 COPY public-website ./public-website
 
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS=--max-old-space-size=4096
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ARG SOURCE_GIT_REF=main
 ARG GITHUB_REPO=iclubmedasu/website
 
-# HF upload may store PNGs as Xet/LFS pointer stubs. Fetch real bytes when needed.
-# Soft-fail: stub fetch is best-effort; prefer a Space that boots over a failed build.
+# Prefer real PNG bytes; do not fail the image build when GitHub is rate-limited.
 RUN SOURCE_GIT_REF="${SOURCE_GIT_REF}" GITHUB_REPO="${GITHUB_REPO}" \
     node public-website/scripts/materialize-public-images.mjs \
     || echo "WARN: materialize-public-images failed (continuing build)"
