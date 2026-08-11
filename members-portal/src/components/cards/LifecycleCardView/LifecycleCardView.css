@@ -75,18 +75,35 @@
 
 @media (max-width: 900px) {
     .project-card--expanded {
-        padding: 1.25rem;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+        box-shadow: none;
+        padding: 1rem 1rem 1.25rem;
+        padding-top: max(1rem, env(safe-area-inset-top));
+        padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
     }
 }
 
-/* Reclaim screen real estate on landscape mobile */
+/* Full-bleed on short landscape viewports */
 @media (max-height: 500px) {
     .project-card--expanded {
-        top: 0.35rem;
-        left: 0.35rem;
-        right: 0.35rem;
-        bottom: 0.35rem;
-        padding: 0.65rem 0.9rem;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 0.65rem max(0.9rem, env(safe-area-inset-right))
+            max(0.65rem, env(safe-area-inset-bottom))
+            max(0.9rem, env(safe-area-inset-left));
+        padding-top: max(0.65rem, env(safe-area-inset-top));
     }
 }
 
