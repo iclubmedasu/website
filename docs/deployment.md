@@ -30,7 +30,7 @@ Health check URLs default to the `iclubmedasu-*.hf.space` paths below; override 
 - **Space auto-revert** restores only **code** from movable `deployed-*` tags when a post-upload **health** check fails. It does **not** reverse Prisma migrations or seeds.
 - Migrations are **forward-only**. Prefer additive schema (new columns/tables) so old and new app versions can share the expanded schema. Destructive changes need a deliberate multi-step release and, if rolled back in the app, a **manual compensating migration** on Supabase — CI will not do it for you.
 - The `production` environment approval gate (when configured) is the intended human checkpoint before a risky migrate+deploy lands.
-- **HF cold starts:** after idle scale-to-zero or a rebuild, the first requests may receive HTML or temporary 429 interstitials instead of JSON. The members portal parses API bodies defensively and shows a short “try again” message rather than a raw JSON parse error.
+- **HF cold starts:** after idle scale-to-zero or a rebuild, the first requests may receive HTML or temporary 429 interstitials instead of JSON. The members portal parses API bodies defensively and shows a short “try again” message rather than a raw JSON parse error. **HF `cpu-basic` Spaces can also return 429 independently of Express rate limits** — wait 1–2 minutes and avoid hammering Continue/reload during sign-in.
 
 ### Hugging Face Spaces — CI upload only (no `create_repo`)
 

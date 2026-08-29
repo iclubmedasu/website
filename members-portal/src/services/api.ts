@@ -328,6 +328,7 @@ const getAuthOnlyHeaders = (): JsonHeaders => {
 };
 
 const STARTING_UP_MESSAGE = 'Server is starting up — please try again in a few seconds.';
+export const RATE_LIMIT_FALLBACK_MESSAGE = 'Too many requests. Wait a minute, then try again.';
 
 function responseHeader(response: Response, name: string): string | null {
     try {
@@ -362,10 +363,13 @@ export async function safeParseJsonResponse<T = unknown>(
     try {
         text = await readResponseBodyText(response);
     } catch {
-        return { ok: false, error: STARTING_UP_MESSAGE };
+        return { ok: false, error: nonJsonBodyMessage(response) };
     }
 
     if (!text) {
+        if (response.status === 429) {
+            return { ok: false, error: formatRateLimitMessage(response, RATE_LIMIT_FALLBACK_MESSAGE) };
+        }
         return { ok: true, data: {} as T };
     }
 
@@ -375,25 +379,35 @@ export async function safeParseJsonResponse<T = unknown>(
         text.trimStart().startsWith('[');
 
     if (!looksJson) {
-        return { ok: false, error: STARTING_UP_MESSAGE };
+        return { ok: false, error: nonJsonBodyMessage(response) };
     }
 
     try {
         return { ok: true, data: JSON.parse(text) as T };
     } catch {
-        return { ok: false, error: STARTING_UP_MESSAGE };
+        return { ok: false, error: nonJsonBodyMessage(response) };
     }
 }
 
-function formatRateLimitMessage(response: Response, fallback: string): string {
+export function formatRateLimitMessage(response: Response, fallback: string): string {
     const retryAfter = responseHeader(response, 'Retry-After');
     if (retryAfter) {
         const seconds = Number.parseInt(retryAfter, 10);
         if (Number.isFinite(seconds) && seconds > 0) {
-            return `Too many attempts — try again in ${seconds}s`;
+            return `Too many requests — try again in ${seconds}s`;
         }
     }
-    return fallback || 'Too many attempts. Please wait a few minutes and try again.';
+    return fallback || RATE_LIMIT_FALLBACK_MESSAGE;
+}
+
+function nonJsonBodyMessage(response: Response): string {
+    if (response.status === 429) {
+        return formatRateLimitMessage(response, RATE_LIMIT_FALLBACK_MESSAGE);
+    }
+    if (response.status >= 500) {
+        return STARTING_UP_MESSAGE;
+    }
+    return `HTTP error! status: ${response.status}`;
 }
 
 // Helper function to handle API responses

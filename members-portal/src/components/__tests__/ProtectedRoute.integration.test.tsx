@@ -92,4 +92,22 @@ describe('ProtectedRoute integration', () => {
             expect(replaceMock).toHaveBeenCalledWith('/login');
         });
     });
+
+    it('does not retry /auth/me when HF returns 429 HTML', async () => {
+        fetchMock.mockResolvedValueOnce({
+            ok: false,
+            status: 429,
+            headers: {
+                get: (name: string) => (name === 'content-type' ? 'text/html' : null),
+            },
+            text: async () => '<!doctype html><html><body>Rate limited</body></html>',
+        });
+
+        renderProtectedTree();
+
+        await waitFor(() => {
+            expect(replaceMock).toHaveBeenCalledWith('/login');
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
 });

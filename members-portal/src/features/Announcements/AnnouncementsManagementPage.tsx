@@ -16,6 +16,7 @@ import { announcementsAPI, eventsAPI, projectsAPI } from '@/services/api'
 import { FormToggleRow } from '@/components/toggle/FormToggleRow'
 import AnnouncementPost from './AnnouncementPost'
 import { formatPeriods } from './announcementAvailability'
+import { exportAnnouncementResponsesExcel } from './exportAnnouncementResponsesExcel'
 import '@/components/modal/modal.css'
 import '@/components/toggle/toggle.css'
 import './AnnouncementsManagementPage.css'
@@ -62,6 +63,8 @@ interface AnnouncementResponseRow {
     notes: string | null
     member: { id: number; fullName: string }
     periods: Array<{ start: string; end: string }>
+    createdAt: string
+    updatedAt: string
 }
 
 type TargetType = 'NONE' | 'EVENT' | 'PROJECT'
@@ -182,6 +185,18 @@ function parseResponses(raw: unknown): AnnouncementResponseRow[] {
                   })
                   .filter((p) => p.start && p.end)
             : []
+        const createdAt =
+            typeof entry.createdAt === 'string'
+                ? entry.createdAt
+                : entry.createdAt instanceof Date
+                  ? entry.createdAt.toISOString()
+                  : ''
+        const updatedAt =
+            typeof entry.updatedAt === 'string'
+                ? entry.updatedAt
+                : entry.updatedAt instanceof Date
+                  ? entry.updatedAt.toISOString()
+                  : ''
         return [
             {
                 id: entry.id,
@@ -189,6 +204,8 @@ function parseResponses(raw: unknown): AnnouncementResponseRow[] {
                 notes: typeof entry.notes === 'string' ? entry.notes : null,
                 member,
                 periods,
+                createdAt,
+                updatedAt,
             },
         ]
     })
@@ -500,6 +517,7 @@ function ResponsesModal({
 }) {
     const [responses, setResponses] = useState<AnnouncementResponseRow[]>([])
     const [loading, setLoading] = useState(true)
+    const [exporting, setExporting] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
@@ -526,6 +544,19 @@ function ResponsesModal({
         }
     }, [announcement.id])
 
+    async function handleExport() {
+        if (responses.length === 0) return
+        setExporting(true)
+        setError(null)
+        try {
+            await exportAnnouncementResponsesExcel(announcement.title, responses)
+        } catch (err) {
+            setError(getErrorMessage(err, 'Failed to export responses'))
+        } finally {
+            setExporting(false)
+        }
+    }
+
     return (
         <>
             <div className="modal-backdrop" onClick={onClose} />
@@ -539,57 +570,69 @@ function ResponsesModal({
                 <div className="modal-body">
                     {loading ? (
                         <div className="empty-message">Loading responses…</div>
-                    ) : error ? (
-                        <p className="error-message">{error}</p>
                     ) : (
-                        <div className="members-table-shell">
-                            {responses.length === 0 ? (
-                                <div className="empty-state">
-                                    <Users className="empty-state-icon" />
-                                    <h4 className="empty-state-title">No responses yet</h4>
-                                    <p className="empty-state-text">
-                                        Responses will appear here when members reply.
-                                    </p>
+                        <>
+                            {error ? <p className="error-message">{error}</p> : null}
+                            {responses.length === 0 && !error ? (
+                                <div className="members-table-shell">
+                                    <div className="empty-state">
+                                        <Users className="empty-state-icon" />
+                                        <h4 className="empty-state-title">No responses yet</h4>
+                                        <p className="empty-state-text">
+                                            Responses will appear here when members reply.
+                                        </p>
+                                    </div>
                                 </div>
-                            ) : (
-                                <div className="table-container">
-                                    <table className="members-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Member</th>
-                                                <th>Status</th>
-                                                <th>Availability</th>
-                                                <th>Notes</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {responses.map((row, index) => (
-                                                <tr
-                                                    key={row.id}
-                                                    className={index % 2 === 0 ? 'even-row' : 'odd-row'}
-                                                >
-                                                    <td>{row.member.fullName}</td>
-                                                    <td>
-                                                        <span className={statusBadgeClass(row.status)}>
-                                                            {statusLabel(row.status)}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        {row.periods.length > 0
-                                                            ? formatPeriods(row.periods)
-                                                            : '—'}
-                                                    </td>
-                                                    <td>{row.notes?.trim() ? row.notes : '—'}</td>
+                            ) : null}
+                            {responses.length > 0 ? (
+                                <div className="members-table-shell">
+                                    <div className="table-container">
+                                        <table className="members-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Member</th>
+                                                    <th>Status</th>
+                                                    <th>Availability</th>
+                                                    <th>Notes</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody>
+                                                {responses.map((row, index) => (
+                                                    <tr
+                                                        key={row.id}
+                                                        className={index % 2 === 0 ? 'even-row' : 'odd-row'}
+                                                    >
+                                                        <td>{row.member.fullName}</td>
+                                                        <td>
+                                                            <span className={statusBadgeClass(row.status)}>
+                                                                {statusLabel(row.status)}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            {row.periods.length > 0
+                                                                ? formatPeriods(row.periods)
+                                                                : '—'}
+                                                        </td>
+                                                        <td>{row.notes?.trim() ? row.notes : '—'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                            )}
-                        </div>
+                            ) : null}
+                        </>
                     )}
                 </div>
                 <div className="modal-footer">
+                    <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => void handleExport()}
+                        disabled={loading || exporting || responses.length === 0}
+                    >
+                        {exporting ? 'Exporting…' : 'Export Excel'}
+                    </button>
                     <button type="button" className="btn btn-secondary" onClick={onClose}>
                         Close
                     </button>

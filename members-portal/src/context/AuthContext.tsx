@@ -1,6 +1,6 @@
 'use client'
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { setToken, clearToken as clearTokenUtil, initToken, shouldSendCredentials, safeParseJsonResponse } from '../services/api';
+import { setToken, clearToken as clearTokenUtil, initToken, shouldSendCredentials, safeParseJsonResponse, formatRateLimitMessage, RATE_LIMIT_FALLBACK_MESSAGE } from '../services/api';
 import { apiFetch } from '../services/api';
 import type {
     ApiErrorResponse,
@@ -144,6 +144,10 @@ function isNetworkFetchError(error: unknown): boolean {
 }
 
 function readRetryAfterMessage(response: Response, fallback: string): string {
+    return formatRateLimitMessage(response, fallback);
+}
+
+function readRetryAfterMs(response: Response, defaultMs: number): number {
     let retryAfter: string | null = null;
     try {
         retryAfter = response.headers?.get?.('Retry-After') ?? null;
@@ -153,10 +157,20 @@ function readRetryAfterMessage(response: Response, fallback: string): string {
     if (retryAfter) {
         const seconds = Number.parseInt(retryAfter, 10);
         if (Number.isFinite(seconds) && seconds > 0) {
-            return `Too many attempts — try again in ${seconds}s`;
+            return seconds * 1000;
         }
     }
-    return fallback;
+    return defaultMs;
+}
+
+async function fetchWithSingle429Retry(url: string, init: RequestInit): Promise<Response> {
+    const response = await fetch(url, init);
+    if (response.status !== 429) {
+        return response;
+    }
+    const delayMs = Math.min(readRetryAfterMs(response, 15_000), 30_000);
+    await sleep(delayMs);
+    return fetch(url, init);
 }
 
 async function parseJsonBody<T>(response: Response): Promise<T> {
@@ -171,7 +185,7 @@ async function parseJsonBody<T>(response: Response): Promise<T> {
     if (response.status === 429) {
         const err = parsed.data as { error?: string };
         throw new Error(
-            readRetryAfterMessage(response, err.error || "Too many attempts. Please wait a few minutes and try again."),
+            readRetryAfterMessage(response, err.error || RATE_LIMIT_FALLBACK_MESSAGE),
         );
     }
     return parsed.data;
@@ -193,20 +207,25 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * GET /auth/me with short retries on transient failures (network blips, backend-api
- * proxy 502s, momentary 5xx, or an HF cold-start interstitial). A definitive 401/403
- * or a successful response returns immediately — only ambiguous failures are retried,
- * so a single hiccup doesn't get treated the same as "not logged in".
+ * proxy 502/503, or an HF cold-start interstitial). A definitive 401/403/429 or a
+ * successful response returns immediately — only ambiguous transient failures are retried.
  */
 async function fetchAuthMeWithRetry(): Promise<Response | null> {
     let lastError: unknown = null;
     for (let attempt = 0; attempt <= AUTH_ME_RETRY_DELAYS_MS.length; attempt++) {
         try {
             const response = await apiFetch(`${API_URL}/auth/me`);
-            if (response.ok || response.status === 401 || response.status === 403) {
+            if (
+                response.ok ||
+                response.status === 401 ||
+                response.status === 403 ||
+                response.status === 429
+            ) {
                 return response;
             }
+            const retryableStatus = response.status === 502 || response.status === 503;
             lastError = null;
-            if (attempt < AUTH_ME_RETRY_DELAYS_MS.length) {
+            if (retryableStatus && attempt < AUTH_ME_RETRY_DELAYS_MS.length) {
                 await sleep(AUTH_ME_RETRY_DELAYS_MS[attempt]);
                 continue;
             }
@@ -313,7 +332,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const checkEmail = async (email: string): Promise<Result<CheckEmailResponse>> => {
         try {
-            const response = await fetch(`${API_URL}/auth/check-email`, {
+            const response = await fetchWithSingle429Retry(`${API_URL}/auth/check-email`, {
                 method: "POST",
                 credentials: shouldSendCredentials() ? "include" : "omit",
                 headers: {
@@ -588,7 +607,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const login = async (email: string, password: string): Promise<Result> => {
         try {
-            const response = await fetch(`${API_URL}/auth/login`, {
+            const response = await fetchWithSingle429Retry(`${API_URL}/auth/login`, {
                 method: "POST",
                 credentials: shouldSendCredentials() ? "include" : "omit",
                 headers: authClientHeaders(),

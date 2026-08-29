@@ -40,7 +40,7 @@
     position: absolute;
     display: flex;
     align-items: flex-start;
-    overflow: visible;
+    overflow: hidden;
     white-space: normal;
     word-break: break-word;
     overflow-wrap: anywhere;
