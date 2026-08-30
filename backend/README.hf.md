@@ -22,6 +22,7 @@ Common keys:
 |----------|---------|
 | `DATABASE_URL` | Supabase Postgres connection string |
 | `JWT_SECRET` | JWT signing secret (production required) |
+| `BFF_PROXY_SECRET` | Same secret as members-portal Space; trusts BFF `X-Iclub-Client-Ip` for rate-limit keys |
 | `FRONTEND_URL` | Members portal origin (password-reset links) |
 | `FRONTEND_ORIGINS` | Comma-separated CORS browser origins |
 | `PUBLIC_WEBSITE_URL` | Public site origin |

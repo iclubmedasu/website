@@ -30,7 +30,7 @@ Health check URLs default to the `iclubmedasu-*.hf.space` paths below; override 
 - **Space auto-revert** restores only **code** from movable `deployed-*` tags when a post-upload **health** check fails. It does **not** reverse Prisma migrations or seeds.
 - Migrations are **forward-only**. Prefer additive schema (new columns/tables) so old and new app versions can share the expanded schema. Destructive changes need a deliberate multi-step release and, if rolled back in the app, a **manual compensating migration** on Supabase — CI will not do it for you.
 - The `production` environment approval gate (when configured) is the intended human checkpoint before a risky migrate+deploy lands.
-- **HF cold starts:** after idle scale-to-zero or a rebuild, the first requests may receive HTML or temporary 429 interstitials instead of JSON. The members portal parses API bodies defensively and shows a short “try again” message rather than a raw JSON parse error. **HF `cpu-basic` Spaces can also return 429 independently of Express rate limits** — wait 1–2 minutes and avoid hammering Continue/reload during sign-in.
+- **HF cold starts:** after idle scale-to-zero or a rebuild, the first requests may receive HTML or temporary 429 interstitials instead of JSON. The members portal parses API bodies defensively and shows a short “try again” message rather than a raw JSON parse error. The portal **BFF** (`/backend-api`) also retries once on non-JSON 429 / 502 / 503 (HF interstitials), but **does not** retry Express JSON 429. **HF `cpu-basic` Spaces can also return 429 independently of Express rate limits** — wait 1–2 minutes and avoid hammering Continue/reload during sign-in.
 
 ### Hugging Face Spaces — CI upload only (no `create_repo`)
 
@@ -127,6 +127,8 @@ Sites and API stay on Hugging Face URLs. Outbound mail uses your verified Resend
 
 Restart the backend Space. Members portal browser calls use same-origin `/backend-api` (BFF) when `NEXT_PUBLIC_API_URL` points at a different host; set portal Space runtime `BACKEND_API_URL=https://iclubmedasu-backend.hf.space`. Public website keeps direct `NEXT_PUBLIC_API_URL=https://iclubmedasu-backend.hf.space/api`.
 
+**Required after deploy (rate-limit identity):** set the **same** `BFF_PROXY_SECRET` on both the **backend** and **members-portal** Hugging Face Spaces (Secrets). Until both are set, Express ignores `X-Iclub-Client-Ip` and all portal login POSTs still share one NAT bucket.
+
 ### Smoke test
 
 1. Local or HF: send a test ticket → From = `noreply@iclubmedasu.com`, Reply-To = your inbox.
@@ -178,13 +180,15 @@ Set these in your backend Hugging Face Space → Settings → Variables and secr
 | RESEND_FROM_EMAIL         | `noreply@iclubmedasu.com` after domain Verified in Resend (works for local testing too). Fallback: `onboarding@resend.dev` |
 | RESEND_REPLY_TO           | Address that actually receives mail (e.g. Gmail) |
 | PUBLIC_WEBSITE_URL        | `https://iclubmedasu-public-website.hf.space`. Local: `http://localhost:3002` |
+| BFF_PROXY_SECRET          | **Secret (runtime).** Same long random value as members-portal Space. Enables trusted `X-Iclub-Client-Ip` for Express rate-limit keys via the portal BFF. Leave unset until both Spaces have it. |
 
 ### Hugging Face Space Settings (Members Portal)
-Set these in the members portal Hugging Face Space → Settings → **Variables** (not Secrets). Rebuild after changing any `NEXT_PUBLIC_*` value.
+Set `NEXT_PUBLIC_*` in Settings → **Variables** (rebuild after changes). Set `BACKEND_API_URL` and `BFF_PROXY_SECRET` as **runtime** vars/secrets (no rebuild required for those).
 
 | Variable                        | Value |
 |---------------------------------|-------|
 | BACKEND_API_URL                 | **Runtime.** Backend origin for the BFF proxy: `https://iclubmedasu-backend.hf.space` (no `/api`). Default if unset. |
+| BFF_PROXY_SECRET                | **Secret (runtime).** Must match backend `BFF_PROXY_SECRET`. Portal BFF sends it as `X-Iclub-Bff` with the browser client IP so auth rate limits are per visitor, not per Space NAT. |
 | NEXT_PUBLIC_API_URL             | Build-time. `https://iclubmedasu-backend.hf.space/api` (browser remaps to same-origin `/backend-api` on HF) or set `/backend-api` explicitly |
 | NEXT_PUBLIC_BACKEND_ORIGIN      | Optional build-time WS host: `https://iclubmedasu-backend.hf.space` |
 | NEXT_PUBLIC_PUBLIC_WEBSITE_URL  | Optional: `https://iclubmedasu-public-website.hf.space` |

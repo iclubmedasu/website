@@ -1,5 +1,38 @@
-import rateLimit from "express-rate-limit";
+import crypto from "crypto";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import type { Request } from "express";
+
+/** Loose IPv4 / IPv6 check so spoofed junk headers cannot become limiter keys. */
+function looksLikeIp(value: string): boolean {
+    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)) return true;
+    if (value.includes(":") && /^[0-9a-fA-F:.]+$/.test(value)) return true;
+    return false;
+}
+
+function secretsMatch(provided: string | undefined, expected: string): boolean {
+    if (!provided) return false;
+    const a = Buffer.from(provided);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+}
+
+/**
+ * Rate-limit key: real browser IP when the portal BFF presents a matching secret;
+ * otherwise `req.ip` (direct public-site / attacker traffic cannot spoof the header).
+ * Until `BFF_PROXY_SECRET` is set on the backend, headers are ignored (pre-deploy behavior).
+ */
+export function resolveRateLimitKey(req: Request): string {
+    const secret = process.env.BFF_PROXY_SECRET?.trim();
+    if (secret) {
+        const bffHeader = req.get("x-iclub-bff") ?? undefined;
+        const clientIp = req.get("x-iclub-client-ip")?.trim();
+        if (secretsMatch(bffHeader, secret) && clientIp && looksLikeIp(clientIp)) {
+            return ipKeyGenerator(clientIp);
+        }
+    }
+    return ipKeyGenerator(req.ip ?? "unknown");
+}
 
 /** Shared limiter factory — trust proxy is already set on the Express app. */
 function createLimiter(options: {
@@ -16,6 +49,7 @@ function createLimiter(options: {
         legacyHeaders: false,
         message: { error: options.message },
         skip: options.skip,
+        keyGenerator: (req) => resolveRateLimitKey(req),
     });
 }
 

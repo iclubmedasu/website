@@ -147,30 +147,17 @@ function readRetryAfterMessage(response: Response, fallback: string): string {
     return formatRateLimitMessage(response, fallback);
 }
 
-function readRetryAfterMs(response: Response, defaultMs: number): number {
-    let retryAfter: string | null = null;
-    try {
-        retryAfter = response.headers?.get?.('Retry-After') ?? null;
-    } catch {
-        retryAfter = null;
-    }
-    if (retryAfter) {
-        const seconds = Number.parseInt(retryAfter, 10);
-        if (Number.isFinite(seconds) && seconds > 0) {
-            return seconds * 1000;
-        }
-    }
-    return defaultMs;
+const PUBLIC_AUTH_PATHS = new Set(["/login", "/forgot-password", "/reset-password"]);
+
+export function isPublicAuthPath(pathname: string): boolean {
+    const path = pathname.split("?")[0]?.split("#")[0]?.replace(/\/+$/, "") || "/";
+    return PUBLIC_AUTH_PATHS.has(path);
 }
 
-async function fetchWithSingle429Retry(url: string, init: RequestInit): Promise<Response> {
-    const response = await fetch(url, init);
-    if (response.status !== 429) {
-        return response;
-    }
-    const delayMs = Math.min(readRetryAfterMs(response, 15_000), 30_000);
-    await sleep(delayMs);
-    return fetch(url, init);
+/** Logged-out web tabs on public auth routes skip boot GET /auth/me. PWA bearer still restores. */
+export function shouldSkipBootAuthMe(pathname: string, bearerToken?: string | null): boolean {
+    if (!isPublicAuthPath(pathname)) return false;
+    return !(typeof bearerToken === "string" && bearerToken.length > 0);
 }
 
 async function parseJsonBody<T>(response: Response): Promise<T> {
@@ -252,9 +239,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const [isAlumni, setIsAlumni] = useState(false);
 
     useEffect(() => {
-        // PWA: rehydrate bearer from localStorage. Web: no localStorage token —
-        // still hit /auth/me so the httpOnly cookie can restore the session.
-        initToken();
+        // PWA: rehydrate bearer from localStorage. Web cookies restore via /auth/me.
+        // Public auth routes skip that boot GET unless a PWA bearer is present.
+        const bearer = initToken();
+        const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+        if (shouldSkipBootAuthMe(pathname, bearer)) {
+            setLoading(false);
+            return;
+        }
         void checkAuth();
     }, []);
 
@@ -332,7 +324,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const checkEmail = async (email: string): Promise<Result<CheckEmailResponse>> => {
         try {
-            const response = await fetchWithSingle429Retry(`${API_URL}/auth/check-email`, {
+            const response = await fetch(`${API_URL}/auth/check-email`, {
                 method: "POST",
                 credentials: shouldSendCredentials() ? "include" : "omit",
                 headers: {
@@ -607,7 +599,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const login = async (email: string, password: string): Promise<Result> => {
         try {
-            const response = await fetchWithSingle429Retry(`${API_URL}/auth/login`, {
+            const response = await fetch(`${API_URL}/auth/login`, {
                 method: "POST",
                 credentials: shouldSendCredentials() ? "include" : "omit",
                 headers: authClientHeaders(),

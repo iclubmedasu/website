@@ -26,6 +26,13 @@ interface RealtimeContextValue {
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
 
+export const WS_RECONNECT_INITIAL_MS = 2_000;
+export const WS_RECONNECT_MAX_MS = 30_000;
+
+export function nextWsReconnectDelayMs(currentDelayMs: number): number {
+    return Math.min(currentDelayMs * 2, WS_RECONNECT_MAX_MS);
+}
+
 export function RealtimeProvider({ children }: { children: ReactNode }) {
     const [isConnected, setIsConnected] = useState(false);
     const socketRef = useRef<WebSocket | null>(null);
@@ -72,6 +79,18 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         let disposed = false;
         let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
         let connecting = false;
+        let reconnectDelayMs = WS_RECONNECT_INITIAL_MS;
+
+        const scheduleReconnect = () => {
+            if (disposed) return;
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+            const delay = reconnectDelayMs;
+            reconnectDelayMs = nextWsReconnectDelayMs(reconnectDelayMs);
+            reconnectTimer = setTimeout(() => {
+                reconnectTimer = null;
+                void connect();
+            }, delay);
+        };
 
         const connect = async () => {
             if (disposed || connecting) return;
@@ -99,6 +118,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
                 socket.onopen = () => {
                     if (disposed) return;
+                    reconnectDelayMs = WS_RECONNECT_INITIAL_MS;
                     setIsConnected(true);
                     resubscribeAllTopics();
                     if (hasConnectedOnceRef.current) {
@@ -124,10 +144,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
                 socket.onclose = () => {
                     setIsConnected(false);
                     socketRef.current = null;
-                    if (disposed) return;
-                    reconnectTimer = setTimeout(() => {
-                        void connect();
-                    }, 2000);
+                    scheduleReconnect();
                 };
             } finally {
                 connecting = false;

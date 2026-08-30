@@ -1,4 +1,8 @@
 import type { NextRequest } from "next/server";
+import {
+    applyBffIdentityHeaders,
+    fetchUpstreamWithOptionalRetry,
+} from "@/lib/bffProxy";
 
 /**
  * Same-origin BFF proxy: browser → /backend-api/* → backend /api/*
@@ -34,56 +38,17 @@ function resolveUpstream(pathSegments: string[], search: string): string {
     return `${backendOrigin()}/api/${path}${search}`;
 }
 
-async function proxyRequest(
-    request: NextRequest,
-    pathSegments: string[],
-): Promise<Response> {
-    if (request.method === "OPTIONS") {
-        // Same-origin calls never need CORS; answer preflight locally if any.
-        return new Response(null, {
-            status: 204,
-            headers: {
-                "Access-Control-Allow-Methods":
-                    "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS",
-                "Access-Control-Allow-Headers":
-                    request.headers.get("access-control-request-headers") ||
-                    "Content-Type, Authorization, X-Client-Surface, X-Client-Instance-Id",
-                "Access-Control-Max-Age": "600",
-            },
-        });
-    }
-
-    const upstreamUrl = resolveUpstream(pathSegments, request.nextUrl.search);
+function buildUpstreamHeaders(request: NextRequest): Headers {
     const headers = new Headers();
     request.headers.forEach((value, key) => {
         if (HOP_BY_HOP.has(key.toLowerCase())) return;
         headers.set(key, value);
     });
+    applyBffIdentityHeaders(headers, request.headers, process.env.BFF_PROXY_SECRET);
+    return headers;
+}
 
-    const init: RequestInit = {
-        method: request.method,
-        headers,
-        redirect: "manual",
-    };
-
-    if (request.method !== "GET" && request.method !== "HEAD") {
-        const body = await request.arrayBuffer();
-        if (body.byteLength > 0) {
-            init.body = body;
-        }
-    }
-
-    let upstream: Response;
-    try {
-        upstream = await fetch(upstreamUrl, init);
-    } catch (error) {
-        console.error("backend-api proxy fetch failed:", upstreamUrl, error);
-        return Response.json(
-            { error: "Upstream API unreachable" },
-            { status: 502 },
-        );
-    }
-
+function toClientResponse(upstream: Response): Response {
     const responseHeaders = new Headers();
     upstream.headers.forEach((value, key) => {
         const lower = key.toLowerCase();
@@ -112,6 +77,57 @@ async function proxyRequest(
         statusText: upstream.statusText,
         headers: responseHeaders,
     });
+}
+
+async function proxyRequest(
+    request: NextRequest,
+    pathSegments: string[],
+): Promise<Response> {
+    if (request.method === "OPTIONS") {
+        // Same-origin calls never need CORS; answer preflight locally if any.
+        return new Response(null, {
+            status: 204,
+            headers: {
+                "Access-Control-Allow-Methods":
+                    "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS",
+                "Access-Control-Allow-Headers":
+                    request.headers.get("access-control-request-headers") ||
+                    "Content-Type, Authorization, X-Client-Surface, X-Client-Instance-Id",
+                "Access-Control-Max-Age": "600",
+            },
+        });
+    }
+
+    const upstreamUrl = resolveUpstream(pathSegments, request.nextUrl.search);
+    const headers = buildUpstreamHeaders(request);
+
+    const init: RequestInit = {
+        method: request.method,
+        headers,
+        redirect: "manual",
+    };
+
+    if (request.method !== "GET" && request.method !== "HEAD") {
+        const body = await request.arrayBuffer();
+        if (body.byteLength > 0) {
+            init.body = body;
+        }
+    }
+
+    let upstream: Response;
+    try {
+        // Absorb one-shot HF HTML 429 / gateway blips server-side so the browser
+        // never sees them. Pass through Express JSON 429 (real limiter decision).
+        upstream = await fetchUpstreamWithOptionalRetry(upstreamUrl, init);
+    } catch (error) {
+        console.error("backend-api proxy fetch failed:", upstreamUrl, error);
+        return Response.json(
+            { error: "Upstream API unreachable" },
+            { status: 502 },
+        );
+    }
+
+    return toClientResponse(upstream);
 }
 
 type RouteContext = { params: Promise<{ path: string[] }> };

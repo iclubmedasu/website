@@ -148,6 +148,8 @@ Env documentation: [`backend/.env.example`](../backend/.env.example), [deploymen
 
 **Member portal browsing is not rate-limited.** Limits apply only to the listed endpoints (mostly auth, public forms, and public registration). Staff juggling events/pages uses normal authenticated APIs without these middleware caps.
 
+When `BFF_PROXY_SECRET` matches on both Spaces, portal BFF traffic is keyed by `X-Iclub-Client-Ip` (browser hop). Direct hits and mismatched/missing secrets still key on `req.ip`.
+
 ### Helmet and CORS
 
 [`backend/server.ts`](../backend/server.ts):
