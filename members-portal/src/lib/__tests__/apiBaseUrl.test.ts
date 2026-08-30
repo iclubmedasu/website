@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, afterEach, vi } from "vitest";
 import {
     isCrossOriginApiUrl,
     PORTAL_BACKEND_API_PREFIX,
     resolveApiBaseUrl,
     resolveBackendOriginForWebSocket,
+    resolveDirectBackendApiUrl,
 } from "../apiBaseUrl";
 
 describe("resolveApiBaseUrl (HF BFF proxy)", () => {
@@ -60,6 +61,60 @@ describe("resolveApiBaseUrl (HF BFF proxy)", () => {
                 pageOrigin: "http://localhost:3001",
             }),
         ).toBe("http://localhost:3000/api");
+    });
+});
+
+describe("resolveDirectBackendApiUrl", () => {
+    const portalOrigin = "https://iclubmedasu-members-portal.hf.space";
+    const backendApi = "https://iclubmedasu-backend.hf.space/api";
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
+    it("returns backend /api on HF when browsing would use BFF", () => {
+        expect(
+            resolveDirectBackendApiUrl({
+                configuredApiUrl: backendApi,
+                pageOrigin: portalOrigin,
+            }),
+        ).toBe(backendApi);
+    });
+
+    it("uses NEXT_PUBLIC_BACKEND_ORIGIN when configured is /backend-api", () => {
+        vi.stubEnv("NEXT_PUBLIC_BACKEND_ORIGIN", "https://iclubmedasu-backend.hf.space");
+        expect(
+            resolveDirectBackendApiUrl({
+                configuredApiUrl: "/backend-api",
+                pageOrigin: portalOrigin,
+            }),
+        ).toBe("https://iclubmedasu-backend.hf.space/api");
+    });
+
+    it("keeps localhost API unchanged (same as resolveApiBaseUrl)", () => {
+        expect(
+            resolveDirectBackendApiUrl({
+                configuredApiUrl: "http://localhost:3000/api",
+                pageOrigin: "http://localhost:3001",
+                pageHostname: "localhost",
+            }),
+        ).toBe(
+            resolveApiBaseUrl({
+                configuredApiUrl: "http://localhost:3000/api",
+                pageOrigin: "http://localhost:3001",
+                pageHostname: "localhost",
+            }),
+        );
+    });
+
+    it("keeps LAN-rewritten API unchanged", () => {
+        expect(
+            resolveDirectBackendApiUrl({
+                configuredApiUrl: "http://localhost:3000/api",
+                pageOrigin: "http://192.168.1.9:3001",
+                pageHostname: "192.168.1.9",
+            }),
+        ).toBe("http://192.168.1.9:3000/api");
     });
 });
 

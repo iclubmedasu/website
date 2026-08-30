@@ -126,6 +126,58 @@ export function resolveApiBaseUrl(options?: {
     return "http://localhost:3000/api";
 }
 
+/**
+ * Direct backend `/api` base for unauthenticated auth POSTs (check-email, login, …).
+ *
+ * On HF / cross-origin, browsing uses same-origin `/backend-api` (BFF), but HF
+ * throttles Space→Space proxy hops. Auth POSTs go straight to the backend Space
+ * instead. Localhost/LAN keep the same URL as {@link resolveApiBaseUrl}.
+ */
+export function resolveDirectBackendApiUrl(options?: {
+    configuredApiUrl?: string | undefined;
+    pageOrigin?: string | undefined;
+    pageHostname?: string | undefined;
+}): string {
+    const browsingApi = resolveApiBaseUrl(options);
+    const usesBff =
+        browsingApi === PORTAL_BACKEND_API_PREFIX ||
+        browsingApi.endsWith(PORTAL_BACKEND_API_PREFIX) ||
+        browsingApi.includes(`${PORTAL_BACKEND_API_PREFIX}/`) ||
+        /\/backend-api(?:\/|$)/.test(browsingApi);
+
+    if (!usesBff) {
+        return browsingApi;
+    }
+
+    const fromBackendOrigin = process.env.NEXT_PUBLIC_BACKEND_ORIGIN?.trim();
+    if (fromBackendOrigin) {
+        return `${fromBackendOrigin.replace(/\/$/, "")}/api`;
+    }
+
+    const configured =
+        options?.configuredApiUrl ?? process.env.NEXT_PUBLIC_API_URL?.trim();
+    if (configured) {
+        try {
+            const pageOrigin = options?.pageOrigin ?? "http://localhost";
+            const absolute = new URL(configured, pageOrigin);
+            if (
+                !absolute.pathname.includes("backend-api") &&
+                !isLoopbackHost(absolute.hostname)
+            ) {
+                const path = absolute.pathname.replace(/\/$/, "");
+                if (path && path !== "/") {
+                    return absolute.toString().replace(/\/$/, "");
+                }
+                return `${absolute.origin}/api`;
+            }
+        } catch {
+            // fall through
+        }
+    }
+
+    return `${defaultBackendOrigin()}/api`;
+}
+
 /** Direct backend origin for WebSocket (not proxied by Next). */
 export function resolveBackendOriginForWebSocket(options?: {
     pageOrigin?: string;

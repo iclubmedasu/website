@@ -61,6 +61,17 @@ function jsonResponse(status: number, body: unknown) {
     };
 }
 
+const HF_PORTAL = 'https://iclubmedasu-members-portal.hf.space';
+const HF_BACKEND_API = 'https://iclubmedasu-backend.hf.space/api';
+
+function stubHfPortalLocation(pathname = '/login') {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', HF_BACKEND_API);
+    Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: new URL(`${HF_PORTAL}${pathname}`),
+    });
+}
+
 describe('public auth path helpers', () => {
     it('treats login and password routes as public auth paths', () => {
         expect(isPublicAuthPath('/login')).toBe(true);
@@ -91,6 +102,7 @@ describe('AuthProvider boot /auth/me', () => {
 
     afterEach(() => {
         vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
         localStorage.clear();
         window.history.pushState({}, '', '/');
     });
@@ -140,6 +152,7 @@ describe('AuthProvider login/check-email 429', () => {
 
     afterEach(() => {
         vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
         localStorage.clear();
         window.history.pushState({}, '', '/');
     });
@@ -190,5 +203,108 @@ describe('AuthProvider login/check-email 429', () => {
         });
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/auth/login');
+    });
+});
+
+describe('AuthProvider direct backend auth POSTs', () => {
+    const fetchMock = vi.fn();
+
+    beforeEach(() => {
+        localStorage.clear();
+        fetchMock.mockReset();
+        vi.stubGlobal('fetch', fetchMock);
+        stubHfPortalLocation('/login');
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
+        localStorage.clear();
+        window.history.pushState({}, '', '/');
+    });
+
+    it('checkEmail posts to backend host, not /backend-api', async () => {
+        fetchMock.mockResolvedValue(
+            jsonResponse(200, { exists: true, needsSetup: false }),
+        );
+
+        render(
+            <AuthProvider>
+                <AuthActions />
+            </AuthProvider>,
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('boot-ready')).toBeTruthy();
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Check email' }));
+
+        await waitFor(() => {
+            expect(fetchMock).toHaveBeenCalled();
+        });
+
+        const url = String(fetchMock.mock.calls[0]?.[0]);
+        const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+        expect(url).toBe(`${HF_BACKEND_API}/auth/check-email`);
+        expect(url).not.toContain('/backend-api');
+        expect(init.credentials).toBe('omit');
+    });
+
+    it('login posts to backend host and establishes portal session cookie', async () => {
+        const token = 'aaa.bbb.ccc';
+        fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url.includes('/auth/login')) {
+                return jsonResponse(200, {
+                    user: { id: '1', email: 'member@med.asu.edu.eg', role: 'MEMBER' },
+                    token,
+                });
+            }
+            if (url.includes('/api/session')) {
+                return jsonResponse(200, { ok: true });
+            }
+            if (url.includes('/auth/me')) {
+                return jsonResponse(200, {
+                    user: { id: '1', email: 'member@med.asu.edu.eg', role: 'MEMBER' },
+                });
+            }
+            return jsonResponse(404, { error: 'not found' });
+        });
+
+        render(
+            <AuthProvider>
+                <AuthActions />
+            </AuthProvider>,
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('boot-ready')).toBeTruthy();
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
+
+        await waitFor(() => {
+            const urls = fetchMock.mock.calls.map((call) => String(call[0]));
+            expect(urls.some((u) => u === `${HF_BACKEND_API}/auth/login`)).toBe(true);
+            expect(urls.some((u) => u === '/api/session' || u.endsWith('/api/session'))).toBe(true);
+        });
+
+        const loginCall = fetchMock.mock.calls.find(
+            (call) => String(call[0]) === `${HF_BACKEND_API}/auth/login`,
+        );
+        expect(String(loginCall?.[0])).not.toContain('/backend-api');
+        expect((loginCall?.[1] as RequestInit).credentials).toBe('omit');
+
+        const sessionCall = fetchMock.mock.calls.find((call) => {
+            const url = String(call[0]);
+            return url === '/api/session' || url.endsWith('/api/session');
+        });
+        expect(sessionCall?.[1]).toEqual(
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({ token }),
+            }),
+        );
     });
 });

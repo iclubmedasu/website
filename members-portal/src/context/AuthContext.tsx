@@ -76,8 +76,9 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-import { resolveApiBaseUrl } from "../lib/apiBaseUrl";
+import { resolveApiBaseUrl, resolveDirectBackendApiUrl } from "../lib/apiBaseUrl";
 
+/** Same-origin BFF (or local Express) for credentialed browsing after login. */
 function resolveApiUrl(): string {
     if (typeof window !== "undefined") {
         return resolveApiBaseUrl({
@@ -92,7 +93,46 @@ function resolveApiUrl(): string {
     });
 }
 
-const API_URL = resolveApiUrl();
+/**
+ * Direct backend `/api` for unauthenticated auth POSTs.
+ * Avoids HF Space→Space 429s on the portal BFF hop.
+ */
+function resolveDirectAuthApiUrl(): string {
+    if (typeof window !== "undefined") {
+        return resolveDirectBackendApiUrl({
+            configuredApiUrl: process.env.NEXT_PUBLIC_API_URL,
+            pageOrigin: window.location.origin,
+            pageHostname: window.location.hostname,
+        });
+    }
+
+    return resolveDirectBackendApiUrl({
+        configuredApiUrl: process.env.NEXT_PUBLIC_API_URL,
+    });
+}
+
+async function establishPortalSession(token: string): Promise<void> {
+    setToken(token);
+    try {
+        await fetch("/api/session", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token }),
+        });
+    } catch (error) {
+        console.error("Failed to establish portal session cookie:", error);
+    }
+}
+
+function clearPortalSession(): void {
+    void fetch("/api/session", {
+        method: "DELETE",
+        credentials: "same-origin",
+    }).catch((error) => {
+        console.error("Failed to clear portal session cookie:", error);
+    });
+}
 
 const NO_SETUP: CheckStudentIdResponse = { canSetup: false };
 
@@ -180,7 +220,7 @@ async function parseJsonBody<T>(response: Response): Promise<T> {
 
 function logAuthNetworkOrError(label: string, error: unknown): void {
     if (isNetworkFetchError(error)) {
-        console.error(`${label}: Backend unreachable at ${API_URL}`);
+        console.error(`${label}: Backend unreachable at ${resolveApiUrl()}`);
         return;
     }
     console.error(`${label}:`, error);
@@ -199,9 +239,10 @@ function sleep(ms: number): Promise<void> {
  */
 async function fetchAuthMeWithRetry(): Promise<Response | null> {
     let lastError: unknown = null;
+    const apiUrl = resolveApiUrl();
     for (let attempt = 0; attempt <= AUTH_ME_RETRY_DELAYS_MS.length; attempt++) {
         try {
-            const response = await apiFetch(`${API_URL}/auth/me`);
+            const response = await apiFetch(`${apiUrl}/auth/me`);
             if (
                 response.ok ||
                 response.status === 401 ||
@@ -299,7 +340,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const refreshUser = async (): Promise<void> => {
         try {
-            const response = await apiFetch(`${API_URL}/auth/me`);
+            const response = await apiFetch(`${resolveApiUrl()}/auth/me`);
 
             if (response.ok) {
                 const data = await parseJsonBody<AuthMeResponse>(response);
@@ -324,9 +365,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const checkEmail = async (email: string): Promise<Result<CheckEmailResponse>> => {
         try {
-            const response = await fetch(`${API_URL}/auth/check-email`, {
+            const response = await fetch(`${resolveDirectAuthApiUrl()}/auth/check-email`, {
                 method: "POST",
-                credentials: shouldSendCredentials() ? "include" : "omit",
+                credentials: "omit",
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -353,9 +394,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const checkStudentId = async (studentId: string | number): Promise<Result<CheckStudentIdResponse>> => {
         try {
-            const response = await fetch(`${API_URL}/auth/check-student-id`, {
+            const response = await fetch(`${resolveDirectAuthApiUrl()}/auth/check-student-id`, {
                 method: "POST",
-                credentials: shouldSendCredentials() ? "include" : "omit",
+                credentials: "omit",
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -391,9 +432,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         email3?: string,
     ): Promise<Result> => {
         try {
-            const response = await fetch(`${API_URL}/auth/complete-profile`, {
+            const response = await fetch(`${resolveDirectAuthApiUrl()}/auth/complete-profile`, {
                 method: "POST",
-                credentials: shouldSendCredentials() ? "include" : "omit",
+                credentials: "omit",
                 headers: authClientHeaders(),
                 body: JSON.stringify(withClientSurface({
                     studentId: String(studentId).trim(),
@@ -410,7 +451,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             if (!response.ok) {
                 throw new Error(readApiError(data, "Failed to complete profile"));
             }
-            if (data.token) setToken(data.token);
+            if (data.token) await establishPortalSession(data.token);
             setUser(data.user);
             await refreshUser();
             return { success: true };
@@ -434,9 +475,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         officerEmail?: string,
     ): Promise<Result> => {
         try {
-            const response = await fetch(`${API_URL}/auth/complete-officer-profile`, {
+            const response = await fetch(`${resolveDirectAuthApiUrl()}/auth/complete-officer-profile`, {
                 method: "POST",
-                credentials: shouldSendCredentials() ? "include" : "omit",
+                credentials: "omit",
                 headers: authClientHeaders(),
                 body: JSON.stringify(withClientSurface({
                     identifier: identifier.trim(),
@@ -455,7 +496,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             if (!response.ok) {
                 throw new Error(readApiError(data, "Failed to complete officer profile"));
             }
-            if (data.token) setToken(data.token);
+            if (data.token) await establishPortalSession(data.token);
             setUser(data.user);
             await refreshUser();
             return { success: true };
@@ -476,9 +517,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         email3?: string,
     ): Promise<Result> => {
         try {
-            const response = await fetch(`${API_URL}/auth/update-invited-profile`, {
+            const response = await fetch(`${resolveDirectAuthApiUrl()}/auth/update-invited-profile`, {
                 method: "POST",
-                credentials: shouldSendCredentials() ? "include" : "omit",
+                credentials: "omit",
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -508,9 +549,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const setupPassword = async (email: string, password: string): Promise<Result> => {
         try {
-            const response = await fetch(`${API_URL}/auth/setup-password`, {
+            const response = await fetch(`${resolveDirectAuthApiUrl()}/auth/setup-password`, {
                 method: "POST",
-                credentials: shouldSendCredentials() ? "include" : "omit",
+                credentials: "omit",
                 headers: authClientHeaders(),
                 body: JSON.stringify(withClientSurface({ email, password })),
             });
@@ -519,7 +560,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             if (!response.ok) {
                 throw new Error(readApiError(data, "Setup failed"));
             }
-            if (data.token) setToken(data.token);
+            if (data.token) await establishPortalSession(data.token);
             setUser(data.user);
             await refreshUser();
             return { success: true };
@@ -536,9 +577,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     ): Promise<Result<Pick<ForgotPasswordResponse, "message">>> => {
         try {
             const body: ForgotPasswordInput = { email: email.trim() };
-            const response = await fetch(`${API_URL}/auth/forgot-password`, {
+            const response = await fetch(`${resolveDirectAuthApiUrl()}/auth/forgot-password`, {
                 method: "POST",
-                credentials: shouldSendCredentials() ? "include" : "omit",
+                credentials: "omit",
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -570,9 +611,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     ): Promise<Result<Pick<ResetPasswordResponse, "message">>> => {
         try {
             const body: ResetPasswordInput = { token, password, confirmPassword };
-            const response = await fetch(`${API_URL}/auth/reset-password`, {
+            const response = await fetch(`${resolveDirectAuthApiUrl()}/auth/reset-password`, {
                 method: "POST",
-                credentials: shouldSendCredentials() ? "include" : "omit",
+                credentials: "omit",
                 headers: {
                     "Content-Type": "application/json",
                 },
@@ -599,9 +640,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const login = async (email: string, password: string): Promise<Result> => {
         try {
-            const response = await fetch(`${API_URL}/auth/login`, {
+            const response = await fetch(`${resolveDirectAuthApiUrl()}/auth/login`, {
                 method: "POST",
-                credentials: shouldSendCredentials() ? "include" : "omit",
+                credentials: "omit",
                 headers: authClientHeaders(),
                 body: JSON.stringify(withClientSurface({ email, password })),
             });
@@ -619,7 +660,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
                 throw new Error(readApiError(data, "Login failed"));
             }
-            if (data.token) setToken(data.token);
+            if (data.token) await establishPortalSession(data.token);
             setUser(data.user);
             setIsAlumni(false);
             await refreshUser();
@@ -633,12 +674,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     const logout = (): void => {
-        void fetch(`${API_URL}/auth/logout`, {
+        void fetch(`${resolveApiUrl()}/auth/logout`, {
             method: "POST",
             credentials: shouldSendCredentials() ? "include" : "omit",
         }).catch((error) => {
             console.error("Logout request failed:", error);
         });
+        clearPortalSession();
         clearTokenUtil();
         setUser(null);
         setIsAlumni(false);

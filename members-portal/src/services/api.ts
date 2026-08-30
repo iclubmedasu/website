@@ -144,7 +144,8 @@ type JsonHeaders = Record<string, string>;
 // Auth token management
 //
 // Split by client surface (deliberate tradeoff — see docs/security/security.md):
-// - Regular browser tabs: httpOnly cookie only (no localStorage, no Authorization header).
+// - Regular browser tabs: httpOnly cookie primary; in-memory token used for Bearer
+//   immediately after login (before /api/session cookie round-trip). Not persisted.
 // - Installed standalone PWA: also keep a Bearer token (localStorage + memory) because
 //   SameSite=None cookies are unreliable in some iOS standalone contexts.
 let authToken: string | null = null;
@@ -158,7 +159,7 @@ export function getAuthToken(): string | null {
     return authToken;
 }
 
-/** Memory token for Bearer/WS only when the surface is the installed PWA. */
+/** Memory token for WS/XHR Bearer when the surface is the installed PWA. */
 function getBearerTokenIfAllowed(): string | null {
     return shouldUseBearerAuth() ? authToken : null;
 }
@@ -206,12 +207,13 @@ export function getClientInstanceId(): string | null {
     return clientInstanceId;
 }
 
-// Base fetch: cookie credentials for all surfaces; Bearer only for installed PWA.
+// Base fetch: cookie credentials for all surfaces; Bearer whenever an in-memory
+// token exists (post-login before portal cookie is set, and installed PWA).
 export const apiFetch = (input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> => {
     const headers: Record<string, string> = {
         ...(init.headers as Record<string, string>),
     };
-    const bearer = getBearerTokenIfAllowed();
+    const bearer = authToken;
     if (bearer) {
         headers['Authorization'] = `Bearer ${bearer}`;
     }
