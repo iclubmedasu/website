@@ -1,6 +1,6 @@
 FROM node:20-alpine AS build
 
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.0.0
 
 WORKDIR /app
 
@@ -24,7 +24,7 @@ RUN pnpm run build
 
 FROM node:20-alpine AS runtime
 
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.0.0
 
 WORKDIR /app
 

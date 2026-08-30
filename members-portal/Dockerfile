@@ -4,7 +4,7 @@
 # ============================================
 
 FROM node:20-alpine AS base
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.0.0
 
 # Build stage: install + build together so every workspace's
 # node_modules (incl. packages/shared/.bin/tsc) stays intact.
