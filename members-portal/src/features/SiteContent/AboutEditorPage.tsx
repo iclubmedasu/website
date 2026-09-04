@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import type { EditorAboutPage, EditorAboutSection, SitePageHeader } from '@iclub/shared';
+import { ConfirmModal } from '@/components/modal/ConfirmModal';
 import { useAuth } from '@/context/AuthContext';
 import { siteContentAPI } from '@/services/api';
 import { PageHeaderEditor } from './components/PageHeaderEditor';
@@ -35,6 +36,7 @@ export default function AboutEditorPage() {
     const [editingSection, setEditingSection] = useState<EditorAboutSection | null>(null);
     const [showAddModal, setShowAddModal] = useState(false);
     const [busy, setBusy] = useState(false);
+    const [deleteSectionTarget, setDeleteSectionTarget] = useState<EditorAboutSection | null>(null);
 
     const loadPage = useCallback(async () => {
         setLoading(true);
@@ -91,12 +93,13 @@ export default function AboutEditorPage() {
         }
     };
 
-    const deleteSection = async (sectionId: number) => {
-        if (!window.confirm('Delete this section?')) return;
+    const deleteSection = async () => {
+        if (!deleteSectionTarget) return;
         setBusy(true);
         try {
-            const updated = (await siteContentAPI.deleteAboutSection(sectionId)) as EditorAboutPage;
+            const updated = (await siteContentAPI.deleteAboutSection(deleteSectionTarget.id)) as EditorAboutPage;
             setPage(updated);
+            setDeleteSectionTarget(null);
         } catch (err) {
             setError(getErrorMessage(err, 'Failed to delete section'));
         } finally {
@@ -197,7 +200,7 @@ export default function AboutEditorPage() {
                                                 onMoveUp={() => moveSection(index, -1)}
                                                 onMoveDown={() => moveSection(index, 1)}
                                                 onEdit={() => setEditingSection(section)}
-                                                onDelete={() => deleteSection(section.id)}
+                                                onDelete={() => setDeleteSectionTarget(section)}
                                                 ariaLabel={`Actions for ${section.title}`}
                                                 editLabel="Edit section"
                                                 deleteLabel="Delete section"
@@ -224,6 +227,20 @@ export default function AboutEditorPage() {
                     onClose={() => setEditingSection(null)}
                     onSaved={handleSectionSaved}
                     onPartialSave={handlePartialSectionSave}
+                />
+            ) : null}
+
+            {deleteSectionTarget ? (
+                <ConfirmModal
+                    title="Delete section"
+                    message="Delete this section?"
+                    confirmLabel="Delete"
+                    variant="danger"
+                    busy={busy}
+                    onClose={() => {
+                        if (!busy) setDeleteSectionTarget(null);
+                    }}
+                    onConfirm={deleteSection}
                 />
             ) : null}
         </div>

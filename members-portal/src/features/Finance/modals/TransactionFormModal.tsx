@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import type { FinanceAccountSummary, FinanceTransactionRow } from '@iclub/shared';
 import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
+import { ConfirmModal } from '@/components/modal/ConfirmModal';
 import { DateInput } from '@/components/input/DateInput';
 import { FormSelect } from '@/components/input/FormSelect';
 import { financeAPI } from '@/services/api';
@@ -40,6 +41,7 @@ export function TransactionFormModal({
     const [reference, setReference] = useState(transaction?.reference ?? '');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
+    const [confirmDelete, setConfirmDelete] = useState(false);
 
     const categoryOptions = useMemo(() => {
         const options = [...categories];
@@ -92,12 +94,12 @@ export function TransactionFormModal({
 
     const remove = async () => {
         if (!transaction) return;
-        if (!window.confirm('Delete this transaction?')) return;
 
         setBusy(true);
         setError('');
         try {
             await financeAPI.deleteTransaction(transaction.id);
+            setConfirmDelete(false);
             onSaved();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to delete transaction');
@@ -107,13 +109,19 @@ export function TransactionFormModal({
     };
 
     return (
+        <>
         <FinanceModal
             title={transaction ? 'Edit transaction' : 'Add transaction'}
             onClose={onClose}
             footer={
                 <>
                     {transaction ? (
-                        <button type="button" className="btn btn-secondary" onClick={() => void remove()} disabled={busy}>
+                        <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => setConfirmDelete(true)}
+                            disabled={busy}
+                        >
                             Delete
                         </button>
                     ) : null}
@@ -206,5 +214,20 @@ export function TransactionFormModal({
                 />
             </div>
         </FinanceModal>
+
+        {confirmDelete && transaction ? (
+            <ConfirmModal
+                title="Delete transaction"
+                message="Delete this transaction?"
+                confirmLabel="Delete"
+                variant="danger"
+                busy={busy}
+                onClose={() => {
+                    if (!busy) setConfirmDelete(false);
+                }}
+                onConfirm={remove}
+            />
+        ) : null}
+        </>
     );
 }

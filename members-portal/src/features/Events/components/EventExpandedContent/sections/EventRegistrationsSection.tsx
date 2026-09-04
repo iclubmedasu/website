@@ -1,6 +1,7 @@
 import { CLUB_TIMEZONE, formatSessionRange, toEventDayString } from '@iclub/shared/utils';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useResourceChannel } from '@/hooks/useResourceChannel';
+import { useAutoDismissMessage } from '@/hooks/useAutoDismissMessage';
 import { Download, Filter, Plus, Search, Upload } from 'lucide-react';
 import Toggle from '@/components/toggle/Toggle';
 import { fmtDate } from '@/components/cards/LifecycleCardView/LifecycleCardView';
@@ -189,6 +190,8 @@ export default function EventRegistrationsSection({
     const [walkInAttendanceOpen, setWalkInAttendanceOpen] = useState(false);
     const [walkInAttendanceSessionId, setWalkInAttendanceSessionId] = useState<string | null>(null);
     const [editingField, setEditingField] = useState<EventCustomFieldRef | null>(null);
+    const { message: successMessage, show: showSuccessMessage, clear: clearSuccessMessage } = useAutoDismissMessage();
+    const { message: errorMessage, show: showErrorMessage, clear: clearErrorMessage } = useAutoDismissMessage();
     const tableScrollRef = useRef<HTMLDivElement>(null);
 
     const hasRegistrations = totalRegistered > 0;
@@ -351,10 +354,17 @@ export default function EventRegistrationsSection({
     const handlePublishToggle = async (nextPublished: boolean) => {
         if (!onPublishedChange || publishing) return;
         setPublishing(true);
+        clearSuccessMessage();
+        clearErrorMessage();
         try {
             await onPublishedChange(eventId as Id, nextPublished);
+            showSuccessMessage(
+                nextPublished
+                    ? 'Registrations published to the public website.'
+                    : 'Registrations unpublished from the public website.',
+            );
         } catch {
-            window.alert('Failed to update registration publish status.');
+            showErrorMessage('Failed to update registration publish status.');
         } finally {
             setPublishing(false);
         }
@@ -400,11 +410,13 @@ export default function EventRegistrationsSection({
     };
 
     const handleRemoveField = async (fieldId: number) => {
+        clearSuccessMessage();
+        clearErrorMessage();
         try {
             await eventsAPI.removeCustomField(eventId, fieldId);
             onFieldsChange(fields.filter((item) => item.id !== fieldId));
         } catch {
-            window.alert('Cannot delete this field after registrations exist.');
+            showErrorMessage('Cannot delete this field after registrations exist.');
         }
     };
 
@@ -572,6 +584,8 @@ export default function EventRegistrationsSection({
 
     const handleExportExcel = async () => {
         setExporting(true);
+        clearSuccessMessage();
+        clearErrorMessage();
         try {
             const allRegistrations = await eventsAPI.getRegistrations(eventId);
             await exportEventRegistrationsExcel({
@@ -583,8 +597,9 @@ export default function EventRegistrationsSection({
                 eventTimezone,
                 trackSessionCheckOut,
             });
+            showSuccessMessage('Registrations exported to Excel.');
         } catch {
-            window.alert('Failed to export registrations to Excel.');
+            showErrorMessage('Failed to export registrations to Excel.');
         } finally {
             setExporting(false);
         }
@@ -766,6 +781,8 @@ export default function EventRegistrationsSection({
                     <GenerateEmbedButton eventSlug={eventSlug || String(eventId)} isPublished={isPublished} />
                 </div>
             </div>
+            {errorMessage ? <div className="error-message">{errorMessage}</div> : null}
+            {successMessage ? <div className="success-message">{successMessage}</div> : null}
             <div className="event-registrations-layout">
                 <div className="event-registrations-table-column">
                     <div className="page-search-row event-registration-search-row">

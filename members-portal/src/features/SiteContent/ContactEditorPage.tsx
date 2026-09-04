@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import type { EditorContactPage, EditorContactMethod, EditorSocialLink, SitePageHeader } from '@iclub/shared';
+import { ConfirmModal } from '@/components/modal/ConfirmModal';
 import { useAuth } from '@/context/AuthContext';
 import { siteContentAPI } from '@/services/api';
 import { PageHeaderEditor } from './components/PageHeaderEditor';
@@ -27,6 +28,11 @@ export default function ContactEditorPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<
+        | { kind: 'method'; id: number }
+        | { kind: 'link'; id: number }
+        | null
+    >(null);
     const [editingMethod, setEditingMethod] = useState<EditorContactMethod | null>(null);
     const [editingLink, setEditingLink] = useState<EditorSocialLink | null>(null);
     const [showMethodModal, setShowMethodModal] = useState(false);
@@ -89,27 +95,26 @@ export default function ContactEditorPage() {
         }
     };
 
-    const deleteMethod = async (methodId: number) => {
-        if (!window.confirm('Delete this contact method?')) return;
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
         setBusy(true);
         try {
-            const updated = (await siteContentAPI.deleteContactMethod(methodId)) as EditorContactPage;
+            const updated = (
+                deleteTarget.kind === 'method'
+                    ? await siteContentAPI.deleteContactMethod(deleteTarget.id)
+                    : await siteContentAPI.deleteSocialLink(deleteTarget.id)
+            ) as EditorContactPage;
             setPage(updated);
+            setDeleteTarget(null);
         } catch (err) {
-            setError(getErrorMessage(err, 'Failed to delete contact method'));
-        } finally {
-            setBusy(false);
-        }
-    };
-
-    const deleteLink = async (linkId: number) => {
-        if (!window.confirm('Delete this social link?')) return;
-        setBusy(true);
-        try {
-            const updated = (await siteContentAPI.deleteSocialLink(linkId)) as EditorContactPage;
-            setPage(updated);
-        } catch (err) {
-            setError(getErrorMessage(err, 'Failed to delete social link'));
+            setError(
+                getErrorMessage(
+                    err,
+                    deleteTarget.kind === 'method'
+                        ? 'Failed to delete contact method'
+                        : 'Failed to delete social link',
+                ),
+            );
         } finally {
             setBusy(false);
         }
@@ -192,7 +197,7 @@ export default function ContactEditorPage() {
                                                 moveItem(page.methods, index, 1, siteContentAPI.reorderContactMethods)
                                             }
                                             onEdit={() => setEditingMethod(method)}
-                                            onDelete={() => deleteMethod(method.id)}
+                                            onDelete={() => setDeleteTarget({ kind: 'method', id: method.id })}
                                             ariaLabel={`Actions for contact method`}
                                             editLabel="Edit method"
                                             deleteLabel="Delete method"
@@ -244,7 +249,7 @@ export default function ContactEditorPage() {
                                                 moveItem(page.socialLinks, index, 1, siteContentAPI.reorderSocialLinks)
                                             }
                                             onEdit={() => setEditingLink(link)}
-                                            onDelete={() => deleteLink(link.id)}
+                                            onDelete={() => setDeleteTarget({ kind: 'link', id: link.id })}
                                             ariaLabel={`Actions for social link`}
                                             editLabel="Edit link"
                                             deleteLabel="Delete link"
@@ -296,6 +301,24 @@ export default function ContactEditorPage() {
                         setPage(updated);
                         setEditingLink(null);
                     }}
+                />
+            ) : null}
+
+            {deleteTarget ? (
+                <ConfirmModal
+                    title={deleteTarget.kind === 'method' ? 'Delete contact method' : 'Delete social link'}
+                    message={
+                        deleteTarget.kind === 'method'
+                            ? 'Delete this contact method?'
+                            : 'Delete this social link?'
+                    }
+                    confirmLabel="Delete"
+                    variant="danger"
+                    busy={busy}
+                    onClose={() => {
+                        if (!busy) setDeleteTarget(null);
+                    }}
+                    onConfirm={confirmDelete}
                 />
             ) : null}
         </div>

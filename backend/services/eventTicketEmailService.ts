@@ -11,6 +11,7 @@ import {
 import { prisma } from '../db';
 import { generateTokensForRegistration, getSessionTokensForRegistration } from './sessionTokenService';
 import { sendEmail, type EmailAttachment } from './emailService';
+import { runEmailJob } from './emailSendPool';
 import { splitSessionsForTicket } from '../lib/eventSessionCapacity';
 import * as githubStorage from './githubStorageService';
 
@@ -69,28 +70,46 @@ function loadEmailAsset(filename: string, contentId: string): EmailAttachment {
     };
 }
 
+/** Process-lifetime cache: one GitHub download per path across bulk/background sends. */
+const githubImageAttachmentCache = new Map<string, Promise<EmailAttachment | null>>();
+
+/** Clears the GitHub ticket-image cache (tests only). */
+export function clearGithubImageAttachmentCache(): void {
+    githubImageAttachmentCache.clear();
+}
+
 async function loadGithubImageAttachment(input: {
     githubPath: string;
     contentId: string;
     filename: string;
     mimeType: string | null | undefined;
 }): Promise<EmailAttachment | null> {
-    try {
-        const response = await githubStorage.downloadFile(input.githubPath);
-        const buffer = Buffer.from(await response.arrayBuffer());
-        return {
-            contentId: input.contentId,
-            content: buffer.toString('base64'),
-            filename: input.filename,
-            contentType: input.mimeType || 'image/png',
-        };
-    } catch (error) {
-        console.error(
-            `Failed to load ticket design image for email (${input.contentId}):`,
-            error instanceof Error ? error.message : error,
-        );
-        return null;
+    const cached = githubImageAttachmentCache.get(input.githubPath);
+    if (cached) {
+        return cached;
     }
+
+    const loadPromise = (async (): Promise<EmailAttachment | null> => {
+        try {
+            const response = await githubStorage.downloadFile(input.githubPath);
+            const buffer = Buffer.from(await response.arrayBuffer());
+            return {
+                contentId: input.contentId,
+                content: buffer.toString('base64'),
+                filename: input.filename,
+                contentType: input.mimeType || 'image/png',
+            };
+        } catch (error) {
+            console.error(
+                `Failed to load ticket design image for email (${input.contentId}):`,
+                error instanceof Error ? error.message : error,
+            );
+            return null;
+        }
+    })();
+
+    githubImageAttachmentCache.set(input.githubPath, loadPromise);
+    return loadPromise;
 }
 
 function buildTicketEmailAttachments(confirmationCode: string): Promise<EmailAttachment[]> {
@@ -599,4 +618,18 @@ export async function sendEventTicketEmail(registrationId: number): Promise<void
 
 export async function sendEventReminderEmail(registrationId: number): Promise<void> {
     await sendRegistrationEmail(registrationId, 'reminder');
+}
+
+/** Fire-and-forget queue used after registration / bulk send. Shares the email concurrency pool. */
+export function queueTicketEmail(registrationId: number, context: string): void {
+    void runEmailJob(() => sendEventTicketEmail(registrationId)).catch((error) => {
+        console.error(`Failed to send ticket email (${context}) for registration ${registrationId}:`, error);
+    });
+}
+
+/** Fire-and-forget queue used for bulk reminder send. Shares the email concurrency pool. */
+export function queueReminderEmail(registrationId: number, context: string): void {
+    void runEmailJob(() => sendEventReminderEmail(registrationId)).catch((error) => {
+        console.error(`Failed to send reminder email (${context}) for registration ${registrationId}:`, error);
+    });
 }

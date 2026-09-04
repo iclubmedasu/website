@@ -9,6 +9,10 @@ const emailMocks = vi.hoisted(() => ({
     sendEmail: vi.fn(),
 }));
 
+const githubStorageMocks = vi.hoisted(() => ({
+    downloadFile: vi.fn(),
+}));
+
 vi.mock('../../db', () => ({
     prisma: {
         eventRegistration: {
@@ -28,17 +32,20 @@ vi.mock('../../db', () => ({
 }));
 
 vi.mock('../../services/emailService', () => emailMocks);
+vi.mock('../../services/githubStorageService', () => githubStorageMocks);
 vi.mock('../../services/sessionTokenService', () => ({
     generateTokensForRegistration: vi.fn().mockResolvedValue(0),
     getSessionTokensForRegistration: vi.fn().mockResolvedValue(new Map()),
 }));
 
 import {
+    clearGithubImageAttachmentCache,
     ICLUB_AVATAR_CID,
     ICLUB_LOGO_CID,
     IHUB_LOGO_CID,
     sendEventReminderEmail,
     sendEventTicketEmail,
+    TICKET_HEADER_IMAGE_CID,
     TICKET_QR_CONTENT_ID,
 } from '../../services/eventTicketEmailService';
 
@@ -55,6 +62,15 @@ const registrationFixture = {
         venue: 'Hall A',
         eventDate: new Date('2026-06-20T10:00:00.000Z'),
         eventEndDate: new Date('2026-06-20T18:00:00.000Z'),
+        timezone: 'Africa/Cairo',
+        ticketAccentColor: null,
+        ticketHeaderTitle: null,
+        ticketHeaderSubtitle: null,
+        ticketFooterNote: null,
+        ticketHeaderImageGithubPath: null,
+        ticketHeaderImageMimeType: null,
+        ticketFooterImageGithubPath: null,
+        ticketFooterImageMimeType: null,
     },
     tier: { name: 'VIP' },
 };
@@ -89,10 +105,12 @@ describe('eventTicketEmailService', () => {
         emailMocks.sendEmail.mockResolvedValue({ id: 'email-123' });
         prismaMocks.eventRegistrationUpdate.mockResolvedValue({});
         prismaMocks.eventRegistrationFindUnique.mockResolvedValue(registrationFixture);
+        clearGithubImageAttachmentCache();
     });
 
     afterEach(() => {
         vi.clearAllMocks();
+        clearGithubImageAttachmentCache();
     });
 
     it('sends ticket email with branded HTML and four CID inline attachments', async () => {
@@ -137,5 +155,34 @@ describe('eventTicketEmailService', () => {
             where: { id: 1 },
             data: { reminderEmailSentAt: expect.any(Date) },
         });
+    });
+
+    it('downloads a GitHub ticket image once when the same path is used twice', async () => {
+        const headerPath = 'events/42/ticket-header.png';
+        githubStorageMocks.downloadFile.mockResolvedValue(
+            new Response(Buffer.from('header-bytes'), {
+                status: 200,
+                headers: { 'content-type': 'image/png' },
+            }),
+        );
+        prismaMocks.eventRegistrationFindUnique.mockResolvedValue({
+            ...registrationFixture,
+            event: {
+                ...registrationFixture.event,
+                ticketHeaderImageGithubPath: headerPath,
+                ticketHeaderImageMimeType: 'image/png',
+            },
+        });
+
+        await sendEventTicketEmail(1);
+        await sendEventTicketEmail(1);
+
+        expect(githubStorageMocks.downloadFile).toHaveBeenCalledTimes(1);
+        expect(githubStorageMocks.downloadFile).toHaveBeenCalledWith(headerPath);
+
+        const firstAttachments = emailMocks.sendEmail.mock.calls[0][0].attachments as Array<{ contentId: string }>;
+        const secondAttachments = emailMocks.sendEmail.mock.calls[1][0].attachments as Array<{ contentId: string }>;
+        expect(firstAttachments.some((a) => a.contentId === TICKET_HEADER_IMAGE_CID)).toBe(true);
+        expect(secondAttachments.some((a) => a.contentId === TICKET_HEADER_IMAGE_CID)).toBe(true);
     });
 });

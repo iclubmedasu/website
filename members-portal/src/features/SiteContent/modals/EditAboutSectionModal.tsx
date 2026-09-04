@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { EditorAboutPage, EditorAboutSection } from '@iclub/shared';
 import { Plus, Trash2 } from 'lucide-react';
+import { ConfirmModal } from '@/components/modal/ConfirmModal';
 import { siteContentAPI } from '@/services/api';
 import { SiteContentModal } from '../components/SiteContentModal';
 
@@ -23,6 +24,7 @@ export function EditAboutSectionModal({ section, onClose, onSaved, onPartialSave
     const [emptyMessage, setEmptyMessage] = useState(section.type === 'SPONSORS' ? section.emptyMessage ?? '' : '');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
+    const [deleteSponsorId, setDeleteSponsorId] = useState<number | null>(null);
 
     const saveSection = async () => {
         setBusy(true);
@@ -77,14 +79,14 @@ export function EditAboutSectionModal({ section, onClose, onSaved, onPartialSave
         }
     };
 
-    const removeSponsor = async (sponsorId: number) => {
-        if (section.type !== 'SPONSORS') return;
-        if (!window.confirm('Delete this sponsor?')) return;
+    const removeSponsor = async () => {
+        if (section.type !== 'SPONSORS' || deleteSponsorId == null) return;
         setBusy(true);
         setError('');
         try {
-            const updated = (await siteContentAPI.deleteSponsor(section.id, sponsorId)) as EditorAboutPage;
+            const updated = (await siteContentAPI.deleteSponsor(section.id, deleteSponsorId)) as EditorAboutPage;
             onPartialSave(updated);
+            setDeleteSponsorId(null);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to delete sponsor');
         } finally {
@@ -95,6 +97,7 @@ export function EditAboutSectionModal({ section, onClose, onSaved, onPartialSave
     const currentSponsors = section.type === 'SPONSORS' ? section.sponsors : [];
 
     return (
+        <>
         <SiteContentModal
             title="Edit section"
             onClose={onClose}
@@ -249,7 +252,11 @@ export function EditAboutSectionModal({ section, onClose, onSaved, onPartialSave
                                     placeholder="Website URL"
                                     onBlur={(event) => void updateSponsor(sponsor.id, { websiteUrl: event.target.value })}
                                 />
-                                <button type="button" className="btn btn-danger site-content-inline-action" onClick={() => void removeSponsor(sponsor.id)}>
+                                <button
+                                    type="button"
+                                    className="btn btn-danger site-content-inline-action"
+                                    onClick={() => setDeleteSponsorId(sponsor.id)}
+                                >
                                     Remove sponsor
                                 </button>
                             </div>
@@ -262,5 +269,20 @@ export function EditAboutSectionModal({ section, onClose, onSaved, onPartialSave
                 </>
             ) : null}
         </SiteContentModal>
+
+        {deleteSponsorId != null ? (
+            <ConfirmModal
+                title="Delete sponsor"
+                message="Delete this sponsor?"
+                confirmLabel="Delete"
+                variant="danger"
+                busy={busy}
+                onClose={() => {
+                    if (!busy) setDeleteSponsorId(null);
+                }}
+                onConfirm={removeSponsor}
+            />
+        ) : null}
+        </>
     );
 }

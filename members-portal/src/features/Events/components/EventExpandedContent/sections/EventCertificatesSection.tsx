@@ -538,12 +538,14 @@ export default function EventCertificatesSection({
     const handleResendEmail = async (row: UnifiedCertificateRow) => {
         if (!canManage || !canResendCertificateEmail(row) || row.certificateId == null) return;
         setResendingEmailId(Number(row.certificateId));
+        setError(null);
+        clearSuccessMessage();
         try {
             const result = await certificatesAPI.resendEmail(row.certificateId);
-            window.alert(result.message || 'Certificate email sent.');
+            showSuccessMessage(result.message || 'Certificate email sent.');
             await loadIssued();
         } catch (err: unknown) {
-            window.alert(getErrorMessage(err, 'Failed to send certificate email.'));
+            setError(getErrorMessage(err, 'Failed to send certificate email.'));
         } finally {
             setResendingEmailId(null);
         }
@@ -553,10 +555,11 @@ export default function EventCertificatesSection({
         const code = row.verificationCode?.trim();
         if (!code || row.certStatus !== 'ISSUED') return;
         setDownloadingPdfCode(code);
+        setError(null);
         try {
             await certificatesAPI.downloadPdfByVerificationCode(code);
         } catch (err: unknown) {
-            window.alert(getErrorMessage(err, 'Failed to download certificate PDF.'));
+            setError(getErrorMessage(err, 'Failed to download certificate PDF.'));
         } finally {
             setDownloadingPdfCode(null);
         }

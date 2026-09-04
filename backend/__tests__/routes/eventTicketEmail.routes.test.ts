@@ -39,6 +39,8 @@ const activityMocks = vi.hoisted(() => ({
 const ticketEmailMocks = vi.hoisted(() => ({
     sendEventTicketEmail: vi.fn(),
     sendEventReminderEmail: vi.fn(),
+    queueTicketEmail: vi.fn(),
+    queueReminderEmail: vi.fn(),
 }));
 
 const sessionTokenMocks = vi.hoisted(() => ({
@@ -190,7 +192,7 @@ describe('event ticket email routes', () => {
             });
 
         expect(response.status).toBe(201);
-        expect(ticketEmailMocks.sendEventTicketEmail).toHaveBeenCalledWith(91);
+        expect(ticketEmailMocks.queueTicketEmail).toHaveBeenCalledWith(91, 'public-registration');
     });
 
     it('does not send ticket email for manager-created registration', async () => {
@@ -218,7 +220,7 @@ describe('event ticket email routes', () => {
             });
 
         expect(response.status).toBe(201);
-        expect(ticketEmailMocks.sendEventTicketEmail).not.toHaveBeenCalled();
+        expect(ticketEmailMocks.queueTicketEmail).not.toHaveBeenCalled();
     });
 
     it('sends ticket email for new walk-in when remaining event days exist', async () => {
@@ -249,7 +251,7 @@ describe('event ticket email routes', () => {
             });
 
         expect(response.status).toBe(201);
-        expect(ticketEmailMocks.sendEventTicketEmail).toHaveBeenCalledWith(93);
+        expect(ticketEmailMocks.queueTicketEmail).toHaveBeenCalledWith(93, 'walk-in');
     });
 
     it('skips ticket email for new walk-in on last event day', async () => {
@@ -280,7 +282,7 @@ describe('event ticket email routes', () => {
             });
 
         expect(response.status).toBe(201);
-        expect(ticketEmailMocks.sendEventTicketEmail).not.toHaveBeenCalled();
+        expect(ticketEmailMocks.queueTicketEmail).not.toHaveBeenCalled();
     });
 
     it('resends ticket email for an active registration', async () => {
@@ -325,12 +327,11 @@ describe('event ticket email routes', () => {
         expect(ticketEmailMocks.sendEventTicketEmail).not.toHaveBeenCalled();
     });
 
-    it('sends tickets for newly imported registration IDs', async () => {
+    it('queues tickets for newly imported registration IDs', async () => {
         prismaMocks.eventRegistrationFindMany.mockResolvedValue([
             { id: 101, email: 'alice@example.com' },
             { id: 102, email: 'import.10.guest@event-import.local' },
         ]);
-        ticketEmailMocks.sendEventTicketEmail.mockResolvedValue(undefined);
 
         const response = await request(createApp())
             .post('/events/10/registrations/send-tickets')
@@ -339,22 +340,20 @@ describe('event ticket email routes', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({
-            sent: 1,
+            queued: 1,
             skipped: 1,
-            failed: 0,
-            errors: [],
         });
-        expect(ticketEmailMocks.sendEventTicketEmail).toHaveBeenCalledTimes(1);
-        expect(ticketEmailMocks.sendEventTicketEmail).toHaveBeenCalledWith(101);
+        expect(ticketEmailMocks.queueTicketEmail).toHaveBeenCalledTimes(1);
+        expect(ticketEmailMocks.queueTicketEmail).toHaveBeenCalledWith(101, 'bulk-send-tickets');
+        expect(ticketEmailMocks.sendEventTicketEmail).not.toHaveBeenCalled();
     });
 
-    it('sends tickets for all eligible registration IDs concurrently', async () => {
+    it('queues tickets for all eligible registration IDs', async () => {
         prismaMocks.eventRegistrationFindMany.mockResolvedValue([
             { id: 101, email: 'alice@example.com' },
             { id: 102, email: 'bob@example.com' },
             { id: 103, email: 'carol@example.com' },
         ]);
-        ticketEmailMocks.sendEventTicketEmail.mockResolvedValue(undefined);
 
         const response = await request(createApp())
             .post('/events/10/registrations/send-tickets')
@@ -363,38 +362,14 @@ describe('event ticket email routes', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({
-            sent: 3,
+            queued: 3,
             skipped: 0,
-            failed: 0,
-            errors: [],
         });
-        expect(ticketEmailMocks.sendEventTicketEmail).toHaveBeenCalledTimes(3);
-        expect(ticketEmailMocks.sendEventTicketEmail.mock.calls.map((call) => call[0]).sort()).toEqual([
+        expect(ticketEmailMocks.queueTicketEmail).toHaveBeenCalledTimes(3);
+        expect(ticketEmailMocks.queueTicketEmail.mock.calls.map((call) => call[0]).sort()).toEqual([
             101, 102, 103,
         ]);
-    });
-
-    it('returns partial failure summary when some ticket sends fail', async () => {
-        prismaMocks.eventRegistrationFindMany.mockResolvedValue([
-            { id: 201, email: 'good@example.com' },
-            { id: 202, email: 'bad@example.com' },
-        ]);
-        ticketEmailMocks.sendEventTicketEmail
-            .mockResolvedValueOnce(undefined)
-            .mockRejectedValueOnce(new Error('Resend API error'));
-
-        const response = await request(createApp())
-            .post('/events/10/registrations/send-tickets')
-            .set('Authorization', `Bearer ${createManagerToken()}`)
-            .send({ registrationIds: [201, 202] });
-
-        expect(response.status).toBe(200);
-        expect(response.body).toEqual({
-            sent: 1,
-            skipped: 0,
-            failed: 1,
-            errors: [{ registrationId: 202, message: 'Resend API error' }],
-        });
+        expect(ticketEmailMocks.sendEventTicketEmail).not.toHaveBeenCalled();
     });
 
     it('requires manager access to send tickets', async () => {
@@ -403,7 +378,7 @@ describe('event ticket email routes', () => {
             .send({ registrationIds: [101] });
 
         expect(response.status).toBe(401);
-        expect(ticketEmailMocks.sendEventTicketEmail).not.toHaveBeenCalled();
+        expect(ticketEmailMocks.queueTicketEmail).not.toHaveBeenCalled();
     });
 
     it('requires at least one registration ID to send tickets', async () => {
@@ -413,7 +388,7 @@ describe('event ticket email routes', () => {
             .send({ registrationIds: [] });
 
         expect(response.status).toBe(400);
-        expect(ticketEmailMocks.sendEventTicketEmail).not.toHaveBeenCalled();
+        expect(ticketEmailMocks.queueTicketEmail).not.toHaveBeenCalled();
     });
 
     it('filters registrations by source group and ticket status', async () => {
@@ -487,12 +462,11 @@ describe('event ticket email routes', () => {
         expect(ticketEmailMocks.sendEventReminderEmail).toHaveBeenCalledWith(95);
     });
 
-    it('sends reminders for registration IDs', async () => {
+    it('queues reminders for registration IDs', async () => {
         prismaMocks.eventRegistrationFindMany.mockResolvedValue([
             { id: 501, email: 'alice@example.com' },
             { id: 502, email: 'import.10.guest@event-import.local' },
         ]);
-        ticketEmailMocks.sendEventReminderEmail.mockResolvedValue(undefined);
 
         const response = await request(createApp())
             .post('/events/10/registrations/send-reminders')
@@ -501,13 +475,12 @@ describe('event ticket email routes', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).toEqual({
-            sent: 1,
+            queued: 1,
             skipped: 1,
-            failed: 0,
-            errors: [],
         });
-        expect(ticketEmailMocks.sendEventReminderEmail).toHaveBeenCalledTimes(1);
-        expect(ticketEmailMocks.sendEventReminderEmail).toHaveBeenCalledWith(501);
+        expect(ticketEmailMocks.queueReminderEmail).toHaveBeenCalledTimes(1);
+        expect(ticketEmailMocks.queueReminderEmail).toHaveBeenCalledWith(501, 'bulk-send-reminders');
+        expect(ticketEmailMocks.sendEventReminderEmail).not.toHaveBeenCalled();
     });
 
     it('requires manager access to send reminders', async () => {
@@ -516,6 +489,6 @@ describe('event ticket email routes', () => {
             .send({ registrationIds: [501] });
 
         expect(response.status).toBe(401);
-        expect(ticketEmailMocks.sendEventReminderEmail).not.toHaveBeenCalled();
+        expect(ticketEmailMocks.queueReminderEmail).not.toHaveBeenCalled();
     });
 });

@@ -20,6 +20,7 @@ import {
 import { formatDate } from '@iclub/shared/utils';
 import { useAuth } from '@/context/AuthContext';
 import CertificateStatusBadge from '@/components/certificates/CertificateStatusBadge';
+import { useAutoDismissMessage } from '@/hooks/useAutoDismissMessage';
 import { getPublicWebsiteOrigin } from '@/lib/publicWebsiteUrl';
 import {
     certificatesAPI,
@@ -192,6 +193,7 @@ export default function CertificatesPage() {
     const [loading, setLoading] = useState(true);
     const [templatesLoading, setTemplatesLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { message: successMessage, show: showSuccessMessage, clear: clearSuccessMessage } = useAutoDismissMessage();
     const [searchQuery, setSearchQuery] = useState('');
     const [templateSearchQuery, setTemplateSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<CertificateStatus | ''>('');
@@ -483,12 +485,13 @@ export default function CertificatesPage() {
         if (!canResendCertificateEmail(cert)) return;
         setResendingEmailId(cert.id);
         setError(null);
+        clearSuccessMessage();
         try {
             const result = await certificatesAPI.resendEmail(cert.id);
-            window.alert(result.message || 'Certificate email sent.');
+            showSuccessMessage(result.message || 'Certificate email sent.');
             await refreshCertificates();
         } catch (err: unknown) {
-            window.alert(getErrorMessage(err, 'Failed to send certificate email.'));
+            setError(getErrorMessage(err, 'Failed to send certificate email.'));
         } finally {
             setResendingEmailId(null);
         }
@@ -498,10 +501,11 @@ export default function CertificatesPage() {
         const code = cert.verificationCode?.trim();
         if (!canDownloadCertificatePdf(cert) || !code) return;
         setDownloadingPdfCode(code);
+        setError(null);
         try {
             await certificatesAPI.downloadPdfByVerificationCode(code);
         } catch (err: unknown) {
-            window.alert(getErrorMessage(err, 'Failed to download certificate PDF.'));
+            setError(getErrorMessage(err, 'Failed to download certificate PDF.'));
         } finally {
             setDownloadingPdfCode(null);
         }
@@ -535,6 +539,7 @@ export default function CertificatesPage() {
             <hr className="title-divider" />
 
             {error && <div className="error-message">{error}</div>}
+            {successMessage ? <div className="success-message">{successMessage}</div> : null}
 
             <div
                 className={`card members-table-card certificates-main-card${isEditorOpen ? ' certificates-main-card--editor' : ''}`}

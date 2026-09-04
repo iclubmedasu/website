@@ -37,8 +37,12 @@ import { resolveEventByIdOrSlug } from '../lib/publicEntitySlug';
 import { formatEventDay, isWithinEventDays, parseEventDayString, resolveCheckInEventDay, eventDayStringToDate, shouldSendWalkInTicket } from '../services/eventDates';
 import { generateTokensForSession, generateTokensForRegistration } from '../services/sessionTokenService';
 import { emitNotificationEvent } from '../services/notificationService';
-import { mapWithEmailConcurrency, runEmailJob } from '../services/emailSendPool';
-import { sendEventReminderEmail, sendEventTicketEmail } from '../services/eventTicketEmailService';
+import {
+    queueReminderEmail,
+    queueTicketEmail,
+    sendEventReminderEmail,
+    sendEventTicketEmail,
+} from '../services/eventTicketEmailService';
 import {
     collectChangedFields,
     changesToPayload,
@@ -116,12 +120,6 @@ async function loadEventTimezone(eventId: number): Promise<string> {
         select: { timezone: true },
     });
     return eventTz(event);
-}
-
-function queueTicketEmail(registrationId: number, context: string): void {
-    void runEmailJob(() => sendEventTicketEmail(registrationId)).catch((error) => {
-        console.error(`Failed to send ticket email (${context}) for registration ${registrationId}:`, error);
-    });
 }
 
 function normalizeTierCurrency(value: unknown): string {
@@ -4300,59 +4298,27 @@ router.post('/:id/registrations/send-tickets', authenticateToken, async (req, re
         });
         const registrationById = new Map(registrations.map((registration) => [registration.id, registration]));
 
-        type TicketSendOutcome =
-            | { type: 'sent' }
-            | { type: 'skipped' }
-            | { type: 'failed'; registrationId: number; message: string };
+        let queued = 0;
+        let skipped = 0;
 
-        const outcomes = await mapWithEmailConcurrency(
-            registrationIds,
-            async (registrationId): Promise<TicketSendOutcome> => {
-                const registration = registrationById.get(registrationId);
-                if (!registration) {
-                    return { type: 'skipped' };
-                }
-
-                const email = registration.email?.trim() ?? '';
-                if (!email || isImportPlaceholderEmail(email)) {
-                    return { type: 'skipped' };
-                }
-
-                try {
-                    await sendEventTicketEmail(registrationId);
-                    return { type: 'sent' };
-                } catch (error) {
-                    return {
-                        type: 'failed',
-                        registrationId,
-                        message: error instanceof Error ? error.message : 'Failed to send ticket email',
-                    };
-                }
-            },
-        );
-
-        const result = {
-            sent: 0,
-            skipped: 0,
-            failed: 0,
-            errors: [] as Array<{ registrationId: number; message: string }>,
-        };
-
-        for (const outcome of outcomes) {
-            if (outcome.type === 'sent') {
-                result.sent += 1;
-            } else if (outcome.type === 'skipped') {
-                result.skipped += 1;
-            } else {
-                result.failed += 1;
-                result.errors.push({
-                    registrationId: outcome.registrationId,
-                    message: outcome.message,
-                });
+        for (const registrationId of registrationIds) {
+            const registration = registrationById.get(registrationId);
+            if (!registration) {
+                skipped += 1;
+                continue;
             }
+
+            const email = registration.email?.trim() ?? '';
+            if (!email || isImportPlaceholderEmail(email)) {
+                skipped += 1;
+                continue;
+            }
+
+            queueTicketEmail(registrationId, 'bulk-send-tickets');
+            queued += 1;
         }
 
-        return res.json(result);
+        return res.json({ queued, skipped });
     } catch (error) {
         console.error(`POST /events/${req.params.id}/registrations/send-tickets error:`, error);
         return res.status(500).json({ error: 'Failed to send ticket emails' });
@@ -4387,59 +4353,27 @@ router.post('/:id/registrations/send-reminders', authenticateToken, async (req, 
         });
         const registrationById = new Map(registrations.map((registration) => [registration.id, registration]));
 
-        type ReminderSendOutcome =
-            | { type: 'sent' }
-            | { type: 'skipped' }
-            | { type: 'failed'; registrationId: number; message: string };
+        let queued = 0;
+        let skipped = 0;
 
-        const outcomes = await mapWithEmailConcurrency(
-            registrationIds,
-            async (registrationId): Promise<ReminderSendOutcome> => {
-                const registration = registrationById.get(registrationId);
-                if (!registration) {
-                    return { type: 'skipped' };
-                }
-
-                const email = registration.email?.trim() ?? '';
-                if (!email || isImportPlaceholderEmail(email)) {
-                    return { type: 'skipped' };
-                }
-
-                try {
-                    await sendEventReminderEmail(registrationId);
-                    return { type: 'sent' };
-                } catch (error) {
-                    return {
-                        type: 'failed',
-                        registrationId,
-                        message: error instanceof Error ? error.message : 'Failed to send reminder email',
-                    };
-                }
-            },
-        );
-
-        const result = {
-            sent: 0,
-            skipped: 0,
-            failed: 0,
-            errors: [] as Array<{ registrationId: number; message: string }>,
-        };
-
-        for (const outcome of outcomes) {
-            if (outcome.type === 'sent') {
-                result.sent += 1;
-            } else if (outcome.type === 'skipped') {
-                result.skipped += 1;
-            } else {
-                result.failed += 1;
-                result.errors.push({
-                    registrationId: outcome.registrationId,
-                    message: outcome.message,
-                });
+        for (const registrationId of registrationIds) {
+            const registration = registrationById.get(registrationId);
+            if (!registration) {
+                skipped += 1;
+                continue;
             }
+
+            const email = registration.email?.trim() ?? '';
+            if (!email || isImportPlaceholderEmail(email)) {
+                skipped += 1;
+                continue;
+            }
+
+            queueReminderEmail(registrationId, 'bulk-send-reminders');
+            queued += 1;
         }
 
-        return res.json(result);
+        return res.json({ queued, skipped });
     } catch (error) {
         console.error(`POST /events/${req.params.id}/registrations/send-reminders error:`, error);
         return res.status(500).json({ error: 'Failed to send reminder emails' });

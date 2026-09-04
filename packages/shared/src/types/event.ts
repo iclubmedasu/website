@@ -482,10 +482,8 @@ export interface SendRegistrationRemindersPayload {
 }
 
 export interface SendRegistrationTicketsResult {
-    sent: number;
+    queued: number;
     skipped: number;
-    failed: number;
-    errors: Array<{ registrationId: number; message: string }>;
 }
 
 export type EventRegistrationSourceGroup = "PRE_REGISTERED" | "WALK_IN" | "IMPORT";

@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell, Filter, Loader2, Mail, Search } from 'lucide-react';
 import { fmtDate } from '@/components/cards/LifecycleCardView/LifecycleCardView';
 import { Checkbox } from '@/components/checkbox';
+import { ConfirmModal } from '@/components/modal/ConfirmModal';
+import { useAutoDismissMessage } from '@/hooks/useAutoDismissMessage';
 import { useResourceChannel } from '@/hooks/useResourceChannel';
 import { eventsAPI } from '@/services/api';
 import type {
@@ -71,13 +73,17 @@ interface EventTicketsSectionProps {
     onReload: () => void;
 }
 
-function formatBulkSummary(result: SendRegistrationTicketsResult, label: string): string {
-    return [
-        `${label}: ${result.sent}`,
-        result.skipped > 0 ? `Skipped: ${result.skipped}` : '',
-        result.failed > 0 ? `Failed: ${result.failed}` : '',
-    ].filter(Boolean).join('\n');
+function formatBulkSummary(result: SendRegistrationTicketsResult, kind: 'ticket' | 'reminder'): string {
+    const label = kind === 'ticket' ? 'ticket' : 'reminder';
+    const parts = [
+        `Queued ${result.queued} ${label} email${result.queued === 1 ? '' : 's'}.`,
+        result.skipped > 0 ? `Skipped: ${result.skipped}.` : '',
+        'Statuses update as emails send. Reload if the Sent column is still empty.',
+    ];
+    return parts.filter(Boolean).join(' ');
 }
+
+type BulkConfirmKind = 'tickets' | 'reminders';
 
 function EmailDeliveryStatusCell({
     status,
@@ -150,9 +156,12 @@ export default function EventTicketsSection({
     const [resendingTicketId, setResendingTicketId] = useState<number | null>(null);
     const [sendingReminderId, setSendingReminderId] = useState<number | null>(null);
     const [bulkAction, setBulkAction] = useState<'tickets' | 'reminders' | null>(null);
+    const [bulkConfirm, setBulkConfirm] = useState<{ kind: BulkConfirmKind; registrationIds: number[] } | null>(null);
     const [selection, setSelection] = useState<Set<string>>(new Set());
     const [attendanceRemovalTarget, setAttendanceRemovalTarget] = useState<AttendanceRemovalTarget | null>(null);
     const [removingAttendance, setRemovingAttendance] = useState(false);
+    const { message: successMessage, show: showSuccessMessage, clear: clearSuccessMessage } = useAutoDismissMessage();
+    const { message: errorMessage, show: showErrorMessage, clear: clearErrorMessage } = useAutoDismissMessage();
 
     const withinEventDays = isWithinEventDays(eventDate, eventEndDate, new Date(), eventTimezone);
     const multiDayEvent = isMultiDayEvent(eventDate, eventEndDate, eventTimezone);
@@ -323,12 +332,14 @@ export default function EventTicketsSection({
         if (!canSendEmail(registration)) return;
 
         setResendingTicketId(Number(registration.id));
+        clearSuccessMessage();
+        clearErrorMessage();
         try {
             const result = await eventsAPI.resendRegistrationTicket(eventId, registration.id);
-            window.alert(result.message || 'Ticket email sent.');
+            showSuccessMessage(result.message || 'Ticket email sent.');
             void refreshAll();
         } catch (error) {
-            window.alert(error instanceof Error ? error.message : 'Failed to send ticket email.');
+            showErrorMessage(error instanceof Error ? error.message : 'Failed to send ticket email.');
         } finally {
             setResendingTicketId(null);
         }
@@ -338,52 +349,47 @@ export default function EventTicketsSection({
         if (!canSendEmail(registration)) return;
 
         setSendingReminderId(Number(registration.id));
+        clearSuccessMessage();
+        clearErrorMessage();
         try {
             const result = await eventsAPI.resendRegistrationReminder(eventId, registration.id);
-            window.alert(result.message || 'Reminder email sent.');
+            showSuccessMessage(result.message || 'Reminder email sent.');
             void refreshAll();
         } catch (error) {
-            window.alert(error instanceof Error ? error.message : 'Failed to send reminder email.');
+            showErrorMessage(error instanceof Error ? error.message : 'Failed to send reminder email.');
         } finally {
             setSendingReminderId(null);
         }
     };
 
-    const handleSendSelectedTickets = async () => {
+    const openBulkConfirm = (kind: BulkConfirmKind) => {
         const registrationIds = getSelectedVisibleRegistrationIds();
         if (registrationIds.length === 0) return;
-
-        if (!window.confirm(`Send tickets to ${registrationIds.length} selected registrant(s)?`)) {
-            return;
-        }
-
-        setBulkAction('tickets');
-        try {
-            const result = await eventsAPI.sendRegistrationTickets(eventId, { registrationIds });
-            window.alert(formatBulkSummary(result, 'Tickets sent'));
-            void refreshAll();
-        } catch (error) {
-            window.alert(error instanceof Error ? error.message : 'Failed to send ticket emails.');
-        } finally {
-            setBulkAction(null);
-        }
+        setBulkConfirm({ kind, registrationIds });
     };
 
-    const handleSendSelectedReminders = async () => {
-        const registrationIds = getSelectedVisibleRegistrationIds();
-        if (registrationIds.length === 0) return;
+    const handleConfirmBulkSend = async () => {
+        if (!bulkConfirm || bulkAction !== null) return;
 
-        if (!window.confirm(`Send reminders to ${registrationIds.length} selected registrant(s)?`)) {
-            return;
-        }
-
-        setBulkAction('reminders');
+        const { kind, registrationIds } = bulkConfirm;
+        setBulkAction(kind);
+        clearSuccessMessage();
+        clearErrorMessage();
         try {
-            const result = await eventsAPI.sendRegistrationReminders(eventId, { registrationIds });
-            window.alert(formatBulkSummary(result, 'Reminders sent'));
+            const result = kind === 'tickets'
+                ? await eventsAPI.sendRegistrationTickets(eventId, { registrationIds })
+                : await eventsAPI.sendRegistrationReminders(eventId, { registrationIds });
+            showSuccessMessage(formatBulkSummary(result, kind === 'tickets' ? 'ticket' : 'reminder'));
+            setBulkConfirm(null);
             void refreshAll();
         } catch (error) {
-            window.alert(error instanceof Error ? error.message : 'Failed to send reminder emails.');
+            showErrorMessage(
+                error instanceof Error
+                    ? error.message
+                    : kind === 'tickets'
+                        ? 'Failed to send ticket emails.'
+                        : 'Failed to send reminder emails.',
+            );
         } finally {
             setBulkAction(null);
         }
@@ -394,6 +400,9 @@ export default function EventTicketsSection({
             <div className="event-expanded-header event-expanded-header--compact event-tickets-header">
                 <ExpandedSectionTitle label="Tickets" onReload={refreshAll} />
             </div>
+
+            {errorMessage ? <div className="error-message">{errorMessage}</div> : null}
+            {successMessage ? <div className="success-message">{successMessage}</div> : null}
 
             <div className="event-tickets-layout">
                 <div className="event-tickets-table-column">
@@ -597,7 +606,7 @@ export default function EventTicketsSection({
                                 type="button"
                                 className="btn btn-primary event-tickets-io-btn"
                                 disabled={selectedVisibleCount === 0 || bulkAction !== null}
-                                onClick={() => void handleSendSelectedTickets()}
+                                onClick={() => openBulkConfirm('tickets')}
                             >
                                 {bulkAction === 'tickets'
                                     ? 'Sending…'
@@ -609,7 +618,7 @@ export default function EventTicketsSection({
                                 type="button"
                                 className="btn btn-primary event-tickets-io-btn"
                                 disabled={selectedVisibleCount === 0 || bulkAction !== null}
-                                onClick={() => void handleSendSelectedReminders()}
+                                onClick={() => openBulkConfirm('reminders')}
                             >
                                 {bulkAction === 'reminders'
                                     ? 'Sending…'
@@ -653,6 +662,25 @@ export default function EventTicketsSection({
                         if (!removingAttendance) setAttendanceRemovalTarget(null);
                     }}
                     onConfirm={handleConfirmRemoveAttendance}
+                />
+            ) : null}
+
+            {bulkConfirm ? (
+                <ConfirmModal
+                    title={bulkConfirm.kind === 'tickets' ? 'Send tickets' : 'Send reminders'}
+                    message={
+                        bulkConfirm.kind === 'tickets'
+                            ? `Send tickets to ${bulkConfirm.registrationIds.length} selected registrant(s)?`
+                            : `Send reminders to ${bulkConfirm.registrationIds.length} selected registrant(s)?`
+                    }
+                    confirmLabel={bulkConfirm.kind === 'tickets' ? 'Send tickets' : 'Send reminders'}
+                    busyLabel="Sending…"
+                    busy={bulkAction !== null}
+                    variant="primary"
+                    onClose={() => {
+                        if (bulkAction === null) setBulkConfirm(null);
+                    }}
+                    onConfirm={handleConfirmBulkSend}
                 />
             ) : null}
         </section>

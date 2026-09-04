@@ -40,6 +40,7 @@ export default function CopyPublicEventLinkButton({
     isPublished = false,
 }: CopyPublicEventLinkButtonProps) {
     const [copied, setCopied] = useState(false);
+    const [copyFailed, setCopyFailed] = useState(false);
     const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
@@ -55,15 +56,18 @@ export default function CopyPublicEventLinkButton({
 
         const url = await buildPublicEventUrl(eventSlug);
         const ok = await copyTextToClipboard(url);
-        if (!ok) {
-            window.alert('Failed to copy link.');
-            return;
-        }
-
-        setCopied(true);
         if (resetTimerRef.current) {
             clearTimeout(resetTimerRef.current);
         }
+        if (!ok) {
+            setCopied(false);
+            setCopyFailed(true);
+            resetTimerRef.current = setTimeout(() => setCopyFailed(false), 2000);
+            return;
+        }
+
+        setCopyFailed(false);
+        setCopied(true);
         resetTimerRef.current = setTimeout(() => setCopied(false), 2000);
     }, [eventSlug, isPublished]);
 
@@ -84,6 +88,10 @@ export default function CopyPublicEventLinkButton({
             {copied ? (
                 <span className="event-expanded-copy-link-feedback" aria-live="polite">
                     Copied!
+                </span>
+            ) : copyFailed ? (
+                <span className="event-expanded-copy-link-feedback" aria-live="polite">
+                    Couldn&apos;t copy
                 </span>
             ) : null}
         </div>
