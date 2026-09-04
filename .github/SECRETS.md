@@ -53,4 +53,4 @@ These run in GitHub Actions and do **not** require paid GitHub Advanced Security
    - [`.gitleaksignore`](../.gitleaksignore) allowlists one historical fingerprint; rotate production `JWT_SECRET` if that old sample was ever used live.
 
 ### Existing
-- `pnpm audit` remains in [`.github/workflows/ci.yml`](workflows/ci.yml) (`Security Audit` job).
+- `pnpm audit` runs as the `Security Audit` job in [`.github/workflows/ci.yml`](workflows/ci.yml). It **gates** deploy (deploy keys off successful **CI — Lint, Type Check & Build**). Root `pnpm.overrides` keep current moderate+ findings green. Retries are registry-only (timeout / 500 / `FetchError`); real “vulnerabilities found” fails immediately.

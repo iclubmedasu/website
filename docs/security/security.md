@@ -216,7 +216,9 @@ Configs live under [`.github/`](../.github/). Enablement notes: [.github/SECRETS
 
 ### Existing audit
 
-- `pnpm audit --audit-level moderate` remains in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) (`Security Audit` job). CI retries `pnpm audit` on npm registry timeouts.
+- `pnpm audit --audit-level moderate` runs as the `Security Audit` job in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml). It **gates** Hugging Face deploy: deploy keys off successful **CI — Lint, Type Check & Build** (`workflow_run`), so a red audit blocks deploy.
+- Root `pnpm.overrides` pin patched transitives (browserslist, mysql2, fast-uri, qs, `@humanfs/node`, fflate, and existing floors) so moderate+ findings stay clear without ignoring those GHSAs.
+- The audit step retries **only** on npm registry timeouts / 500 / `FetchError`. Real “vulnerabilities found” output fails immediately (no backoff loop on advisories).
 - Unfixable community `xlsx` advisories may be listed under root `pnpm.auditConfig.ignoreGhsas` when no free patched release exists; prefer replacing `xlsx` later if export allows.
 
 ### After CI fails
@@ -322,7 +324,7 @@ Out of scope (typical): production HF/Supabase, social engineering, volumetric D
 - [ ] `/test-db` absent on production (`NODE_ENV=production`)
 - [ ] `/health` returns 200; smoke `GET /api/public/...` from a browser
 - [ ] Login works with cookies; no unexpected CORS errors
-- [ ] CI green: lint/typecheck/build, `pnpm audit`, Semgrep, Gitleaks
+- [ ] CI green: lint/typecheck/build and Security Audit (audit gates deploy); Semgrep / Gitleaks reviewed
 - [ ] Dependabot / audit PRs for critical CVEs reviewed or temporarily waived with an expiry
 - [ ] No new secrets in client bundles (`NEXT_PUBLIC_*` must stay non-secret)
 - [ ] Migrations applied; RLS enable script still part of migrate/deploy path
