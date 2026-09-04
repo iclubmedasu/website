@@ -31,6 +31,7 @@ These run in GitHub Actions and do **not** require paid GitHub Advanced Security
 
 ### Dependabot (dependency updates)
 - Config: [`.github/dependabot.yml`](dependabot.yml) — **monthly** grouped minor/patch PRs for npm/pnpm (workspace root) and GitHub Actions (`open-pull-requests-limit: 3`).
+- **Temporarily disabled:** `updates: []` stub; restore previous `dependabot.yml` from git and remove the `dependabot[bot]` actor skips in `ci.yml` / `gitleaks.yml` when re-enabling.
 - Enable: once the file is on the default branch, Dependabot starts automatically. Optionally confirm under **Settings → Code security → Dependabot**.
 - Alerts: enable **Dependabot alerts** and **Dependabot security updates** in the same settings page if not already on.
 - When open PRs lag a large security/CI land on `main`, **close them** and let the next monthly run open fresh groups. Treat Prisma major/minor bumps as review-only (never auto-land without migrate confidence).
