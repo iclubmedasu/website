@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { DateInput } from '@/components/input/DateInput';
+import { FormSelect } from '@/components/input/FormSelect';
+import FilterNumberInput from '../FilterNumberInput';
 import {
     createDefaultCertificateEligibleFilter,
     DEFAULT_CERTIFICATE_ELIGIBLE_SORT,
@@ -40,7 +42,7 @@ function renderValueEditor(
         case 'text':
             return (
                 <>
-                    <select
+                    <FormSelect
                         aria-label="Text filter operator"
                         className="form-input"
                         value={filter.operator}
@@ -52,7 +54,7 @@ function renderValueEditor(
                         <option value="contains">Contains</option>
                         <option value="equals">Equals</option>
                         <option value="isEmpty">Is empty</option>
-                    </select>
+                    </FormSelect>
                     {filter.operator !== 'isEmpty' ? (
                         <input
                             aria-label="Text filter value"
@@ -66,7 +68,7 @@ function renderValueEditor(
         case 'number':
             return (
                 <>
-                    <select
+                    <FormSelect
                         aria-label="Number filter operator"
                         className="form-input"
                         value={filter.operator}
@@ -79,17 +81,42 @@ function renderValueEditor(
                         <option value="greaterThan">Greater than</option>
                         <option value="lessThan">Less than</option>
                         <option value="isEmpty">Is empty</option>
-                    </select>
+                    </FormSelect>
                     {filter.operator !== 'isEmpty' ? (
-                        <input
+                        <FilterNumberInput
                             aria-label="Number filter value"
-                            type="number"
-                            className="form-input"
-                            value={filter.value ?? 0}
-                            onChange={(event) => onChange({
-                                ...filter,
-                                value: Number(event.target.value),
-                            })}
+                            value={filter.value}
+                            onChange={(value) => onChange({ ...filter, value })}
+                        />
+                    ) : null}
+                </>
+            );
+        case 'count':
+            return (
+                <>
+                    <FormSelect
+                        aria-label="Count filter operator"
+                        className="form-input"
+                        value={filter.operator}
+                        onChange={(event) => onChange({
+                            ...filter,
+                            operator: event.target.value as typeof filter.operator,
+                        })}
+                    >
+                        <option value="hasAny">
+                            {column.id === 'sessionsAttendedCount' ? 'Has sessions' : 'Has attendance'}
+                        </option>
+                        <option value="hasNone">Has none</option>
+                        <option value="equals">Equal to</option>
+                        <option value="greaterThan">Greater than</option>
+                        <option value="lessThan">Less than</option>
+                    </FormSelect>
+                    {filter.operator !== 'hasAny' && filter.operator !== 'hasNone' ? (
+                        <FilterNumberInput
+                            aria-label="Count filter value"
+                            min={0}
+                            value={filter.value}
+                            onChange={(value) => onChange({ ...filter, value })}
                         />
                     ) : null}
                 </>
@@ -140,7 +167,7 @@ function renderValueEditor(
         case 'idSet':
             return (
                 <>
-                    <select
+                    <FormSelect
                         aria-label="Id set filter operator"
                         className="form-input"
                         value={filter.operator}
@@ -151,7 +178,7 @@ function renderValueEditor(
                     >
                         <option value="includesAll">All selected</option>
                         <option value="includesAny">Any selected</option>
-                    </select>
+                    </FormSelect>
                     <div className="event-registration-filter-options">
                         {(column.options ?? []).map((option) => {
                             const checked = filter.values.includes(option);
@@ -272,7 +299,7 @@ export default function CertificateEligibleFilterModal({
                     <div className="event-registration-filter-sort">
                         <h3 className="form-section-title">Sort by</h3>
                         <div className="event-registration-filter-sort__controls">
-                            <select
+                            <FormSelect
                                 aria-label="Sort by"
                                 className="form-input"
                                 value={draftSortSpec.columnId}
@@ -284,7 +311,7 @@ export default function CertificateEligibleFilterModal({
                                 {columns.map((column) => (
                                     <option key={column.id} value={column.id}>{column.label}</option>
                                 ))}
-                            </select>
+                            </FormSelect>
                             <button
                                 type="button"
                                 className="btn btn-secondary event-registration-sort-direction-btn"
@@ -313,7 +340,7 @@ export default function CertificateEligibleFilterModal({
                                     return (
                                         <div key={`${filter.columnId}-${index}`} className="event-registration-filter-rule">
                                             <div className="event-registration-filter-rule__header">
-                                                <select
+                                                <FormSelect
                                                     aria-label="Filter column"
                                                     className="form-input"
                                                     value={filter.columnId}
@@ -333,7 +360,7 @@ export default function CertificateEligibleFilterModal({
                                                             {entry.label}
                                                         </option>
                                                     ))}
-                                                </select>
+                                                </FormSelect>
                                                 <button
                                                     type="button"
                                                     className="table-action-btn event-registration-filter-rule__remove"

@@ -15,6 +15,7 @@ import type {
     UpdateEventSessionPayload,
 } from '@/types/backend-contracts';
 import EventSetupRowActions from './EventSetupRowActions';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface EventSessionsSectionProps {
     eventId: Id | string;
@@ -332,7 +333,7 @@ export default function EventSessionsSection({
                 disabled={options?.disabled}
                 aria-label="Session end"
             />
-            <select
+            <FormSelect
                 aria-label="Session type"
                 value={values.mode}
                 onChange={(e) => {
@@ -347,7 +348,7 @@ export default function EventSessionsSection({
             >
                 <option value="ONSITE">Onsite</option>
                 <option value="ONLINE">Online</option>
-            </select>
+            </FormSelect>
             <input
                 type="number"
                 min={1}

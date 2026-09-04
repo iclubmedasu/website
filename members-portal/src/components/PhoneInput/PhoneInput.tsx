@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { COUNTRY_CODES, parsePhoneValue, formatPhoneValue, dedupeRepeatedPhoneDigits } from "@/utils/countryCodes";
+import { FormSelect, type FormSelectChangeEvent } from "@/components/input/FormSelect";
 import "./PhoneInput.css";
 
 interface ParsedPhoneValue {
@@ -63,7 +64,7 @@ export function PhoneInput({
         onChange?.(full);
     };
 
-    const handleCountryChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const handleCountryChange = (e: FormSelectChangeEvent) => {
         const code = e.target.value;
         setCountryCode(code);
         emitChange(code, nationalNumber);
@@ -83,11 +84,13 @@ export function PhoneInput({
                 </label>
             )}
             <div className="phone-input-row">
-                <select
+                <FormSelect
                     className="phone-input-select"
                     value={countryCode}
                     onChange={handleCountryChange}
                     disabled={disabled}
+                    searchable
+                    searchPlaceholder="Search country…"
                     aria-label="Country code"
                 >
                     {countryCodeOptions.map(({ code, country }) => (
@@ -95,7 +98,7 @@ export function PhoneInput({
                             {country} ({code})
                         </option>
                     ))}
-                </select>
+                </FormSelect>
                 <input
                     type="tel"
                     id={id}

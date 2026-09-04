@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { teamSubteamsAPI } from '../../../../services/api';
 import { toTitleCase } from '../../../../utils/titleCase';
 import type { Id } from '../../../../types/backend-contracts';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface TeamSubteamItem {
     id: Id;
@@ -170,7 +171,7 @@ const EditSubteamModal = ({ isOpen, onClose, onSubmit, teamId, initialSubteamId 
 
                         <div className="form-group">
                             <label htmlFor="subteamSelect" className="form-label">Select Subteam to Edit *</label>
-                            <select
+                            <FormSelect
                                 id="subteamSelect"
                                 className={`form-input ${errors.subteam ? 'error' : ''}`}
                                 value={selectedSubteamId}
@@ -189,7 +190,7 @@ const EditSubteamModal = ({ isOpen, onClose, onSubmit, teamId, initialSubteamId 
                                         {isLoadingSubteams ? 'Loading subteams...' : 'No subteams available'}
                                     </option>
                                 )}
-                            </select>
+                            </FormSelect>
                             {errors.subteam && <span className="field-error">{errors.subteam}</span>}
                         </div>
 

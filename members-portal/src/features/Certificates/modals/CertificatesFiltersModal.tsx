@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { DateInput } from '@/components/input/DateInput';
+import { FormSelect } from '@/components/input/FormSelect';
 import type { CertificateStatus, CertificateType } from '@/services/certificatesAPI';
 import '../../Events/modals/EventFiltersModal.css';
 
@@ -119,7 +120,7 @@ export default function CertificatesFiltersModal({
                                     <label className="form-label" htmlFor="certificates-filter-status">
                                         Certificate status
                                     </label>
-                                    <select
+                                    <FormSelect
                                         id="certificates-filter-status"
                                         className="form-input"
                                         value={draftStatus}
@@ -133,7 +134,7 @@ export default function CertificatesFiltersModal({
                                                 {value.charAt(0) + value.slice(1).toLowerCase()}
                                             </option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                             </div>
 
@@ -143,7 +144,7 @@ export default function CertificatesFiltersModal({
                                     <label className="form-label" htmlFor="certificates-filter-type">
                                         Certificate type
                                     </label>
-                                    <select
+                                    <FormSelect
                                         id="certificates-filter-type"
                                         className="form-input"
                                         value={draftType}
@@ -157,7 +158,7 @@ export default function CertificatesFiltersModal({
                                                 {formatCertificateType(value)}
                                             </option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                             </div>
                         </>
@@ -168,7 +169,7 @@ export default function CertificatesFiltersModal({
                                 <label className="form-label" htmlFor="templates-filter-active">
                                     Template status
                                 </label>
-                                <select
+                                <FormSelect
                                     id="templates-filter-active"
                                     className="form-input"
                                     value={draftActiveFilter}
@@ -179,7 +180,7 @@ export default function CertificatesFiltersModal({
                                     <option value="">All statuses</option>
                                     <option value="active">Active</option>
                                     <option value="inactive">Inactive</option>
-                                </select>
+                                </FormSelect>
                             </div>
                         </div>
                     )}
@@ -250,7 +251,7 @@ export default function CertificatesFiltersModal({
                             >
                                 {isCertificates ? 'Recipient name' : 'Template name'}
                             </label>
-                            <select
+                            <FormSelect
                                 id={
                                     isCertificates
                                         ? 'certificates-filter-name-sort'
@@ -265,7 +266,7 @@ export default function CertificatesFiltersModal({
                                 <option value="">Default order</option>
                                 <option value="asc">A→Z</option>
                                 <option value="desc">Z→A</option>
-                            </select>
+                            </FormSelect>
                         </div>
                     </div>
                 </div>

@@ -9,6 +9,7 @@ import {
 } from '@iclub/shared';
 import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
 import { DateInput } from '@/components/input/DateInput';
+import { FormSelect } from '@/components/input/FormSelect';
 import { financeAPI } from '@/services/api';
 import { FormToggleRow } from '@/components/toggle/FormToggleRow';
 import { FinanceModal } from '../components/FinanceModal';
@@ -115,7 +116,7 @@ export function ScheduledItemFormModal({ item, accounts, onClose, onSaved }: Sch
             </div>
             <div className="form-group">
                 <label htmlFor="finance-scheduled-type" className="form-label">Type</label>
-                <select
+                <FormSelect
                     id="finance-scheduled-type"
                     className="form-input"
                     value={type}
@@ -124,7 +125,7 @@ export function ScheduledItemFormModal({ item, accounts, onClose, onSaved }: Sch
                     {SCHEDULED_TYPES.map((option) => (
                         <option key={option} value={option}>{option}</option>
                     ))}
-                </select>
+                </FormSelect>
             </div>
             <div className="form-group">
                 <label htmlFor="finance-scheduled-amount" className="form-label">Amount</label>
@@ -148,7 +149,7 @@ export function ScheduledItemFormModal({ item, accounts, onClose, onSaved }: Sch
             </div>
             <div className="form-group">
                 <label htmlFor="finance-scheduled-account" className="form-label">Account</label>
-                <select
+                <FormSelect
                     id="finance-scheduled-account"
                     className="form-input"
                     value={accountId}
@@ -158,11 +159,11 @@ export function ScheduledItemFormModal({ item, accounts, onClose, onSaved }: Sch
                     {activeAccounts.map((account) => (
                         <option key={account.id} value={account.id}>{account.name}</option>
                     ))}
-                </select>
+                </FormSelect>
             </div>
             <div className="form-group">
                 <label htmlFor="finance-scheduled-recurrence" className="form-label">Recurrence</label>
-                <select
+                <FormSelect
                     id="finance-scheduled-recurrence"
                     className="form-input"
                     value={recurrence}
@@ -171,7 +172,7 @@ export function ScheduledItemFormModal({ item, accounts, onClose, onSaved }: Sch
                     {RECURRENCE_OPTIONS.map((option) => (
                         <option key={option.value || 'none'} value={option.value}>{option.label}</option>
                     ))}
-                </select>
+                </FormSelect>
             </div>
             <div className="form-group">
                 <label htmlFor="finance-scheduled-notes" className="form-label">Notes</label>

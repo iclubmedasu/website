@@ -47,6 +47,7 @@ import {
     truncateRegistrationCell,
 } from '@/features/Events/components/EventExpandedContent/customFieldUtils';
 import './ProjectCertificatesSection.css';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface ProjectCertificatesSectionProps {
     projectId: Id | string;
@@ -116,44 +117,23 @@ function certListKey(cert: CertificateListItem): string {
     return `e:${cert.recipientEmail.trim().toLowerCase()}:${cert.type}`;
 }
 
-function pickPreferredCert(
-    current: CertificateListItem | undefined,
-    next: CertificateListItem,
-): CertificateListItem {
-    if (!current) return next;
-    const rank = (status: CertificateStatus) => {
-        if (status === 'ISSUED') return 3;
-        if (status === 'DRAFT') return 2;
-        return 1;
-    };
-    return rank(next.status) >= rank(current.status) ? next : current;
-}
-
 function buildUnifiedRows(
     eligible: ProjectEligibleResponse | null,
     issued: CertificateListItem[],
 ): UnifiedCertificateRow[] {
-    const certByKey = new Map<string, CertificateListItem>();
-    for (const cert of issued) {
-        const key = certListKey(cert);
-        certByKey.set(key, pickPreferredCert(certByKey.get(key), cert));
-    }
+    const keysWithCert = new Set(issued.map(certListKey));
 
     const contributors = eligible?.contributors ?? [];
-    const usedCertIds = new Set<Id>();
-    const rows: UnifiedCertificateRow[] = contributors.map((recipient) => {
+    const rows: UnifiedCertificateRow[] = [];
+
+    for (const recipient of contributors) {
         const key = recipientKey(recipient);
-        const cert = certByKey.get(key);
-        if (cert) usedCertIds.add(cert.id);
+        if (keysWithCert.has(key)) continue;
 
-        let status: CertificateRowStatus = 'NOT_ISSUED';
-        if (cert?.status === 'ISSUED') status = 'ISSUED';
-        else if (cert?.status === 'REVOKED') status = 'REVOKED';
-        else if (recipient.alreadyIssued) status = 'ISSUED';
-
+        const status: CertificateRowStatus = recipient.alreadyIssued ? 'ISSUED' : 'NOT_ISSUED';
         const alreadyIssued = status === 'ISSUED';
 
-        return {
+        rows.push({
             key,
             memberId: recipient.memberId,
             fullName: recipient.fullName,
@@ -163,22 +143,20 @@ function buildUnifiedRows(
             taskCount: recipient.taskCount,
             status,
             alreadyIssued,
-            issueDate: cert?.issuedAt ?? cert?.createdAt ?? null,
-            certificateId: cert?.id ?? null,
-            verificationCode: cert?.verificationCode ?? null,
-            certStatus: cert?.status ?? null,
-            certificateEmailSentAt: cert?.certificateEmailSentAt ?? null,
+            issueDate: null,
+            certificateId: null,
+            verificationCode: null,
+            certStatus: null,
+            certificateEmailSentAt: null,
             selectable: !alreadyIssued,
-        };
-    });
+        });
+    }
 
     for (const cert of issued) {
-        if (usedCertIds.has(cert.id)) continue;
-        const key = `cert:${cert.id}`;
         const status: CertificateRowStatus =
             cert.status === 'ISSUED' ? 'ISSUED' : cert.status === 'REVOKED' ? 'REVOKED' : 'NOT_ISSUED';
         rows.push({
-            key,
+            key: `cert:${cert.id}`,
             memberId: cert.recipientMemberId ?? null,
             fullName: cert.recipientName || cert.recipientMember?.fullName || '—',
             email: cert.recipientEmail,
@@ -789,7 +767,7 @@ export default function ProjectCertificatesSection({
                                     </span>
                                 ) : null}
                             </div>
-                            <select
+                            <FormSelect
                                 className="form-input project-cert-io-template"
                                 aria-label="Certificate template"
                                 value={selectedTemplateId}
@@ -805,7 +783,7 @@ export default function ProjectCertificatesSection({
                                         {template.name}
                                     </option>
                                 ))}
-                            </select>
+                            </FormSelect>
                             <button
                                 type="button"
                                 className="btn btn-secondary project-cert-io-btn"

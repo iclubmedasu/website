@@ -46,8 +46,8 @@ function loadUnicodeFontBytes(): UnicodeFontBytes | null {
     if (cachedUnicodeFontBytes !== undefined) return cachedUnicodeFontBytes;
     try {
         const files = {
-            latinRegular: path.join(FONTS_DIR, 'NotoSans-Regular.ttf'),
-            latinBold: path.join(FONTS_DIR, 'NotoSans-Bold.ttf'),
+            latinRegular: path.join(FONTS_DIR, 'Poppins-Regular.ttf'),
+            latinBold: path.join(FONTS_DIR, 'Poppins-Bold.ttf'),
             arabicRegular: path.join(FONTS_DIR, 'NotoSansArabic-Regular.ttf'),
             arabicBold: path.join(FONTS_DIR, 'NotoSansArabic-Bold.ttf'),
         };

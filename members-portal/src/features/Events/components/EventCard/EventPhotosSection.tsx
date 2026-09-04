@@ -18,8 +18,9 @@ import Toggle from '@/components/toggle/Toggle';
 import { apiFetch, eventPhotosAPI } from '@/services/api';
 import type { EventPhotoRef, Id } from '@/types/backend-contracts';
 import { useEventPhotos } from '../../hooks/useEventPhotos';
-import { formatAttendanceDayLabel, getEventDayRange } from '../eventDateUtils';
+import { enumerateEventDays, formatAttendanceDayLabel } from '../eventDateUtils';
 import './EventPhotosSection.css';
+import { FormSelect } from '@/components/input/FormSelect';
 
 const ACCEPTED_IMAGE_TYPES = new Set([
     'image/jpeg',
@@ -57,34 +58,6 @@ type DisplayGroup = {
 let _uid = 0;
 function uid() {
     return `photo_upload_${Date.now()}_${++_uid}`;
-}
-
-function addCalendarDay(day: string): string {
-    const parsed = new Date(`${day}T12:00:00`);
-    parsed.setDate(parsed.getDate() + 1);
-    const y = parsed.getFullYear();
-    const m = String(parsed.getMonth() + 1).padStart(2, '0');
-    const d = String(parsed.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-}
-
-function enumerateEventDays(
-    eventDate?: string | null,
-    eventEndDate?: string | null,
-    timezone: string = CLUB_TIMEZONE,
-): string[] {
-    const range = getEventDayRange(eventDate, eventEndDate, timezone);
-    if (!range) return [];
-
-    const days: string[] = [];
-    let cursor = range.startDay;
-    let guard = 0;
-    while (cursor <= range.endDay && guard < 366) {
-        days.push(cursor);
-        cursor = addCalendarDay(cursor);
-        guard += 1;
-    }
-    return days;
 }
 
 function dayHeading(eventDay: string | null, dayIndexByKey: Map<string, number>): string {
@@ -596,7 +569,7 @@ export default function EventPhotosSection({
                 <div className="event-photos-upload-meta">
                     <div className="event-photos-field">
                         <label className="form-label" htmlFor={`event-photo-day-${eventId}`}>Day</label>
-                        <select
+                        <FormSelect
                             id={`event-photo-day-${eventId}`}
                             className="form-input"
                             value={selectedDay}
@@ -609,7 +582,7 @@ export default function EventPhotosSection({
                                     {`Day ${index + 1} — ${formatAttendanceDayLabel(day)}`}
                                 </option>
                             ))}
-                        </select>
+                        </FormSelect>
                     </div>
                     <div className="event-photos-field">
                         <label className="form-label" htmlFor={`event-photo-caption-${eventId}`}>Caption (optional)</label>

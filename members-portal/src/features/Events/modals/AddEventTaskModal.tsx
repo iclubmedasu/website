@@ -25,6 +25,7 @@ import type {
     Id,
     MemberSummary,
 } from '@/types/backend-contracts';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface AssigneeRow {
     memberId: string;
@@ -295,7 +296,7 @@ export default function AddEventTaskModal({ eventId, day, task, members, onClose
                     <div className="form-group">
                         <label className="form-label">Task leader <span className="form-label-optional">(optional)</span></label>
                         <div className="form-slot-row">
-                            <select
+                            <FormSelect
                                 className="form-input"
                                 aria-label="Task leader"
                                 value={leaderId}
@@ -305,7 +306,7 @@ export default function AddEventTaskModal({ eventId, day, task, members, onClose
                                 {sortedMembers.map((member) => (
                                     <option key={member.id} value={member.id}>{memberOptionLabel(member)}</option>
                                 ))}
-                            </select>
+                            </FormSelect>
                             <QuarterHourTimeSelect
                                 aria-label="Leader start time"
                                 value={leaderStart}
@@ -328,7 +329,7 @@ export default function AddEventTaskModal({ eventId, day, task, members, onClose
                             {assignees.map((row, index) => (
                                 <div key={index}>
                                     <div className="form-slot-row">
-                                        <select
+                                        <FormSelect
                                             className="form-input"
                                             aria-label={`Assignee ${index + 1}`}
                                             value={row.memberId}
@@ -338,7 +339,7 @@ export default function AddEventTaskModal({ eventId, day, task, members, onClose
                                             {sortedMembers.map((member) => (
                                                 <option key={member.id} value={member.id}>{memberOptionLabel(member)}</option>
                                             ))}
-                                        </select>
+                                        </FormSelect>
                                         <QuarterHourTimeSelect
                                             aria-label={`Assignee ${index + 1} start time`}
                                             value={row.startTime}

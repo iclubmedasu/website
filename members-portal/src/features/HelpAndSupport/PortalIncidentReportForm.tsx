@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { YesNoField } from '@/components/YesNoField/YesNoField';
 import { useAuth } from '@/context/AuthContext';
 import { supportContentAPI, teamsAPI } from '@/services/api';
+import { FormSelect } from '@/components/input/FormSelect';
 
 function dropdownOptions(field: PublicIncidentReportField): string[] {
     if (!Array.isArray(field.options)) return [];
@@ -163,7 +164,7 @@ export function PortalIncidentReportForm({ forms, onSubmitted }: PortalIncidentR
                 <label htmlFor="portal-report-form" className="form-label">
                     Form *
                 </label>
-                <select
+                <FormSelect
                     id="portal-report-form"
                     className={`form-input${errors.formId ? ' form-input--error' : ''}`}
                     value={formId}
@@ -175,7 +176,7 @@ export function PortalIncidentReportForm({ forms, onSubmitted }: PortalIncidentR
                             {form.label}
                         </option>
                     ))}
-                </select>
+                </FormSelect>
                 {errors.formId ? <p className="field-error">{errors.formId}</p> : null}
             </div>
 
@@ -267,7 +268,7 @@ export function PortalIncidentReportForm({ forms, onSubmitted }: PortalIncidentR
                                 {field.label}
                                 {field.required ? ' *' : ''}
                             </label>
-                            <select
+                            <FormSelect
                                 id={`portal-extra-${field.id}`}
                                 className={`form-input${error ? ' form-input--error' : ''}`}
                                 value={value == null ? '' : String(value)}
@@ -279,7 +280,7 @@ export function PortalIncidentReportForm({ forms, onSubmitted }: PortalIncidentR
                                         {option}
                                     </option>
                                 ))}
-                            </select>
+                            </FormSelect>
                             {error ? <p className="field-error">{error}</p> : null}
                         </div>
                     );

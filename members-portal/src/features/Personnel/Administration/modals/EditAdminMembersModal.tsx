@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { X } from 'lucide-react';
@@ -6,6 +6,7 @@ import { formatDate } from '@iclub/shared/utils';
 import { useAutoDismissMessage } from '@/hooks/useAutoDismissMessage';
 import { teamMembersAPI } from '../../../../services/api';
 import type { Id } from '../../../../types/backend-contracts';
+import { FormSelect } from '@/components/input/FormSelect';
 
 const EDIT_MODES = {
     PROMOTION_DEMOTION: 'promotion_demotion',
@@ -206,7 +207,7 @@ const EditAdminMembersModal = ({
         }
     }, [isOpen, member, currentTeamAssignment, clearSuccessMessage]);
 
-    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string; name: string; type?: string } }) => {
         const { name, value } = e.target;
         setFormData((prev) => ({
             ...prev,
@@ -499,7 +500,7 @@ const EditAdminMembersModal = ({
                                 <h3 className="form-section-title">Promotion or Demotion</h3>
                                 <div className="form-group">
                                     <label htmlFor="promoDemotionType" className="form-label">Record as *</label>
-                                    <select
+                                    <FormSelect
                                         id="promoDemotionType"
                                         name="promoDemotionType"
                                         className="form-input"
@@ -510,11 +511,11 @@ const EditAdminMembersModal = ({
                                         {promoDemotionOptions.map((opt) => (
                                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                                 <div className="form-group">
                                     <label htmlFor="newRoleId" className="form-label">Role (optional)</label>
-                                    <select
+                                    <FormSelect
                                         id="newRoleId"
                                         name="newRoleId"
                                         className={`form-input ${errors.newRoleId ? 'error' : ''}`}
@@ -537,7 +538,7 @@ const EditAdminMembersModal = ({
                                                     : role.roleName;
                                                 return <option key={role.id} value={role.id} disabled={isFull}>{label}</option>;
                                             })}
-                                    </select>
+                                    </FormSelect>
                                     {errors.newRoleId && <span className="field-error">{errors.newRoleId}</span>}
                                     <p className="form-hint-inline">Officer is assigned separately.</p>
                                 </div>
@@ -549,7 +550,7 @@ const EditAdminMembersModal = ({
                                 <h3 className="form-section-title">Transfer to team</h3>
                                 <div className="form-group">
                                     <label htmlFor="newTeamId" className="form-label">Target team *</label>
-                                    <select
+                                    <FormSelect
                                         id="newTeamId"
                                         name="newTeamId"
                                         className={`form-input ${errors.newTeamId ? 'error' : ''}`}
@@ -561,7 +562,7 @@ const EditAdminMembersModal = ({
                                         {teams.filter((team) => team.isActive !== false && team.id !== currentTeamId).map((team) => (
                                             <option key={team.id} value={team.id}>{team.name}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                     {errors.newTeamId && <span className="field-error">{errors.newTeamId}</span>}
                                     <p className="form-hint-inline">Member will be assigned the default Member role with no subteam.</p>
                                 </div>
@@ -573,7 +574,7 @@ const EditAdminMembersModal = ({
                                 <h3 className="form-section-title">Leave type</h3>
                                 <div className="form-group">
                                     <label htmlFor="leaveType" className="form-label">Type *</label>
-                                    <select
+                                    <FormSelect
                                         id="leaveType"
                                         name="leaveType"
                                         className="form-input"
@@ -584,7 +585,7 @@ const EditAdminMembersModal = ({
                                         {leaveTypeOptions.map((opt) => (
                                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                             </div>
                         )}

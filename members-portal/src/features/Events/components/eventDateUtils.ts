@@ -54,6 +54,35 @@ export function isMultiDayEvent(
     return range.startDay !== range.endDay;
 }
 
+function addCalendarDay(day: string): string {
+    const parsed = new Date(`${day}T12:00:00`);
+    parsed.setDate(parsed.getDate() + 1);
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+/** Inclusive calendar days from event start through end in the event timezone. */
+export function enumerateEventDays(
+    eventDate?: string | null,
+    eventEndDate?: string | null,
+    timezone: string = CLUB_TIMEZONE,
+): string[] {
+    const range = getEventDayRange(eventDate, eventEndDate, timezone);
+    if (!range) return [];
+
+    const days: string[] = [];
+    let cursor = range.startDay;
+    let guard = 0;
+    while (cursor <= range.endDay && guard < 366) {
+        days.push(cursor);
+        cursor = addCalendarDay(cursor);
+        guard += 1;
+    }
+    return days;
+}
+
 export function formatAttendanceDayLabel(eventDay: string): string {
     const dayKey = eventDay.split('T')[0];
     const parsed = new Date(`${dayKey}T12:00:00`);

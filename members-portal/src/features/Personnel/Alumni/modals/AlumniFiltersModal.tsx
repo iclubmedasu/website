@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { DateInput } from '@/components/input/DateInput';
+import { FormSelect } from '@/components/input/FormSelect';
 import type { TeamRef } from '@/types/backend-contracts';
 
 export interface AlumniFiltersState {
@@ -53,17 +54,19 @@ export default function AlumniFiltersModal({
                         <h3 className="form-section-title">Team</h3>
                         <div className="form-group">
                             <label className="form-label" htmlFor="alumni-filter-team">Left from team</label>
-                            <select
+                            <FormSelect
                                 id="alumni-filter-team"
-                                className="form-input"
                                 value={draftTeamId}
                                 onChange={(event) => setDraftTeamId(event.target.value)}
-                            >
-                                <option value="">All teams</option>
-                                {allTeams.map((team) => (
-                                    <option key={team.id} value={String(team.id)}>{team.name}</option>
-                                ))}
-                            </select>
+                                placeholder="All teams"
+                                options={[
+                                    { value: '', label: 'All teams' },
+                                    ...allTeams.map((team) => ({
+                                        value: String(team.id),
+                                        label: team.name,
+                                    })),
+                                ]}
+                            />
                         </div>
                     </div>
 

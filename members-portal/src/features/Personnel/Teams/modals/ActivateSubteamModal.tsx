@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { CheckCircle, X } from 'lucide-react';
 import { teamSubteamsAPI } from '../../../../services/api';
 import type { Id } from '../../../../types/backend-contracts';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface TeamSubteamItem {
     id: Id;
@@ -146,7 +147,7 @@ const ActivateSubteamModal = ({ isOpen, onClose, onSubmit, teamId, initialSubtea
                             <label htmlFor="subteamSelect" className="form-label">
                                 Select Subteam to Activate *
                             </label>
-                            <select
+                            <FormSelect
                                 id="subteamSelect"
                                 className={`form-input ${errors.subteam ? 'error' : ''}`}
                                 value={selectedSubteamId}
@@ -167,7 +168,7 @@ const ActivateSubteamModal = ({ isOpen, onClose, onSubmit, teamId, initialSubtea
                                         {isLoading ? 'Loading subteams...' : 'No inactive subteams available'}
                                     </option>
                                 )}
-                            </select>
+                            </FormSelect>
                             {errors.subteam && (
                                 <span className="field-error">{errors.subteam}</span>
                             )}

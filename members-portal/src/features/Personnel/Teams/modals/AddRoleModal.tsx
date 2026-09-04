@@ -1,8 +1,9 @@
-﻿'use client';
+'use client';
 
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { toTitleCase } from '../../../../utils/titleCase';
+import { FormSelect } from '@/components/input/FormSelect';
 
 type RoleType = 'Leadership' | 'Special Roles' | 'Regular';
 
@@ -60,7 +61,7 @@ const AddRoleModal = ({ isOpen, onClose, onSubmit }: AddRoleModalProps) => {
 
     const isLeadership = formData.roleType === 'Leadership';
 
-    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleChange = (e: ChangeEvent<HTMLInputElement> | { target: { value: string; name: string; type?: string } }) => {
         const { name, value } = e.target;
         const next: RoleFormData = {
             ...formData,
@@ -174,7 +175,7 @@ const AddRoleModal = ({ isOpen, onClose, onSubmit }: AddRoleModalProps) => {
                             <label htmlFor="roleType" className="form-label">
                                 Role Type *
                             </label>
-                            <select
+                            <FormSelect
                                 id="roleType"
                                 name="roleType"
                                 className={`form-input ${errors.roleType ? 'error' : ''}`}
@@ -187,9 +188,9 @@ const AddRoleModal = ({ isOpen, onClose, onSubmit }: AddRoleModalProps) => {
                                         {opt.label}
                                     </option>
                                 ))}
-                            </select>
+                            </FormSelect>
                             <p className="form-hint-small">
-                                Leadership → Leadership card (max 1). Special Roles → Special card. Regular → Team Members table.
+                                Leadership ? Leadership card (max 1). Special Roles ? Special card. Regular ? Team Members table.
                             </p>
                         </div>
 

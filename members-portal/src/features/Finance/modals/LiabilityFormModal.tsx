@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { FinanceAccountSummary, FinanceLiabilityRow, FinanceLiabilityStatus } from '@iclub/shared';
 import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
 import { DateInput } from '@/components/input/DateInput';
+import { FormSelect } from '@/components/input/FormSelect';
 import { financeAPI } from '@/services/api';
 import { FinanceModal } from '../components/FinanceModal';
 
@@ -109,7 +110,7 @@ export function LiabilityFormModal({ liability, accounts, onClose, onSaved }: Li
             </div>
             <div className="form-group">
                 <label htmlFor="finance-liability-account" className="form-label">Account</label>
-                <select
+                <FormSelect
                     id="finance-liability-account"
                     className="form-input"
                     value={accountId}
@@ -119,7 +120,7 @@ export function LiabilityFormModal({ liability, accounts, onClose, onSaved }: Li
                     {activeAccounts.map((account) => (
                         <option key={account.id} value={account.id}>{account.name}</option>
                     ))}
-                </select>
+                </FormSelect>
             </div>
             <div className="form-group">
                 <label htmlFor="finance-liability-description" className="form-label">Description</label>
@@ -173,7 +174,7 @@ export function LiabilityFormModal({ liability, accounts, onClose, onSaved }: Li
             </div>
             <div className="form-group">
                 <label htmlFor="finance-liability-status" className="form-label">Status</label>
-                <select
+                <FormSelect
                     id="finance-liability-status"
                     className="form-input"
                     value={status}
@@ -182,7 +183,7 @@ export function LiabilityFormModal({ liability, accounts, onClose, onSaved }: Li
                     {LIABILITY_STATUSES.map((option) => (
                         <option key={option} value={option}>{option}</option>
                     ))}
-                </select>
+                </FormSelect>
             </div>
         </FinanceModal>
     );

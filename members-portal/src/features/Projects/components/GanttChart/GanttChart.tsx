@@ -45,6 +45,7 @@ import {
 import { generateXlsxBlob } from '@/utils/generateXlsxBlob';
 import '@/components/table/table.css';
 import './GanttChart.css';
+import { FormSelect } from '@/components/input/FormSelect';
 
 type ScaleKey = 'quarter' | 'month' | 'week' | 'day';
 
@@ -3757,7 +3758,7 @@ export default function GanttChart({
                                                         </span>
                                                     )}
                                                     {col.key === 'status' && row.type !== 'phase' && isEditing && (
-                                                        <select
+                                                        <FormSelect
                                                             ref={activeSelectRef}
                                                             className="gantt-col-select"
                                                             title="Select status"
@@ -3769,7 +3770,7 @@ export default function GanttChart({
                                                             {Object.entries(STATUS_LABELS).map(([k, v]) => (
                                                                 <option key={k} value={k}>{v}</option>
                                                             ))}
-                                                        </select>
+                                                        </FormSelect>
                                                     )}
                                                     {col.key === 'status' && row.type === 'phase' && (
                                                         <span
@@ -3796,7 +3797,7 @@ export default function GanttChart({
                                                         </span>
                                                     )}
                                                     {col.key === 'priority' && row.type !== 'phase' && isEditing && (
-                                                        <select
+                                                        <FormSelect
                                                             ref={activeSelectRef}
                                                             className="gantt-col-select"
                                                             title="Select priority"
@@ -3808,7 +3809,7 @@ export default function GanttChart({
                                                             {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
                                                                 <option key={k} value={k}>{v}</option>
                                                             ))}
-                                                        </select>
+                                                        </FormSelect>
                                                     )}
 
                                                     {/* Difficulty */}
@@ -3824,7 +3825,7 @@ export default function GanttChart({
                                                         </span>
                                                     )}
                                                     {col.key === 'difficulty' && row.type !== 'phase' && isEditing && (
-                                                        <select
+                                                        <FormSelect
                                                             ref={activeSelectRef}
                                                             className="gantt-col-select"
                                                             title="Select difficulty"
@@ -3836,7 +3837,7 @@ export default function GanttChart({
                                                             {Object.entries(DIFFICULTY_LABELS).map(([k, v]) => (
                                                                 <option key={k} value={k}>{v}</option>
                                                             ))}
-                                                        </select>
+                                                        </FormSelect>
                                                     )}
                                                 </div>
                                             );

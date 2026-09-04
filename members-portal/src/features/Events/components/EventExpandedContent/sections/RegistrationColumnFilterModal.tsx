@@ -11,7 +11,9 @@ import {
     type RegistrationSortSpec,
     type RegistrationTableContext,
 } from '../registrationTableFilterUtils';
+import FilterNumberInput from '../FilterNumberInput';
 import RegistrationTableSortControl from './RegistrationTableSortControl';
+import { FormSelect } from '@/components/input/FormSelect';
 
 export const DEFAULT_REGISTRATION_SORT: RegistrationSortSpec = {
     columnId: 'fullName',
@@ -62,10 +64,6 @@ interface RegistrationColumnFilterModalProps {
     onClear: () => void;
 }
 
-function getSessionTitle(session: EventSessionRef): string {
-    return session.label?.trim() || 'Untitled session';
-}
-
 function describeServerFilterChip(
     key: keyof RegistrationServerFilters,
     value: string,
@@ -110,14 +108,14 @@ function renderValueEditor(
     filter: RegistrationColumnFilter,
     column: FilterableColumn,
     tiers: EventTierRef[],
-    sessions: EventSessionRef[],
+    _sessions: EventSessionRef[],
     onChange: (next: RegistrationColumnFilter) => void,
 ) {
     switch (filter.kind) {
         case 'text':
             return (
                 <>
-                    <select
+                    <FormSelect
                         aria-label="Text filter operator"
                         className="form-input"
                         value={filter.operator}
@@ -129,7 +127,7 @@ function renderValueEditor(
                         <option value="contains">Contains</option>
                         <option value="equals">Equals</option>
                         <option value="isEmpty">Is empty</option>
-                    </select>
+                    </FormSelect>
                     {filter.operator !== 'isEmpty' ? (
                         <input
                             aria-label="Text filter value"
@@ -143,7 +141,7 @@ function renderValueEditor(
         case 'number':
             return (
                 <>
-                    <select
+                    <FormSelect
                         aria-label="Number filter operator"
                         className="form-input"
                         value={filter.operator}
@@ -156,17 +154,42 @@ function renderValueEditor(
                         <option value="greaterThan">Greater than</option>
                         <option value="lessThan">Less than</option>
                         <option value="isEmpty">Is empty</option>
-                    </select>
+                    </FormSelect>
                     {filter.operator !== 'isEmpty' ? (
-                        <input
+                        <FilterNumberInput
                             aria-label="Number filter value"
-                            type="number"
-                            className="form-input"
-                            value={filter.value ?? 0}
-                            onChange={(event) => onChange({
-                                ...filter,
-                                value: Number(event.target.value),
-                            })}
+                            value={filter.value}
+                            onChange={(value) => onChange({ ...filter, value })}
+                        />
+                    ) : null}
+                </>
+            );
+        case 'count':
+            return (
+                <>
+                    <FormSelect
+                        aria-label="Count filter operator"
+                        className="form-input"
+                        value={filter.operator}
+                        onChange={(event) => onChange({
+                            ...filter,
+                            operator: event.target.value as typeof filter.operator,
+                        })}
+                    >
+                        <option value="hasAny">
+                            {column.id === 'sessionsAttendedCount' ? 'Has sessions' : 'Has attendance'}
+                        </option>
+                        <option value="hasNone">Has none</option>
+                        <option value="equals">Equal to</option>
+                        <option value="greaterThan">Greater than</option>
+                        <option value="lessThan">Less than</option>
+                    </FormSelect>
+                    {filter.operator !== 'hasAny' && filter.operator !== 'hasNone' ? (
+                        <FilterNumberInput
+                            aria-label="Count filter value"
+                            min={0}
+                            value={filter.value}
+                            onChange={(value) => onChange({ ...filter, value })}
                         />
                     ) : null}
                 </>
@@ -212,7 +235,7 @@ function renderValueEditor(
             );
         case 'tier':
             return (
-                <select
+                <FormSelect
                     aria-label="Tier filter"
                     className="form-input"
                     value={filter.tierId}
@@ -222,42 +245,56 @@ function renderValueEditor(
                     {tiers.map((tier) => (
                         <option key={tier.id} value={tier.id}>{tier.name}</option>
                     ))}
-                </select>
+                </FormSelect>
             );
-        case 'sessions':
+        case 'idSet':
             return (
                 <>
-                    <select
-                        aria-label="Sessions filter operator"
+                    <FormSelect
+                        aria-label="Id set filter operator"
                         className="form-input"
                         value={filter.operator}
                         onChange={(event) => onChange({
                             ...filter,
                             operator: event.target.value as typeof filter.operator,
+                            values: event.target.value === 'hasNone' ? [] : filter.values,
                         })}
                     >
-                        <option value="includes">Includes session</option>
-                        <option value="hasNone">Has none</option>
-                    </select>
-                    {filter.operator === 'includes' ? (
-                        <select
-                            aria-label="Session"
-                            className="form-input"
-                            value={filter.sessionId ?? ''}
-                            onChange={(event) => onChange({ ...filter, sessionId: event.target.value })}
-                        >
-                            <option value="">Select session…</option>
-                            {sessions.map((session) => (
-                                <option key={session.id} value={session.id}>{getSessionTitle(session)}</option>
-                            ))}
-                        </select>
+                        <option value="includesAll">All selected</option>
+                        <option value="includesAny">Any selected</option>
+                        {column.idSetAllowHasNone ? (
+                            <option value="hasNone">Has none</option>
+                        ) : null}
+                    </FormSelect>
+                    {filter.operator !== 'hasNone' ? (
+                        <div className="event-registration-filter-options">
+                            {(column.options ?? []).map((option) => {
+                                const checked = filter.values.includes(option);
+                                const optionLabel = column.optionLabels?.[option] ?? option;
+                                return (
+                                    <label key={option} className="event-registration-filter-option">
+                                        <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => {
+                                                const nextValues = checked
+                                                    ? filter.values.filter((value) => value !== option)
+                                                    : [...filter.values, option];
+                                                onChange({ ...filter, values: nextValues });
+                                            }}
+                                        />
+                                        <span>{optionLabel}</span>
+                                    </label>
+                                );
+                            })}
+                        </div>
                     ) : null}
                 </>
             );
         case 'ticketStatus':
         case 'reminderStatus':
             return (
-                <select
+                <FormSelect
                     aria-label={`${column.label} filter`}
                     className="form-input"
                     value={filter.value}
@@ -268,40 +305,7 @@ function renderValueEditor(
                 >
                     <option value="sent">Sent</option>
                     <option value="notSent">Not sent</option>
-                </select>
-            );
-        case 'attendance':
-            return (
-                <>
-                    <select
-                        aria-label="Attendance filter operator"
-                        className="form-input"
-                        value={filter.operator}
-                        onChange={(event) => onChange({
-                            ...filter,
-                            operator: event.target.value as typeof filter.operator,
-                        })}
-                    >
-                        <option value="hasAny">Has attendance</option>
-                        <option value="hasNone">Has none</option>
-                        <option value="countEquals">Count equals</option>
-                        <option value="countGreaterThan">Count greater than</option>
-                        <option value="countLessThan">Count less than</option>
-                    </select>
-                    {filter.operator !== 'hasAny' && filter.operator !== 'hasNone' ? (
-                        <input
-                            aria-label="Attendance count"
-                            type="number"
-                            min={0}
-                            className="form-input"
-                            value={filter.value ?? 0}
-                            onChange={(event) => onChange({
-                                ...filter,
-                                value: Number(event.target.value),
-                            })}
-                        />
-                    ) : null}
-                </>
+                </FormSelect>
             );
         default:
             return null;
@@ -412,7 +416,7 @@ export default function RegistrationColumnFilterModal({
                                 {serverFilterConfig.showTier ? (
                                     <div className="form-group">
                                         <label className="form-label" htmlFor="registration-quick-tier">Tier</label>
-                                        <select
+                                        <FormSelect
                                             id="registration-quick-tier"
                                             aria-label="Filter by tier"
                                             className="form-input"
@@ -423,13 +427,13 @@ export default function RegistrationColumnFilterModal({
                                             {tiers.map((tier) => (
                                                 <option key={tier.id} value={tier.id}>{tier.name}</option>
                                             ))}
-                                        </select>
+                                        </FormSelect>
                                     </div>
                                 ) : null}
                                 {serverFilterConfig.showSource ? (
                                     <div className="form-group">
                                         <label className="form-label" htmlFor="registration-quick-source">Source</label>
-                                        <select
+                                        <FormSelect
                                             id="registration-quick-source"
                                             aria-label="Filter by source"
                                             className="form-input"
@@ -442,13 +446,13 @@ export default function RegistrationColumnFilterModal({
                                             {REGISTRATION_SOURCE_GROUP_OPTIONS.map((option) => (
                                                 <option key={option.value || 'all'} value={option.value}>{option.label}</option>
                                             ))}
-                                        </select>
+                                        </FormSelect>
                                     </div>
                                 ) : null}
                                 {serverFilterConfig.showCheckIn ? (
                                     <div className="form-group">
                                         <label className="form-label" htmlFor="registration-quick-checkin">Check-in status</label>
-                                        <select
+                                        <FormSelect
                                             id="registration-quick-checkin"
                                             aria-label="Filter by check-in status"
                                             className="form-input"
@@ -461,13 +465,13 @@ export default function RegistrationColumnFilterModal({
                                             {serverFilterConfig.showCheckedInToday ? (
                                                 <option value="CHECKED_IN_TODAY">Checked in today</option>
                                             ) : null}
-                                        </select>
+                                        </FormSelect>
                                     </div>
                                 ) : null}
                                 {serverFilterConfig.showTicketStatus ? (
                                     <div className="form-group">
                                         <label className="form-label" htmlFor="registration-quick-ticket">Ticket status</label>
-                                        <select
+                                        <FormSelect
                                             id="registration-quick-ticket"
                                             aria-label="Filter by ticket status"
                                             className="form-input"
@@ -480,13 +484,13 @@ export default function RegistrationColumnFilterModal({
                                             <option value="">Any ticket status</option>
                                             <option value="SENT">Sent</option>
                                             <option value="NOT_SENT">Not sent</option>
-                                        </select>
+                                        </FormSelect>
                                     </div>
                                 ) : null}
                                 {serverFilterConfig.showReminderStatus ? (
                                     <div className="form-group">
                                         <label className="form-label" htmlFor="registration-quick-reminder">Reminder status</label>
-                                        <select
+                                        <FormSelect
                                             id="registration-quick-reminder"
                                             aria-label="Filter by reminder status"
                                             className="form-input"
@@ -499,7 +503,7 @@ export default function RegistrationColumnFilterModal({
                                             <option value="">Any reminder status</option>
                                             <option value="SENT">Sent</option>
                                             <option value="NOT_SENT">Not sent</option>
-                                        </select>
+                                        </FormSelect>
                                     </div>
                                 ) : null}
                             </div>
@@ -520,7 +524,7 @@ export default function RegistrationColumnFilterModal({
                                     return (
                                         <div key={`${filter.columnId}-${index}`} className="event-registration-filter-rule">
                                             <div className="event-registration-filter-rule__header">
-                                                <select
+                                                <FormSelect
                                                     aria-label="Filter column"
                                                     className="form-input"
                                                     value={filter.columnId}
@@ -533,7 +537,7 @@ export default function RegistrationColumnFilterModal({
                                                     {columns.map((entry) => (
                                                         <option key={entry.id} value={entry.id}>{entry.label}</option>
                                                     ))}
-                                                </select>
+                                                </FormSelect>
                                                 <button
                                                     type="button"
                                                     className="table-action-btn event-registration-filter-rule__remove"

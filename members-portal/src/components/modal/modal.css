@@ -2679,31 +2679,13 @@ html:has(.modal-backdrop) body {
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-    max-height: 12rem;
-    overflow-y: auto;
     margin-top: 0.5rem;
-    padding: 0.25rem;
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-md);
-    background: var(--bg-card);
 }
 
 .modal-picker-option {
     display: block;
-    width: 100%;
-    text-align: left;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: transparent;
     color: var(--gray-900);
-    padding: 0.45rem 0.6rem;
-    font: inherit;
     font-size: 0.875rem;
-    cursor: pointer;
-}
-
-.modal-picker-option:hover:not(:disabled) {
-    background: var(--gray-100);
 }
 
 .modal-picker-option--selected {

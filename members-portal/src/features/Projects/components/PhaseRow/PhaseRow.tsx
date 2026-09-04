@@ -13,6 +13,7 @@ import {
 import { tasksAPI, getProfilePhotoUrl } from '../../../../services/api';
 import DeletePhaseTaskModal from '../../modals/DeletePhaseTaskModal';
 import './PhaseRow.css';
+import { FormSelect } from '@/components/input/FormSelect';
 
 const STATUS_LABELS = {
     NOT_STARTED: 'Not Started',
@@ -49,7 +50,7 @@ function InlineSelect({ taskId, field, current, options, labels, canEdit, onChan
     const [busy, setBusy] = useState(false);
     const effectiveCurrent = current ?? options?.[0] ?? '';
 
-    const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const handleChange = async (e: { target: { value: string } }) => {
         const next = e.target.value;
         if (next === effectiveCurrent || !canEdit) return;
         // optimistic update
@@ -79,19 +80,20 @@ function InlineSelect({ taskId, field, current, options, labels, canEdit, onChan
     }
 
     return (
-        <select
-            className={`phase-row-select phase-row-select--${field} phase-row-select--${current}`}
-            title={`Select ${field}`}
-            aria-label={`Select ${field}`}
-            value={effectiveCurrent}
-            onChange={handleChange}
-            disabled={busy}
-            onClick={(e) => e.stopPropagation()}
-        >
-            {options.map((o: string) => (
-                <option key={o} value={o}>{labels[o]}</option>
-            ))}
-        </select>
+        <div onClick={(e) => e.stopPropagation()}>
+            <FormSelect
+                className={`phase-row-select phase-row-select--${field} phase-row-select--${current}`}
+                title={`Select ${field}`}
+                aria-label={`Select ${field}`}
+                value={effectiveCurrent}
+                onChange={handleChange}
+                disabled={busy}
+            >
+                {options.map((o: string) => (
+                    <option key={o} value={o}>{labels[o]}</option>
+                ))}
+            </FormSelect>
+        </div>
     );
 }
 

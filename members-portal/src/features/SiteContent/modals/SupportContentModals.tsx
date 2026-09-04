@@ -13,6 +13,7 @@ import Toggle from '@/components/toggle/Toggle';
 import { SiteContentModal } from '../components/SiteContentModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
 import { SiteContentRowActions } from '../components/SiteContentRowActions';
+import { FormSelect } from '@/components/input/FormSelect';
 
 export const INCIDENT_FIELD_TYPES = ['text', 'dropdown', 'checkbox', 'number'] as const;
 
@@ -134,7 +135,7 @@ function FormFieldModal({ formId, field, onClose, onSaved }: FormFieldModalProps
                 <label htmlFor="incident-field-type" className="form-label">
                     Type
                 </label>
-                <select
+                <FormSelect
                     id="incident-field-type"
                     className="form-input"
                     value={type}
@@ -145,7 +146,7 @@ function FormFieldModal({ formId, field, onClose, onSaved }: FormFieldModalProps
                             {INCIDENT_FIELD_TYPE_LABELS[fieldType]}
                         </option>
                     ))}
-                </select>
+                </FormSelect>
             </div>
             {type === 'dropdown' ? (
                 <div className="form-group">
@@ -539,7 +540,7 @@ export function EditSupportNoticeModal({ notice, onClose, onSaved }: EditSupport
                 <label htmlFor="support-notice-locale" className="form-label">
                     Language
                 </label>
-                <select
+                <FormSelect
                     id="support-notice-locale"
                     className="form-input"
                     value={locale}
@@ -547,7 +548,7 @@ export function EditSupportNoticeModal({ notice, onClose, onSaved }: EditSupport
                 >
                     <option value="EN">English</option>
                     <option value="AR">Arabic</option>
-                </select>
+                </FormSelect>
             </div>
             <div className="form-group">
                 <label htmlFor="support-notice-content" className="form-label">

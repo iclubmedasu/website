@@ -28,6 +28,7 @@ import {
     type NewFieldImportDraft,
     type ParsedRegistrationWorkbook,
 } from '../components/registrationExcelImport';
+import { FormSelect } from '@/components/input/FormSelect';
 
 type ImportStep = 'upload' | 'mapping' | 'preview';
 
@@ -289,7 +290,7 @@ export default function ImportRegistrationsModal({
                                     ] as const).map(([key, label, required]) => (
                                         <div key={key} className="import-registrations-mapping-row">
                                             <span className={required ? 'import-registrations-mapping-label--required' : undefined}>{label}</span>
-                                            <select
+                                            <FormSelect
                                                 className="form-input"
                                                 value={mapping[key] ?? NOT_IN_FILE}
                                                 onChange={(event) => updateStandardMapping(key, event.target.value)}
@@ -297,7 +298,7 @@ export default function ImportRegistrationsModal({
                                                 {columnOptions(parsed.headers).map((option) => (
                                                     <option key={`${key}-${option.value || 'none'}`} value={option.value}>{option.label}</option>
                                                 ))}
-                                            </select>
+                                            </FormSelect>
                                         </div>
                                     ))}
 
@@ -306,7 +307,7 @@ export default function ImportRegistrationsModal({
                                             <span className={field.required ? 'import-registrations-mapping-label--required' : undefined}>
                                                 {field.label}
                                             </span>
-                                            <select
+                                            <FormSelect
                                                 className="form-input"
                                                 value={mapping.customFields[String(field.id)] ?? NOT_IN_FILE}
                                                 onChange={(event) => updateCustomFieldMapping(String(field.id), event.target.value)}
@@ -314,7 +315,7 @@ export default function ImportRegistrationsModal({
                                                 {columnOptions(parsed.headers).map((option) => (
                                                     <option key={`${field.id}-${option.value || 'none'}`} value={option.value}>{option.label}</option>
                                                 ))}
-                                            </select>
+                                            </FormSelect>
                                         </div>
                                     ))}
                                 </div>
@@ -340,7 +341,7 @@ export default function ImportRegistrationsModal({
                                                     </div>
                                                     <div className="form-group">
                                                         <label className="form-label" htmlFor={`import-action-${field.excelColumn}`}>Action</label>
-                                                        <select
+                                                        <FormSelect
                                                             id={`import-action-${field.excelColumn}`}
                                                             className="form-input"
                                                             value={field.mode}
@@ -350,7 +351,7 @@ export default function ImportRegistrationsModal({
                                                         >
                                                             <option value="skip">Skip column</option>
                                                             <option value="import">Import as new field</option>
-                                                        </select>
+                                                        </FormSelect>
                                                     </div>
                                                     {field.mode === 'import' ? (
                                                         <>
@@ -366,7 +367,7 @@ export default function ImportRegistrationsModal({
                                                             </div>
                                                             <div className="form-group">
                                                                 <label className="form-label" htmlFor={`import-type-${field.excelColumn}`}>Type</label>
-                                                                <select
+                                                                <FormSelect
                                                                     id={`import-type-${field.excelColumn}`}
                                                                     className="form-input"
                                                                     value={field.type}
@@ -378,7 +379,7 @@ export default function ImportRegistrationsModal({
                                                                     {FIELD_TYPES.map((type) => (
                                                                         <option key={type} value={type}>{type}</option>
                                                                     ))}
-                                                                </select>
+                                                                </FormSelect>
                                                             </div>
                                                             {field.type === 'dropdown' ? (
                                                                 <div className="form-group">

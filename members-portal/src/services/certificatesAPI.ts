@@ -71,6 +71,22 @@ export interface CertificateQueryParams {
     recipientMemberId?: Id | string;
 }
 
+export interface CertificatePaginatedQueryParams extends CertificateQueryParams {
+    page: number;
+    pageSize?: number;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    nameSort?: 'asc' | 'desc' | '';
+}
+
+export interface CertificateListPage {
+    items: CertificateListItem[];
+    total: number;
+    page: number;
+    pageSize: number;
+}
+
 export interface CreateCustomCertificatePayload {
     type: CertificateType;
     recipientName: string;
@@ -195,6 +211,29 @@ export const certificatesAPI = {
         const url = qs ? `${API_BASE_URL}/certificates?${qs}` : `${API_BASE_URL}/certificates`;
         const response = await apiFetch(url, { headers: getAuthHeaders() });
         return handleResponse<CertificateListItem[]>(response);
+    },
+
+    listPage: async (params: CertificatePaginatedQueryParams): Promise<CertificateListPage> => {
+        const search = new URLSearchParams();
+        search.set('page', String(params.page));
+        if (params.pageSize != null) search.set('pageSize', String(params.pageSize));
+        if (params.eventId != null) search.append('eventId', String(params.eventId));
+        if (params.projectId != null) search.append('projectId', String(params.projectId));
+        if (params.status) search.append('status', params.status);
+        if (params.type) search.append('type', params.type);
+        if (params.recipientMemberId != null) {
+            search.append('recipientMemberId', String(params.recipientMemberId));
+        }
+        if (params.search?.trim()) search.append('search', params.search.trim());
+        if (params.dateFrom) search.append('dateFrom', params.dateFrom);
+        if (params.dateTo) search.append('dateTo', params.dateTo);
+        if (params.nameSort === 'asc' || params.nameSort === 'desc') {
+            search.append('nameSort', params.nameSort);
+        }
+        const response = await apiFetch(`${API_BASE_URL}/certificates?${search.toString()}`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<CertificateListPage>(response);
     },
 
     getById: async (id: Id | string): Promise<CertificateListItem> => {

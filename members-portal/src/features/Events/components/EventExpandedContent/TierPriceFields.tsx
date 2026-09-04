@@ -1,5 +1,6 @@
 import type { EventTierCurrency } from '@/types/backend-contracts';
 import { DEFAULT_TIER_CURRENCY, TIER_CURRENCIES } from '../tierPriceUtils';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface TierPriceFieldsProps {
     price: string;
@@ -33,7 +34,7 @@ export default function TierPriceFields({
                 disabled={disabled}
                 aria-label="Tier price"
             />
-            <select
+            <FormSelect
                 id={`${idPrefix}-currency`}
                 value={currency}
                 onChange={(e) => onCurrencyChange(e.target.value as EventTierCurrency)}
@@ -44,7 +45,7 @@ export default function TierPriceFields({
                 {TIER_CURRENCIES.map((code) => (
                     <option key={code} value={code}>{code}</option>
                 ))}
-            </select>
+            </FormSelect>
         </div>
     );
 }

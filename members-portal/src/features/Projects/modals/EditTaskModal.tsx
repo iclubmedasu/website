@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, type ChangeEvent, type ReactNode } from '
 import { AlertTriangle, Check, X, Link2, Trash2 } from 'lucide-react';
 import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
 import { DateInput } from '@/components/input/DateInput';
+import { FormSelect } from '@/components/input/FormSelect';
 import { tasksAPI } from '../../../services/api';
 import { toTitleCase } from '../../../utils/titleCase';
 import {
@@ -284,7 +285,7 @@ export default function EditTaskModal({
 
     const setField =
         <K extends keyof Omit<EditTaskFormState, 'assigneeIds'>>(key: K) =>
-            (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+            (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string; name: string; type?: string } }) => {
                 const value = e.target.value;
                 setForm((current) => ({ ...current, [key]: value }));
             };
@@ -468,7 +469,7 @@ export default function EditTaskModal({
                         <div className="form-row">
                             <div className="form-group">
                                 <label className="form-label" htmlFor="edit-task-status">Status</label>
-                                <select
+                                <FormSelect
                                     id="edit-task-status"
                                     title="Task status"
                                     className="form-input"
@@ -480,23 +481,23 @@ export default function EditTaskModal({
                                     {STATUSES.map((status) => (
                                         <option key={status} value={status}>{STATUS_LABELS[status]}</option>
                                     ))}
-                                </select>
+                                </FormSelect>
                             </div>
                             <div className="form-group">
                                 <label className="form-label" htmlFor="edit-task-priority">Priority</label>
-                                <select id="edit-task-priority" title="Task priority" className="form-input" value={form.priority} onChange={setField('priority')} disabled={!canManageTask}>
+                                <FormSelect id="edit-task-priority" title="Task priority" className="form-input" value={form.priority} onChange={setField('priority')} disabled={!canManageTask}>
                                     {PRIORITIES.map((priority) => (
                                         <option key={priority} value={priority}>{PRIORITY_LABELS[priority]}</option>
                                     ))}
-                                </select>
+                                </FormSelect>
                             </div>
                             <div className="form-group">
                                 <label className="form-label" htmlFor="edit-task-difficulty">Difficulty</label>
-                                <select id="edit-task-difficulty" title="Task difficulty" className="form-input" value={form.difficulty} onChange={setField('difficulty')} disabled={!canManageTask}>
+                                <FormSelect id="edit-task-difficulty" title="Task difficulty" className="form-input" value={form.difficulty} onChange={setField('difficulty')} disabled={!canManageTask}>
                                     {DIFFICULTIES.map((difficulty) => (
                                         <option key={difficulty} value={difficulty}>{DIFFICULTY_LABELS[difficulty]}</option>
                                     ))}
-                                </select>
+                                </FormSelect>
                             </div>
                         </div>
 
@@ -562,7 +563,7 @@ export default function EditTaskModal({
                             <div className="form-group">
                                 <label className="form-label" htmlFor="edit-task-dependency-target">Depends on</label>
                                 {projectDetail ? (
-                                    <select
+                                    <FormSelect
                                         id="edit-task-dependency-target"
                                         title="Dependency task"
                                         className="form-input"
@@ -576,7 +577,7 @@ export default function EditTaskModal({
                                                 {formatDependencyTaskLabel(candidate)}
                                             </option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 ) : (
                                     <input
                                         id="edit-task-dependency-target"
@@ -592,7 +593,7 @@ export default function EditTaskModal({
                             </div>
                             <div className="form-group">
                                 <label className="form-label" htmlFor="edit-task-dependency-type">Dependency Type</label>
-                                <select
+                                <FormSelect
                                     id="edit-task-dependency-type"
                                     title="Dependency type"
                                     className="form-input"
@@ -602,7 +603,7 @@ export default function EditTaskModal({
                                 >
                                     <option value="FINISH_TO_START">Finish to Start</option>
                                     <option value="START_TO_START">Start to Start</option>
-                                </select>
+                                </FormSelect>
                             </div>
                         </div>
 

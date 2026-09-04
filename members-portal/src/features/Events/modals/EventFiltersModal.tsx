@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { DateInput } from '@/components/input/DateInput';
+import { FormSelect } from '@/components/input/FormSelect';
 import './EventFiltersModal.css';
 import type { EventQueryParams, ProjectStatus, TeamRef } from '@/types/backend-contracts';
 
@@ -89,7 +90,7 @@ export default function EventFiltersModal({
                         <h3 className="form-section-title">Status</h3>
                         <div className="form-group">
                             <label className="form-label" htmlFor="event-filter-status">Work status</label>
-                            <select
+                            <FormSelect
                                 id="event-filter-status"
                                 className="form-input"
                                 value={draftStatus}
@@ -99,7 +100,7 @@ export default function EventFiltersModal({
                                 {WORK_STATUSES.map((value) => (
                                     <option key={value} value={value}>{STATUS_LABELS[value]}</option>
                                 ))}
-                            </select>
+                            </FormSelect>
                         </div>
                     </div>
 
@@ -107,7 +108,7 @@ export default function EventFiltersModal({
                         <h3 className="form-section-title">Team</h3>
                         <div className="form-group">
                             <label className="form-label" htmlFor="event-filter-team">Assigned team</label>
-                            <select
+                            <FormSelect
                                 id="event-filter-team"
                                 className="form-input"
                                 value={draftTeam}
@@ -117,7 +118,7 @@ export default function EventFiltersModal({
                                 {allTeams.map((team) => (
                                     <option key={team.id} value={String(team.id)}>{team.name}</option>
                                 ))}
-                            </select>
+                            </FormSelect>
                         </div>
                     </div>
 
@@ -125,7 +126,7 @@ export default function EventFiltersModal({
                         <h3 className="form-section-title">Category</h3>
                         <div className="form-group">
                             <label className="form-label" htmlFor="event-filter-category">Event category</label>
-                            <select
+                            <FormSelect
                                 id="event-filter-category"
                                 className="form-input"
                                 value={draftCategory}
@@ -135,7 +136,7 @@ export default function EventFiltersModal({
                                 {allCategories.map((category) => (
                                     <option key={category} value={category}>{category}</option>
                                 ))}
-                            </select>
+                            </FormSelect>
                         </div>
                     </div>
 
@@ -143,7 +144,7 @@ export default function EventFiltersModal({
                         <h3 className="form-section-title">Priority</h3>
                         <div className="form-group">
                             <label className="form-label" htmlFor="event-filter-priority">Priority</label>
-                            <select
+                            <FormSelect
                                 id="event-filter-priority"
                                 className="form-input"
                                 value={draftPriority}
@@ -153,7 +154,7 @@ export default function EventFiltersModal({
                                 {PRIORITIES.map((priority) => (
                                     <option key={priority} value={priority}>{PRIORITY_LABELS[priority]}</option>
                                 ))}
-                            </select>
+                            </FormSelect>
                         </div>
                     </div>
 

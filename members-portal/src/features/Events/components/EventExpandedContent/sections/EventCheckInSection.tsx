@@ -22,6 +22,7 @@ import SessionAttendanceOptions from './SessionAttendanceOptions';
 import { useAuthorizedIdCardBackground } from './IdCardDesign/useAuthorizedIdCardBackground';
 import { printIdCard } from './IdCardDesign/idCardPrint';
 import { AUTO_DISMISS_MS } from '@/hooks/useAutoDismissMessage';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface EventCheckInPanelProps {
     eventId: Id | string;
@@ -215,7 +216,7 @@ export default function EventCheckInPanel({
             return (
                 <div key={field.id} className="form-group">
                     <label className="form-label" htmlFor={`checkin-field-${field.id}`}>{field.label}</label>
-                    <select
+                    <FormSelect
                         id={`checkin-field-${field.id}`}
                         value={value != null ? String(value) : ''}
                         onChange={(event) => updatePendingField(fieldKey, event.target.value || null)}
@@ -225,7 +226,7 @@ export default function EventCheckInPanel({
                         {dropdownOptions(field).map((option) => (
                             <option key={option} value={option}>{option}</option>
                         ))}
-                    </select>
+                    </FormSelect>
                     {fieldError ? <span className="field-error">{fieldError}</span> : null}
                 </div>
             );
@@ -401,7 +402,7 @@ export default function EventCheckInPanel({
                         <h3 className="form-section-title">Registration tier</h3>
                         <div className="form-group">
                             <label className="form-label" htmlFor="checkin-tier-select">Tier *</label>
-                            <select
+                            <FormSelect
                                 id="checkin-tier-select"
                                 value={selectedTierId}
                                 onChange={(event) => {
@@ -414,7 +415,7 @@ export default function EventCheckInPanel({
                                 {tiers.map((tier) => (
                                     <option key={tier.id} value={tier.id}>{tier.name}</option>
                                 ))}
-                            </select>
+                            </FormSelect>
                             {fieldErrors._tier ? <span className="field-error">{fieldErrors._tier}</span> : null}
                         </div>
                     </section>

@@ -4,6 +4,7 @@ import { useMemo, useState, type ChangeEvent, type ReactNode } from 'react';
 import { AlertTriangle, Check, X } from 'lucide-react';
 import { fromDateInputValue } from '@iclub/shared/utils';
 import { DateInput } from '@/components/input/DateInput';
+import { FormSelect } from '@/components/input/FormSelect';
 import { tasksAPI } from '../../../services/api';
 import { toTitleCase } from '../../../utils/titleCase';
 import {
@@ -164,7 +165,7 @@ export default function AddTaskModal({
 
     const setField =
         <K extends keyof Omit<TaskFormState, 'assigneeIds'>>(key: K) =>
-            (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+            (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string; name: string; type?: string } }) => {
                 const value = e.target.value;
                 setForm((current) => ({ ...current, [key]: value }));
             };
@@ -273,27 +274,27 @@ export default function AddTaskModal({
                         <div className="form-row">
                             <div className="form-group">
                                 <label className="form-label" htmlFor="add-task-status">Status</label>
-                                <select id="add-task-status" title="Task status" className="form-input" value={form.status} onChange={setField('status')}>
+                                <FormSelect id="add-task-status" title="Task status" className="form-input" value={form.status} onChange={setField('status')}>
                                     {STATUSES.map((status) => (
                                         <option key={status} value={status}>{STATUS_LABELS[status]}</option>
                                     ))}
-                                </select>
+                                </FormSelect>
                             </div>
                             <div className="form-group">
                                 <label className="form-label" htmlFor="add-task-priority">Priority</label>
-                                <select id="add-task-priority" title="Task priority" className="form-input" value={form.priority} onChange={setField('priority')}>
+                                <FormSelect id="add-task-priority" title="Task priority" className="form-input" value={form.priority} onChange={setField('priority')}>
                                     {PRIORITIES.map((priority) => (
                                         <option key={priority} value={priority}>{PRIORITY_LABELS[priority]}</option>
                                     ))}
-                                </select>
+                                </FormSelect>
                             </div>
                             <div className="form-group">
                                 <label className="form-label" htmlFor="add-task-difficulty">Difficulty</label>
-                                <select id="add-task-difficulty" title="Task difficulty" className="form-input" value={form.difficulty} onChange={setField('difficulty')}>
+                                <FormSelect id="add-task-difficulty" title="Task difficulty" className="form-input" value={form.difficulty} onChange={setField('difficulty')}>
                                     {DIFFICULTIES.map((difficulty) => (
                                         <option key={difficulty} value={difficulty}>{DIFFICULTY_LABELS[difficulty]}</option>
                                     ))}
-                                </select>
+                                </FormSelect>
                             </div>
                         </div>
 

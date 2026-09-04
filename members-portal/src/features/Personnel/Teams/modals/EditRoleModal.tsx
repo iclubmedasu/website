@@ -1,9 +1,10 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { teamRolesAPI } from '../../../../services/api';
 import { toTitleCase } from '../../../../utils/titleCase';
+import { FormSelect } from '@/components/input/FormSelect';
 
 type RoleType = 'Leadership' | 'Special Roles' | 'Regular';
 
@@ -139,7 +140,7 @@ const EditRoleModal = ({ isOpen, onClose, onSubmit, teamId, initialRoleId }: Edi
         setSelectedRoleId(roleId);
     };
 
-    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleChange = (e: ChangeEvent<HTMLInputElement> | { target: { value: string; name: string; type?: string } }) => {
         const target = e.target;
         const { name } = target;
         const isCheckboxInput = target instanceof HTMLInputElement && target.type === 'checkbox';
@@ -243,7 +244,7 @@ const EditRoleModal = ({ isOpen, onClose, onSubmit, teamId, initialRoleId }: Edi
                             <label htmlFor="roleSelect" className="form-label">
                                 Select Role to Edit *
                             </label>
-                            <select
+                            <FormSelect
                                 id="roleSelect"
                                 className={`form-input ${errors.role ? 'error' : ''}`}
                                 value={selectedRoleId}
@@ -262,7 +263,7 @@ const EditRoleModal = ({ isOpen, onClose, onSubmit, teamId, initialRoleId }: Edi
                                         {isLoadingRoles ? 'Loading roles...' : 'No roles available'}
                                     </option>
                                 )}
-                            </select>
+                            </FormSelect>
                             {errors.role && (
                                 <span className="field-error">{errors.role}</span>
                             )}
@@ -295,7 +296,7 @@ const EditRoleModal = ({ isOpen, onClose, onSubmit, teamId, initialRoleId }: Edi
                                     <label htmlFor="roleType" className="form-label">
                                         Role Type *
                                     </label>
-                                    <select
+                                    <FormSelect
                                         id="roleType"
                                         name="roleType"
                                         className={`form-input ${errors.roleType ? 'error' : ''}`}
@@ -308,9 +309,9 @@ const EditRoleModal = ({ isOpen, onClose, onSubmit, teamId, initialRoleId }: Edi
                                                 {opt.label}
                                             </option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                     <p className="form-hint-small">
-                                        Leadership → Leadership card. Special Roles → Special card. Regular → Team Members table.
+                                        Leadership ? Leadership card. Special Roles ? Special card. Regular ? Team Members table.
                                     </p>
                                 </div>
 

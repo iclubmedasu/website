@@ -1,7 +1,70 @@
-/* NewCustomCertificateModal — size override only; base styles in modal.css */
+/* NewCustomCertificateModal — size override + recipient combobox */
 
 .new-custom-certificate-modal .modal-container {
     max-width: 35rem;
     max-height: min(90vh, 56.25rem);
     overflow: auto;
+}
+
+.new-custom-certificate-modal .recipient-pair-hint {
+    margin-bottom: 0.75rem;
+}
+
+.new-custom-certificate-modal .recipient-pair-label-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.new-custom-certificate-modal .recipient-pair-clear {
+    border: none;
+    background: transparent;
+    padding: 0;
+    font: inherit;
+    font-size: 0.8125rem;
+    color: var(--text-secondary, #64748b);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+
+.new-custom-certificate-modal .recipient-pair-clear:hover:not(:disabled) {
+    color: var(--text-primary, #0f172a);
+}
+
+.new-custom-certificate-modal .recipient-pair-clear:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.new-custom-certificate-modal .recipient-combobox {
+    position: relative;
+    width: 100%;
+}
+
+.new-custom-certificate-modal .recipient-combobox-input--locked {
+    background: var(--gray-50, #f8fafc);
+    color: var(--text-secondary, #64748b);
+    cursor: default;
+}
+
+.new-custom-certificate-modal .recipient-combobox .form-combobox-list {
+    z-index: 30;
+}
+
+.new-custom-certificate-modal .recipient-combobox .form-combobox-option {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+}
+
+.new-custom-certificate-modal .recipient-combobox-option-name {
+    font-size: 0.875rem;
+}
+
+.new-custom-certificate-modal .recipient-combobox-option-email {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #64748b);
 }

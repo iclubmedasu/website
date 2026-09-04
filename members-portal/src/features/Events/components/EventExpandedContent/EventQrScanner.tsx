@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { parseScannedPayload } from './checkInScanUtils';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface EventQrScannerProps {
     paused: boolean;
@@ -176,7 +177,7 @@ export default function EventQrScanner({ paused, onCode }: EventQrScannerProps) 
         };
     }, [cameraInitFailed, containerId, paused, selectedCameraId, stopScanner]);
 
-    const handleCameraChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const handleCameraChange = (event: { target: { value: string } }) => {
         setSelectedCameraId(event.target.value);
     };
 
@@ -190,7 +191,7 @@ export default function EventQrScanner({ paused, onCode }: EventQrScannerProps) 
                 <p className="event-qr-scanner__error">{errorMessage}</p>
             ) : null}
             {cameras.length > 1 && state === 'active' ? (
-                <select
+                <FormSelect
                     aria-label="Camera"
                     value={selectedCameraId ?? ''}
                     onChange={handleCameraChange}
@@ -202,7 +203,7 @@ export default function EventQrScanner({ paused, onCode }: EventQrScannerProps) 
                             {camera.label || `Camera ${camera.id.slice(0, 6)}`}
                         </option>
                     ))}
-                </select>
+                </FormSelect>
             ) : null}
         </div>
     );

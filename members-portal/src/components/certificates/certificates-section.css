@@ -83,13 +83,14 @@
     display: contents;
 }
 
-/* Equal-width slots — same visual language as .event-tickets-io-btn */
+/* Equal-width slots — same visual language as .event-tickets-io-btn.
+ * FormSelect wraps the trigger; the flex child is .form-select. */
 .event-cert-io-bar > .event-cert-io-btn,
-.event-cert-io-bar > .event-cert-io-template,
+.event-cert-io-bar > .form-select,
 .event-cert-io-bar > .event-cert-io-issue,
 .event-cert-io-bar-row--pair > .event-cert-io-btn,
 .project-cert-io-bar > .project-cert-io-btn,
-.project-cert-io-bar > .project-cert-io-template,
+.project-cert-io-bar > .form-select,
 .project-cert-io-bar > .project-cert-io-issue,
 .project-cert-io-bar-row--pair > .project-cert-io-btn {
     flex: 1 1 0;
@@ -109,10 +110,15 @@
     gap: 0.35rem;
 }
 
-/* Keep native <select> display — inline-flex on select breaks value sync in some browsers */
-.event-cert-io-bar > .event-cert-io-template,
-.project-cert-io-bar > .project-cert-io-template {
+/* Template slot: wrapper owns the flex share; trigger fills the slot */
+.event-cert-io-bar > .form-select,
+.project-cert-io-bar > .form-select {
     display: block;
+}
+
+.event-cert-io-bar > .form-select .form-select-trigger,
+.project-cert-io-bar > .form-select .form-select-trigger {
+    width: 100%;
 }
 
 .event-cert-io-issue,
@@ -376,10 +382,10 @@
     }
 
     /* Issue, template, custom — full-width rows */
-    .event-cert-io-bar > .event-cert-io-template,
+    .event-cert-io-bar > .form-select,
     .event-cert-io-bar > .event-cert-io-issue,
     .event-cert-io-bar > .event-cert-io-btn,
-    .project-cert-io-bar > .project-cert-io-template,
+    .project-cert-io-bar > .form-select,
     .project-cert-io-bar > .project-cert-io-issue,
     .project-cert-io-bar > .project-cert-io-btn {
         flex: 1 1 100%;
@@ -387,9 +393,12 @@
         min-width: 0;
     }
 
+    .event-cert-io-bar > .form-select .form-select-trigger,
+    .project-cert-io-bar > .form-select .form-select-trigger,
     .event-cert-io-template,
     .project-cert-io-template {
         max-width: none;
+        width: 100%;
     }
 }
 

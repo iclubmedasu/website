@@ -863,6 +863,12 @@ export default function EventExpandedContent({
 
                         eventId={eventId}
 
+                        eventDate={eventDate}
+
+                        eventEndDate={eventEndDate}
+
+                        eventTimezone={eventTimezone}
+
                         isFinalized={isFinalized}
 
                         isCertifiable={isCertifiable}

@@ -5,6 +5,7 @@ import type { FinanceAccountSummary, FinanceAccountType } from '@iclub/shared';
 import { financeAPI } from '@/services/api';
 import { FormToggleRow } from '@/components/toggle/FormToggleRow';
 import { FinanceModal } from '../components/FinanceModal';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface AccountFormModalProps {
     account?: FinanceAccountSummary;
@@ -83,7 +84,7 @@ export function AccountFormModal({ account, onClose, onSaved }: AccountFormModal
             </div>
             <div className="form-group">
                 <label htmlFor="finance-account-type" className="form-label">Account type</label>
-                <select
+                <FormSelect
                     id="finance-account-type"
                     className="form-input"
                     value={accountType}
@@ -92,7 +93,7 @@ export function AccountFormModal({ account, onClose, onSaved }: AccountFormModal
                     {ACCOUNT_TYPES.map((option) => (
                         <option key={option} value={option}>{option}</option>
                     ))}
-                </select>
+                </FormSelect>
             </div>
             <div className="form-group">
                 <label htmlFor="finance-account-currency" className="form-label">Currency</label>

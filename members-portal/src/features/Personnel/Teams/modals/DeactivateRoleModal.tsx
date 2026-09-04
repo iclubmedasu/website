@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { teamRolesAPI } from '../../../../services/api';
 import type { Id } from '../../../../types/backend-contracts';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface TeamRoleItem {
     id: Id;
@@ -138,7 +139,7 @@ const DeactivateRoleModal = ({ isOpen, onClose, onSubmit, teamId, initialRoleId 
                             <label htmlFor="roleSelect" className="form-label">
                                 Select Role to Deactivate *
                             </label>
-                            <select
+                            <FormSelect
                                 id="roleSelect"
                                 className={`form-input ${errors.role ? 'error' : ''}`}
                                 value={selectedRoleId}
@@ -161,7 +162,7 @@ const DeactivateRoleModal = ({ isOpen, onClose, onSubmit, teamId, initialRoleId 
                                         {isLoading ? 'Loading roles...' : 'No active roles available'}
                                     </option>
                                 )}
-                            </select>
+                            </FormSelect>
                             {errors.role && (
                                 <span className="field-error">{errors.role}</span>
                             )}

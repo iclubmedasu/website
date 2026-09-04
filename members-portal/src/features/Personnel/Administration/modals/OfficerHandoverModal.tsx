@@ -4,6 +4,7 @@ import { useState, useEffect, type FormEvent, type MouseEvent } from 'react';
 import { X } from 'lucide-react';
 import { formatDate } from '@iclub/shared/utils';
 import type { Id } from '../../../../types/backend-contracts';
+import { FormSelect } from '@/components/input/FormSelect';
 
 const MODES = {
     RETIRE: 'retire',
@@ -226,7 +227,7 @@ function OfficerHandoverModal({
                                 <h3 className="form-section-title">Retire</h3>
                                 <div className="form-group">
                                     <label htmlFor="retire-changeType" className="form-label">Type *</label>
-                                    <select
+                                    <FormSelect
                                         id="retire-changeType"
                                         className="form-input"
                                         value={retireData.changeType}
@@ -236,7 +237,7 @@ function OfficerHandoverModal({
                                         {RETIRE_TYPE_OPTIONS.map((opt) => (
                                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                                 <div className="form-group">
                                     <label htmlFor="retire-changeReason" className="form-label">Reason</label>

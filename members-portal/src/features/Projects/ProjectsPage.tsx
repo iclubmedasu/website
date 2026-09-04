@@ -30,6 +30,7 @@ import ProjectFiltersModal, { type ProjectFiltersState } from './modals/ProjectF
 import { isDateWithinRange } from '../../utils/filterDateRange';
 import { compareByPriorityThenDate, matchesPriorityFilter } from '../../utils/priorityOrder';
 import type { Id } from '../../types/backend-contracts';
+import { FormSelect } from '@/components/input/FormSelect';
 
 // ─────────────────────────────────────────────────────────
 //  Small helpers
@@ -74,19 +75,20 @@ function TaskStatusSelect({ taskId, current, canEdit, onChanged }: any) {
     if (!canEdit) return <StatusBadge status={current} />;
 
     return (
-        <select
-            className={`status-select-inline s-${current}`}
-            title="Select task status"
-            aria-label="Select task status"
-            value={current}
-            onChange={handleChange}
-            disabled={busy}
-            onClick={(e) => e.stopPropagation()}
-        >
-            {TASK_STATUSES.map((s) => (
-                <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-            ))}
-        </select>
+        <div onClick={(e) => e.stopPropagation()}>
+            <FormSelect
+                className={`status-select-inline s-${current}`}
+                title="Select task status"
+                aria-label="Select task status"
+                value={current}
+                onChange={handleChange}
+                disabled={busy}
+            >
+                {TASK_STATUSES.map((s) => (
+                    <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                ))}
+            </FormSelect>
+        </div>
     );
 }
 

@@ -5,6 +5,7 @@ import type { ContactMethodType, EditorContactMethod, EditorContactPage } from '
 import { siteContentAPI } from '@/services/api';
 import { PublicVisibilityToggle } from '../components/PublicVisibilityToggle';
 import { SiteContentModal } from '../components/SiteContentModal';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface EditContactMethodModalProps {
     method?: EditorContactMethod;
@@ -58,7 +59,7 @@ export function EditContactMethodModal({ method, onClose, onSaved }: EditContact
                 <label htmlFor="contact-method-type" className="form-label">
                     Type
                 </label>
-                <select
+                <FormSelect
                     id="contact-method-type"
                     className="form-input"
                     value={type}
@@ -69,7 +70,7 @@ export function EditContactMethodModal({ method, onClose, onSaved }: EditContact
                             {option}
                         </option>
                     ))}
-                </select>
+                </FormSelect>
             </div>
             <div className="form-group">
                 <label htmlFor="contact-method-label" className="form-label">

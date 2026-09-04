@@ -392,14 +392,30 @@
     font-weight: 600;
 }
 
-.template-editor-color-input {
-    width: 100%;
+.template-editor-color-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.template-editor-color-swatch {
+    width: 2.25rem;
     height: 2.25rem;
-    padding: 0.15rem;
+    padding: 0;
     border: 1px solid var(--border-brand);
-    border-radius: var(--radius-md);
-    background: var(--bg-card);
+    border-radius: var(--radius-sm);
+    background: transparent;
     cursor: pointer;
+}
+
+.template-editor-color-swatch::-webkit-color-swatch-wrapper {
+    padding: 2px;
+}
+
+.template-editor-color-swatch::-webkit-color-swatch {
+    border-radius: calc(var(--radius-sm) - 2px);
+    border: none;
 }
 
 .template-editor-delete-btn {

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { DateInput } from '@/components/input/DateInput';
+import { FormSelect } from '@/components/input/FormSelect';
 import type { ProjectStatus, TeamRef } from '@/types/backend-contracts';
 
 const WORK_STATUSES: ProjectStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD', 'CANCELLED'];
@@ -90,17 +91,19 @@ export default function ProjectFiltersModal({
                         <h3 className="form-section-title">Status</h3>
                         <div className="form-group">
                             <label className="form-label" htmlFor="project-filter-status">Work status</label>
-                            <select
+                            <FormSelect
                                 id="project-filter-status"
-                                className="form-input"
                                 value={draftStatus}
                                 onChange={(event) => setDraftStatus(event.target.value)}
-                            >
-                                <option value="">All statuses</option>
-                                {WORK_STATUSES.map((value) => (
-                                    <option key={value} value={value}>{STATUS_LABELS[value]}</option>
-                                ))}
-                            </select>
+                                placeholder="All statuses"
+                                options={[
+                                    { value: '', label: 'All statuses' },
+                                    ...WORK_STATUSES.map((value) => ({
+                                        value,
+                                        label: STATUS_LABELS[value],
+                                    })),
+                                ]}
+                            />
                         </div>
                     </div>
 
@@ -108,17 +111,19 @@ export default function ProjectFiltersModal({
                         <h3 className="form-section-title">Team</h3>
                         <div className="form-group">
                             <label className="form-label" htmlFor="project-filter-team">Assigned team</label>
-                            <select
+                            <FormSelect
                                 id="project-filter-team"
-                                className="form-input"
                                 value={draftTeam}
                                 onChange={(event) => setDraftTeam(event.target.value)}
-                            >
-                                <option value="">All teams</option>
-                                {allTeams.map((team) => (
-                                    <option key={team.id} value={String(team.id)}>{team.name}</option>
-                                ))}
-                            </select>
+                                placeholder="All teams"
+                                options={[
+                                    { value: '', label: 'All teams' },
+                                    ...allTeams.map((team) => ({
+                                        value: String(team.id),
+                                        label: team.name,
+                                    })),
+                                ]}
+                            />
                         </div>
                     </div>
 
@@ -126,17 +131,19 @@ export default function ProjectFiltersModal({
                         <h3 className="form-section-title">Category</h3>
                         <div className="form-group">
                             <label className="form-label" htmlFor="project-filter-category">Project category</label>
-                            <select
+                            <FormSelect
                                 id="project-filter-category"
-                                className="form-input"
                                 value={draftCategory}
                                 onChange={(event) => setDraftCategory(event.target.value)}
-                            >
-                                <option value="">All categories</option>
-                                {allCategories.map((category) => (
-                                    <option key={category} value={category}>{category}</option>
-                                ))}
-                            </select>
+                                placeholder="All categories"
+                                options={[
+                                    { value: '', label: 'All categories' },
+                                    ...allCategories.map((category) => ({
+                                        value: category,
+                                        label: category,
+                                    })),
+                                ]}
+                            />
                         </div>
                     </div>
 
@@ -144,17 +151,19 @@ export default function ProjectFiltersModal({
                         <h3 className="form-section-title">Priority</h3>
                         <div className="form-group">
                             <label className="form-label" htmlFor="project-filter-priority">Priority</label>
-                            <select
+                            <FormSelect
                                 id="project-filter-priority"
-                                className="form-input"
                                 value={draftPriority}
                                 onChange={(event) => setDraftPriority(event.target.value)}
-                            >
-                                <option value="">All priorities</option>
-                                {PRIORITIES.map((priority) => (
-                                    <option key={priority} value={priority}>{PRIORITY_LABELS[priority]}</option>
-                                ))}
-                            </select>
+                                placeholder="All priorities"
+                                options={[
+                                    { value: '', label: 'All priorities' },
+                                    ...PRIORITIES.map((priority) => ({
+                                        value: priority,
+                                        label: PRIORITY_LABELS[priority],
+                                    })),
+                                ]}
+                            />
                         </div>
                     </div>
 

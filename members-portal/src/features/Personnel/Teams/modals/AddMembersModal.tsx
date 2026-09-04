@@ -1,9 +1,10 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { membersAPI, teamMembersAPI } from '../../../../services/api';
 import type { Id } from '../../../../types/backend-contracts';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface ModalTeam {
     id: Id;
@@ -167,7 +168,7 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
         };
     }, [isOpen, formData.selectedTeamId]);
 
-    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string; name: string; type?: string } }) => {
         const { name, value } = e.target;
         setFormData((prev) => ({
             ...prev,
@@ -537,7 +538,7 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
                                     <label htmlFor="selectedTeamId" className="form-label">
                                         Select Team *
                                     </label>
-                                    <select
+                                    <FormSelect
                                         id="selectedTeamId"
                                         name="selectedTeamId"
                                         className={`form-input ${errors.selectedTeamId ? 'error' : ''}`}
@@ -551,7 +552,7 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
                                                 {team.name}
                                             </option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                     {errors.selectedTeamId && (
                                         <span className="field-error">{errors.selectedTeamId}</span>
                                     )}
@@ -561,7 +562,7 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
                                     <label htmlFor="selectedRoleId" className="form-label">
                                         Select Role *
                                     </label>
-                                    <select
+                                    <FormSelect
                                         id="selectedRoleId"
                                         name="selectedRoleId"
                                         className={`form-input ${errors.selectedRoleId ? 'error' : ''}`}
@@ -582,7 +583,7 @@ const AddMembersModal = ({ isOpen, onClose, onSubmit, selectedTeamId, teams, rol
                                                 </option>
                                             );
                                         })}
-                                    </select>
+                                    </FormSelect>
                                     {errors.selectedRoleId && (
                                         <span className="field-error">{errors.selectedRoleId}</span>
                                     )}

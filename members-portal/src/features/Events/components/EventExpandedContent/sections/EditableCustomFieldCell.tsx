@@ -9,6 +9,7 @@ import {
     parseCustomFieldInputValue,
 } from '../customFieldUtils';
 import { handleRegistrationConflict } from '../registrationConflictUtils';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface EditableCustomFieldCellProps {
     eventId: Id | string;
@@ -86,7 +87,7 @@ export default function EditableCustomFieldCell({
     if (field.type === 'dropdown') {
         return (
             <td className={`${savingClass}${errorClass}`.trim() || undefined} title={error || undefined}>
-                <select
+                <FormSelect
                     aria-label={field.label}
                     value={storedValue != null ? String(storedValue) : ''}
                     disabled={saving}
@@ -97,7 +98,7 @@ export default function EditableCustomFieldCell({
                     {dropdownOptions(field).map((option) => (
                         <option key={option} value={option}>{option}</option>
                     ))}
-                </select>
+                </FormSelect>
             </td>
         );
     }

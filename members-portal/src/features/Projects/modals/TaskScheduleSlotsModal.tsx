@@ -15,6 +15,7 @@ import {
 import MemberAvailabilityHint from '@/components/MemberAvailabilityHint/MemberAvailabilityHint';
 import { useTargetAvailability } from '@/hooks/useTargetAvailability';
 import type { Id, MemberSummary, ScheduleSlot, TaskSummary } from '../../../types/backend-contracts';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface ScheduleSlotView extends ScheduleSlot {
     task?: {
@@ -313,7 +314,7 @@ export default function TaskScheduleSlotsModal({
                                         <label className="form-label" htmlFor="task-slot-member">
                                             Member
                                         </label>
-                                        <select
+                                        <FormSelect
                                             id="task-slot-member"
                                             title="Select member"
                                             className="form-input"
@@ -327,7 +328,7 @@ export default function TaskScheduleSlotsModal({
                                                     {memberOptionLabel(member)}
                                                 </option>
                                             ))}
-                                        </select>
+                                        </FormSelect>
                                         {selectedMemberHint()}
                                     </div>
                                     <div className="form-group">

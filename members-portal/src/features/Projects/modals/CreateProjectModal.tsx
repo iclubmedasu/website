@@ -4,6 +4,7 @@ import { useEffect, useState, type ChangeEvent } from 'react';
 import { X } from 'lucide-react';
 import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
 import { DateInput } from '@/components/input/DateInput';
+import { FormSelect } from '@/components/input/FormSelect';
 import SearchableBadgePicker from '@/components/SearchableBadgePicker/SearchableBadgePicker';
 import { projectsAPI, projectTypesAPI } from '../../../services/api';
 import { toTitleCase } from '../../../utils/titleCase';
@@ -165,7 +166,7 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
         ? projectTypes.filter((typeItem) => typeItem.category === selectedCategory)
         : projectTypes;
 
-    const handleCategoryChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const handleCategoryChange = (e: ChangeEvent<HTMLInputElement> | { target: { value: string } }) => {
         const category = e.target.value;
         setSelectedCategory(category);
 
@@ -180,7 +181,7 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
     };
 
     const setField = (key: keyof Omit<ProjectFormState, 'teamIds'>) =>
-        (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+        (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string } }) => {
             const value = e.target.value;
             setForm((current) => ({ ...current, [key]: value }));
         };
@@ -292,7 +293,7 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                         <div className="form-row">
                             <div className="form-group">
                                 <label className="form-label" htmlFor="create-project-category">Category</label>
-                                <select
+                                <FormSelect
                                     id="create-project-category"
                                     title="Project category"
                                     className="form-input"
@@ -303,11 +304,11 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                                     {categories.map((category) => (
                                         <option key={category} value={category}>{category}</option>
                                     ))}
-                                </select>
+                                </FormSelect>
                             </div>
                             <div className="form-group">
                                 <label className="form-label" htmlFor="create-project-type">Type</label>
-                                <select
+                                <FormSelect
                                     id="create-project-type"
                                     title="Project type"
                                     className="form-input"
@@ -319,7 +320,7 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                                     {filteredTypes.map((typeItem) => (
                                         <option key={typeItem.id} value={String(typeItem.id)}>{typeItem.name}</option>
                                     ))}
-                                </select>
+                                </FormSelect>
                             </div>
                         </div>
 
@@ -327,15 +328,15 @@ export default function ProjectModal({ mode = 'create', initial = null, allTeams
                         <div className="form-row">
                             <div className="form-group">
                                 <label className="form-label" htmlFor="create-project-priority">Priority</label>
-                                <select id="create-project-priority" title="Project priority" className="form-input" value={form.priority} onChange={setField('priority')}>
+                                <FormSelect id="create-project-priority" title="Project priority" className="form-input" value={form.priority} onChange={setField('priority')}>
                                     {PRIORITIES.map((priority) => <option key={priority} value={priority}>{PRIORITY_LABELS[priority]}</option>)}
-                                </select>
+                                </FormSelect>
                             </div>
                             <div className="form-group">
                                 <label className="form-label" htmlFor="create-project-status">Status</label>
-                                <select id="create-project-status" title="Project status" className="form-input" value={form.status} onChange={setField('status')}>
+                                <FormSelect id="create-project-status" title="Project status" className="form-input" value={form.status} onChange={setField('status')}>
                                     {PROJECT_STATUSES.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
-                                </select>
+                                </FormSelect>
                             </div>
                         </div>
 

@@ -47,7 +47,7 @@ import WalkInDraftFields from './WalkInDraftFields';
 import SessionAttendanceOptions from './SessionAttendanceOptions';
 import EventStaffModal from '@/features/Events/components/EventStaffModal';
 import { useCheckInFlow } from '../useCheckInFlow';
-import { formatEventDuration, getActiveSessionsNow, isMultiDayEvent, isWithinEventDays } from '../../eventDateUtils';
+import { enumerateEventDays, formatEventDuration, getActiveSessionsNow, isMultiDayEvent, isWithinEventDays } from '../../eventDateUtils';
 import RegistrationColumnFilterModal, {
     DEFAULT_REGISTRATION_SORT,
     EMPTY_REGISTRATION_SERVER_FILTERS,
@@ -66,6 +66,7 @@ import {
 } from '../registrationTableFilterUtils';
 import type { RegistrationTableFunnelState } from '../eventExpandedFunnelState';
 import ExpandedSectionTitle from '../ExpandedSectionTitle';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface EventRegistrationsSectionProps {
     eventId: Id | string;
@@ -201,6 +202,10 @@ export default function EventRegistrationsSection({
     const canEditCustomFieldValues = withinEventDays;
     const eventDurationLabel = formatEventDuration(eventDate, eventEndDate ?? eventDate);
     const multiDayEvent = isMultiDayEvent(eventDate, eventEndDate, eventTimezone);
+    const eventDays = useMemo(
+        () => enumerateEventDays(eventDate, eventEndDate, eventTimezone),
+        [eventDate, eventEndDate, eventTimezone],
+    );
     const activeSessionsNow = getActiveSessionsNow(sessions);
     const sessionDateById = new Map(
         sessions.map((session) => {
@@ -210,16 +215,16 @@ export default function EventRegistrationsSection({
         }),
     );
     const filterableColumns = useMemo(
-        () => buildFilterableColumns('registrations', fields, tiers, sessions, multiDayEvent),
-        [fields, multiDayEvent, sessions, tiers],
+        () => buildFilterableColumns('registrations', fields, tiers, sessions, eventDays),
+        [eventDays, fields, sessions, tiers],
     );
     const tableContext = useMemo(() => ({
         tableKind: 'registrations' as const,
         fields,
         tiers,
         sessions,
-        multiDayEvent,
-    }), [fields, multiDayEvent, sessions, tiers]);
+        eventDays,
+    }), [eventDays, fields, sessions, tiers]);
 
     useEffect(() => {
         setSortSpec((current) => normalizeSortSpec(current, filterableColumns));
@@ -987,7 +992,7 @@ export default function EventRegistrationsSection({
                                     {trackSessionCheckOut && sortedActiveSessions.length > 0 ? (
                                         <div className="event-registrations-footer-bar__right">
                                             <div className="event-registrations-footer-station">
-                                                <select
+                                                <FormSelect
                                                     className="form-input event-registrations-footer-station__select"
                                                     value={stationSessionId}
                                                     disabled={
@@ -1013,7 +1018,7 @@ export default function EventRegistrationsSection({
                                                             </option>
                                                         );
                                                     })}
-                                                </select>
+                                                </FormSelect>
                                                 <button
                                                     type="button"
                                                     className="btn btn-secondary event-registrations-footer-station__close"

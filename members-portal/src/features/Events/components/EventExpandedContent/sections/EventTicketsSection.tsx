@@ -2,6 +2,7 @@ import { CLUB_TIMEZONE, toEventDayString } from '@iclub/shared/utils';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell, Filter, Loader2, Mail, Search } from 'lucide-react';
 import { fmtDate } from '@/components/cards/LifecycleCardView/LifecycleCardView';
+import { Checkbox } from '@/components/checkbox';
 import { useResourceChannel } from '@/hooks/useResourceChannel';
 import { eventsAPI } from '@/services/api';
 import type {
@@ -23,7 +24,7 @@ import {
     REGISTRATION_NAME_DISPLAY_LIMIT,
     truncateRegistrationCell,
 } from '../customFieldUtils';
-import { isMultiDayEvent, isWithinEventDays } from '../../eventDateUtils';
+import { isMultiDayEvent, isWithinEventDays, enumerateEventDays } from '../../eventDateUtils';
 import CollapsibleAttendanceChips, { type AttendanceRemovalTarget } from './CollapsibleAttendanceChips';
 import RemoveAttendanceModal from '@/features/Events/modals/RemoveAttendanceModal';
 import RegistrationColumnFilterModal, {
@@ -148,16 +149,17 @@ export default function EventTicketsSection({
     const [filterModalOpen, setFilterModalOpen] = useState(false);
     const [resendingTicketId, setResendingTicketId] = useState<number | null>(null);
     const [sendingReminderId, setSendingReminderId] = useState<number | null>(null);
-    const [bulkAction, setBulkAction] = useState<
-        'imported' | 'allTickets' | 'reminders' | 'filtered' | 'filteredReminders' | null
-    >(null);
-    const [allTicketsCount, setAllTicketsCount] = useState(0);
-    const [allRemindersCount, setAllRemindersCount] = useState(0);
+    const [bulkAction, setBulkAction] = useState<'tickets' | 'reminders' | null>(null);
+    const [selection, setSelection] = useState<Set<string>>(new Set());
     const [attendanceRemovalTarget, setAttendanceRemovalTarget] = useState<AttendanceRemovalTarget | null>(null);
     const [removingAttendance, setRemovingAttendance] = useState(false);
 
     const withinEventDays = isWithinEventDays(eventDate, eventEndDate, new Date(), eventTimezone);
     const multiDayEvent = isMultiDayEvent(eventDate, eventEndDate, eventTimezone);
+    const eventDays = useMemo(
+        () => enumerateEventDays(eventDate, eventEndDate, eventTimezone),
+        [eventDate, eventEndDate, eventTimezone],
+    );
     const sessionDateById = new Map(
         sessions.map((session) => {
             const instant = session.startDateTime ?? session.sessionDate;
@@ -165,18 +167,18 @@ export default function EventTicketsSection({
             return [String(session.id), day ?? ''] as const;
         }),
     );
-    const columnCount = multiDayEvent ? 6 : 5;
+    const columnCount = multiDayEvent ? 7 : 6;
     const filterableColumns = useMemo(
-        () => buildFilterableColumns('tickets', fields, tiers, sessions, multiDayEvent),
-        [fields, multiDayEvent, sessions, tiers],
+        () => buildFilterableColumns('tickets', fields, tiers, sessions, eventDays),
+        [eventDays, fields, sessions, tiers],
     );
     const tableContext = useMemo(() => ({
         tableKind: 'tickets' as const,
         fields,
         tiers,
         sessions,
-        multiDayEvent,
-    }), [fields, multiDayEvent, sessions, tiers]);
+        eventDays,
+    }), [eventDays, fields, sessions, tiers]);
 
     useEffect(() => {
         setSortSpec((current) => normalizeSortSpec(current, filterableColumns));
@@ -212,21 +214,9 @@ export default function EventTicketsSection({
         serverFilters.ticketStatus,
     ]);
 
-    const loadBulkCounts = useCallback(async () => {
-        try {
-            const allSendable = await eventsAPI.getRegistrations(eventId);
-            const sendableCount = getSendableRegistrations(allSendable).length;
-            setAllTicketsCount(sendableCount);
-            setAllRemindersCount(sendableCount);
-        } catch {
-            setAllTicketsCount(0);
-            setAllRemindersCount(0);
-        }
-    }, [eventId]);
-
     const refreshAll = useCallback(async () => {
-        await Promise.all([loadRegistrations(), loadBulkCounts()]);
-    }, [loadBulkCounts, loadRegistrations]);
+        await loadRegistrations();
+    }, [loadRegistrations]);
 
     useResourceChannel({
         resource: 'event',
@@ -239,10 +229,6 @@ export default function EventTicketsSection({
     useEffect(() => {
         void loadRegistrations();
     }, [loadRegistrations]);
-
-    useEffect(() => {
-        void loadBulkCounts();
-    }, [loadBulkCounts]);
 
     const filtered = useMemo(() => {
         let rows = registrations;
@@ -259,16 +245,53 @@ export default function EventTicketsSection({
         [filtered],
     );
 
-    const filteredReminderSendable = useMemo(
-        () => getSendableRegistrations(filtered),
-        [filtered],
+    const filteredSendableKeys = useMemo(
+        () => filteredSendable.map((registration) => String(registration.id)),
+        [filteredSendable],
     );
+
+    const selectedVisibleCount = useMemo(() => {
+        let count = 0;
+        for (const key of filteredSendableKeys) {
+            if (selection.has(key)) count += 1;
+        }
+        return count;
+    }, [filteredSendableKeys, selection]);
 
     const canSendEmail = (registration: EventRegistrationRef) => (
         registration.status !== 'CANCELLED'
         && Boolean(registration.email?.trim())
         && !isImportPlaceholderEmail(registration.email)
     );
+
+    const toggleSelection = (registration: EventRegistrationRef) => {
+        if (!canSendEmail(registration)) return;
+        const key = String(registration.id);
+        setSelection((prev) => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    };
+
+    const selectAllFiltered = () => {
+        setSelection(new Set(filteredSendableKeys));
+    };
+
+    const clearSelection = () => {
+        setSelection(new Set());
+    };
+
+    const getSelectedVisibleRegistrationIds = () => {
+        const visibleKeys = new Set(filteredSendableKeys);
+        return filteredSendable
+            .filter((registration) => {
+                const key = String(registration.id);
+                return selection.has(key) && visibleKeys.has(key);
+            })
+            .map((registration) => Number(registration.id));
+    };
 
     const handleRegistrationUpdated = (updated: EventRegistrationRef) => {
         setRegistrations((current) => current.map((item) => (item.id === updated.id ? updated : item)));
@@ -326,40 +349,15 @@ export default function EventTicketsSection({
         }
     };
 
-    const handleResendAllTickets = async () => {
-        setBulkAction('allTickets');
-        try {
-            const all = await eventsAPI.getRegistrations(eventId);
-            const registrationIds = getSendableRegistrations(all).map((registration) => Number(registration.id));
-
-            if (registrationIds.length === 0) {
-                window.alert('No registrations with a real email address can receive tickets.');
-                return;
-            }
-
-            if (!window.confirm(`Send ticket emails to ${registrationIds.length} registration(s)?`)) {
-                return;
-            }
-
-            const result = await eventsAPI.sendRegistrationTickets(eventId, { registrationIds });
-            window.alert(formatBulkSummary(result, 'Tickets sent'));
-            void refreshAll();
-        } catch (error) {
-            window.alert(error instanceof Error ? error.message : 'Failed to send ticket emails.');
-        } finally {
-            setBulkAction(null);
-        }
-    };
-
-    const handleSendFilteredTickets = async () => {
-        const registrationIds = filteredSendable.map((registration) => Number(registration.id));
+    const handleSendSelectedTickets = async () => {
+        const registrationIds = getSelectedVisibleRegistrationIds();
         if (registrationIds.length === 0) return;
 
-        if (!window.confirm(`Send tickets to ${registrationIds.length} filtered registrant(s)?`)) {
+        if (!window.confirm(`Send tickets to ${registrationIds.length} selected registrant(s)?`)) {
             return;
         }
 
-        setBulkAction('filtered');
+        setBulkAction('tickets');
         try {
             const result = await eventsAPI.sendRegistrationTickets(eventId, { registrationIds });
             window.alert(formatBulkSummary(result, 'Tickets sent'));
@@ -371,40 +369,15 @@ export default function EventTicketsSection({
         }
     };
 
-    const handleSendReminders = async () => {
+    const handleSendSelectedReminders = async () => {
+        const registrationIds = getSelectedVisibleRegistrationIds();
+        if (registrationIds.length === 0) return;
+
+        if (!window.confirm(`Send reminders to ${registrationIds.length} selected registrant(s)?`)) {
+            return;
+        }
+
         setBulkAction('reminders');
-        try {
-            const all = await eventsAPI.getRegistrations(eventId);
-            const registrationIds = getSendableRegistrations(all).map((registration) => Number(registration.id));
-
-            if (registrationIds.length === 0) {
-                window.alert('No registrations with a real email address can receive reminders.');
-                return;
-            }
-
-            if (!window.confirm(`Send reminders to ${registrationIds.length} registrant(s)?`)) {
-                return;
-            }
-
-            const result = await eventsAPI.sendRegistrationReminders(eventId, { registrationIds });
-            window.alert(formatBulkSummary(result, 'Reminders sent'));
-            void refreshAll();
-        } catch (error) {
-            window.alert(error instanceof Error ? error.message : 'Failed to send reminder emails.');
-        } finally {
-            setBulkAction(null);
-        }
-    };
-
-    const handleSendFilteredReminders = async () => {
-        const registrationIds = filteredReminderSendable.map((registration) => Number(registration.id));
-        if (registrationIds.length === 0) return;
-
-        if (!window.confirm(`Send reminders to ${registrationIds.length} filtered registrant(s)?`)) {
-            return;
-        }
-
-        setBulkAction('filteredReminders');
         try {
             const result = await eventsAPI.sendRegistrationReminders(eventId, { registrationIds });
             window.alert(formatBulkSummary(result, 'Reminders sent'));
@@ -501,6 +474,7 @@ export default function EventTicketsSection({
                             <table className="members-table event-registrations-table">
                                 <thead>
                                     <tr>
+                                        <th aria-label="Select" />
                                         <th className="event-registrations-name-cell">Name</th>
                                         <th className="event-registrations-email-cell">Email</th>
                                         {multiDayEvent ? <th>Attendance</th> : null}
@@ -521,9 +495,20 @@ export default function EventTicketsSection({
                                         const ticketStatus = formatTicketEmailStatus(registration);
                                         const reminderStatus = formatReminderEmailStatus(registration);
                                         const sendable = canSendEmail(registration);
+                                        const registrationKey = String(registration.id);
+                                        const checked = selection.has(registrationKey);
 
                                         return (
                                             <tr key={registration.id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
+                                                <td className="event-registrations-table-checkbox">
+                                                    <Checkbox
+                                                        color="purple"
+                                                        checked={checked}
+                                                        disabled={!sendable}
+                                                        onChange={() => toggleSelection(registration)}
+                                                        aria-label={`Select ${registration.fullName || registration.email || registrationKey}`}
+                                                    />
+                                                </td>
                                                 <td className="event-registrations-name-cell" title={registration.fullName || undefined}>
                                                     {registration.fullName
                                                         ? truncateRegistrationCell(registration.fullName, REGISTRATION_NAME_DISPLAY_LIMIT)
@@ -590,67 +575,47 @@ export default function EventTicketsSection({
                         </div>
 
                         <div className="event-tickets-io-bar">
-                            {/* Send tickets to imported — hidden for now
+                            <div className="event-tickets-io-bar-row event-tickets-io-bar-row--pair">
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary event-tickets-io-btn"
+                                    disabled={filteredSendableKeys.length === 0}
+                                    onClick={selectAllFiltered}
+                                >
+                                    Select all
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary event-tickets-io-btn"
+                                    disabled={selection.size === 0}
+                                    onClick={clearSelection}
+                                >
+                                    Clear
+                                </button>
+                            </div>
                             <button
                                 type="button"
-                                className="btn btn-secondary event-tickets-io-btn"
-                                disabled={bulkAction !== null || importUnsentCount === 0}
-                                onClick={() => void handleSendImportedTickets()}
+                                className="btn btn-primary event-tickets-io-btn"
+                                disabled={selectedVisibleCount === 0 || bulkAction !== null}
+                                onClick={() => void handleSendSelectedTickets()}
                             >
-                                {bulkAction === 'imported'
+                                {bulkAction === 'tickets'
                                     ? 'Sending…'
-                                    : importUnsentCount > 0
-                                        ? `Send tickets to imported (${importUnsentCount})`
-                                        : 'Send tickets to imported'}
-                            </button>
-                            */}
-                            <button
-                                type="button"
-                                className="btn btn-secondary event-tickets-io-btn"
-                                disabled={bulkAction !== null || filteredSendable.length === 0}
-                                onClick={() => void handleSendFilteredTickets()}
-                            >
-                                {bulkAction === 'filtered'
-                                    ? 'Sending…'
-                                    : filteredSendable.length > 0
-                                        ? `Send tickets to filtered (${filteredSendable.length})`
-                                        : 'Send tickets to filtered'}
+                                    : selectedVisibleCount > 0
+                                        ? `Send tickets (${selectedVisibleCount})`
+                                        : 'Send tickets'}
                             </button>
                             <button
                                 type="button"
                                 className="btn btn-primary event-tickets-io-btn"
-                                disabled={bulkAction !== null || allTicketsCount === 0}
-                                onClick={() => void handleResendAllTickets()}
-                            >
-                                {bulkAction === 'allTickets'
-                                    ? 'Sending…'
-                                    : allTicketsCount > 0
-                                        ? `Send tickets to all (${allTicketsCount})`
-                                        : 'Send tickets to all'}
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-primary event-tickets-io-btn"
-                                disabled={bulkAction !== null || allRemindersCount === 0}
-                                onClick={() => void handleSendReminders()}
+                                disabled={selectedVisibleCount === 0 || bulkAction !== null}
+                                onClick={() => void handleSendSelectedReminders()}
                             >
                                 {bulkAction === 'reminders'
                                     ? 'Sending…'
-                                    : allRemindersCount > 0
-                                        ? `Send reminders to all (${allRemindersCount})`
-                                        : 'Send reminders to all'}
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-secondary event-tickets-io-btn"
-                                disabled={bulkAction !== null || filteredReminderSendable.length === 0}
-                                onClick={() => void handleSendFilteredReminders()}
-                            >
-                                {bulkAction === 'filteredReminders'
-                                    ? 'Sending…'
-                                    : filteredReminderSendable.length > 0
-                                        ? `Send reminders to filtered (${filteredReminderSendable.length})`
-                                        : 'Send reminders to filtered'}
+                                    : selectedVisibleCount > 0
+                                        ? `Send reminders (${selectedVisibleCount})`
+                                        : 'Send reminders'}
                             </button>
                         </div>
                     </div>

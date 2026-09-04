@@ -941,18 +941,19 @@ src/
    - `appearance: none` is intentional for all engines so width stays full-width (WebKit otherwise shrink-to-fits) with our calendar icon.
    - Chromium: transparent `::-webkit-calendar-picker-indicator` is stretched over the field so any tap opens the picker.
    - Prefer stacking From/To (or Start/End) full-width on narrow screens when space is tight rather than leaving half-width date cells.
-6. **`select.form-input`:** themed purple chevron + `appearance: none` live centrally in `components/input/input.css`. **Never** add per-modal `appearance: none` + chevron background duplicates — reuse the shared rule; only override `background-position` / `padding` if a specific select needs a different size.
-7. **`datetime-local` / `time`:** still use `type` + `.form-input`; global icon/min-height rules apply in `input.css`. Prefer wrapping new occurrences in a similar empty-label pattern if empty fields look blank.
-8. **Boolean on/off fields** MUST use `Toggle` from `@/components/toggle/Toggle` (`role="switch"`), never raw `<input type="checkbox">`. Use `FormToggleRow` from `@/components/toggle/FormToggleRow` for label + switch layout (`.form-toggle-row`). Import `@/components/toggle/toggle.css`.
-9. **Multi-section modal bodies** MUST wrap each logical block in `.form-section`:
+6. **Form dropdowns:** use `FormSelect` from `@/components/input/FormSelect` (not a native `<select>`). Closed trigger uses `.form-input` / `.modal-select` + shared chevron rules in `components/input/input.css`; open list uses `.form-combobox-list` / `.form-combobox-option` (portal/fixed so `overflow: hidden` parents do not clip). **Do not** add native `<select className="form-input|modal-select">` for new form fields. Optional `searchable` for long lists. Leave native only for date/datetime/time, file, radio/checkbox, and `components/dropdown` manage menus.
+7. **Overlay suggestion lists** (custom combobox / email-domain / session menus, not native OS `<select>` popups): use the shared `.form-combobox-list` / `.form-combobox-option` (and legacy aliases) rules in `components/input/input.css`. **Do not** copy recipient-combobox card/option chrome into feature CSS — keep only layout-specific overrides (z-index, name/email stacking, checkbox flex).
+8. **`datetime-local` / `time`:** still use `type` + `.form-input`; global icon/min-height rules apply in `input.css`. Prefer wrapping new occurrences in a similar empty-label pattern if empty fields look blank.
+9. **Boolean on/off fields** MUST use `Toggle` from `@/components/toggle/Toggle` (`role="switch"`), never raw `<input type="checkbox">`. Use `FormToggleRow` from `@/components/toggle/FormToggleRow` for label + switch layout (`.form-toggle-row`). Import `@/components/toggle/toggle.css`.
+10. **Multi-section modal bodies** MUST wrap each logical block in `.form-section`:
    - Optional `.form-section-title`, then optional `.form-hint-text` caption, then fields/controls
    - Dividers come from `.form-section` `border-bottom` — do not invent per-modal divider classes
    - Captions/hints that sit **above** controls use `.form-hint-text` (space below). After-field helpers use `.form-hint`
    - The last `.form-section` has no bottom border (`:last-of-type`)
    - Single-purpose modals (one field / one confirm message) do not need multiple sections
-10. If the modal needs a unique width: `.my-modal .modal-container { max-width: 500px; }`
-11. Do NOT redefine any base modal classes — import from `modal.css` (already in `app.css`)
-12. Page scroll behind the modal is locked automatically via `html:has(.modal-backdrop)` rules in `modal.css` (see §7.5.1)
+11. If the modal needs a unique width: `.my-modal .modal-container { max-width: 500px; }`
+12. Do NOT redefine any base modal classes — import from `modal.css` (already in `app.css`)
+13. Page scroll behind the modal is locked automatically via `html:has(.modal-backdrop)` rules in `modal.css` (see §7.5.1)
 
 ### 11.4 When Adding a New UI Component
 

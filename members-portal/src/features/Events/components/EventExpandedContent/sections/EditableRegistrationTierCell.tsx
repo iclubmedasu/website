@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { eventsAPI } from '@/services/api';
 import type { EventRegistrationRef, EventTierRef, Id } from '@/types/backend-contracts';
 import { handleRegistrationConflict } from '../registrationConflictUtils';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface EditableRegistrationTierCellProps {
     eventId: Id | string;
@@ -71,7 +72,7 @@ export default function EditableRegistrationTierCell({
 
     return (
         <td className={cellClass} title={error || undefined}>
-            <select
+            <FormSelect
                 aria-label={`Tier for ${registration.fullName}`}
                 value={localTierId}
                 disabled={saving}
@@ -82,7 +83,7 @@ export default function EditableRegistrationTierCell({
                 {tiers.map((tier) => (
                     <option key={tier.id} value={tier.id}>{tier.name}</option>
                 ))}
-            </select>
+            </FormSelect>
         </td>
     );
 }

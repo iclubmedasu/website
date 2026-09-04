@@ -1,9 +1,10 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { teamMembersAPI, teamRolesAPI, membersAPI } from '../../../../services/api';
 import type { Id } from '../../../../types/backend-contracts';
+import { FormSelect } from '@/components/input/FormSelect';
 
 const MODES = {
     ASSIGN: 'assign',
@@ -167,7 +168,7 @@ const AssignToTeamModal = ({
         }
     }, [formData.teamId, rolesForTeam, formData.roleId, mode]);
 
-    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string; name: string; type?: string } }) => {
         const { name, value } = e.target;
         setFormData((prev) => {
             if (name === 'leaveType') {
@@ -396,7 +397,7 @@ const AssignToTeamModal = ({
                                 <h3 className="form-section-title">Team &amp; Role</h3>
                                 <div className="form-group">
                                     <label htmlFor="assign-teamId" className="form-label">Team *</label>
-                                    <select
+                                    <FormSelect
                                         id="assign-teamId"
                                         name="teamId"
                                         className={`form-input ${errors.teamId ? 'error' : ''}`}
@@ -408,12 +409,12 @@ const AssignToTeamModal = ({
                                         {(teams || []).filter(t => t.isActive !== false).map(t => (
                                             <option key={t.id} value={String(t.id)}>{t.name}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                     {errors.teamId && <span className="field-error">{errors.teamId}</span>}
                                 </div>
                                 <div className="form-group">
                                     <label htmlFor="assign-roleId" className="form-label">Role *</label>
-                                    <select
+                                    <FormSelect
                                         id="assign-roleId"
                                         name="roleId"
                                         className={`form-input ${errors.roleId ? 'error' : ''}`}
@@ -434,7 +435,7 @@ const AssignToTeamModal = ({
                                                 </option>
                                             );
                                         })}
-                                    </select>
+                                    </FormSelect>
                                     {errors.roleId && <span className="field-error">{errors.roleId}</span>}
                                 </div>
                             </div>
@@ -446,7 +447,7 @@ const AssignToTeamModal = ({
                                 <h3 className="form-section-title">Leave type</h3>
                                 <div className="form-group">
                                     <label htmlFor="leaveType" className="form-label">Type *</label>
-                                    <select
+                                    <FormSelect
                                         id="leaveType"
                                         name="leaveType"
                                         className="form-input"
@@ -457,7 +458,7 @@ const AssignToTeamModal = ({
                                         {leaveTypeOptions.map(opt => (
                                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                             </div>
                         )}

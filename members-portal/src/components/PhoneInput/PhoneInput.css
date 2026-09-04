@@ -24,15 +24,23 @@
     flex: 0 0 auto;
     min-width: 140px;
     padding: 0.5rem 0.75rem;
+    padding-right: 2.2rem;
     font-size: 0.9rem;
     border: 2px solid var(--gray-300);
     border-radius: var(--radius-sm);
-    background: var(--bg-card);
+    background-color: var(--bg-card);
     color: var(--gray-900);
 }
 
-.phone-input-select:disabled {
-    background: var(--gray-100);
+.phone-input-row .form-select {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 140px;
+}
+
+.phone-input-select:disabled,
+.phone-input-select.form-select-trigger:disabled {
+    background-color: var(--gray-100);
     color: var(--gray-500);
     cursor: not-allowed;
 }

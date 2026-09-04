@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import type { FinanceAccountSummary } from '@iclub/shared';
 import { DateInput } from '@/components/input/DateInput';
+import { FormSelect } from '@/components/input/FormSelect';
 
 export interface TransactionFiltersState {
     accountId: string;
@@ -74,7 +75,7 @@ export default function TransactionFiltersModal({
                             <label className="form-label" htmlFor="tx-filter-account">
                                 Account
                             </label>
-                            <select
+                            <FormSelect
                                 id="tx-filter-account"
                                 className="form-input"
                                 value={draftAccountId}
@@ -86,7 +87,7 @@ export default function TransactionFiltersModal({
                                         {account.name}
                                     </option>
                                 ))}
-                            </select>
+                            </FormSelect>
                         </div>
                     </div>
 
@@ -96,7 +97,7 @@ export default function TransactionFiltersModal({
                             <label className="form-label" htmlFor="tx-filter-type">
                                 Transaction type
                             </label>
-                            <select
+                            <FormSelect
                                 id="tx-filter-type"
                                 className="form-input"
                                 value={draftType}
@@ -105,7 +106,7 @@ export default function TransactionFiltersModal({
                                 <option value="">All types</option>
                                 <option value="INCOME">Income</option>
                                 <option value="EXPENSE">Expense</option>
-                            </select>
+                            </FormSelect>
                         </div>
                     </div>
 
@@ -115,7 +116,7 @@ export default function TransactionFiltersModal({
                             <label className="form-label" htmlFor="tx-filter-category">
                                 Category
                             </label>
-                            <select
+                            <FormSelect
                                 id="tx-filter-category"
                                 className="form-input"
                                 value={draftCategory}
@@ -127,7 +128,7 @@ export default function TransactionFiltersModal({
                                         {item}
                                     </option>
                                 ))}
-                            </select>
+                            </FormSelect>
                         </div>
                     </div>
 

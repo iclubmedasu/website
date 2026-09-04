@@ -31,12 +31,43 @@ const rows: CertificateEligibleRow[] = [
 ];
 
 describe('certificateEligibleFilterUtils', () => {
-    it('filters by attendance days and excludes empty results', () => {
+    it('filters by attendance days count operators and excludes empty results', () => {
         const filters: CertificateEligibleFilter[] = [
-            { columnId: 'attendanceDaysCount', kind: 'number', operator: 'greaterThan', value: 1 },
+            { columnId: 'attendanceDaysCount', kind: 'count', operator: 'greaterThan', value: 1 },
         ];
         const result = applyCertificateEligibleFilters(rows, filters);
         expect(result.map((r) => r.fullName)).toEqual(['Ada Lovelace', 'Alan Turing']);
+    });
+
+    it('supports hasAny / hasNone count operators for days attended', () => {
+        const mixed: CertificateEligibleRow[] = [
+            {
+                fullName: 'Present',
+                email: 'present@example.com',
+                type: 'ATTENDANCE',
+                category: 'ATTENDEE',
+                attendanceDaysCount: 2,
+                alreadyIssued: false,
+            },
+            {
+                fullName: 'Absent',
+                email: 'absent@example.com',
+                type: 'ATTENDANCE',
+                category: 'ATTENDEE',
+                attendanceDaysCount: 0,
+                alreadyIssued: false,
+            },
+        ];
+
+        const hasAny = applyCertificateEligibleFilters(mixed, [
+            { columnId: 'attendanceDaysCount', kind: 'count', operator: 'hasAny' },
+        ]);
+        expect(hasAny.map((r) => r.fullName)).toEqual(['Present']);
+
+        const hasNone = applyCertificateEligibleFilters(mixed, [
+            { columnId: 'attendanceDaysCount', kind: 'count', operator: 'hasNone' },
+        ]);
+        expect(hasNone.map((r) => r.fullName)).toEqual(['Absent']);
     });
 
     it('filters alreadyIssued checkbox and supports search + sort pipeline', () => {
@@ -112,7 +143,7 @@ describe('certificateEligibleFilterUtils', () => {
         ];
 
         const daysFilter: CertificateEligibleFilter[] = [
-            { columnId: 'attendanceDaysCount', kind: 'number', operator: 'greaterThan', value: 0 },
+            { columnId: 'attendanceDaysCount', kind: 'count', operator: 'greaterThan', value: 0 },
         ];
         expect(applyCertificateEligibleFilters(mixed, daysFilter).map((r) => r.fullName)).toEqual([
             'Staff Lead',
@@ -120,7 +151,7 @@ describe('certificateEligibleFilterUtils', () => {
         ]);
 
         const sessionsFilter: CertificateEligibleFilter[] = [
-            { columnId: 'sessionsAttendedCount', kind: 'number', operator: 'greaterThan', value: 0 },
+            { columnId: 'sessionsAttendedCount', kind: 'count', operator: 'greaterThan', value: 0 },
         ];
         expect(applyCertificateEligibleFilters(mixed, sessionsFilter).map((r) => r.fullName)).toEqual([
             'Staff Lead',

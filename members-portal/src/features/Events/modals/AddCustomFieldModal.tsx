@@ -10,6 +10,7 @@ import type {
     Id,
     UpdateEventCustomFieldPayload,
 } from '@/types/backend-contracts';
+import { FormSelect } from '@/components/input/FormSelect';
 
 export const FIELD_TYPES = ['text', 'dropdown', 'checkbox', 'number'] as const;
 
@@ -150,7 +151,7 @@ export default function AddCustomFieldModal({
 
                     <div className="form-group">
                         <label className="form-label" htmlFor="custom-field-type">Type</label>
-                        <select
+                        <FormSelect
                             id="custom-field-type"
                             aria-label="Field type"
                             value={type}
@@ -161,7 +162,7 @@ export default function AddCustomFieldModal({
                             {FIELD_TYPES.map((fieldType) => (
                                 <option key={fieldType} value={fieldType}>{FIELD_TYPE_LABELS[fieldType]}</option>
                             ))}
-                        </select>
+                        </FormSelect>
                     </div>
 
                     {type === 'dropdown' && (

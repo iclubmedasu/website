@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Calendar, User } from 'lucide-react';
 import { formatDateTime } from '@iclub/shared/utils';
 import { DateInput } from '@/components/input/DateInput';
+import { FormSelect } from '@/components/input/FormSelect';
 import { getProfilePhotoUrl } from '@/services/api';
 import {
     collectReadableChanges,
@@ -142,7 +143,7 @@ export default function ActivityTimeline({
                     <div className="timeline-filters-row">
                         <div className="modal-form-group timeline-filter-field">
                             <label className="modal-label" htmlFor="timeline-filter-action">Action</label>
-                            <select
+                            <FormSelect
                                 id="timeline-filter-action"
                                 className="modal-select"
                                 value={actionTypeFilter}
@@ -152,12 +153,12 @@ export default function ActivityTimeline({
                                 {actionTypeOptions.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
-                            </select>
+                            </FormSelect>
                         </div>
 
                         <div className="modal-form-group timeline-filter-field">
                             <label className="modal-label" htmlFor="timeline-filter-actor">Who</label>
-                            <select
+                            <FormSelect
                                 id="timeline-filter-actor"
                                 className="modal-select"
                                 value={actorFilter}
@@ -167,7 +168,7 @@ export default function ActivityTimeline({
                                 {actorOptions.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
-                            </select>
+                            </FormSelect>
                         </div>
 
                         <div className="modal-form-group timeline-filter-field">

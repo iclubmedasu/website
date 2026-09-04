@@ -15,6 +15,7 @@ import {
     certificatesAPI,
     type BackgroundFocus,
 } from '@/services/certificatesAPI';
+import { DEFAULT_TICKET_ACCENT, normalizeHex } from '@iclub/shared/utils';
 import { createUuid } from '@/utils/createUuid';
 import ClampedNumberInput from './ClampedNumberInput';
 import { textFitsInBox } from './textFitsInBox';
@@ -71,7 +72,7 @@ const ONCE_ONLY_FIELDS = new Set<string>([
 ]);
 
 /** Template-owned wording: editable via Text Content and stored on `element.text`. */
-const WORDING_FIELDS = new Set<string>(['description', 'issuerName']);
+const WORDING_FIELDS = new Set<string>(['title', 'description', 'issuerName']);
 
 const FIELD_MAP = Object.fromEntries(
     AVAILABLE_FIELDS.map((f) => [f.field, f]),
@@ -382,6 +383,10 @@ export default function TemplateEditor({
 
     const selectedElementId = typeof selection === 'string' ? selection : null;
     const selectedElement = elements.find((el) => el.id === selectedElementId) ?? null;
+    const selectedColorHexValue =
+        normalizeHex(selectedElement?.color) ?? selectedElement?.color ?? '';
+    const selectedColorPickerValue =
+        normalizeHex(selectedElement?.color) ?? DEFAULT_TICKET_ACCENT;
     const backgroundSelected = selection === 'background';
 
     useEffect(() => {
@@ -550,7 +555,7 @@ export default function TemplateEditor({
             fontSize: isVerificationUrl ? 60 : DEFAULT_ELEMENT_FONT_SIZE,
             fontWeight: 'normal',
             align: 'center',
-            color: isVerificationUrl ? '#0563C1' : '#ffffff',
+            color: isVerificationUrl ? '#0563C1' : DEFAULT_TICKET_ACCENT,
         };
 
         if (fieldKey === '__static') {
@@ -1446,15 +1451,36 @@ export default function TemplateEditor({
                                         <label className="form-label" htmlFor="te-color">
                                             Color
                                         </label>
-                                        <input
-                                            id="te-color"
-                                            type="color"
-                                            className="template-editor-color-input"
-                                            value={selectedElement.color || '#000000'}
-                                            onChange={(e) =>
-                                                updateSelected({ color: e.target.value })
-                                            }
-                                        />
+                                        <div className="template-editor-color-row">
+                                            <input
+                                                type="color"
+                                                className="template-editor-color-swatch"
+                                                value={selectedColorPickerValue}
+                                                onChange={(e) =>
+                                                    updateSelected({
+                                                        color:
+                                                            normalizeHex(e.target.value) ??
+                                                            e.target.value,
+                                                    })
+                                                }
+                                                aria-label="Pick color"
+                                            />
+                                            <input
+                                                id="te-color"
+                                                type="text"
+                                                className="form-input"
+                                                value={selectedColorHexValue}
+                                                onChange={(e) => {
+                                                    const raw = e.target.value;
+                                                    updateSelected({
+                                                        color: normalizeHex(raw) ?? raw,
+                                                    });
+                                                }}
+                                                placeholder={DEFAULT_TICKET_ACCENT}
+                                                spellCheck={false}
+                                                autoComplete="off"
+                                            />
+                                        </div>
                                     </div>
 
                                     {textFitError ? (

@@ -1,4 +1,5 @@
 import type { FilterableColumn, RegistrationSortSpec, SortDirection } from '../registrationTableFilterUtils';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface RegistrationTableSortControlProps {
     columns: FilterableColumn[];
@@ -18,7 +19,7 @@ export default function RegistrationTableSortControl({
 
     return (
         <>
-            <select
+            <FormSelect
                 aria-label="Sort by"
                 className="form-input"
                 value={sortSpec.columnId}
@@ -27,7 +28,7 @@ export default function RegistrationTableSortControl({
                 {columns.map((column) => (
                     <option key={column.id} value={column.id}>{column.label}</option>
                 ))}
-            </select>
+            </FormSelect>
             <button
                 type="button"
                 className="btn btn-secondary event-registration-sort-direction-btn"

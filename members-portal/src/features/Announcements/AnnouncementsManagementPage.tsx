@@ -14,6 +14,7 @@ import {
 import { useAnnouncements } from '@/hooks/useAnnouncements'
 import { announcementsAPI, eventsAPI, projectsAPI } from '@/services/api'
 import { FormToggleRow } from '@/components/toggle/FormToggleRow'
+import { FormSelect } from '@/components/input/FormSelect'
 import AnnouncementPost from './AnnouncementPost'
 import { formatPeriods } from './announcementAvailability'
 import { exportAnnouncementResponsesExcel } from './exportAnnouncementResponsesExcel'
@@ -398,7 +399,7 @@ function AnnouncementFormModal({
                             <label htmlFor="announcement-target" className="form-label">
                                 Target
                             </label>
-                            <select
+                            <FormSelect
                                 id="announcement-target"
                                 className="form-input"
                                 value={form.targetType}
@@ -416,7 +417,7 @@ function AnnouncementFormModal({
                                 <option value="NONE">None</option>
                                 <option value="EVENT">Event</option>
                                 <option value="PROJECT">Project</option>
-                            </select>
+                            </FormSelect>
                         </div>
 
                         {form.targetType === 'EVENT' ? (
@@ -424,7 +425,7 @@ function AnnouncementFormModal({
                                 <label htmlFor="announcement-event" className="form-label">
                                     Event *
                                 </label>
-                                <select
+                                <FormSelect
                                     id="announcement-event"
                                     className={`form-input ${fieldErrors.eventId ? 'error' : ''}`}
                                     value={form.eventId}
@@ -439,7 +440,7 @@ function AnnouncementFormModal({
                                             {event.title}
                                         </option>
                                     ))}
-                                </select>
+                                </FormSelect>
                                 {fieldErrors.eventId ? (
                                     <span className="field-error">{fieldErrors.eventId}</span>
                                 ) : null}
@@ -451,7 +452,7 @@ function AnnouncementFormModal({
                                 <label htmlFor="announcement-project" className="form-label">
                                     Project *
                                 </label>
-                                <select
+                                <FormSelect
                                     id="announcement-project"
                                     className={`form-input ${fieldErrors.projectId ? 'error' : ''}`}
                                     value={form.projectId}
@@ -466,7 +467,7 @@ function AnnouncementFormModal({
                                             {project.title}
                                         </option>
                                     ))}
-                                </select>
+                                </FormSelect>
                                 {fieldErrors.projectId ? (
                                     <span className="field-error">{fieldErrors.projectId}</span>
                                 ) : null}
@@ -829,3 +830,4 @@ export default function AnnouncementsManagementPage() {
         </div>
     )
 }
+

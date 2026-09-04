@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import type { FinanceAccountSummary, FinanceTransactionRow } from '@iclub/shared';
 import { fromDateInputValue, toDateInputValue } from '@iclub/shared/utils';
 import { DateInput } from '@/components/input/DateInput';
+import { FormSelect } from '@/components/input/FormSelect';
 import { financeAPI } from '@/services/api';
 import { FinanceModal } from '../components/FinanceModal';
 
@@ -128,7 +129,7 @@ export function TransactionFormModal({
             {error ? <p className="error-message">{error}</p> : null}
             <div className="form-group">
                 <label htmlFor="finance-tx-account" className="form-label">Account</label>
-                <select
+                <FormSelect
                     id="finance-tx-account"
                     className="form-input"
                     value={accountId}
@@ -138,11 +139,11 @@ export function TransactionFormModal({
                     {activeAccounts.map((account) => (
                         <option key={account.id} value={account.id}>{account.name}</option>
                     ))}
-                </select>
+                </FormSelect>
             </div>
             <div className="form-group">
                 <label htmlFor="finance-tx-type" className="form-label">Type</label>
-                <select
+                <FormSelect
                     id="finance-tx-type"
                     className="form-input"
                     value={type}
@@ -150,7 +151,7 @@ export function TransactionFormModal({
                 >
                     <option value="INCOME">Income</option>
                     <option value="EXPENSE">Expense</option>
-                </select>
+                </FormSelect>
             </div>
             <div className="form-group">
                 <label htmlFor="finance-tx-amount" className="form-label">Amount</label>
@@ -166,7 +167,7 @@ export function TransactionFormModal({
             </div>
             <div className="form-group">
                 <label htmlFor="finance-tx-category" className="form-label">Category</label>
-                <select
+                <FormSelect
                     id="finance-tx-category"
                     className="form-input"
                     value={category}
@@ -176,7 +177,7 @@ export function TransactionFormModal({
                     {categoryOptions.map((item) => (
                         <option key={item} value={item}>{item}</option>
                     ))}
-                </select>
+                </FormSelect>
             </div>
             <div className="form-group">
                 <label htmlFor="finance-tx-date" className="form-label">Date</label>

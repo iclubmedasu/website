@@ -6,6 +6,7 @@ import { DEFAULT_TICKET_ACCENT, normalizeHex } from '@iclub/shared/utils';
 import { buildRegistrationEmbedSnippet } from '@/lib/publicWebsiteUrl';
 import './EventExpandedContent/sections/TicketDesign/TicketDesignPanel.css';
 import './GenerateEmbedButton.css';
+import { FormSelect } from '@/components/input/FormSelect';
 
 /** Default embed accent; matches design token --purple-600. */
 const DEFAULT_EMBED_ACCENT = '#9063b3';
@@ -263,7 +264,7 @@ export default function GenerateEmbedButton({
                                         <label className="form-label" htmlFor="embed-layout">
                                             Layout preset
                                         </label>
-                                        <select
+                                        <FormSelect
                                             id="embed-layout"
                                             className="form-input"
                                             value={layout}
@@ -272,7 +273,7 @@ export default function GenerateEmbedButton({
                                             <option value="default">Default</option>
                                             <option value="compact">Compact</option>
                                             <option value="spacious">Spacious</option>
-                                        </select>
+                                        </FormSelect>
                                     </div>
 
                                     <div className="form-group generate-embed-modal__full">

@@ -4,6 +4,13 @@ import type {
     EventSessionRef,
     EventTierRef,
 } from '@/types/backend-contracts';
+import { formatAttendanceDayLabel } from '../eventDateUtils';
+import {
+    matchesCountFilter,
+    matchesIdSetFilter as matchesSharedIdSetFilter,
+    type CountFilterOperator,
+    type IdSetFilterOperator as SharedIdSetFilterOperator,
+} from './eventAttendanceFilterShared';
 import {
     dropdownOptions,
     formatReminderEmailStatus,
@@ -11,6 +18,9 @@ import {
     getCustomFieldValue,
     isCustomFieldValueEmpty,
 } from './customFieldUtils';
+
+export type { CountFilterOperator };
+export type IdSetFilterOperator = SharedIdSetFilterOperator | 'hasNone';
 
 export type RegistrationTableKind = 'registrations' | 'tickets';
 
@@ -21,34 +31,35 @@ export type RegistrationColumnKind =
     | 'dropdown'
     | 'checkbox'
     | 'tier'
-    | 'sessions'
+    | 'count'
+    | 'idSet'
     | 'ticketStatus'
-    | 'reminderStatus'
-    | 'attendance';
+    | 'reminderStatus';
 
 export interface FilterableColumn {
     id: string;
     label: string;
     kind: RegistrationColumnKind;
     options?: string[];
+    optionLabels?: Record<string, string>;
+    /** When true, idSet operators include hasNone (Selected sessions). */
+    idSetAllowHasNone?: boolean;
 }
 
 export type TextFilterOperator = 'contains' | 'equals' | 'isEmpty';
 export type NumberFilterOperator = 'equals' | 'greaterThan' | 'lessThan' | 'isEmpty';
-export type SessionsFilterOperator = 'includes' | 'hasNone';
-export type AttendanceFilterOperator = 'hasAny' | 'hasNone' | 'countEquals' | 'countGreaterThan' | 'countLessThan';
 export type EmailStatusFilterValue = 'sent' | 'notSent';
 export type CheckboxFilterValue = 'yes' | 'no' | 'any';
 
 export type RegistrationColumnFilter =
     | { columnId: string; kind: 'text'; operator: TextFilterOperator; value?: string }
     | { columnId: string; kind: 'number'; operator: NumberFilterOperator; value?: number }
+    | { columnId: string; kind: 'count'; operator: CountFilterOperator; value?: number }
     | { columnId: string; kind: 'dropdown'; values: string[] }
     | { columnId: string; kind: 'checkbox'; value: CheckboxFilterValue }
     | { columnId: string; kind: 'tier'; tierId: string }
-    | { columnId: string; kind: 'sessions'; operator: SessionsFilterOperator; sessionId?: string }
-    | { columnId: string; kind: 'ticketStatus' | 'reminderStatus'; value: EmailStatusFilterValue }
-    | { columnId: string; kind: 'attendance'; operator: AttendanceFilterOperator; value?: number };
+    | { columnId: string; kind: 'idSet'; operator: IdSetFilterOperator; values: string[] }
+    | { columnId: string; kind: 'ticketStatus' | 'reminderStatus'; value: EmailStatusFilterValue };
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -62,7 +73,7 @@ export interface RegistrationTableContext {
     fields: EventCustomFieldRef[];
     tiers: EventTierRef[];
     sessions: EventSessionRef[];
-    multiDayEvent: boolean;
+    eventDays: string[];
 }
 
 const CUSTOM_FIELD_PREFIX = 'custom:';
@@ -95,16 +106,36 @@ function getSessionTitle(session: EventSessionRef): string {
     return session.label?.trim() || 'Untitled session';
 }
 
-function getRegistrationSessionIds(registration: EventRegistrationRef): string[] {
+function buildSessionOptionLabel(session: EventSessionRef): string {
+    const daySource = session.sessionDate || session.startDateTime || '';
+    const dateLabel = daySource ? formatAttendanceDayLabel(daySource) : '';
+    if (session.label?.trim()) {
+        return dateLabel ? `${session.label.trim()} (${dateLabel})` : session.label.trim();
+    }
+    return dateLabel || 'Untitled session';
+}
+
+function getRegistrationSelectedSessionIds(registration: EventRegistrationRef): string[] {
     return (registration.sessionSelections ?? []).map((selection) => String(selection.sessionId));
 }
 
-function getRegistrationSessionLabels(
+function getRegistrationAttendanceDays(registration: EventRegistrationRef): string[] {
+    return (registration.attendanceDays ?? []).map((day) => day.eventDay);
+}
+
+function getRegistrationAttendedSessionIds(registration: EventRegistrationRef): string[] {
+    const ids = new Set(
+        (registration.sessionAttendances ?? []).map((attendance) => String(attendance.sessionId)),
+    );
+    return Array.from(ids);
+}
+
+function getRegistrationSelectedSessionLabels(
     registration: EventRegistrationRef,
     sessions: EventSessionRef[],
 ): string[] {
     const sessionById = new Map(sessions.map((session) => [String(session.id), session]));
-    return getRegistrationSessionIds(registration)
+    return getRegistrationSelectedSessionIds(registration)
         .map((sessionId) => {
             const session = sessionById.get(sessionId);
             if (session) return getSessionTitle(session);
@@ -128,12 +159,6 @@ function isCheckboxYes(field: EventCustomFieldRef, registration: EventRegistrati
     return !isCustomFieldValueEmpty(field, value);
 }
 
-function getAttendanceCount(registration: EventRegistrationRef): number {
-    const dayCount = registration.attendanceDays?.length ?? 0;
-    const sessionCount = registration.sessionAttendances?.length ?? 0;
-    return dayCount + sessionCount;
-}
-
 function compareStrings(left: string, right: string, direction: SortDirection): number {
     const result = left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
     return direction === 'asc' ? result : -result;
@@ -150,12 +175,23 @@ function compareBooleans(left: boolean, right: boolean, direction: SortDirection
     return compareNumbers(leftValue, rightValue, direction);
 }
 
+function buildSessionOptionColumns(sessions: EventSessionRef[]): {
+    options: string[];
+    optionLabels: Record<string, string>;
+} {
+    const options = sessions.map((session) => String(session.id));
+    const optionLabels = Object.fromEntries(
+        sessions.map((session) => [String(session.id), buildSessionOptionLabel(session)]),
+    );
+    return { options, optionLabels };
+}
+
 export function buildFilterableColumns(
     tableKind: RegistrationTableKind,
     fields: EventCustomFieldRef[],
     tiers: EventTierRef[],
     sessions: EventSessionRef[],
-    multiDayEvent: boolean,
+    eventDays: string[] = [],
 ): FilterableColumn[] {
     const columns: FilterableColumn[] = [
         { id: 'fullName', label: 'Name', kind: 'text' },
@@ -177,8 +213,40 @@ export function buildFilterableColumns(
         );
     }
 
+    columns.push({ id: 'attendanceDaysCount', label: 'Days attended', kind: 'count' });
+
+    if (eventDays.length > 0) {
+        columns.push({
+            id: 'attendedDays',
+            label: 'Specific days',
+            kind: 'idSet',
+            options: eventDays,
+            optionLabels: Object.fromEntries(
+                eventDays.map((day) => [day, formatAttendanceDayLabel(day)]),
+            ),
+        });
+    }
+
     if (sessions.length > 0) {
-        columns.push({ id: 'sessions', label: 'Sessions', kind: 'sessions' });
+        const { options, optionLabels } = buildSessionOptionColumns(sessions);
+        columns.push(
+            { id: 'sessionsAttendedCount', label: 'Sessions attended', kind: 'count' },
+            {
+                id: 'attendedSessionIds',
+                label: 'Specific sessions',
+                kind: 'idSet',
+                options,
+                optionLabels,
+            },
+            {
+                id: 'selectedSessions',
+                label: 'Selected sessions',
+                kind: 'idSet',
+                options,
+                optionLabels,
+                idSetAllowHasNone: true,
+            },
+        );
     }
 
     if (tiers.length > 0) {
@@ -192,10 +260,6 @@ export function buildFilterableColumns(
             kind: customFieldColumnKind(field),
             options: field.type === 'dropdown' ? dropdownOptions(field) : undefined,
         });
-    }
-
-    if (multiDayEvent) {
-        columns.push({ id: 'attendance', label: 'Attendance', kind: 'attendance' });
     }
 
     return columns;
@@ -272,6 +336,29 @@ function matchesCheckboxFilter(
     return !isYes;
 }
 
+function getIdSetValuesForColumn(
+    registration: EventRegistrationRef,
+    columnId: string,
+): string[] {
+    if (columnId === 'attendedDays') return getRegistrationAttendanceDays(registration);
+    if (columnId === 'attendedSessionIds') return getRegistrationAttendedSessionIds(registration);
+    if (columnId === 'selectedSessions') return getRegistrationSelectedSessionIds(registration);
+    return [];
+}
+
+function getCountValueForColumn(
+    registration: EventRegistrationRef,
+    columnId: string,
+): number {
+    if (columnId === 'attendanceDaysCount') {
+        return getRegistrationAttendanceDays(registration).length;
+    }
+    if (columnId === 'sessionsAttendedCount') {
+        return getRegistrationAttendedSessionIds(registration).length;
+    }
+    return 0;
+}
+
 function matchesFilter(
     registration: EventRegistrationRef,
     filter: RegistrationColumnFilter,
@@ -282,7 +369,7 @@ function matchesFilter(
         context.fields,
         context.tiers,
         context.sessions,
-        context.multiDayEvent,
+        context.eventDays,
     ).find((entry) => entry.id === filter.columnId);
 
     if (!column) return true;
@@ -311,6 +398,12 @@ function matchesFilter(
                 : Number(raw);
             return matchesNumberFilter(numeric, filter);
         }
+        case 'count':
+            return matchesCountFilter(
+                getCountValueForColumn(registration, filter.columnId),
+                filter.operator,
+                filter.value,
+            );
         case 'dropdown': {
             const field = findCustomFieldByColumnId(filter.columnId, context.fields);
             if (!field || filter.values.length === 0) return true;
@@ -325,11 +418,10 @@ function matchesFilter(
         }
         case 'tier':
             return String(registration.tierId ?? '') === filter.tierId;
-        case 'sessions': {
-            const sessionIds = getRegistrationSessionIds(registration);
-            if (filter.operator === 'hasNone') return sessionIds.length === 0;
-            if (!filter.sessionId) return true;
-            return sessionIds.includes(filter.sessionId);
+        case 'idSet': {
+            const values = getIdSetValuesForColumn(registration, filter.columnId);
+            if (filter.operator === 'hasNone') return values.length === 0;
+            return matchesSharedIdSetFilter(values, filter.operator, filter.values);
         }
         case 'ticketStatus': {
             const sent = formatTicketEmailStatus(registration).sent;
@@ -338,14 +430,6 @@ function matchesFilter(
         case 'reminderStatus': {
             const sent = formatReminderEmailStatus(registration).sent;
             return filter.value === 'sent' ? sent : !sent;
-        }
-        case 'attendance': {
-            const count = getAttendanceCount(registration);
-            if (filter.operator === 'hasAny') return count > 0;
-            if (filter.operator === 'hasNone') return count === 0;
-            if (filter.operator === 'countEquals') return count === (filter.value ?? 0);
-            if (filter.operator === 'countGreaterThan') return count > (filter.value ?? 0);
-            return count < (filter.value ?? 0);
         }
         default:
             return true;
@@ -372,12 +456,20 @@ function getSortValue(
     if (columnId === 'confirmationCode') return registration.confirmationCode || '';
     if (columnId === 'createdAt') return registration.createdAt ? new Date(registration.createdAt) : null;
     if (columnId === 'tier') return getTierName(registration, context.tiers);
-    if (columnId === 'sessions') {
-        return getRegistrationSessionLabels(registration, context.sessions).join(', ');
+    if (columnId === 'selectedSessions') {
+        return getRegistrationSelectedSessionLabels(registration, context.sessions).join(', ');
+    }
+    if (columnId === 'attendedDays') {
+        return getRegistrationAttendanceDays(registration).join(', ');
+    }
+    if (columnId === 'attendedSessionIds') {
+        return getRegistrationAttendedSessionIds(registration).join(', ');
+    }
+    if (columnId === 'attendanceDaysCount' || columnId === 'sessionsAttendedCount') {
+        return getCountValueForColumn(registration, columnId);
     }
     if (columnId === 'ticketStatus') return formatTicketEmailStatus(registration).sent;
     if (columnId === 'reminderStatus') return formatReminderEmailStatus(registration).sent;
-    if (columnId === 'attendance') return getAttendanceCount(registration);
 
     const field = findCustomFieldByColumnId(columnId, context.fields);
     if (!field) return '';
@@ -438,21 +530,21 @@ export function createDefaultFilterForColumn(
         case 'text':
             return { columnId: column.id, kind: 'text', operator: 'contains', value: '' };
         case 'number':
-            return { columnId: column.id, kind: 'number', operator: 'equals', value: 0 };
+            return { columnId: column.id, kind: 'number', operator: 'equals', value: undefined };
+        case 'count':
+            return { columnId: column.id, kind: 'count', operator: 'hasAny' };
         case 'dropdown':
             return { columnId: column.id, kind: 'dropdown', values: [] };
         case 'checkbox':
             return { columnId: column.id, kind: 'checkbox', value: 'any' };
         case 'tier':
             return { columnId: column.id, kind: 'tier', tierId: '' };
-        case 'sessions':
-            return { columnId: column.id, kind: 'sessions', operator: 'includes', sessionId: '' };
+        case 'idSet':
+            return { columnId: column.id, kind: 'idSet', operator: 'includesAll', values: [] };
         case 'ticketStatus':
             return { columnId: column.id, kind: 'ticketStatus', value: 'sent' };
         case 'reminderStatus':
             return { columnId: column.id, kind: 'reminderStatus', value: 'sent' };
-        case 'attendance':
-            return { columnId: column.id, kind: 'attendance', operator: 'hasAny' };
         case 'date':
             return { columnId: column.id, kind: 'text', operator: 'contains', value: '' };
         default:
@@ -489,6 +581,17 @@ export function describeRegistrationFilter(
             return describeTextFilter(filter, label);
         case 'number':
             return describeNumberFilter(filter, label);
+        case 'count': {
+            if (filter.operator === 'hasAny') {
+                return filter.columnId === 'sessionsAttendedCount'
+                    ? `${label} has sessions`
+                    : `${label} has attendance`;
+            }
+            if (filter.operator === 'hasNone') return `${label} has none`;
+            if (filter.operator === 'equals') return `${label} = ${filter.value ?? 0}`;
+            if (filter.operator === 'greaterThan') return `${label} > ${filter.value ?? 0}`;
+            return `${label} < ${filter.value ?? 0}`;
+        }
         case 'dropdown':
             return `${label} = ${filter.values.length > 0 ? filter.values.join(', ') : 'any'}`;
         case 'checkbox':
@@ -497,22 +600,21 @@ export function describeRegistrationFilter(
             const tier = context.tiers.find((entry) => String(entry.id) === filter.tierId);
             return `${label} = ${tier?.name ?? 'Unknown tier'}`;
         }
-        case 'sessions': {
+        case 'idSet': {
             if (filter.operator === 'hasNone') return `${label} has none`;
-            const session = context.sessions.find((entry) => String(entry.id) === filter.sessionId);
-            return `${label} includes ${session ? getSessionTitle(session) : 'session'}`;
+            const displayValues = filter.values.map((value) => (
+                column?.optionLabels?.[value] ?? value
+            ));
+            const joined = displayValues.length > 0 ? displayValues.join(', ') : 'none';
+            if (filter.operator === 'includesAny') {
+                return `${label} includes any of ${joined}`;
+            }
+            return `${label} includes all of ${joined}`;
         }
         case 'ticketStatus':
             return `${label} = ${filter.value === 'sent' ? 'Sent' : 'Not sent'}`;
         case 'reminderStatus':
             return `${label} = ${filter.value === 'sent' ? 'Sent' : 'Not sent'}`;
-        case 'attendance': {
-            if (filter.operator === 'hasAny') return `${label} has attendance`;
-            if (filter.operator === 'hasNone') return `${label} has none`;
-            if (filter.operator === 'countEquals') return `${label} count = ${filter.value ?? 0}`;
-            if (filter.operator === 'countGreaterThan') return `${label} count > ${filter.value ?? 0}`;
-            return `${label} count < ${filter.value ?? 0}`;
-        }
         default:
             return label;
     }
@@ -532,21 +634,21 @@ export function isRegistrationFilterComplete(
         case 'number':
             if (filter.operator === 'isEmpty') return true;
             return filter.value !== undefined && !Number.isNaN(filter.value);
+        case 'count':
+            if (filter.operator === 'hasAny' || filter.operator === 'hasNone') return true;
+            return filter.value !== undefined && !Number.isNaN(filter.value);
         case 'dropdown':
             return filter.values.length > 0;
         case 'checkbox':
             return filter.value !== 'any';
         case 'tier':
             return Boolean(filter.tierId);
-        case 'sessions':
+        case 'idSet':
             if (filter.operator === 'hasNone') return true;
-            return Boolean(filter.sessionId);
+            return filter.values.length > 0;
         case 'ticketStatus':
         case 'reminderStatus':
             return true;
-        case 'attendance':
-            if (filter.operator === 'hasAny' || filter.operator === 'hasNone') return true;
-            return filter.value !== undefined && !Number.isNaN(filter.value);
         default:
             return false;
     }

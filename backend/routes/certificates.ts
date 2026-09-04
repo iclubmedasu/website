@@ -871,6 +871,14 @@ router.get("/", async (req: Request, res: Response) => {
         const eventId = parseId(req.query.eventId);
         const projectId = parseId(req.query.projectId);
         const type = typeof req.query.type === "string" ? req.query.type.trim() : undefined;
+        const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+        const dateFrom = typeof req.query.dateFrom === "string" ? req.query.dateFrom.trim() : "";
+        const dateTo = typeof req.query.dateTo === "string" ? req.query.dateTo.trim() : "";
+        const nameSortRaw = typeof req.query.nameSort === "string" ? req.query.nameSort.trim() : "";
+        const nameSort = nameSortRaw === "asc" || nameSortRaw === "desc" ? nameSortRaw : "";
+        const pageRaw = typeof req.query.page === "string" ? req.query.page.trim() : "";
+        const pageParsed = pageRaw !== "" ? Number.parseInt(pageRaw, 10) : NaN;
+        const hasPage = Number.isInteger(pageParsed) && pageParsed > 0;
 
         if (eventId) where.eventId = eventId;
         if (projectId) where.projectId = projectId;
@@ -879,6 +887,37 @@ router.get("/", async (req: Request, res: Response) => {
         }
         if (type && VALID_CERTIFICATE_TYPES.has(type)) {
             where.type = type as CertificateType;
+        }
+
+        if (search) {
+            where.OR = [
+                { recipientName: { contains: search, mode: "insensitive" } },
+                { recipientMember: { fullName: { contains: search, mode: "insensitive" } } },
+            ];
+        }
+
+        if (dateFrom || dateTo) {
+            const issuedAt: Prisma.DateTimeFilter = {};
+            const createdAt: Prisma.DateTimeFilter = {};
+            if (dateFrom) {
+                const from = new Date(dateFrom);
+                from.setHours(0, 0, 0, 0);
+                issuedAt.gte = from;
+                createdAt.gte = from;
+            }
+            if (dateTo) {
+                const to = new Date(dateTo);
+                to.setHours(23, 59, 59, 999);
+                issuedAt.lte = to;
+                createdAt.lte = to;
+            }
+            const dateFilter: Prisma.CertificateWhereInput = {
+                OR: [
+                    { issuedAt },
+                    { AND: [{ issuedAt: null }, { createdAt }] },
+                ],
+            };
+            where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), dateFilter];
         }
 
         const canListProjectCerts =
@@ -894,10 +933,34 @@ router.get("/", async (req: Request, res: Response) => {
             where.recipientMemberId = req.user?.memberId ?? -1;
         }
 
+        const orderBy: Prisma.CertificateOrderByWithRelationInput = nameSort
+            ? { recipientName: nameSort }
+            : { createdAt: "desc" };
+
+        if (hasPage) {
+            const page = pageParsed;
+            const pageSizeRaw = parseId(req.query.pageSize) ?? 100;
+            const pageSize = Math.min(100, Math.max(1, pageSizeRaw));
+            const [total, items] = await Promise.all([
+                prisma.certificate.count({ where }),
+                prisma.certificate.findMany({
+                    where,
+                    orderBy,
+                    skip: (page - 1) * pageSize,
+                    take: pageSize,
+                    include: listInclude,
+                }),
+            ]);
+            return res.json({ items, total, page, pageSize });
+        }
+
+        // Scoped event/project lists return the full set (no 200 cap) so every issued
+        // cert appears as its own row. Unscoped admin list keeps the historical take: 200.
+        const isScoped = eventId != null || projectId != null;
         const certificates = await prisma.certificate.findMany({
             where,
-            orderBy: { createdAt: "desc" },
-            take: 200,
+            orderBy,
+            ...(isScoped ? {} : { take: 200 }),
             include: listInclude,
         });
 

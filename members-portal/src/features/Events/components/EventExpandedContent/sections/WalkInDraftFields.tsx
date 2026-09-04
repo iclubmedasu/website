@@ -9,6 +9,7 @@ import {
 } from '../customFieldUtils';
 import type { MiddleColumn } from '../registrationColumnOrderUtils';
 import { compareSessionsBySchedule } from '../../eventUtils';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface WalkInDraftFieldsProps {
     variant: 'table' | 'stack';
@@ -235,7 +236,7 @@ function renderCustomFieldStackInput(
                 <label className="form-label" htmlFor={`walkin-stack-${field.id}`}>
                     {field.label}{field.required ? ' *' : ''}
                 </label>
-                <select
+                <FormSelect
                     id={`walkin-stack-${field.id}`}
                     value={value != null ? String(value) : ''}
                     onChange={(event) => onCustomFieldChange(fieldKey, event.target.value || null)}
@@ -245,7 +246,7 @@ function renderCustomFieldStackInput(
                     {dropdownOptions(field).map((option) => (
                         <option key={option} value={option}>{option}</option>
                     ))}
-                </select>
+                </FormSelect>
             </div>
         );
     }
@@ -295,7 +296,7 @@ function renderCustomFieldTableCell(
     if (field.type === 'dropdown') {
         return (
             <td key={field.id} className={errorClass.trim() || undefined}>
-                <select
+                <FormSelect
                     aria-label={field.label}
                     value={value != null ? String(value) : ''}
                     onChange={(event) => onCustomFieldChange(fieldKey, event.target.value || null)}
@@ -305,7 +306,7 @@ function renderCustomFieldTableCell(
                     {dropdownOptions(field).map((option) => (
                         <option key={option} value={option}>{option}</option>
                     ))}
-                </select>
+                </FormSelect>
             </td>
         );
     }
@@ -364,7 +365,7 @@ function renderMiddleColumnStack(
                 <label className="form-label" htmlFor="walkin-stack-tier">
                     Tier{tierFieldRequired ? ' *' : ''}
                 </label>
-                <select
+                <FormSelect
                     id="walkin-stack-tier"
                     aria-label="Tier"
                     value={draft.tierId}
@@ -376,7 +377,7 @@ function renderMiddleColumnStack(
                 >
                     <option value="">{tierFieldRequired ? 'Select tier…' : 'No tier'}</option>
                     {tiers.map((tier) => <option key={tier.id} value={tier.id}>{tier.name}</option>)}
-                </select>
+                </FormSelect>
                 {draftErrors.tierId ? <p className="error-message">{draftErrors.tierId}</p> : null}
             </div>
         );
@@ -419,7 +420,7 @@ function renderMiddleColumnTable(
     if (column.kind === 'tier') {
         return (
             <td key="tier" className={cellErrorClass(draftErrors, 'tierId').trim() || undefined}>
-                <select
+                <FormSelect
                     aria-label="Tier"
                     value={draft.tierId}
                     onChange={(event) => {
@@ -430,7 +431,7 @@ function renderMiddleColumnTable(
                 >
                     <option value="">{tierFieldRequired ? 'Select tier…' : 'No tier'}</option>
                     {tiers.map((tier) => <option key={tier.id} value={tier.id}>{tier.name}</option>)}
-                </select>
+                </FormSelect>
             </td>
         );
     }

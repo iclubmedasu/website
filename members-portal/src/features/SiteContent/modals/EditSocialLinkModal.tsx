@@ -5,6 +5,7 @@ import type { EditorContactPage, EditorSocialLink, SocialPlatform } from '@iclub
 import { siteContentAPI } from '@/services/api';
 import { PublicVisibilityToggle } from '../components/PublicVisibilityToggle';
 import { SiteContentModal } from '../components/SiteContentModal';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface EditSocialLinkModalProps {
     link?: EditorSocialLink;
@@ -57,7 +58,7 @@ export function EditSocialLinkModal({ link, onClose, onSaved }: EditSocialLinkMo
                 <label htmlFor="social-link-platform" className="form-label">
                     Platform
                 </label>
-                <select
+                <FormSelect
                     id="social-link-platform"
                     className="form-input"
                     value={platform}
@@ -68,7 +69,7 @@ export function EditSocialLinkModal({ link, onClose, onSaved }: EditSocialLinkMo
                             {option}
                         </option>
                     ))}
-                </select>
+                </FormSelect>
             </div>
             <div className="form-group">
                 <label htmlFor="social-link-url" className="form-label">

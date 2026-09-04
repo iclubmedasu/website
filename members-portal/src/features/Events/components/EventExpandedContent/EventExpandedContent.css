@@ -1410,20 +1410,33 @@
 .event-tickets-io-bar {
     display: flex;
     flex-shrink: 0;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    align-items: center;
     gap: 0.5rem;
     padding: 0.75rem 1rem;
     border-top: 1px solid var(--border-brand);
     background: var(--bg-card);
+    z-index: 2;
 }
 
-.event-tickets-io-btn {
+/*
+ * Desktop: pair wrapper is transparent to flex so Select all / Clear stay equal slots.
+ * Mobile: pair becomes a real flex row of two buttons.
+ */
+.event-tickets-io-bar-row--pair {
+    display: contents;
+}
+
+/* Equal-width slots */
+.event-tickets-io-bar > .event-tickets-io-btn,
+.event-tickets-io-bar-row--pair > .event-tickets-io-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    width: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.35rem;
-    flex: 1 1 12rem;
-    min-width: 0;
     text-align: center;
     white-space: normal;
     line-height: 1.25;
@@ -1431,6 +1444,43 @@
     min-height: 2.75rem;
     padding-top: 0.55rem;
     padding-bottom: 0.55rem;
+}
+
+/* §7.8 — IO toolbar utility buttons: no layout shift from inherited .btn lift */
+.event-tickets-io-bar > .btn.event-tickets-io-btn:hover:not(:disabled),
+.event-tickets-io-bar-row--pair > .btn.event-tickets-io-btn:hover:not(:disabled) {
+    transform: none;
+}
+
+@media (max-width: 768px) {
+    .event-tickets-io-bar {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 0.65rem 0.75rem;
+        align-items: stretch;
+    }
+
+    /* Select all | Clear side-by-side */
+    .event-tickets-io-bar-row--pair {
+        display: flex;
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 0;
+        gap: 0.5rem;
+    }
+
+    .event-tickets-io-bar-row--pair > .event-tickets-io-btn {
+        flex: 1 1 0;
+        width: auto;
+        min-width: 0;
+    }
+
+    /* Send buttons full-width below */
+    .event-tickets-io-bar > .event-tickets-io-btn {
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 0;
+    }
 }
 
 .event-registrations-table tbody td.event-registrations-add-field-col {
@@ -2031,10 +2081,13 @@
     pointer-events: none;
 }
 
-.event-registrations-table-checkbox {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.event-tickets-table-shell td.event-registrations-table-checkbox {
+    vertical-align: middle;
+}
+
+.event-tickets-table-shell td.event-registrations-table-checkbox .defaultCheckbox {
+    display: inline-block;
+    vertical-align: middle;
 }
 
 /* Header spacing on the title row or bare title only — not nested h2s inside the row */

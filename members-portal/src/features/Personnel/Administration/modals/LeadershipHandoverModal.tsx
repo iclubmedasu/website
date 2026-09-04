@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { formatDate } from '@iclub/shared/utils';
 import { membersAPI, teamMembersAPI, teamRolesAPI, teamsAPI } from '../../../../services/api';
 import type { Id } from '../../../../types/backend-contracts';
+import { FormSelect } from '@/components/input/FormSelect';
 
 interface MemberOption {
     id: Id;
@@ -326,7 +327,7 @@ function LeadershipHandoverModal({
                             </p>
                             <div className="form-group">
                                 <label htmlFor="leadership-team" className="form-label">Filter by team</label>
-                                <select
+                                <FormSelect
                                     id="leadership-team"
                                     value={teamFilterId}
                                     onChange={(e) => handleTeamFilterChange(e.target.value)}
@@ -336,28 +337,30 @@ function LeadershipHandoverModal({
                                     {teams.map((team) => (
                                         <option key={team.id} value={team.id}>{team.name}</option>
                                     ))}
-                                </select>
+                                </FormSelect>
                             </div>
                             <div className="form-group">
                                 <label htmlFor="leadership-member" className="form-label">Member *</label>
-                                <select
+                                <FormSelect
                                     id="leadership-member"
                                     value={memberId}
                                     onChange={(e) => setMemberId(e.target.value)}
                                     className="form-input"
                                     disabled={loadingTeamMembers}
+                                    searchable
+                                    searchPlaceholder="Search members…"
                                 >
                                     <option value="">{loadingTeamMembers ? 'Loading...' : 'Select a member'}</option>
                                     {displayMembers.map((member) => (
                                         <option key={member.id} value={member.id}>{member.fullName || member.email || 'Member'}</option>
                                     ))}
-                                </select>
+                                </FormSelect>
                             </div>
                             {memberId && loadingAssignments && <p className="form-hint-text">Loading current assignment...</p>}
                             {memberId && !loadingAssignments && memberAssignments.length > 1 && (
                                 <div className="form-group">
                                     <label htmlFor="leadership-assignment" className="form-label">Current assignment *</label>
-                                    <select
+                                    <FormSelect
                                         id="leadership-assignment"
                                         value={currentAssignmentId}
                                         onChange={(e) => setCurrentAssignmentId(e.target.value)}
@@ -370,7 +373,7 @@ function LeadershipHandoverModal({
                                                 {assignment.team?.name ?? 'Team'} - {assignment.role?.roleName ?? 'Role'}
                                             </option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                             )}
                         </div>
@@ -410,7 +413,7 @@ function LeadershipHandoverModal({
                                 <h3 className="form-section-title">Outgoing leader exit type</h3>
                                 <div className="form-group">
                                     <label htmlFor="outgoing-changeType" className="form-label">Type *</label>
-                                    <select
+                                    <FormSelect
                                         id="outgoing-changeType"
                                         className="form-input"
                                         value={outgoingChangeType}
@@ -420,7 +423,7 @@ function LeadershipHandoverModal({
                                         {OUTGOING_CHANGE_TYPE_OPTIONS.map((option) => (
                                             <option key={option} value={option}>{option}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                             </div>
                         ) : (
@@ -428,7 +431,7 @@ function LeadershipHandoverModal({
                                 <h3 className="form-section-title">Outgoing leader transfer target</h3>
                                 <div className="form-group">
                                     <label htmlFor="outgoing-team" className="form-label">Team *</label>
-                                    <select
+                                    <FormSelect
                                         id="outgoing-team"
                                         className="form-input"
                                         value={outgoingTransferTeamId}
@@ -442,11 +445,11 @@ function LeadershipHandoverModal({
                                         {teams.map((team) => (
                                             <option key={team.id} value={team.id}>{team.name}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                                 <div className="form-group">
                                     <label htmlFor="outgoing-role" className="form-label">Role *</label>
-                                    <select
+                                    <FormSelect
                                         id="outgoing-role"
                                         className="form-input"
                                         value={outgoingTransferRoleId}
@@ -457,7 +460,7 @@ function LeadershipHandoverModal({
                                         {outgoingTransferRoles.map((role) => (
                                             <option key={role.id} value={role.id}>{role.roleName}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                             </div>
                         )}

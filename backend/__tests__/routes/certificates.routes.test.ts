@@ -6,6 +6,7 @@ const prismaMocks = vi.hoisted(() => ({
     certificateFindFirst: vi.fn(),
     certificateFindUnique: vi.fn(),
     certificateFindMany: vi.fn(),
+    certificateCount: vi.fn(),
     certificateCreate: vi.fn(),
     certificateUpdate: vi.fn(),
     certificateTemplateFindUnique: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock('../../db', () => ({
             findFirst: prismaMocks.certificateFindFirst,
             findUnique: prismaMocks.certificateFindUnique,
             findMany: prismaMocks.certificateFindMany,
+            count: prismaMocks.certificateCount,
             create: prismaMocks.certificateCreate,
             update: prismaMocks.certificateUpdate,
         },
@@ -487,6 +489,7 @@ describe('certificates routes — project view access & event permissions', () =
             }),
         )
         expect(prismaMocks.certificateFindMany.mock.calls[0][0].where.recipientMemberId).toBeUndefined()
+        expect(prismaMocks.certificateFindMany.mock.calls[0][0].take).toBeUndefined()
     })
 
     it('denies special on event eligible', async () => {
@@ -555,5 +558,91 @@ describe('certificates routes — project view access & event permissions', () =
 
         expect(eventResponse.status).toBe(200)
         expect(projectResponse.status).toBe(200)
+    })
+})
+
+describe('certificates routes — list pagination', () => {
+    afterEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('returns { items, total, page, pageSize } when page is set', async () => {
+        const items = [{ id: 1, title: 'A' }, { id: 2, title: 'B' }]
+        prismaMocks.certificateCount.mockResolvedValueOnce(42)
+        prismaMocks.certificateFindMany.mockResolvedValueOnce(items)
+
+        const response = await request(buildRouteApp(certificatesRouter, manager))
+            .get('/?page=2&pageSize=100&status=ISSUED&search=Ada&dateFrom=2026-01-01&dateTo=2026-12-31&nameSort=asc')
+
+        expect(response.status).toBe(200)
+        expect(response.body).toEqual({
+            items,
+            total: 42,
+            page: 2,
+            pageSize: 100,
+        })
+        expect(prismaMocks.certificateCount).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    status: 'ISSUED',
+                    OR: expect.any(Array),
+                }),
+            }),
+        )
+        expect(prismaMocks.certificateFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                skip: 100,
+                take: 100,
+                orderBy: { recipientName: 'asc' },
+            }),
+        )
+    })
+
+    it('caps pageSize at 100', async () => {
+        prismaMocks.certificateCount.mockResolvedValueOnce(0)
+        prismaMocks.certificateFindMany.mockResolvedValueOnce([])
+
+        const response = await request(buildRouteApp(certificatesRouter, manager))
+            .get('/?page=1&pageSize=500')
+
+        expect(response.status).toBe(200)
+        expect(response.body.pageSize).toBe(100)
+        expect(prismaMocks.certificateFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({ take: 100, skip: 0 }),
+        )
+    })
+
+    it('returns full scoped array without take when eventId set and page omitted', async () => {
+        prismaMocks.certificateFindMany.mockResolvedValueOnce([
+            { id: 1, eventId: 10 },
+            { id: 2, eventId: 10 },
+        ])
+
+        const response = await request(buildRouteApp(certificatesRouter, manager))
+            .get('/?eventId=10')
+
+        expect(response.status).toBe(200)
+        expect(Array.isArray(response.body)).toBe(true)
+        expect(response.body).toHaveLength(2)
+        expect(prismaMocks.certificateFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ eventId: 10 }),
+            }),
+        )
+        expect(prismaMocks.certificateFindMany.mock.calls[0][0].take).toBeUndefined()
+        expect(prismaMocks.certificateCount).not.toHaveBeenCalled()
+    })
+
+    it('keeps take 200 for unscoped list without page', async () => {
+        prismaMocks.certificateFindMany.mockResolvedValueOnce([])
+
+        const response = await request(buildRouteApp(certificatesRouter, manager))
+            .get('/')
+
+        expect(response.status).toBe(200)
+        expect(Array.isArray(response.body)).toBe(true)
+        expect(prismaMocks.certificateFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({ take: 200 }),
+        )
     })
 })

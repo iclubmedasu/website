@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Download, Eye, Filter, Loader2, Mail, Search } from 'lucide-react';
-import { formatDate, formatDurationMinutes } from '@iclub/shared/utils';
+import { CLUB_TIMEZONE, formatDate, formatDurationMinutes } from '@iclub/shared/utils';
 import { Checkbox } from '@/components/checkbox';
 import CertificateStatusBadge from '@/components/certificates/CertificateStatusBadge';
 import NewCustomCertificateModal from '@/features/Certificates/modals/NewCustomCertificateModal';
@@ -28,7 +28,7 @@ import {
 } from '@/services/certificatesAPI';
 import type { Id } from '@/types/backend-contracts';
 import { isDateWithinRange } from '@/utils/filterDateRange';
-import { formatAttendanceDayLabel } from '../../eventDateUtils';
+import { enumerateEventDays, formatAttendanceDayLabel } from '../../eventDateUtils';
 import {
     DEFAULT_CERTIFICATE_ELIGIBLE_SORT,
     EMPTY_CERTIFICATE_ISSUE_DATE_RANGE,
@@ -52,6 +52,7 @@ import {
 } from '../customFieldUtils';
 import type { CertificatesFunnelState } from '../eventExpandedFunnelState';
 import ExpandedSectionTitle from '../ExpandedSectionTitle';
+import { FormSelect } from '@/components/input/FormSelect';
 
 function buildSessionOptionLabel(label: string | null, sessionDate: string): string {
     const dateLabel = formatAttendanceDayLabel(sessionDate);
@@ -61,8 +62,13 @@ function buildSessionOptionLabel(label: string | null, sessionDate: string): str
 
 function buildEventEligibleFilterColumns(
     eligible: EventEligibleResponse | null,
+    eventDate?: string | null,
+    eventEndDate?: string | null,
+    timezone: string = CLUB_TIMEZONE,
 ): CertificateEligibleColumn[] {
-    const dayOptions = eligible?.attendanceDayOptions ?? [];
+    const calendarDays = enumerateEventDays(eventDate, eventEndDate, timezone);
+    const attendanceDays = eligible?.attendanceDayOptions ?? [];
+    const dayOptions = Array.from(new Set([...calendarDays, ...attendanceDays])).sort();
     const sessions = eligible?.sessions ?? [];
 
     const specificDays: CertificateEligibleColumn = {
@@ -88,17 +94,26 @@ function buildEventEligibleFilterColumns(
     };
 
     const columns = [...EVENT_ELIGIBLE_COLUMNS];
-    const insertAt = columns.findIndex((column) => column.id === 'sessionsAttendedCount');
-    if (insertAt >= 0) {
-        columns.splice(insertAt + 1, 0, specificDays, specificSessions);
+    const daysInsertAt = columns.findIndex((column) => column.id === 'attendanceDaysCount');
+    if (daysInsertAt >= 0) {
+        columns.splice(daysInsertAt + 1, 0, specificDays);
     } else {
-        columns.push(specificDays, specificSessions);
+        columns.push(specificDays);
+    }
+    const sessionsInsertAt = columns.findIndex((column) => column.id === 'sessionsAttendedCount');
+    if (sessionsInsertAt >= 0) {
+        columns.splice(sessionsInsertAt + 1, 0, specificSessions);
+    } else {
+        columns.push(specificSessions);
     }
     return columns;
 }
 
 interface EventCertificatesSectionProps {
     eventId: Id | string;
+    eventDate?: string | null;
+    eventEndDate?: string | null;
+    eventTimezone?: string;
     isFinalized: boolean;
     isCertifiable: boolean;
     canManage: boolean;
@@ -179,28 +194,11 @@ function certListKey(cert: CertificateListItem): string {
     return `e:${cert.recipientEmail.trim().toLowerCase()}:${cert.type}`;
 }
 
-function pickPreferredCert(
-    current: CertificateListItem | undefined,
-    next: CertificateListItem,
-): CertificateListItem {
-    if (!current) return next;
-    const rank = (status: CertificateStatus) => {
-        if (status === 'ISSUED') return 3;
-        if (status === 'DRAFT') return 2;
-        return 1;
-    };
-    return rank(next.status) >= rank(current.status) ? next : current;
-}
-
 function buildUnifiedRows(
     eligible: EventEligibleResponse | null,
     issued: CertificateListItem[],
 ): UnifiedCertificateRow[] {
-    const certByKey = new Map<string, CertificateListItem>();
-    for (const cert of issued) {
-        const key = certListKey(cert);
-        certByKey.set(key, pickPreferredCert(certByKey.get(key), cert));
-    }
+    const keysWithCert = new Set(issued.map(certListKey));
 
     const recipients: EventEligibleRecipient[] = eligible
         ? (eligible.recipients?.length
@@ -211,20 +209,16 @@ function buildUnifiedRows(
             ])
         : [];
 
-    const usedCertIds = new Set<Id>();
-    const rows: UnifiedCertificateRow[] = recipients.map((recipient) => {
+    const rows: UnifiedCertificateRow[] = [];
+
+    for (const recipient of recipients) {
         const key = recipientKey(recipient);
-        const cert = certByKey.get(key);
-        if (cert) usedCertIds.add(cert.id);
+        if (keysWithCert.has(key)) continue;
 
-        let status: CertificateRowStatus = 'NOT_ISSUED';
-        if (cert?.status === 'ISSUED') status = 'ISSUED';
-        else if (cert?.status === 'REVOKED') status = 'REVOKED';
-        else if (recipient.alreadyIssued) status = 'ISSUED';
-
+        const status: CertificateRowStatus = recipient.alreadyIssued ? 'ISSUED' : 'NOT_ISSUED';
         const alreadyIssued = status === 'ISSUED';
 
-        return {
+        rows.push({
             key,
             memberId: recipient.memberId ?? null,
             fullName: recipient.fullName,
@@ -240,22 +234,20 @@ function buildUnifiedRows(
             attendedSessionIds: recipient.attendedSessionIds,
             status,
             alreadyIssued,
-            issueDate: cert?.issuedAt ?? cert?.createdAt ?? null,
-            certificateId: cert?.id ?? null,
-            verificationCode: cert?.verificationCode ?? null,
-            certStatus: cert?.status ?? null,
-            certificateEmailSentAt: cert?.certificateEmailSentAt ?? null,
+            issueDate: null,
+            certificateId: null,
+            verificationCode: null,
+            certStatus: null,
+            certificateEmailSentAt: null,
             selectable: !alreadyIssued,
-        };
-    });
+        });
+    }
 
     for (const cert of issued) {
-        if (usedCertIds.has(cert.id)) continue;
-        const key = `cert:${cert.id}`;
         const status: CertificateRowStatus =
             cert.status === 'ISSUED' ? 'ISSUED' : cert.status === 'REVOKED' ? 'REVOKED' : 'NOT_ISSUED';
         rows.push({
-            key,
+            key: `cert:${cert.id}`,
             memberId: cert.recipientMemberId ?? null,
             fullName: cert.recipientName || cert.recipientMember?.fullName || '—',
             email: cert.recipientEmail,
@@ -278,6 +270,9 @@ function buildUnifiedRows(
 
 export default function EventCertificatesSection({
     eventId,
+    eventDate,
+    eventEndDate,
+    eventTimezone,
     isFinalized: _isFinalized,
     isCertifiable,
     canManage,
@@ -428,8 +423,8 @@ export default function EventCertificatesSection({
     }, [unifiedRows]);
 
     const filterColumns = useMemo(
-        () => buildEventEligibleFilterColumns(eligible),
-        [eligible],
+        () => buildEventEligibleFilterColumns(eligible, eventDate, eventEndDate, eventTimezone),
+        [eligible, eventDate, eventEndDate, eventTimezone],
     );
 
     const filteredRows = useMemo(
@@ -958,7 +953,7 @@ export default function EventCertificatesSection({
                                     </span>
                                 ) : null}
                             </div>
-                            <select
+                            <FormSelect
                                 className="form-input event-cert-io-template"
                                 aria-label="Certificate template"
                                 value={selectedTemplateId}
@@ -974,7 +969,7 @@ export default function EventCertificatesSection({
                                         {template.name}
                                     </option>
                                 ))}
-                            </select>
+                            </FormSelect>
                             <button
                                 type="button"
                                 className="btn btn-secondary event-cert-io-btn"

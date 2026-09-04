@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
     ArrowLeft,
@@ -59,9 +59,15 @@ type EditorView =
     | { kind: 'template-edit'; templateId: number };
 
 const ROWS_PER_PAGE = 20;
+const FETCH_WINDOW_SIZE = 100;
 const CERTIFICATE_TABLE_CELL_DISPLAY_LIMIT = 20;
 const CERTIFICATE_TITLE_DISPLAY_LIMIT = 10;
 const CERTIFICATE_TYPE_DISPLAY_LIMIT = 10;
+
+type CertificateWindowCacheEntry = {
+    items: CertificateListItem[];
+    total: number;
+};
 
 function getErrorMessage(error: unknown, fallback: string): string {
     if (error instanceof Error && error.message) {
@@ -179,7 +185,9 @@ export default function CertificatesPage() {
     const [editorView, setEditorView] = useState<EditorView>(() =>
         parseTemplateQuery(searchParams.get('template')),
     );
-    const [certificates, setCertificates] = useState<CertificateListItem[]>([]);
+    const [paginatedCertificates, setPaginatedCertificates] = useState<CertificateListItem[]>([]);
+    const [certificateTotal, setCertificateTotal] = useState(0);
+    const certificateWindowCacheRef = useRef<Map<number, CertificateWindowCacheEntry>>(new Map());
     const [templates, setTemplates] = useState<CertificateTemplate[]>([]);
     const [loading, setLoading] = useState(true);
     const [templatesLoading, setTemplatesLoading] = useState(false);
@@ -249,19 +257,68 @@ export default function CertificatesPage() {
         [syncTemplateQuery],
     );
 
-    const loadCertificates = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const data = await certificatesAPI.getAll();
-            setCertificates(Array.isArray(data) ? data : []);
-        } catch (err: unknown) {
-            setError(getErrorMessage(err, 'Failed to load certificates'));
-            setCertificates([]);
-        } finally {
-            setLoading(false);
-        }
+    const clearCertificateWindowCache = useCallback(() => {
+        certificateWindowCacheRef.current.clear();
     }, []);
+
+    const applyCertificateWindowSlice = useCallback((uiPage: number, entry: CertificateWindowCacheEntry) => {
+        const offset = ((uiPage - 1) * ROWS_PER_PAGE) % FETCH_WINDOW_SIZE;
+        setPaginatedCertificates(entry.items.slice(offset, offset + ROWS_PER_PAGE));
+        setCertificateTotal(entry.total);
+    }, []);
+
+    const loadCertificateWindow = useCallback(
+        async (uiPage: number, options?: { force?: boolean }) => {
+            const windowIndex = Math.floor(((uiPage - 1) * ROWS_PER_PAGE) / FETCH_WINDOW_SIZE);
+            const cached = certificateWindowCacheRef.current.get(windowIndex);
+            if (cached && !options?.force) {
+                applyCertificateWindowSlice(uiPage, cached);
+                setLoading(false);
+                return;
+            }
+
+            setLoading(true);
+            setError(null);
+            try {
+                const result = await certificatesAPI.listPage({
+                    page: windowIndex + 1,
+                    pageSize: FETCH_WINDOW_SIZE,
+                    status: statusFilter || undefined,
+                    type: typeFilter || undefined,
+                    search: searchQuery.trim() || undefined,
+                    dateFrom: certificateDateFrom || undefined,
+                    dateTo: certificateDateTo || undefined,
+                    nameSort: certificateNameSort || undefined,
+                });
+                const entry: CertificateWindowCacheEntry = {
+                    items: Array.isArray(result.items) ? result.items : [],
+                    total: result.total ?? 0,
+                };
+                certificateWindowCacheRef.current.set(windowIndex, entry);
+                applyCertificateWindowSlice(uiPage, entry);
+            } catch (err: unknown) {
+                setError(getErrorMessage(err, 'Failed to load certificates'));
+                setPaginatedCertificates([]);
+                setCertificateTotal(0);
+            } finally {
+                setLoading(false);
+            }
+        },
+        [
+            applyCertificateWindowSlice,
+            certificateDateFrom,
+            certificateDateTo,
+            certificateNameSort,
+            searchQuery,
+            statusFilter,
+            typeFilter,
+        ],
+    );
+
+    const refreshCertificates = useCallback(async () => {
+        clearCertificateWindowCache();
+        await loadCertificateWindow(currentPage, { force: true });
+    }, [clearCertificateWindowCache, currentPage, loadCertificateWindow]);
 
     const loadTemplates = useCallback(async () => {
         setTemplatesLoading(true);
@@ -293,10 +350,6 @@ export default function CertificatesPage() {
     }, [searchParams]);
 
     useEffect(() => {
-        void loadCertificates();
-    }, [loadCertificates]);
-
-    useEffect(() => {
         if (activeTab === 'templates' && canManage && !isEditorOpen) {
             void loadTemplates();
         }
@@ -312,6 +365,7 @@ export default function CertificatesPage() {
     }, [canManage, activeTab, isEditorOpen, handleCloseTemplateEditor]);
 
     useEffect(() => {
+        clearCertificateWindowCache();
         setCurrentPage(1);
     }, [
         searchQuery,
@@ -320,7 +374,15 @@ export default function CertificatesPage() {
         certificateDateFrom,
         certificateDateTo,
         certificateNameSort,
+        clearCertificateWindowCache,
     ]);
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            void loadCertificateWindow(currentPage);
+        }, 250);
+        return () => window.clearTimeout(timer);
+    }, [currentPage, loadCertificateWindow]);
 
     useEffect(() => {
         setShowFiltersModal(false);
@@ -376,46 +438,6 @@ export default function CertificatesPage() {
         setTemplateNameSort('');
     };
 
-    const filteredCertificates = useMemo(() => {
-        const query = searchQuery.trim().toLowerCase();
-        let rows = certificates.filter((cert) => {
-            if (statusFilter && cert.status !== statusFilter) return false;
-            if (typeFilter && cert.type !== typeFilter) return false;
-            if (
-                !isDateWithinRange(
-                    cert.issuedAt || cert.createdAt,
-                    certificateDateFrom,
-                    certificateDateTo,
-                )
-            ) {
-                return false;
-            }
-            if (!query) return true;
-            const recipient = (cert.recipientName || cert.recipientMember?.fullName || '').toLowerCase();
-            return recipient.includes(query);
-        });
-
-        if (certificateNameSort) {
-            rows = [...rows].sort((a, b) =>
-                compareNames(
-                    a.recipientName || a.recipientMember?.fullName || '',
-                    b.recipientName || b.recipientMember?.fullName || '',
-                    certificateNameSort,
-                ),
-            );
-        }
-
-        return rows;
-    }, [
-        certificates,
-        searchQuery,
-        statusFilter,
-        typeFilter,
-        certificateDateFrom,
-        certificateDateTo,
-        certificateNameSort,
-    ]);
-
     const filteredTemplates = useMemo(() => {
         const query = templateSearchQuery.trim().toLowerCase();
         let rows = templates.filter((template) => {
@@ -442,18 +464,14 @@ export default function CertificatesPage() {
         templateNameSort,
     ]);
 
-    const totalPages = Math.max(1, Math.ceil(filteredCertificates.length / ROWS_PER_PAGE));
-    const paginatedCertificates = useMemo(() => {
-        const start = (currentPage - 1) * ROWS_PER_PAGE;
-        return filteredCertificates.slice(start, start + ROWS_PER_PAGE);
-    }, [filteredCertificates, currentPage]);
+    const totalPages = Math.max(1, Math.ceil(certificateTotal / ROWS_PER_PAGE));
 
     const handleIssue = async (id: number) => {
         setActionBusyId(id);
         setError(null);
         try {
             await certificatesAPI.issue(id);
-            await loadCertificates();
+            await refreshCertificates();
         } catch (err: unknown) {
             setError(getErrorMessage(err, 'Failed to issue certificate'));
         } finally {
@@ -468,7 +486,7 @@ export default function CertificatesPage() {
         try {
             const result = await certificatesAPI.resendEmail(cert.id);
             window.alert(result.message || 'Certificate email sent.');
-            await loadCertificates();
+            await refreshCertificates();
         } catch (err: unknown) {
             window.alert(getErrorMessage(err, 'Failed to send certificate email.'));
         } finally {
@@ -611,7 +629,7 @@ export default function CertificatesPage() {
                                     {!loading && (
                                         <div className="certificates-table-shell">
                                             <div className="certificates-table-scroll">
-                                                {filteredCertificates.length === 0 ? (
+                                                {certificateTotal === 0 ? (
                                                     <div className="empty-state">
                                                         <Award className="empty-state-icon" />
                                                         <h4 className="empty-state-title">
@@ -875,7 +893,7 @@ export default function CertificatesPage() {
                                                 )}
                                             </div>
 
-                                            {totalPages > 1 && filteredCertificates.length > 0 && (
+                                            {totalPages > 1 && certificateTotal > 0 && (
                                                 <div className="pagination-controls certificates-table-pagination">
                                                     <button
                                                         className="pagination-btn"
@@ -1170,7 +1188,7 @@ export default function CertificatesPage() {
             <NewCustomCertificateModal
                 isOpen={showNewCustomModal}
                 onClose={() => setShowNewCustomModal(false)}
-                onSuccess={loadCertificates}
+                onSuccess={refreshCertificates}
             />
 
             <DeactivateTemplateModal
@@ -1194,7 +1212,7 @@ export default function CertificatesPage() {
                 onClose={() => setRevokeTarget(null)}
                 onRevoked={async () => {
                     setError(null);
-                    await loadCertificates();
+                    await refreshCertificates();
                 }}
             />
             <ReissueCertificateModal
@@ -1202,7 +1220,7 @@ export default function CertificatesPage() {
                 onClose={() => setReissueTarget(null)}
                 onReissued={async () => {
                     setError(null);
-                    await loadCertificates();
+                    await refreshCertificates();
                 }}
             />
             <TemplatePreviewModal

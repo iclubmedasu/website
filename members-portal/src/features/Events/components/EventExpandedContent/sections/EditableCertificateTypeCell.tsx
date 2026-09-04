@@ -1,4 +1,5 @@
 import type { CertificateType } from '@/services/certificatesAPI';
+import { FormSelect } from '@/components/input/FormSelect';
 
 const CERTIFICATE_TYPES: CertificateType[] = [
     'ATTENDANCE',
@@ -8,7 +9,6 @@ const CERTIFICATE_TYPES: CertificateType[] = [
     'ADMINISTRATION',
     'SUPERVISION',
     'PARTICIPATION',
-    'CUSTOM',
 ];
 
 function formatCertificateType(type: CertificateType): string {
@@ -40,7 +40,7 @@ export default function EditableCertificateTypeCell({
 
     return (
         <td>
-            <select
+            <FormSelect
                 aria-label={
                     recipientName
                         ? `Certificate type for ${recipientName}`
@@ -55,7 +55,7 @@ export default function EditableCertificateTypeCell({
                         {formatCertificateType(type)}
                     </option>
                 ))}
-            </select>
+            </FormSelect>
         </td>
     );
 }

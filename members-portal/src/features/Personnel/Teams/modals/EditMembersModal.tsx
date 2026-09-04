@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { X } from 'lucide-react';
@@ -6,6 +6,7 @@ import { formatDate } from '@iclub/shared/utils';
 import { useAutoDismissMessage } from '@/hooks/useAutoDismissMessage';
 import { teamMembersAPI } from '../../../../services/api';
 import type { Id } from '../../../../types/backend-contracts';
+import { FormSelect } from '@/components/input/FormSelect';
 
 const EDIT_MODES = {
     ASSIGNMENT: 'assignment',
@@ -207,7 +208,7 @@ const EditMembersModal = ({
         }
     }, [isOpen, member, currentTeamAssignment, clearSuccessMessage]);
 
-    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string; name: string; type?: string } }) => {
         const { name, value } = e.target;
         setFormData((prev) => ({
             ...prev,
@@ -539,7 +540,7 @@ const EditMembersModal = ({
                                 <h3 className="form-section-title">Role &amp; Subteam</h3>
                                 <div className="form-group">
                                     <label htmlFor="newRoleId" className="form-label">Role *</label>
-                                    <select
+                                    <FormSelect
                                         id="newRoleId"
                                         name="newRoleId"
                                         className={`form-input ${errors.newRoleId ? 'error' : ''}`}
@@ -558,12 +559,12 @@ const EditMembersModal = ({
                                                 : role.roleName;
                                             return <option key={role.id} value={role.id} disabled={isFull}>{label}</option>;
                                         })}
-                                    </select>
+                                    </FormSelect>
                                     {errors.newRoleId && <span className="field-error">{errors.newRoleId}</span>}
                                 </div>
                                 <div className="form-group">
                                     <label htmlFor="newSubteamId" className="form-label">Subteam (optional)</label>
-                                    <select
+                                    <FormSelect
                                         id="newSubteamId"
                                         name="newSubteamId"
                                         className="form-input"
@@ -575,7 +576,7 @@ const EditMembersModal = ({
                                         {availableSubteams.map((subteam) => (
                                             <option key={subteam.id} value={subteam.id}>{subteam.name}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                             </div>
                         )}
@@ -585,7 +586,7 @@ const EditMembersModal = ({
                                 <h3 className="form-section-title">Promotion or Demotion</h3>
                                 <div className="form-group">
                                     <label htmlFor="promoDemotionType" className="form-label">Record as *</label>
-                                    <select
+                                    <FormSelect
                                         id="promoDemotionType"
                                         name="promoDemotionType"
                                         className="form-input"
@@ -596,11 +597,11 @@ const EditMembersModal = ({
                                         {promoDemotionOptions.map((opt) => (
                                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                                 <div className="form-group">
                                     <label htmlFor="newRoleId" className="form-label">Role (optional)</label>
-                                    <select
+                                    <FormSelect
                                         id="newRoleId"
                                         name="newRoleId"
                                         className={`form-input ${errors.newRoleId ? 'error' : ''}`}
@@ -619,12 +620,12 @@ const EditMembersModal = ({
                                                 : role.roleName;
                                             return <option key={role.id} value={role.id} disabled={isFull}>{label}</option>;
                                         })}
-                                    </select>
+                                    </FormSelect>
                                     {errors.newRoleId && <span className="field-error">{errors.newRoleId}</span>}
                                 </div>
                                 <div className="form-group">
                                     <label htmlFor="newSubteamId" className="form-label">Subteam (optional)</label>
-                                    <select
+                                    <FormSelect
                                         id="newSubteamId"
                                         name="newSubteamId"
                                         className="form-input"
@@ -636,7 +637,7 @@ const EditMembersModal = ({
                                         {availableSubteams.map((subteam) => (
                                             <option key={subteam.id} value={subteam.id}>{subteam.name}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                             </div>
                         )}
@@ -646,7 +647,7 @@ const EditMembersModal = ({
                                 <h3 className="form-section-title">Transfer to team</h3>
                                 <div className="form-group">
                                     <label htmlFor="newTeamId" className="form-label">Target team *</label>
-                                    <select
+                                    <FormSelect
                                         id="newTeamId"
                                         name="newTeamId"
                                         className={`form-input ${errors.newTeamId ? 'error' : ''}`}
@@ -658,7 +659,7 @@ const EditMembersModal = ({
                                         {teams.filter((team) => team.isActive !== false && team.id !== currentTeamId).map((team) => (
                                             <option key={team.id} value={team.id}>{team.name}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                     {errors.newTeamId && <span className="field-error">{errors.newTeamId}</span>}
                                     <p className="form-hint-inline">Member will be assigned the default Member role with no subteam.</p>
                                 </div>
@@ -670,7 +671,7 @@ const EditMembersModal = ({
                                 <h3 className="form-section-title">Leave type</h3>
                                 <div className="form-group">
                                     <label htmlFor="leaveType" className="form-label">Type *</label>
-                                    <select
+                                    <FormSelect
                                         id="leaveType"
                                         name="leaveType"
                                         className="form-input"
@@ -681,7 +682,7 @@ const EditMembersModal = ({
                                         {leaveTypeOptions.map((opt) => (
                                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                             </div>
                         )}

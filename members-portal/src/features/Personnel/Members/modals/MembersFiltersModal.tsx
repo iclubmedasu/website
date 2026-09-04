@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { DateInput } from '@/components/input/DateInput';
+import { FormSelect } from '@/components/input/FormSelect';
 import type { TeamRef } from '@/types/backend-contracts';
 
 export interface MembersFiltersState {
@@ -57,7 +58,7 @@ export default function MembersFiltersModal({
                         <h3 className="form-section-title">Team</h3>
                         <div className="form-group">
                             <label className="form-label" htmlFor="members-filter-team">Team</label>
-                            <select
+                            <FormSelect
                                 id="members-filter-team"
                                 className="form-input"
                                 value={draftTeamId}
@@ -67,7 +68,7 @@ export default function MembersFiltersModal({
                                 {allTeams.map((team) => (
                                     <option key={team.id} value={String(team.id)}>{team.name}</option>
                                 ))}
-                            </select>
+                            </FormSelect>
                         </div>
                     </div>
 
@@ -75,7 +76,7 @@ export default function MembersFiltersModal({
                         <h3 className="form-section-title">Status</h3>
                         <div className="form-group">
                             <label className="form-label" htmlFor="members-filter-status">Membership status</label>
-                            <select
+                            <FormSelect
                                 id="members-filter-status"
                                 className="form-input"
                                 value={draftStatus}
@@ -85,7 +86,7 @@ export default function MembersFiltersModal({
                                 <option value="active">Active</option>
                                 <option value="inactive">Inactive</option>
                                 <option value="unassigned">Unassigned</option>
-                            </select>
+                            </FormSelect>
                         </div>
                     </div>
 

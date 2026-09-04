@@ -24,6 +24,7 @@ import type {
     ProjectTypeRef,
     TeamRef,
 } from '@/types/backend-contracts';
+import { FormSelect } from '@/components/input/FormSelect';
 
 const PROJECT_STATUSES = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD', 'CANCELLED'] as const;
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
@@ -179,7 +180,7 @@ export default function CreateEventModal({
         : projectTypes;
 
     const handleChange = (key: keyof typeof form) => (
-        event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
+        event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | { target: { value: string; name: string; type?: string } },
     ) => {
         const value = event.target.type === 'checkbox'
             ? (event.target as HTMLInputElement).checked
@@ -187,7 +188,7 @@ export default function CreateEventModal({
         setForm((current) => ({ ...current, [key]: value }));
     };
 
-    const handleCategoryChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const handleCategoryChange = (event: { target: { value: string } }) => {
         const category = event.target.value;
         setSelectedCategory(category);
         const stillValid = projectTypes.some(
@@ -210,7 +211,7 @@ export default function CreateEventModal({
         });
     };
 
-    const handleTimezoneChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const handleTimezoneChange = (event: { target: { value: string } }) => {
         const nextTimezone = event.target.value;
         setForm((current) => {
             const convert = (local: string) => {
@@ -372,7 +373,7 @@ export default function CreateEventModal({
                             <div className="form-row">
                                 <div className="form-group">
                                     <label className="form-label" htmlFor="event-category">Category</label>
-                                    <select
+                                    <FormSelect
                                         id="event-category"
                                         className="form-input"
                                         value={selectedCategory}
@@ -382,11 +383,11 @@ export default function CreateEventModal({
                                         {categories.map((category) => (
                                             <option key={category} value={category}>{category}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label" htmlFor="event-type">Type *</label>
-                                    <select
+                                    <FormSelect
                                         id="event-type"
                                         className="form-input"
                                         value={form.projectTypeId}
@@ -397,26 +398,26 @@ export default function CreateEventModal({
                                         {filteredTypes.map((typeItem) => (
                                             <option key={typeItem.id} value={String(typeItem.id)}>{typeItem.name}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                             </div>
 
                             <div className="form-row">
                                 <div className="form-group">
                                     <label className="form-label" htmlFor="event-priority">Priority</label>
-                                    <select id="event-priority" className="form-input" value={form.priority} onChange={handleChange('priority')}>
+                                    <FormSelect id="event-priority" className="form-input" value={form.priority} onChange={handleChange('priority')}>
                                         {PRIORITIES.map((priority) => (
                                             <option key={priority} value={priority}>{PRIORITY_LABELS[priority]}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label" htmlFor="event-status">Status</label>
-                                    <select id="event-status" className="form-input" value={form.status} onChange={handleChange('status')}>
+                                    <FormSelect id="event-status" className="form-input" value={form.status} onChange={handleChange('status')}>
                                         {PROJECT_STATUSES.map((status) => (
                                             <option key={status} value={status}>{STATUS_LABELS[status]}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                 </div>
                             </div>
                         </div>
@@ -427,16 +428,18 @@ export default function CreateEventModal({
                             <div className="form-row">
                                 <div className="form-group">
                                     <label className="form-label" htmlFor="event-timezone">Event timezone *</label>
-                                    <select
+                                    <FormSelect
                                         id="event-timezone"
                                         className="form-input"
                                         value={form.timezone}
                                         onChange={handleTimezoneChange}
+                                        searchable
+                                        searchPlaceholder="Search timezone…"
                                     >
                                         {COMMON_EVENT_TIMEZONES.map((entry) => (
                                             <option key={entry.id} value={entry.id}>{entry.label}</option>
                                         ))}
-                                    </select>
+                                    </FormSelect>
                                     <p className="form-hint-text">
                                         Enter all times below in {timezoneLabel} local time (venue timezone).
                                     </p>
@@ -512,7 +515,7 @@ export default function CreateEventModal({
 
                             <div className="form-group">
                                 <label className="form-label" htmlFor="event-project">Linked Project</label>
-                                <select
+                                <FormSelect
                                     id="event-project"
                                     className="form-input"
                                     value={form.projectId}
@@ -523,7 +526,7 @@ export default function CreateEventModal({
                                     {projects.map((project) => (
                                         <option key={project.id} value={project.id}>{project.title}</option>
                                     ))}
-                                </select>
+                                </FormSelect>
                             </div>
 
                             <div className="form-row">
