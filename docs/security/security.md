@@ -216,7 +216,7 @@ Configs live under [`.github/`](../.github/). Enablement notes: [.github/SECRETS
 
 ### Existing audit
 
-- `pnpm audit --audit-level moderate` remains in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) (`Security Audit` job).
+- `pnpm audit --audit-level moderate` remains in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) (`Security Audit` job). CI retries `pnpm audit` on npm registry timeouts.
 - Unfixable community `xlsx` advisories may be listed under root `pnpm.auditConfig.ignoreGhsas` when no free patched release exists; prefer replacing `xlsx` later if export allows.
 
 ### After CI fails

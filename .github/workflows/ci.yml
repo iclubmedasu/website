@@ -207,4 +207,23 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run security audit
-        run: pnpm audit --audit-level moderate
+        run: |
+          attempt=1
+          max_attempts=4
+          while [ "$attempt" -le "$max_attempts" ]; do
+            if pnpm audit --audit-level moderate; then
+              exit 0
+            fi
+            if [ "$attempt" -eq "$max_attempts" ]; then
+              echo "pnpm audit failed after ${max_attempts} attempts"
+              exit 1
+            fi
+            case "$attempt" in
+              1) delay=20 ;;
+              2) delay=40 ;;
+              3) delay=60 ;;
+            esac
+            echo "pnpm audit failed (attempt ${attempt}/${max_attempts}); retrying in ${delay}s..."
+            sleep "$delay"
+            attempt=$((attempt + 1))
+          done
