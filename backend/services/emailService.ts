@@ -106,12 +106,22 @@ async function sendEmailOnce(input: SendEmailInput): Promise<SendEmailResult> {
 
     const client = getResendClient();
     const replyTo = input.replyTo?.trim() || getReplyToEmail();
-    const attachments = input.attachments?.map((attachment) => ({
-        content: attachment.content,
-        filename: attachment.filename,
-        contentType: attachment.contentType ?? 'image/png',
-        ...(attachment.contentId ? { contentId: attachment.contentId } : {}),
-    }));
+    const attachments = input.attachments?.map((attachment) => {
+        if (attachment.contentId) {
+            return {
+                content: attachment.content,
+                filename: attachment.filename,
+                contentType: attachment.contentType ?? 'image/png',
+                contentId: attachment.contentId,
+            };
+        }
+
+        return {
+            content: attachment.content,
+            filename: attachment.filename,
+            ...(attachment.contentType ? { contentType: attachment.contentType } : {}),
+        };
+    });
     const { data, error } = await client.emails.send({
         from: getFromEmail(),
         to,

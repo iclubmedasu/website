@@ -65,6 +65,8 @@ vi.mock('../../services/eventCode', () => eventCodeMocks)
 vi.mock('../../services/activityLogService', () => activityMocks)
 vi.mock('../../services/eventTicketEmailService', () => ({
     sendEventTicketEmail: vi.fn().mockResolvedValue(undefined),
+    queueTicketEmail: vi.fn(),
+    queueReminderEmail: vi.fn(),
 }))
 vi.mock('../../services/eventDates', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../../services/eventDates')>()

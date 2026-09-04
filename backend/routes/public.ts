@@ -710,10 +710,8 @@ async function streamPublicTicketDesignImage(
             isDisclosed: true,
             isFinalized: true,
             ticketHeaderImageGithubPath: true,
-            ticketHeaderImageFileSize: true,
             ticketHeaderImageMimeType: true,
             ticketFooterImageGithubPath: true,
-            ticketFooterImageFileSize: true,
             ticketFooterImageMimeType: true,
         },
     });
@@ -728,25 +726,20 @@ async function streamPublicTicketDesignImage(
     const mimeType = slot === "header"
         ? event.ticketHeaderImageMimeType
         : event.ticketFooterImageMimeType;
-    const fileSize = slot === "header"
-        ? event.ticketHeaderImageFileSize
-        : event.ticketFooterImageFileSize;
 
     if (!githubPath) {
         return res.status(404).json({ error: "Image not found" });
     }
 
-    const ghResponse = await githubStorage.downloadFile(githubPath);
+    const buffer = await githubStorage.downloadFileBuffer(githubPath);
     res.setHeader("Cache-Control", PUBLIC_EVENT_PHOTO_CACHE_CONTROL);
     res.setHeader("Content-Type", mimeType || "application/octet-stream");
     res.setHeader(
         "Content-Disposition",
         `inline; filename="ticket-${slot}-image"`,
     );
-    if (fileSize) {
-        res.setHeader("Content-Length", fileSize);
-    }
-    await pipeGithubBodyToResponse(ghResponse, res);
+    res.setHeader("Content-Length", buffer.length);
+    return res.send(buffer);
 }
 
 router.get("/events/:id/ticket-design/header-image", async (req: Request, res: Response) => {

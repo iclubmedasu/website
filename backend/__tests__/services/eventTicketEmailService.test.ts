@@ -11,6 +11,7 @@ const emailMocks = vi.hoisted(() => ({
 
 const githubStorageMocks = vi.hoisted(() => ({
     downloadFile: vi.fn(),
+    downloadFileBuffer: vi.fn(),
 }));
 
 vi.mock('../../db', () => ({
@@ -159,12 +160,7 @@ describe('eventTicketEmailService', () => {
 
     it('downloads a GitHub ticket image once when the same path is used twice', async () => {
         const headerPath = 'events/42/ticket-header.png';
-        githubStorageMocks.downloadFile.mockResolvedValue(
-            new Response(Buffer.from('header-bytes'), {
-                status: 200,
-                headers: { 'content-type': 'image/png' },
-            }),
-        );
+        githubStorageMocks.downloadFileBuffer.mockResolvedValue(Buffer.from('header-bytes'));
         prismaMocks.eventRegistrationFindUnique.mockResolvedValue({
             ...registrationFixture,
             event: {
@@ -177,8 +173,8 @@ describe('eventTicketEmailService', () => {
         await sendEventTicketEmail(1);
         await sendEventTicketEmail(1);
 
-        expect(githubStorageMocks.downloadFile).toHaveBeenCalledTimes(1);
-        expect(githubStorageMocks.downloadFile).toHaveBeenCalledWith(headerPath);
+        expect(githubStorageMocks.downloadFileBuffer).toHaveBeenCalledTimes(1);
+        expect(githubStorageMocks.downloadFileBuffer).toHaveBeenCalledWith(headerPath);
 
         const firstAttachments = emailMocks.sendEmail.mock.calls[0][0].attachments as Array<{ contentId: string }>;
         const secondAttachments = emailMocks.sendEmail.mock.calls[1][0].attachments as Array<{ contentId: string }>;

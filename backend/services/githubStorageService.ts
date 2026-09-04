@@ -376,6 +376,52 @@ async function downloadFile(githubPath: string): Promise<Response> {
     return res;
 }
 
+/** Undici/GitHub mid-body disconnects that are worth a fresh download attempt. */
+export function isRetriableGithubDownloadError(err: unknown): boolean {
+    const code = (err as NodeJS.ErrnoException | undefined)?.code;
+    const cause = (err as { cause?: unknown } | undefined)?.cause;
+    const causeCode = (cause as NodeJS.ErrnoException | undefined)?.code;
+    const message = err instanceof Error ? err.message : String(err ?? '');
+    const causeMessage =
+        cause instanceof Error ? cause.message : cause != null ? String(cause) : '';
+
+    if (code === 'UND_ERR_SOCKET' || causeCode === 'UND_ERR_SOCKET') {
+        return true;
+    }
+
+    const haystack = `${message} ${causeMessage}`;
+    return /terminated/i.test(haystack) || /other side closed/i.test(haystack);
+}
+
+const DOWNLOAD_BUFFER_MAX_ATTEMPTS = 3;
+
+/**
+ * Download a file fully into memory, retrying transient GitHub socket aborts.
+ * Prefer this for small assets (ticket images) where streaming cannot retry
+ * after headers/partial body have already been sent.
+ */
+async function downloadFileBuffer(githubPath: string): Promise<Buffer> {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= DOWNLOAD_BUFFER_MAX_ATTEMPTS; attempt++) {
+        try {
+            const res = await downloadFile(githubPath);
+            return Buffer.from(await res.arrayBuffer());
+        } catch (err) {
+            lastError = err;
+            if (
+                attempt < DOWNLOAD_BUFFER_MAX_ATTEMPTS &&
+                isRetriableGithubDownloadError(err)
+            ) {
+                continue;
+            }
+            throw err;
+        }
+    }
+
+    throw lastError;
+}
+
 /**
  * Get the commit history for a specific file.
  * Returns an array of commits (newest first).
@@ -488,6 +534,7 @@ export {
     moveFile,
     deleteFile,
     downloadFile,
+    downloadFileBuffer,
     getFileHistory,
     downloadFileAtVersion,
     restoreDeletedFile,

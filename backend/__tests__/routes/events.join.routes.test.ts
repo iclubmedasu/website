@@ -72,6 +72,8 @@ vi.mock('../../services/notificationService', () => ({
 vi.mock('../../services/eventTicketEmailService', () => ({
     sendEventReminderEmail: vi.fn(),
     sendEventTicketEmail: vi.fn(),
+    queueTicketEmail: vi.fn(),
+    queueReminderEmail: vi.fn(),
 }))
 
 import { authenticateToken, optionalAuthenticateToken } from '../../middleware/auth'

@@ -71,6 +71,8 @@ vi.mock('../../services/eventActivityHelpers', () => ({
 }))
 vi.mock('../../services/eventTicketEmailService', () => ({
     sendEventTicketEmail: vi.fn().mockResolvedValue(undefined),
+    queueTicketEmail: vi.fn(),
+    queueReminderEmail: vi.fn(),
 }))
 vi.mock('../../services/eventCode', () => ({
     generateUniqueConfirmationCode: vi.fn(),

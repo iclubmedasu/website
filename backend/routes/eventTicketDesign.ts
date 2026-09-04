@@ -3,7 +3,6 @@ import multer from "multer";
 import { normalizeHex } from "@iclub/shared/utils";
 import { prisma } from "../db";
 import { canUserAccessEventOperations } from "../lib/eventPermissions";
-import { pipeGithubBodyToResponse } from "../lib/pipeGithubResponse";
 import type { RequestUser } from "../types/auth";
 import * as githubStorage from "../services/githubStorageService";
 
@@ -363,18 +362,14 @@ async function handleImageDownload(
             return res.status(404).json({ error: `Ticket ${slot} image not found` });
         }
 
-        const ghResponse = await githubStorage.downloadFile(image.githubPath);
+        const buffer = await githubStorage.downloadFileBuffer(image.githubPath);
         res.setHeader("Content-Type", image.mimeType || "application/octet-stream");
         res.setHeader(
             "Content-Disposition",
             `inline; filename="${image.fileName}"`,
         );
-        if (image.fileSize) {
-            res.setHeader("Content-Length", image.fileSize);
-        }
-
-        await pipeGithubBodyToResponse(ghResponse, res);
-        return;
+        res.setHeader("Content-Length", buffer.length);
+        return res.send(buffer);
     } catch (error) {
         console.error(`GET /events/:id/ticket-design/${slot}-image/download`, error);
         return res.status(500).json({ error: `Failed to download ticket ${slot} image` });

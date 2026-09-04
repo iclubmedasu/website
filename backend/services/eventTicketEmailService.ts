@@ -91,8 +91,7 @@ async function loadGithubImageAttachment(input: {
 
     const loadPromise = (async (): Promise<EmailAttachment | null> => {
         try {
-            const response = await githubStorage.downloadFile(input.githubPath);
-            const buffer = Buffer.from(await response.arrayBuffer());
+            const buffer = await githubStorage.downloadFileBuffer(input.githubPath);
             return {
                 contentId: input.contentId,
                 content: buffer.toString('base64'),
