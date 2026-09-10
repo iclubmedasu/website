@@ -217,7 +217,7 @@ Configs live under [`.github/`](../.github/). Enablement notes: [.github/SECRETS
 ### Existing audit
 
 - `pnpm audit --audit-level moderate` runs as the `Security Audit` job in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml). It **gates** Hugging Face deploy: deploy keys off successful **CI — Lint, Type Check & Build** (`workflow_run`), so a red audit blocks deploy.
-- Root `pnpm.overrides` pin patched transitives (browserslist, mysql2, fast-uri, qs, `@humanfs/node`, fflate, and existing floors) so moderate+ findings stay clear without ignoring those GHSAs.
+- Root `pnpm.overrides` pin patched transitives (multer, sharp, hono, baseline-browser-mapping, browserslist, mysql2, fast-uri, qs, `@humanfs/node`, fflate, and existing floors) so moderate+ findings stay clear without ignoring those GHSAs.
 - The audit step retries **only** on npm registry timeouts / 500 / `FetchError`. Real “vulnerabilities found” output fails immediately (no backoff loop on advisories).
 - Unfixable community `xlsx` advisories may be listed under root `pnpm.auditConfig.ignoreGhsas` when no free patched release exists; prefer replacing `xlsx` later if export allows.
 

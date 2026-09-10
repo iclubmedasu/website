@@ -3,12 +3,16 @@ import type { Response } from 'express';
 
 const pipelineMock = vi.fn();
 
-vi.mock('stream/promises', () => ({
-    pipeline: (...args: unknown[]) => pipelineMock(...args),
-}));
+vi.mock('stream/promises', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('stream/promises')>();
+    return {
+        ...actual,
+        pipeline: (...args: unknown[]) => pipelineMock(...args),
+    };
+});
 
-vi.mock('stream', async () => {
-    const actual = await vi.importActual<typeof import('stream')>('stream');
+vi.mock('stream', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('stream')>();
     return {
         ...actual,
         Readable: {

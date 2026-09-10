@@ -4,14 +4,17 @@ const sendMock = vi.fn();
 const batchSendMock = vi.fn();
 
 vi.mock('resend', () => ({
-    Resend: vi.fn().mockImplementation(() => ({
-        emails: {
-            send: sendMock,
-        },
-        batch: {
-            send: batchSendMock,
-        },
-    })),
+    // Vitest 4 requires function/class implementations for `new`-able mocks.
+    Resend: vi.fn(function Resend() {
+        return {
+            emails: {
+                send: sendMock,
+            },
+            batch: {
+                send: batchSendMock,
+            },
+        };
+    }),
 }));
 
 describe('emailService sendEmail rate-limit retry', () => {

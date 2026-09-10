@@ -1,31 +1,67 @@
 import { defineConfig } from 'vitest/config'
 import { resolve } from 'path'
 
+const sharedAlias = {
+    '@': resolve(__dirname, 'members-portal/src'),
+    '~': resolve(__dirname, 'members-portal/src')
+}
+
+const sharedExclude = [
+    '**/node_modules/**',
+    '**/.next/**',
+    '**/dist/**',
+    '**/coverage/**',
+    '**/generated/**',
+    'e2e/**'
+]
+
 export default defineConfig({
-    esbuild: {
-        jsx: 'automatic'
-    },
-    resolve: {
-        alias: {
-            '@': resolve(__dirname, 'members-portal/src'),
-            '~': resolve(__dirname, 'members-portal/src')
+    // Vite 8 / Vitest 4 use Oxc for transforms; esbuild.jsx is ignored.
+    oxc: {
+        jsx: {
+            runtime: 'automatic'
         }
     },
+    resolve: {
+        alias: sharedAlias
+    },
     test: {
-        environment: 'jsdom',
-        environmentMatchGlobs: [
-            ['backend/**', 'node']
-        ],
         globals: true,
         setupFiles: ['./test-setup.ts'],
-        include: ['**/*.{test,spec}.{ts,tsx}'],
-        exclude: [
-            '**/node_modules/**',
-            '**/.next/**',
-            '**/dist/**',
-            '**/coverage/**',
-            '**/generated/**',
-            'e2e/**'
+        exclude: sharedExclude,
+        // Vitest 4 removed environmentMatchGlobs — use projects instead.
+        projects: [
+            {
+                resolve: { alias: sharedAlias },
+                test: {
+                    name: 'backend',
+                    environment: 'node',
+                    globals: true,
+                    setupFiles: ['./test-setup.ts'],
+                    include: ['backend/**/*.{test,spec}.{ts,tsx}'],
+                    exclude: sharedExclude
+                }
+            },
+            {
+                oxc: {
+                    jsx: {
+                        runtime: 'automatic'
+                    }
+                },
+                resolve: { alias: sharedAlias },
+                test: {
+                    name: 'frontend',
+                    environment: 'jsdom',
+                    globals: true,
+                    setupFiles: ['./test-setup.ts'],
+                    include: [
+                        'members-portal/**/*.{test,spec}.{ts,tsx}',
+                        'packages/**/*.{test,spec}.{ts,tsx}',
+                        'public-website/**/*.{test,spec}.{ts,tsx}'
+                    ],
+                    exclude: sharedExclude
+                }
+            }
         ],
         coverage: {
             provider: 'v8',
