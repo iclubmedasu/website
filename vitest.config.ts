@@ -66,12 +66,6 @@ export default defineConfig({
         coverage: {
             provider: 'v8',
             reporter: ['text', 'text-summary', 'html', 'lcov'],
-            all: true,
-            include: [
-                'backend/**/*.ts',
-                'members-portal/src/**/*.{ts,tsx}',
-                'packages/shared/src/**/*.ts'
-            ],
             exclude: [
                 '**/*.d.ts',
                 '**/__tests__/**',
