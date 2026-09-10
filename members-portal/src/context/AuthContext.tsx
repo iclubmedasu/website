@@ -226,7 +226,8 @@ function logAuthNetworkOrError(label: string, error: unknown): void {
     console.error(`${label}:`, error);
 }
 
-const AUTH_ME_RETRY_DELAYS_MS = [400, 900];
+/** Backoff between /auth/me retries when the BFF returns 502/503 or the hop fails (HF cold start). */
+const AUTH_ME_RETRY_DELAYS_MS = [800, 2000, 4000];
 
 function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -235,7 +236,8 @@ function sleep(ms: number): Promise<void> {
 /**
  * GET /auth/me with short retries on transient failures (network blips, backend-api
  * proxy 502/503, or an HF cold-start interstitial). A definitive 401/403/429 or a
- * successful response returns immediately — only ambiguous transient failures are retried.
+ * successful response returns immediately — only 502/503 and network errors are retried
+ * (not 429; spamming worsens HF throttle).
  */
 async function fetchAuthMeWithRetry(): Promise<Response | null> {
     let lastError: unknown = null;

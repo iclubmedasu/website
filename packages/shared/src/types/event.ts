@@ -484,6 +484,16 @@ export interface SendRegistrationRemindersPayload {
 export interface SendRegistrationTicketsResult {
     queued: number;
     skipped: number;
+    batchId: string | null;
+}
+
+export interface EmailOutboxBatchStatus {
+    batchId: string;
+    total: number;
+    sent: number;
+    failed: number;
+    pending: number;
+    processing: number;
 }
 
 export type EventRegistrationSourceGroup = "PRE_REGISTERED" | "WALK_IN" | "IMPORT";

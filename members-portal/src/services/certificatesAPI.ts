@@ -118,6 +118,7 @@ export interface BulkIssueResult {
     created: number;
     skipped: number;
     certificateIds: number[];
+    batchId?: string | null;
 }
 
 export type EventEligibleCategory = 'ATTENDEE' | 'STAFF';

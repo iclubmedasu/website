@@ -245,8 +245,11 @@ The members portal previously deployed to Netlify. If you have not already:
 4. API endpoints:
 	- [API](https://iclubmedasu-backend.hf.space/api)
 	- [Health check](https://iclubmedasu-backend.hf.space/health)
-5. **Keep-alive Monitoring:**
-	- The Hugging Face Space is kept alive using [UptimeRobot](https://dashboard.uptimerobot.com/monitors/802817894), which regularly pings the health endpoint to prevent the space from sleeping.
+5. **Keep-alive Monitoring (all Spaces that can sleep):**
+	Free / `cpu-basic` Hugging Face Spaces sleep when idle. **Backend keep-alive alone is not enough** — if the members-portal Space sleeps, the portal URL hangs or “loads forever” even when the API is awake. The public site can still work while the portal sleeps (separate Space; browser talks to the backend directly).
+	- **Backend (existing):** [UptimeRobot monitor `802817894`](https://dashboard.uptimerobot.com/monitors/802817894) → `https://iclubmedasu-backend.hf.space/health`
+	- **Members portal (required):** add a new UptimeRobot monitor → `https://iclubmedasu-members-portal.hf.space/api/health` (same short interval as backend)
+	- **Public website (optional):** add a monitor → `https://iclubmedasu-public-website.hf.space/api/health` so all three Spaces stay warm
 6. **Post-deploy health + auto-revert:** see [Deploy safety net](#deploy-safety-net-health-check--auto-revert). CI also fails the job if `/health` never returns 200 after the rebuild wait.
 
 ## Database (Supabase)
@@ -315,7 +318,7 @@ The public website loads data in the **browser** (same pattern as the members po
 1. Open [backend health](https://iclubmedasu-backend.hf.space/health) — expect HTTP 200 and `"status":"ok"`.
 2. Open [public events API](https://iclubmedasu-backend.hf.space/api/public/events?limit=5&upcoming=false) in your browser — expect a JSON array.
 3. If health returns 503: open the [backend Space](https://huggingface.co/spaces/iclubmedasu/backend) → **Logs** — check for missing `DATABASE_URL`, Prisma errors, or crash on startup.
-4. Wake a sleeping Space by visiting `/health`; confirm [UptimeRobot](https://dashboard.uptimerobot.com/monitors/802817894) pings `/health` regularly.
+4. Wake a sleeping Space by visiting its health URL; confirm [UptimeRobot](https://dashboard.uptimerobot.com/monitors/802817894) still pings backend `/health`, and that you have monitors for portal `/api/health` (required) and optionally public `/api/health` (see [Keep-alive Monitoring](#backend-deployment-hugging-face-spaces)).
 5. On the **public-website** Space → Settings → **Variables**, set `NEXT_PUBLIC_API_URL` to exactly `https://iclubmedasu-backend.hf.space/api` with **no leading or trailing spaces** (must be **Variables**, not Secrets — it is baked in at Docker build time). **Rebuild** the Space after changing it.
 
 If `NEXT_PUBLIC_API_URL` is missing at build time, browser fetches fall back to `localhost:3000` on the client and pages stay empty on the live site.

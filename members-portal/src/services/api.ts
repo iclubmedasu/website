@@ -22,6 +22,7 @@ import type {
     SendRegistrationRemindersPayload,
     SendRegistrationTicketsPayload,
     SendRegistrationTicketsResult,
+    EmailOutboxBatchStatus,
     EventCustomFieldRef,
     EventDetail,
     EventFileCommentRef,
@@ -3501,5 +3502,15 @@ export const usageDashboardAPI = {
             { headers: getAuthHeaders() },
         );
         return handleResponse<UsageDashboardSummary>(response);
+    },
+};
+
+export const emailOutboxAPI = {
+    getBatchStatus: async (batchId: string): Promise<EmailOutboxBatchStatus> => {
+        const response = await apiFetch(
+            `${API_BASE_URL}/email-outbox/batches/${encodeURIComponent(batchId)}`,
+            { headers: getAuthHeaders() },
+        );
+        return handleResponse<EmailOutboxBatchStatus>(response);
     },
 };

@@ -32,6 +32,7 @@ import {
     Award,
     Megaphone,
     FileText,
+    BarChart3,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -91,6 +92,12 @@ const NAV_ITEMS = [
         requiresFinanceAccess: true,
     },
     {
+        label: 'Employee KPIs',
+        href: '/kpis',
+        icon: BarChart3,
+        requiresKpiAccess: true,
+    },
+    {
         label: 'General',
         icon: Globe,
         items: [
@@ -112,6 +119,7 @@ function getNavItems(user: ReturnType<typeof useAuth>['user']) {
         user?.isAdmin ||
         user?.isLeadership
     )
+    const canAccessKpis = canAccessCertificates
     const canManageAnnouncements = !!(user?.isDeveloper || user?.isOfficer || user?.isAdmin || user?.isLeadership || user?.isSpecial)
     const requiresDocumentAccess = !!(
         user?.isDeveloper ||
@@ -123,6 +131,7 @@ function getNavItems(user: ReturnType<typeof useAuth>['user']) {
     return NAV_ITEMS
         .filter((item) => !item.requiresFinanceAccess || canViewFinance)
         .filter((item) => !item.requiresCertificateAccess || canAccessCertificates)
+        .filter((item) => !item.requiresKpiAccess || canAccessKpis)
         .filter((item) => !item.requiresAnnouncementManagement || canManageAnnouncements)
         .filter((item) => !item.requiresDocumentAccess || requiresDocumentAccess)
         .map((item) => {

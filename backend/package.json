@@ -17,7 +17,8 @@
     "prisma:studio": "npx prisma studio",
     "seed:site-content": "tsx scripts/seedSiteContent.ts",
     "seed:support-content": "tsx scripts/seedSupportContent.ts",
-    "seed:finance": "tsx scripts/seedFinance.ts"
+    "seed:finance": "tsx scripts/seedFinance.ts",
+    "merge:from-supabase": "tsx scripts/mergeFromSupabase.ts"
   },
   "keywords": [],
   "author": "",

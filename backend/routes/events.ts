@@ -38,7 +38,8 @@ import { formatEventDay, isWithinEventDays, parseEventDayString, resolveCheckInE
 import { generateTokensForSession, generateTokensForRegistration } from '../services/sessionTokenService';
 import { emitNotificationEvent } from '../services/notificationService';
 import {
-    queueReminderEmail,
+    enqueueReminderEmails,
+    enqueueTicketEmails,
     queueTicketEmail,
     sendEventReminderEmail,
     sendEventTicketEmail,
@@ -4298,7 +4299,7 @@ router.post('/:id/registrations/send-tickets', authenticateToken, async (req, re
         });
         const registrationById = new Map(registrations.map((registration) => [registration.id, registration]));
 
-        let queued = 0;
+        const eligibleIds: number[] = [];
         let skipped = 0;
 
         for (const registrationId of registrationIds) {
@@ -4314,11 +4315,15 @@ router.post('/:id/registrations/send-tickets', authenticateToken, async (req, re
                 continue;
             }
 
-            queueTicketEmail(registrationId, 'bulk-send-tickets');
-            queued += 1;
+            eligibleIds.push(registrationId);
         }
 
-        return res.json({ queued, skipped });
+        if (eligibleIds.length === 0) {
+            return res.json({ queued: 0, skipped, batchId: null });
+        }
+
+        const { batchId, queued } = await enqueueTicketEmails(eligibleIds, 'bulk-send-tickets');
+        return res.json({ queued, skipped, batchId });
     } catch (error) {
         console.error(`POST /events/${req.params.id}/registrations/send-tickets error:`, error);
         return res.status(500).json({ error: 'Failed to send ticket emails' });
@@ -4353,7 +4358,7 @@ router.post('/:id/registrations/send-reminders', authenticateToken, async (req, 
         });
         const registrationById = new Map(registrations.map((registration) => [registration.id, registration]));
 
-        let queued = 0;
+        const eligibleIds: number[] = [];
         let skipped = 0;
 
         for (const registrationId of registrationIds) {
@@ -4369,11 +4374,15 @@ router.post('/:id/registrations/send-reminders', authenticateToken, async (req, 
                 continue;
             }
 
-            queueReminderEmail(registrationId, 'bulk-send-reminders');
-            queued += 1;
+            eligibleIds.push(registrationId);
         }
 
-        return res.json({ queued, skipped });
+        if (eligibleIds.length === 0) {
+            return res.json({ queued: 0, skipped, batchId: null });
+        }
+
+        const { batchId, queued } = await enqueueReminderEmails(eligibleIds, 'bulk-send-reminders');
+        return res.json({ queued, skipped, batchId });
     } catch (error) {
         console.error(`POST /events/${req.params.id}/registrations/send-reminders error:`, error);
         return res.status(500).json({ error: 'Failed to send reminder emails' });

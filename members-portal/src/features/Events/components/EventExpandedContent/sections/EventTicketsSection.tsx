@@ -4,6 +4,9 @@ import { Bell, Filter, Loader2, Mail, Search } from 'lucide-react';
 import { fmtDate } from '@/components/cards/LifecycleCardView/LifecycleCardView';
 import { Checkbox } from '@/components/checkbox';
 import { ConfirmModal } from '@/components/modal/ConfirmModal';
+import BulkEmailProgressBanner, {
+    type BulkEmailProgressBatch,
+} from '@/components/BulkEmailProgressBanner/BulkEmailProgressBanner';
 import { useAutoDismissMessage } from '@/hooks/useAutoDismissMessage';
 import { useResourceChannel } from '@/hooks/useResourceChannel';
 import { eventsAPI } from '@/services/api';
@@ -76,9 +79,8 @@ interface EventTicketsSectionProps {
 function formatBulkSummary(result: SendRegistrationTicketsResult, kind: 'ticket' | 'reminder'): string {
     const label = kind === 'ticket' ? 'ticket' : 'reminder';
     const parts = [
-        `Queued ${result.queued} ${label} email${result.queued === 1 ? '' : 's'}.`,
+        `Sent ${result.queued} ${label} email${result.queued === 1 ? '' : 's'}.`,
         result.skipped > 0 ? `Skipped: ${result.skipped}.` : '',
-        'Statuses update as emails send. Reload if the Sent column is still empty.',
     ];
     return parts.filter(Boolean).join(' ');
 }
@@ -157,6 +159,7 @@ export default function EventTicketsSection({
     const [sendingReminderId, setSendingReminderId] = useState<number | null>(null);
     const [bulkAction, setBulkAction] = useState<'tickets' | 'reminders' | null>(null);
     const [bulkConfirm, setBulkConfirm] = useState<{ kind: BulkConfirmKind; registrationIds: number[] } | null>(null);
+    const [emailBatch, setEmailBatch] = useState<BulkEmailProgressBatch | null>(null);
     const [selection, setSelection] = useState<Set<string>>(new Set());
     const [attendanceRemovalTarget, setAttendanceRemovalTarget] = useState<AttendanceRemovalTarget | null>(null);
     const [removingAttendance, setRemovingAttendance] = useState(false);
@@ -379,8 +382,16 @@ export default function EventTicketsSection({
             const result = kind === 'tickets'
                 ? await eventsAPI.sendRegistrationTickets(eventId, { registrationIds })
                 : await eventsAPI.sendRegistrationReminders(eventId, { registrationIds });
-            showSuccessMessage(formatBulkSummary(result, kind === 'tickets' ? 'ticket' : 'reminder'));
             setBulkConfirm(null);
+            if (result.batchId && result.queued > 0) {
+                setEmailBatch({
+                    batchId: result.batchId,
+                    kind: kind === 'tickets' ? 'ticket' : 'reminder',
+                    skipped: result.skipped,
+                });
+            } else {
+                showSuccessMessage(formatBulkSummary(result, kind === 'tickets' ? 'ticket' : 'reminder'));
+            }
             void refreshAll();
         } catch (error) {
             showErrorMessage(
@@ -402,7 +413,21 @@ export default function EventTicketsSection({
             </div>
 
             {errorMessage ? <div className="error-message">{errorMessage}</div> : null}
-            {successMessage ? <div className="success-message">{successMessage}</div> : null}
+            {emailBatch ? (
+                <BulkEmailProgressBanner
+                    batch={emailBatch}
+                    onRefresh={() => {
+                        void refreshAll();
+                    }}
+                    onComplete={(summary) => {
+                        setEmailBatch(null);
+                        showSuccessMessage(summary);
+                        void refreshAll();
+                    }}
+                />
+            ) : successMessage ? (
+                <div className="success-message">{successMessage}</div>
+            ) : null}
 
             <div className="event-tickets-layout">
                 <div className="event-tickets-table-column">

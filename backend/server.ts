@@ -7,6 +7,7 @@ import routes from "./routes";
 import { prisma } from "./db";
 import { assertValidNodeEnv, resolveJwtSecret } from "./lib/securityEnv";
 import { attachNotificationsWebSocketServer } from "./services/notificationsRealtime";
+import { startEmailOutboxWorker } from "./services/emailOutboxWorker";
 
 // Fail closed early on invalid NODE_ENV or missing production secrets.
 assertValidNodeEnv();
@@ -158,6 +159,9 @@ const server = app.listen(PORT, () => {
         process.env.RESEND_FROM_EMAIL?.trim() || "asu.medicine.iclub@gmail.com";
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Email From: ${emailFrom}`);
+    void startEmailOutboxWorker().catch((error) => {
+        console.error("Failed to start email outbox worker:", error);
+    });
 });
 
 attachNotificationsWebSocketServer(server);

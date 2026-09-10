@@ -13,7 +13,7 @@ import {
     canUserViewProject,
 } from "../lib/projectPermissions";
 import { certificateEmailResendLimiter } from "../middleware/rateLimit";
-import { queueCertificateEmail, sendCertificateEmail } from "../services/certificateEmailService";
+import { enqueueCertificateEmails, queueCertificateEmail, sendCertificateEmail } from "../services/certificateEmailService";
 import { generateCertificatePdfBuffer } from "../services/certificatePdfService";
 import { formatEventDay, getEventDayRange } from "../services/eventDates";
 import { recordUsageEvent, USAGE_ACTION_TYPES } from "../services/usageEventService";
@@ -621,13 +621,13 @@ router.post("/event/:eventId/issue-bulk", async (req: Request, res: Response) =>
             });
         }
 
-        if (issueImmediately) {
-            for (const certificateId of certificateIds) {
-                queueCertificateEmail(certificateId, "event-bulk-issue");
-            }
+        let emailBatchId: string | null = null;
+        if (issueImmediately && certificateIds.length > 0) {
+            const { batchId } = await enqueueCertificateEmails(certificateIds, "event-bulk-issue");
+            emailBatchId = batchId;
         }
 
-        return res.json({ created, skipped, certificateIds });
+        return res.json({ created, skipped, certificateIds, batchId: emailBatchId });
     } catch (error) {
         console.error("POST /certificates/event/:eventId/issue-bulk error:", error);
         return res.status(500).json({ error: "Failed to bulk issue certificates" });
@@ -812,13 +812,13 @@ router.post("/project/:projectId/issue-bulk", async (req: Request, res: Response
             });
         }
 
-        if (issueImmediately) {
-            for (const certificateId of certificateIds) {
-                queueCertificateEmail(certificateId, "project-bulk-issue");
-            }
+        let emailBatchId: string | null = null;
+        if (issueImmediately && certificateIds.length > 0) {
+            const { batchId } = await enqueueCertificateEmails(certificateIds, "project-bulk-issue");
+            emailBatchId = batchId;
         }
 
-        return res.json({ created, skipped, certificateIds });
+        return res.json({ created, skipped, certificateIds, batchId: emailBatchId });
     } catch (error) {
         console.error("POST /certificates/project/:projectId/issue-bulk error:", error);
         return res.status(500).json({ error: "Failed to bulk issue certificates" });

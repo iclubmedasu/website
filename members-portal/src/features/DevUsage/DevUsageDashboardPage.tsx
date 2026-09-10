@@ -1,18 +1,22 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CLUB_TIMEZONE, formatDate } from '@iclub/shared/utils';
 import {
     usageDashboardAPI,
     type UsageDashboardSummary,
-    type UsageDashboardSummaryParams,
 } from '@/services/api';
+import PeriodControl from '@/components/PeriodControl/PeriodControl';
+import {
+    resolvePeriodRange,
+    type PeriodPreset,
+    type PeriodRange,
+} from '@/components/PeriodControl/periodRange';
 import { exportUsageExcel } from './exportUsageExcel';
-import { DateInput } from '@/components/input/DateInput';
 import '@/components/page/page.css';
 import '@/components/cards/universalcard.css';
 import '@/components/buttons/buttons.css';
 import '@/components/errormsg/errormsg.css';
-import '@/components/input/input.css';
 import '@/features/Finance/FinanceDashboardPage.css';
 import './DevUsageDashboardPage.css';
 
@@ -26,71 +30,45 @@ const STATS: { key: keyof UsageDashboardSummary['counts']; label: string }[] = [
     { key: 'activeMembers', label: 'Active members (logins)' },
 ];
 
-const PRESETS = [7, 30, 90] as const;
-
-type PeriodMode = 'preset' | 'custom';
-
 function getErrorMessage(error: unknown, fallback: string): string {
     return error instanceof Error && error.message ? error.message : fallback;
 }
 
-function formatPeriodBound(iso: string): string {
-    try {
-        return new Date(iso).toLocaleDateString(undefined, {
-            dateStyle: 'medium',
-        });
-    } catch {
-        return iso;
-    }
-}
-
-/**
- * Resolve the query for the next fetch.
- * Incomplete custom dates → null (keep current summary, do not fetch/error).
- * Invalid range (from > to) → 'invalid-range' (inline message only).
- */
-function resolveFetchParams(
-    periodMode: PeriodMode,
-    presetDays: number,
-    customFrom: string,
-    customTo: string,
-): UsageDashboardSummaryParams | 'invalid-range' | null {
-    if (periodMode === 'custom') {
-        if (!customFrom || !customTo) {
-            return null;
-        }
-        if (customFrom > customTo) {
-            return 'invalid-range';
-        }
-        return { from: customFrom, to: customTo };
-    }
-    return { days: presetDays };
+function formatClubDay(day: string): string {
+    return formatDate(`${day}T00:00:00.000Z`, { timeZone: CLUB_TIMEZONE });
 }
 
 export default function DevUsageDashboardPage() {
     const [summary, setSummary] = useState<UsageDashboardSummary | null>(null);
     const [error, setError] = useState('');
-    const [rangeHint, setRangeHint] = useState('');
     const [loading, setLoading] = useState(true);
     const [exporting, setExporting] = useState(false);
     const [exportError, setExportError] = useState('');
 
-    const [periodMode, setPeriodMode] = useState<PeriodMode>('preset');
-    const [presetDays, setPresetDays] = useState<number>(30);
+    const [preset, setPreset] = useState<PeriodPreset>('this_month');
     const [customFrom, setCustomFrom] = useState('');
     const [customTo, setCustomTo] = useState('');
+    const [lastRange, setLastRange] = useState<PeriodRange | null>(null);
 
-    const fetchParams = useMemo(
-        () => resolveFetchParams(periodMode, presetDays, customFrom, customTo),
-        [periodMode, presetDays, customFrom, customTo],
+    const range = useMemo(
+        () => resolvePeriodRange(preset, customFrom, customTo),
+        [preset, customFrom, customTo],
     );
 
-    const load = useCallback(async (params: UsageDashboardSummaryParams) => {
+    useEffect(() => {
+        if (range) setLastRange(range);
+    }, [range]);
+
+    const displayRange = range ?? lastRange;
+
+    const load = useCallback(async (nextRange: PeriodRange) => {
         setLoading(true);
         setError('');
-        setRangeHint('');
         try {
-            const data = await usageDashboardAPI.getSummary(params);
+            const data = await usageDashboardAPI.getSummary({
+                from: nextRange.startDate,
+                to: nextRange.endDate,
+            });
             setSummary(data);
         } catch (err) {
             setSummary(null);
@@ -101,19 +79,13 @@ export default function DevUsageDashboardPage() {
     }, []);
 
     useEffect(() => {
-        if (fetchParams === null) {
-            // Incomplete custom range: wait for the other date; keep previous data.
+        if (!range) {
+            // Incomplete/invalid custom range: keep previous data; do not fetch.
             setLoading(false);
-            setRangeHint('');
             return;
         }
-        if (fetchParams === 'invalid-range') {
-            setLoading(false);
-            setRangeHint('From must be on or before To.');
-            return;
-        }
-        void load(fetchParams);
-    }, [fetchParams, load]);
+        void load(range);
+    }, [range, load]);
 
     const handleExport = useCallback(async () => {
         if (!summary) return;
@@ -128,31 +100,32 @@ export default function DevUsageDashboardPage() {
         }
     }, [summary]);
 
-    const selectPreset = (days: number) => {
-        setPeriodMode('preset');
-        setPresetDays(days);
-        setRangeHint('');
+    const seedCustomFromRange = (seed: PeriodRange | null) => {
+        if (!seed) return;
+        setCustomFrom(seed.startDate);
+        setCustomTo(seed.endDate);
     };
 
-    const onCustomFromChange = (value: string) => {
-        setCustomFrom(value);
-        setPeriodMode('custom');
-    };
-
-    const onCustomToChange = (value: string) => {
-        setCustomTo(value);
-        setPeriodMode('custom');
+    const handlePresetChange = (next: PeriodPreset) => {
+        if (next === 'custom') {
+            seedCustomFromRange(range ?? lastRange);
+        }
+        setPreset(next);
     };
 
     const retry = () => {
-        const params = resolveFetchParams(periodMode, presetDays, customFrom, customTo);
-        if (params && params !== 'invalid-range') {
-            void load(params);
-        } else {
-            // Fall back to last preset so Retry always works
-            void load({ days: presetDays });
+        const nextRange = range ?? lastRange ?? resolvePeriodRange('this_month');
+        if (nextRange) {
+            void load(nextRange);
         }
     };
+
+    const periodLabel =
+        displayRange != null
+            ? `${formatClubDay(displayRange.startDate)} – ${formatClubDay(displayRange.endDate)}`
+            : summary
+              ? `${formatDate(summary.since, { timeZone: CLUB_TIMEZONE })} – ${formatDate(summary.until, { timeZone: CLUB_TIMEZONE })}`
+              : null;
 
     return (
         <div className="members-page dev-usage-page">
@@ -184,7 +157,7 @@ export default function DevUsageDashboardPage() {
                                     type="button"
                                     className="btn btn-secondary finance-card-action"
                                     onClick={retry}
-                                    disabled={loading || exporting}
+                                    disabled={loading || exporting || !displayRange}
                                 >
                                     {loading ? 'Refreshing…' : 'Refresh'}
                                 </button>
@@ -199,45 +172,22 @@ export default function DevUsageDashboardPage() {
                             </div>
                         </div>
                         <div className="card-body">
-                            <div className="dev-usage-period-row">
-                                <div className="dev-usage-preset-group" role="group" aria-label="Period presets">
-                                    {PRESETS.map((days) => (
-                                        <button
-                                            key={days}
-                                            type="button"
-                                            className={`btn btn-secondary finance-card-action${
-                                                periodMode === 'preset' && presetDays === days
-                                                    ? ' dev-usage-preset--active'
-                                                    : ''
-                                            }`}
-                                            onClick={() => selectPreset(days)}
-                                            disabled={loading}
-                                        >
-                                            {days} days
-                                        </button>
-                                    ))}
-                                </div>
-                                <div className="finance-filters dev-usage-custom-dates">
-                                    <label className="form-group">
-                                        <span className="form-label">From</span>
-                                        <DateInput
-                                            value={customFrom}
-                                            disabled={loading}
-                                            onChange={(e) => onCustomFromChange(e.target.value)}
-                                        />
-                                    </label>
-                                    <label className="form-group">
-                                        <span className="form-label">To</span>
-                                        <DateInput
-                                            value={customTo}
-                                            disabled={loading}
-                                            onChange={(e) => onCustomToChange(e.target.value)}
-                                        />
-                                    </label>
-                                </div>
-                            </div>
-
-                            {rangeHint ? <p className="error-message">{rangeHint}</p> : null}
+                            <PeriodControl
+                                preset={preset}
+                                customFrom={customFrom}
+                                customTo={customTo}
+                                disabled={loading || exporting}
+                                ariaLabel="Usage period"
+                                onPresetChange={handlePresetChange}
+                                onCustomFromChange={(value) => {
+                                    setCustomFrom(value);
+                                    setPreset('custom');
+                                }}
+                                onCustomToChange={(value) => {
+                                    setCustomTo(value);
+                                    setPreset('custom');
+                                }}
+                            />
 
                             {loading && !summary ? (
                                 <p className="loading-message">Loading usage analytics…</p>
@@ -247,10 +197,14 @@ export default function DevUsageDashboardPage() {
 
                             {summary ? (
                                 <>
-                                    <p className="dev-usage-period-meta">
-                                        Period: {formatPeriodBound(summary.since)} – {formatPeriodBound(summary.until)}
-                                        {' '}({summary.windowDays} day{summary.windowDays === 1 ? '' : 's'})
-                                    </p>
+                                    {periodLabel ? (
+                                        <p className="dev-usage-period-meta">
+                                            Period: {periodLabel}
+                                            {summary.windowDays != null
+                                                ? ` (${summary.windowDays} day${summary.windowDays === 1 ? '' : 's'})`
+                                                : ''}
+                                        </p>
+                                    ) : null}
                                     <div className="dashboard-stats-grid">
                                         {STATS.map((stat) => (
                                             <div key={stat.key} className="dashboard-stat-tile">

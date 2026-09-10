@@ -35,7 +35,9 @@ import supportContentRoutes from "./supportContent";
 import financeRoutes from "./finance";
 import certificateTemplatesRoutes from "./certificateTemplates";
 import certificatesRoutes from "./certificates";
+import emailOutboxRoutes from "./emailOutbox";
 import usageDashboardRoutes from "./usageDashboard";
+import kpisRoutes from "./kpis";
 
 import { downloadProfilePhoto } from "../services/githubStorage";
 
@@ -159,7 +161,10 @@ router.use("/certificates", (req, res, next) => {
     return authenticateToken(req, res, next);
 }, certificatesRoutes);
 
+router.use("/email-outbox", authenticateToken, emailOutboxRoutes);
+
 router.use("/usage-dashboard", authenticateToken, usageDashboardRoutes);
+router.use("/kpis", authenticateToken, kpisRoutes);
 
 router.get("/", (_req: Request, res: Response) => {
     res.json({
@@ -194,7 +199,9 @@ router.get("/", (_req: Request, res: Response) => {
             finance: "/api/finance",
             certificateTemplates: "/api/certificate-templates",
             certificates: "/api/certificates",
+            emailOutbox: "/api/email-outbox",
             usageDashboard: "/api/usage-dashboard",
+            kpis: "/api/kpis",
             public: "/api/public",
         },
     });

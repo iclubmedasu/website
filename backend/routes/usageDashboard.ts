@@ -1,4 +1,5 @@
 import express, { Request, Response } from "express";
+import { CertificateStatus } from "@prisma/client";
 import { prisma } from "../db";
 import { requireDeveloperOnly } from "../middleware/auth";
 import { USAGE_ACTION_TYPES } from "../services/usageEventService";
@@ -8,15 +9,6 @@ const router = express.Router();
 const DEFAULT_DAYS = 30;
 const MAX_DAYS = 366;
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-const ACTION_KEYS = [
-    USAGE_ACTION_TYPES.EVENT_CREATED,
-    USAGE_ACTION_TYPES.CERTIFICATE_ISSUED,
-    USAGE_ACTION_TYPES.CHECK_IN_SCANNED,
-    USAGE_ACTION_TYPES.REGISTRATION_CREATED,
-    USAGE_ACTION_TYPES.DATA_EXPORTED,
-    USAGE_ACTION_TYPES.LOGIN,
-] as const;
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -79,6 +71,8 @@ function resolveWindow(query: Request["query"]):
 /**
  * GET /api/usage-dashboard/summary
  * Developer-only product analytics. Query: days=1..366 (default 30) OR from&to=YYYY-MM-DD.
+ * Durable creates/issues/check-ins/registrations come from source tables;
+ * logins and data exports still come from UsageEvent.
  */
 router.get("/summary", requireDeveloperOnly, async (req: Request, res: Response) => {
     try {
@@ -88,45 +82,79 @@ router.get("/summary", requireDeveloperOnly, async (req: Request, res: Response)
         }
 
         const { since, until, windowDays } = window;
-        const createdAtFilter = { gte: since, lte: until };
+        const inRange = { gte: since, lte: until };
 
-        const grouped = await prisma.usageEvent.groupBy({
-            by: ["actionType"],
-            where: { createdAt: createdAtFilter },
-            _count: { _all: true },
-        });
+        const [
+            eventsCreated,
+            certificatesIssued,
+            checkInsScanned,
+            registrationsCreated,
+            usageGrouped,
+            distinctLoginMembers,
+        ] = await Promise.all([
+            prisma.event.count({
+                where: { createdAt: inRange },
+            }),
+            prisma.certificate.count({
+                where: {
+                    OR: [
+                        { issuedAt: inRange },
+                        {
+                            issuedAt: null,
+                            createdAt: inRange,
+                            status: { not: CertificateStatus.DRAFT },
+                        },
+                    ],
+                },
+            }),
+            prisma.eventRegistrationDay.count({
+                where: { checkedInAt: inRange },
+            }),
+            prisma.eventRegistration.count({
+                where: { createdAt: inRange },
+            }),
+            prisma.usageEvent.groupBy({
+                by: ["actionType"],
+                where: {
+                    createdAt: inRange,
+                    actionType: {
+                        in: [USAGE_ACTION_TYPES.DATA_EXPORTED, USAGE_ACTION_TYPES.LOGIN],
+                    },
+                },
+                _count: { _all: true },
+            }),
+            prisma.usageEvent.findMany({
+                where: {
+                    actionType: USAGE_ACTION_TYPES.LOGIN,
+                    createdAt: inRange,
+                    memberId: { not: null },
+                },
+                select: { memberId: true },
+                distinct: ["memberId"],
+            }),
+        ]);
 
-        const counts: Record<string, number> = {};
-        for (const key of ACTION_KEYS) {
-            counts[key] = 0;
-        }
-        for (const row of grouped) {
-            if (Object.prototype.hasOwnProperty.call(counts, row.actionType)) {
-                counts[row.actionType] = row._count._all;
+        const usageCounts: Record<string, number> = {
+            [USAGE_ACTION_TYPES.DATA_EXPORTED]: 0,
+            [USAGE_ACTION_TYPES.LOGIN]: 0,
+        };
+        for (const row of usageGrouped) {
+            if (Object.prototype.hasOwnProperty.call(usageCounts, row.actionType)) {
+                usageCounts[row.actionType] = row._count._all;
             }
         }
-
-        const distinctLoginMembers = await prisma.usageEvent.findMany({
-            where: {
-                actionType: USAGE_ACTION_TYPES.LOGIN,
-                createdAt: createdAtFilter,
-                memberId: { not: null },
-            },
-            select: { memberId: true },
-            distinct: ["memberId"],
-        });
 
         return res.json({
             windowDays,
             since: since.toISOString(),
             until: until.toISOString(),
             counts: {
-                eventsCreated: counts[USAGE_ACTION_TYPES.EVENT_CREATED],
-                certificatesIssued: counts[USAGE_ACTION_TYPES.CERTIFICATE_ISSUED],
-                checkInsScanned: counts[USAGE_ACTION_TYPES.CHECK_IN_SCANNED],
-                registrationsCreated: counts[USAGE_ACTION_TYPES.REGISTRATION_CREATED],
-                dataExports: counts[USAGE_ACTION_TYPES.DATA_EXPORTED],
-                logins: counts[USAGE_ACTION_TYPES.LOGIN],
+                eventsCreated,
+                certificatesIssued,
+                checkInsScanned,
+                registrationsCreated,
+                dataExports: usageCounts[USAGE_ACTION_TYPES.DATA_EXPORTED],
+                logins: usageCounts[USAGE_ACTION_TYPES.LOGIN],
                 activeMembers: distinctLoginMembers.length,
             },
         });

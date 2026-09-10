@@ -41,6 +41,8 @@ const ticketEmailMocks = vi.hoisted(() => ({
     sendEventReminderEmail: vi.fn(),
     queueTicketEmail: vi.fn(),
     queueReminderEmail: vi.fn(),
+    enqueueTicketEmails: vi.fn(),
+    enqueueReminderEmails: vi.fn(),
 }));
 
 const sessionTokenMocks = vi.hoisted(() => ({
@@ -150,6 +152,14 @@ describe('event ticket email routes', () => {
         eventCodeMocks.generateUniqueConfirmationCode.mockResolvedValue('ABC123');
         activityMocks.logEventActivity.mockResolvedValue(undefined);
         ticketEmailMocks.sendEventTicketEmail.mockResolvedValue(undefined);
+        ticketEmailMocks.enqueueTicketEmails.mockImplementation(async (ids: number[]) => ({
+            batchId: 'ticket-batch-1',
+            queued: ids.length,
+        }));
+        ticketEmailMocks.enqueueReminderEmails.mockImplementation(async (ids: number[]) => ({
+            batchId: 'reminder-batch-1',
+            queued: ids.length,
+        }));
         eventDatesMocks.shouldSendWalkInTicket.mockReturnValue(true);
         prismaMocks.transaction.mockImplementation(async (fn: (tx: {
             eventRegistration: {
@@ -342,9 +352,11 @@ describe('event ticket email routes', () => {
         expect(response.body).toEqual({
             queued: 1,
             skipped: 1,
+            batchId: 'ticket-batch-1',
         });
-        expect(ticketEmailMocks.queueTicketEmail).toHaveBeenCalledTimes(1);
-        expect(ticketEmailMocks.queueTicketEmail).toHaveBeenCalledWith(101, 'bulk-send-tickets');
+        expect(ticketEmailMocks.enqueueTicketEmails).toHaveBeenCalledTimes(1);
+        expect(ticketEmailMocks.enqueueTicketEmails).toHaveBeenCalledWith([101], 'bulk-send-tickets');
+        expect(ticketEmailMocks.queueTicketEmail).not.toHaveBeenCalled();
         expect(ticketEmailMocks.sendEventTicketEmail).not.toHaveBeenCalled();
     });
 
@@ -364,11 +376,13 @@ describe('event ticket email routes', () => {
         expect(response.body).toEqual({
             queued: 3,
             skipped: 0,
+            batchId: 'ticket-batch-1',
         });
-        expect(ticketEmailMocks.queueTicketEmail).toHaveBeenCalledTimes(3);
-        expect(ticketEmailMocks.queueTicketEmail.mock.calls.map((call) => call[0]).sort()).toEqual([
-            101, 102, 103,
-        ]);
+        expect(ticketEmailMocks.enqueueTicketEmails).toHaveBeenCalledTimes(1);
+        expect(ticketEmailMocks.enqueueTicketEmails).toHaveBeenCalledWith(
+            [101, 102, 103],
+            'bulk-send-tickets',
+        );
         expect(ticketEmailMocks.sendEventTicketEmail).not.toHaveBeenCalled();
     });
 
@@ -378,7 +392,7 @@ describe('event ticket email routes', () => {
             .send({ registrationIds: [101] });
 
         expect(response.status).toBe(401);
-        expect(ticketEmailMocks.queueTicketEmail).not.toHaveBeenCalled();
+        expect(ticketEmailMocks.enqueueTicketEmails).not.toHaveBeenCalled();
     });
 
     it('requires at least one registration ID to send tickets', async () => {
@@ -388,7 +402,7 @@ describe('event ticket email routes', () => {
             .send({ registrationIds: [] });
 
         expect(response.status).toBe(400);
-        expect(ticketEmailMocks.queueTicketEmail).not.toHaveBeenCalled();
+        expect(ticketEmailMocks.enqueueTicketEmails).not.toHaveBeenCalled();
     });
 
     it('filters registrations by source group and ticket status', async () => {
@@ -477,9 +491,10 @@ describe('event ticket email routes', () => {
         expect(response.body).toEqual({
             queued: 1,
             skipped: 1,
+            batchId: 'reminder-batch-1',
         });
-        expect(ticketEmailMocks.queueReminderEmail).toHaveBeenCalledTimes(1);
-        expect(ticketEmailMocks.queueReminderEmail).toHaveBeenCalledWith(501, 'bulk-send-reminders');
+        expect(ticketEmailMocks.enqueueReminderEmails).toHaveBeenCalledTimes(1);
+        expect(ticketEmailMocks.enqueueReminderEmails).toHaveBeenCalledWith([501], 'bulk-send-reminders');
         expect(ticketEmailMocks.sendEventReminderEmail).not.toHaveBeenCalled();
     });
 
@@ -489,6 +504,6 @@ describe('event ticket email routes', () => {
             .send({ registrationIds: [501] });
 
         expect(response.status).toBe(401);
-        expect(ticketEmailMocks.queueReminderEmail).not.toHaveBeenCalled();
+        expect(ticketEmailMocks.enqueueReminderEmails).not.toHaveBeenCalled();
     });
 });

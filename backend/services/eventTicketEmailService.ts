@@ -11,7 +11,7 @@ import {
 import { prisma } from '../db';
 import { generateTokensForRegistration, getSessionTokensForRegistration } from './sessionTokenService';
 import { sendEmail, type EmailAttachment } from './emailService';
-import { runEmailJob } from './emailSendPool';
+import { enqueueEmailJob, enqueueEmailJobs } from './emailOutbox';
 import { splitSessionsForTicket } from '../lib/eventSessionCapacity';
 import * as githubStorage from './githubStorageService';
 
@@ -468,7 +468,7 @@ function getEmailSubject(eventTitle: string, variant: EventRegistrationEmailVari
 async function sendRegistrationEmail(
     registrationId: number,
     variant: EventRegistrationEmailVariant,
-): Promise<void> {
+): Promise<{ id: string }> {
     const registration = await prisma.eventRegistration.findUnique({
         where: { id: registrationId },
         include: {
@@ -590,7 +590,7 @@ async function sendRegistrationEmail(
         includeFooterImage,
     });
 
-    await sendEmail({
+    const result = await sendEmail({
         to: registration.email,
         subject: getEmailSubject(registration.event.title, variant),
         html,
@@ -602,33 +602,50 @@ async function sendRegistrationEmail(
             where: { id: registrationId },
             data: { reminderEmailSentAt: new Date() },
         });
-        return;
+        return result;
     }
 
     await prisma.eventRegistration.update({
         where: { id: registrationId },
         data: { ticketEmailSentAt: new Date() },
     });
+    return result;
 }
 
-export async function sendEventTicketEmail(registrationId: number): Promise<void> {
-    await sendRegistrationEmail(registrationId, 'ticket');
+export async function sendEventTicketEmail(registrationId: number): Promise<{ id: string }> {
+    return sendRegistrationEmail(registrationId, 'ticket');
 }
 
-export async function sendEventReminderEmail(registrationId: number): Promise<void> {
-    await sendRegistrationEmail(registrationId, 'reminder');
+export async function sendEventReminderEmail(registrationId: number): Promise<{ id: string }> {
+    return sendRegistrationEmail(registrationId, 'reminder');
 }
 
-/** Fire-and-forget queue used after registration / bulk send. Shares the email concurrency pool. */
+/** Durable outbox enqueue used after registration / bulk send. Worker drains under the email pool. */
 export function queueTicketEmail(registrationId: number, context: string): void {
-    void runEmailJob(() => sendEventTicketEmail(registrationId)).catch((error) => {
-        console.error(`Failed to send ticket email (${context}) for registration ${registrationId}:`, error);
+    void enqueueEmailJob('TICKET', registrationId, context).catch((error) => {
+        console.error(`Failed to enqueue ticket email (${context}) for registration ${registrationId}:`, error);
     });
 }
 
-/** Fire-and-forget queue used for bulk reminder send. Shares the email concurrency pool. */
+/** Durable outbox enqueue used for reminder send. Worker drains under the email pool. */
 export function queueReminderEmail(registrationId: number, context: string): void {
-    void runEmailJob(() => sendEventReminderEmail(registrationId)).catch((error) => {
-        console.error(`Failed to send reminder email (${context}) for registration ${registrationId}:`, error);
+    void enqueueEmailJob('REMINDER', registrationId, context).catch((error) => {
+        console.error(`Failed to enqueue reminder email (${context}) for registration ${registrationId}:`, error);
     });
+}
+
+/** Bulk ticket enqueue with a shared batchId for progress polling. */
+export async function enqueueTicketEmails(
+    registrationIds: number[],
+    context: string,
+): Promise<{ batchId: string; queued: number }> {
+    return enqueueEmailJobs({ kind: 'TICKET', entityIds: registrationIds, context });
+}
+
+/** Bulk reminder enqueue with a shared batchId for progress polling. */
+export async function enqueueReminderEmails(
+    registrationIds: number[],
+    context: string,
+): Promise<{ batchId: string; queued: number }> {
+    return enqueueEmailJobs({ kind: 'REMINDER', entityIds: registrationIds, context });
 }

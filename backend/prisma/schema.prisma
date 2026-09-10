@@ -1810,3 +1810,40 @@ model UsageEvent {
   @@index([actionType, createdAt])
   @@index([memberId])
 }
+
+// ============================================
+// EMAIL OUTBOX - Durable queue for bulk / async email sends
+// ============================================
+enum EmailOutboxKind {
+  TICKET
+  REMINDER
+  CERTIFICATE
+  ANNOUNCEMENT
+}
+
+enum EmailOutboxStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+model EmailOutbox {
+  id              Int               @id @default(autoincrement())
+  batchId         String
+  kind            EmailOutboxKind
+  entityId        Int
+  context         String
+  status          EmailOutboxStatus @default(PENDING)
+  attempts        Int               @default(0)
+  lastError       String?
+  resendMessageId String?           @unique
+  sentAt          DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([status, createdAt])
+  @@index([batchId])
+  @@index([kind, entityId, status])
+  @@index([sentAt])
+}

@@ -1,0 +1,64 @@
+/* Shared period preset pills + optional inline custom dates */
+
+.period-control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--gray-200, #e5e7eb);
+}
+
+.period-control-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem 1rem;
+}
+
+.period-segmented {
+    width: auto;
+    max-width: none;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+}
+
+.period-custom-dates {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+    align-items: flex-end;
+    flex: 0 1 auto;
+    margin-bottom: 0;
+}
+
+.period-custom-dates .form-group {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    min-width: 9rem;
+    flex: 0 0 auto;
+}
+
+@media (max-width: 40rem) {
+    .period-custom-dates {
+        flex-wrap: wrap;
+    }
+}
+
+.period-custom-dates .form-label {
+    display: block;
+    margin: 0 0 0.2rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--gray-600);
+}
+
+.period-hint {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--gray-600);
+}

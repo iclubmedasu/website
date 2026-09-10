@@ -24,6 +24,7 @@ const prismaMocks = vi.hoisted(() => ({
 const emailMocks = vi.hoisted(() => ({
     queueCertificateEmail: vi.fn(),
     sendCertificateEmail: vi.fn(),
+    enqueueCertificateEmails: vi.fn(),
 }))
 
 vi.mock('../../db', () => ({
@@ -111,6 +112,8 @@ describe('certificates routes — template requirement & auto-issue', () => {
         prismaMocks.certificateFindFirst.mockResolvedValue(null)
         prismaMocks.certificateTemplateFindUnique.mockResolvedValue(activeTemplate)
         emailMocks.queueCertificateEmail.mockReset()
+        emailMocks.enqueueCertificateEmails.mockReset()
+        emailMocks.enqueueCertificateEmails.mockResolvedValue({ batchId: 'cert-batch-1', queued: 1 })
     })
 
     afterEach(() => {
@@ -265,6 +268,7 @@ describe('certificates routes — template requirement & auto-issue', () => {
 
             expect(response.status).toBe(200)
             expect(response.body.created).toBe(1)
+            expect(response.body.batchId).toBe('cert-batch-1')
             expect(prismaMocks.certificateCreate).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({
@@ -273,7 +277,8 @@ describe('certificates routes — template requirement & auto-issue', () => {
                     }),
                 }),
             )
-            expect(emailMocks.queueCertificateEmail).toHaveBeenCalledWith(100, 'event-bulk-issue')
+            expect(emailMocks.enqueueCertificateEmails).toHaveBeenCalledWith([100], 'event-bulk-issue')
+            expect(emailMocks.queueCertificateEmail).not.toHaveBeenCalled()
         })
     })
 

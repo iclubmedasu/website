@@ -13,6 +13,9 @@ import RevokeCertificateModal, {
     type RevokeCertificateTarget,
 } from '@/features/Certificates/modals/RevokeCertificateModal';
 import { useAutoDismissMessage } from '@/hooks/useAutoDismissMessage';
+import BulkEmailProgressBanner, {
+    type BulkEmailProgressBatch,
+} from '@/components/BulkEmailProgressBanner/BulkEmailProgressBanner';
 import { buildPublicVerifyUrl } from '@/lib/publicWebsiteUrl';
 import {
     certificatesAPI,
@@ -190,6 +193,7 @@ export default function ProjectCertificatesSection({
     const [eligibleLoading, setEligibleLoading] = useState(false);
     const [issuedLoading, setIssuedLoading] = useState(false);
     const [issuing, setIssuing] = useState(false);
+    const [emailBatch, setEmailBatch] = useState<BulkEmailProgressBatch | null>(null);
     const [resendingEmailId, setResendingEmailId] = useState<number | null>(null);
     const [downloadingPdfCode, setDownloadingPdfCode] = useState<string | null>(null);
     const { message, show: showSuccessMessage, clear: clearSuccessMessage } = useAutoDismissMessage();
@@ -372,7 +376,15 @@ export default function ProjectCertificatesSection({
                 issueImmediately: true,
                 recipients,
             });
-            showSuccessMessage(`${result.created} certificates issued, ${result.skipped} skipped`);
+            if (result.batchId && result.created > 0) {
+                setEmailBatch({
+                    batchId: result.batchId,
+                    kind: 'certificate',
+                    skipped: result.skipped,
+                });
+            } else {
+                showSuccessMessage(`${result.created} certificates issued, ${result.skipped} skipped`);
+            }
             setTypeOverrides(new Map());
             await Promise.all([loadEligible(), loadIssued()]);
         } catch (err: unknown) {
@@ -435,7 +447,21 @@ export default function ProjectCertificatesSection({
     return (
         <div className="project-cert-section">
             {error ? <div className="error-message project-cert-message">{error}</div> : null}
-            {message ? <div className="project-cert-message project-cert-message--success">{message}</div> : null}
+            {emailBatch ? (
+                <BulkEmailProgressBanner
+                    batch={emailBatch}
+                    onRefresh={() => {
+                        void loadIssued();
+                    }}
+                    onComplete={(summary) => {
+                        setEmailBatch(null);
+                        showSuccessMessage(summary);
+                        void loadIssued();
+                    }}
+                />
+            ) : message ? (
+                <div className="project-cert-message project-cert-message--success">{message}</div>
+            ) : null}
 
             <div className="page-search-row event-registration-search-row">
                 <div className="page-search-field page-search-field--full event-registration-search-field">

@@ -4,7 +4,7 @@ import { prisma } from '../db';
 import { getPublicApiUrl } from '../lib/publicApiUrl';
 import { getPublicWebsiteUrl } from '../lib/publicWebsiteUrl';
 import { sendEmail, type EmailAttachment } from './emailService';
-import { runEmailJob } from './emailSendPool';
+import { enqueueEmailJob, enqueueEmailJobs } from './emailOutbox';
 import { generateCertificatePdfBuffer } from './certificatePdfService';
 
 export const ICLUB_AVATAR_CID = 'iclub-avatar';
@@ -217,7 +217,7 @@ export function buildCertificateEmailHtml(input: {
 </html>`;
 }
 
-export async function sendCertificateEmail(certificateId: number): Promise<void> {
+export async function sendCertificateEmail(certificateId: number): Promise<{ id: string }> {
     const certificate = await prisma.certificate.findUnique({
         where: { id: certificateId },
         select: {
@@ -263,7 +263,7 @@ export async function sendCertificateEmail(certificateId: number): Promise<void>
         downloadUrl,
     });
 
-    await sendEmail({
+    const result = await sendEmail({
         to: recipientEmail,
         subject: `Your certificate: ${certificate.title}`,
         html,
@@ -274,14 +274,24 @@ export async function sendCertificateEmail(certificateId: number): Promise<void>
         where: { id: certificateId },
         data: { certificateEmailSentAt: new Date() },
     });
+
+    return result;
 }
 
-/** Fire-and-forget queue used after issue flows (mirrors ticket email). Shares the email concurrency pool. */
+/** Durable outbox enqueue used after issue flows. Worker drains under the email pool. */
 export function queueCertificateEmail(certificateId: number, context: string): void {
-    void runEmailJob(() => sendCertificateEmail(certificateId)).catch((error) => {
+    void enqueueEmailJob('CERTIFICATE', certificateId, context).catch((error) => {
         console.error(
-            `Failed to send certificate email (${context}) for certificate ${certificateId}:`,
+            `Failed to enqueue certificate email (${context}) for certificate ${certificateId}:`,
             error,
         );
     });
+}
+
+/** Bulk certificate enqueue with a shared batchId for progress polling. */
+export async function enqueueCertificateEmails(
+    certificateIds: number[],
+    context: string,
+): Promise<{ batchId: string; queued: number }> {
+    return enqueueEmailJobs({ kind: 'CERTIFICATE', entityIds: certificateIds, context });
 }
