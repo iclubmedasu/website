@@ -16,6 +16,8 @@ export type EmployeeKpiProjectMetrics = {
 
 export type EmployeeKpiEventMetrics = {
     assignedCount: number;
+    distinctDays: number;
+    totalHours: number;
 };
 
 export type EmployeeKpiListItem = {

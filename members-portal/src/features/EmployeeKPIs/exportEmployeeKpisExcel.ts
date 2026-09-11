@@ -133,6 +133,11 @@ function formatAvgDays(days: number | null | undefined): string {
     return String(Math.round(days * 10) / 10);
 }
 
+function formatHours(hours: number | null | undefined): string {
+    if (hours == null || Number.isNaN(hours)) return '';
+    return String(Math.round(hours * 10) / 10);
+}
+
 function buildSummaryMatrix(
     startDate: string,
     endDate: string,
@@ -154,8 +159,13 @@ function buildEventTasksMatrix(employees: EmployeeKpiListItem[]): string[][] {
         (a, b) => b.eventTasks.assignedCount - a.eventTasks.assignedCount,
     );
     return [
-        ['Name', 'Event Task Assignments'],
-        ...rows.map((row) => [row.fullName || 'Unknown', String(row.eventTasks.assignedCount)]),
+        ['Name', 'Days', 'Hours', 'Tasks'],
+        ...rows.map((row) => [
+            row.fullName || 'Unknown',
+            String(row.eventTasks.distinctDays),
+            formatHours(row.eventTasks.totalHours),
+            String(row.eventTasks.assignedCount),
+        ]),
     ];
 }
 

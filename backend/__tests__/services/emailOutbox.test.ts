@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const prismaMocks = vi.hoisted(() => ({
-    emailOutboxFindFirst: vi.fn(),
-    emailOutboxCreate: vi.fn(),
+    emailOutboxFindMany: vi.fn(),
+    emailOutboxCreateMany: vi.fn(),
     emailOutboxUpdate: vi.fn(),
     emailOutboxUpdateMany: vi.fn(),
     emailOutboxGroupBy: vi.fn(),
@@ -29,8 +29,8 @@ const quotaMocks = vi.hoisted(() => ({
 vi.mock('../../db', () => ({
     prisma: {
         emailOutbox: {
-            findFirst: prismaMocks.emailOutboxFindFirst,
-            create: prismaMocks.emailOutboxCreate,
+            findMany: prismaMocks.emailOutboxFindMany,
+            createMany: prismaMocks.emailOutboxCreateMany,
             update: prismaMocks.emailOutboxUpdate,
             updateMany: prismaMocks.emailOutboxUpdateMany,
             groupBy: prismaMocks.emailOutboxGroupBy,
@@ -108,22 +108,21 @@ describe('emailOutbox', () => {
         quotaMocks.isEmailQuotaError.mockReturnValue(false);
         prismaMocks.transaction.mockImplementation(async (fn: (tx: {
             emailOutbox: {
-                findFirst: typeof prismaMocks.emailOutboxFindFirst;
-                create: typeof prismaMocks.emailOutboxCreate;
+                findMany: typeof prismaMocks.emailOutboxFindMany;
+                createMany: typeof prismaMocks.emailOutboxCreateMany;
                 update: typeof prismaMocks.emailOutboxUpdate;
+                updateMany: typeof prismaMocks.emailOutboxUpdateMany;
             };
         }) => Promise<unknown>) => fn({
             emailOutbox: {
-                findFirst: prismaMocks.emailOutboxFindFirst,
-                create: prismaMocks.emailOutboxCreate,
+                findMany: prismaMocks.emailOutboxFindMany,
+                createMany: prismaMocks.emailOutboxCreateMany,
                 update: prismaMocks.emailOutboxUpdate,
+                updateMany: prismaMocks.emailOutboxUpdateMany,
             },
         }));
-        prismaMocks.emailOutboxFindFirst.mockResolvedValue(null);
-        prismaMocks.emailOutboxCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
-            id: 1,
-            ...data,
-        }));
+        prismaMocks.emailOutboxFindMany.mockResolvedValue([]);
+        prismaMocks.emailOutboxCreateMany.mockResolvedValue({ count: 0 });
         prismaMocks.emailOutboxUpdate.mockResolvedValue({});
         prismaMocks.emailOutboxUpdateMany.mockResolvedValue({ count: 0 });
         sendMocks.sendEventTicketEmail.mockResolvedValue(undefined);
@@ -145,8 +144,17 @@ describe('emailOutbox', () => {
 
         expect(result.queued).toBe(2);
         expect(result.batchId).toBeTruthy();
-        expect(prismaMocks.emailOutboxCreate).toHaveBeenCalledTimes(2);
-        expect(prismaMocks.emailOutboxCreate.mock.calls[0][0].data).toEqual(
+        expect(prismaMocks.emailOutboxFindMany).toHaveBeenCalledWith({
+            where: {
+                kind: 'TICKET',
+                entityId: { in: [10, 11] },
+                status: { in: ['PENDING', 'PROCESSING'] },
+            },
+            select: { entityId: true },
+        });
+        expect(prismaMocks.emailOutboxUpdateMany).not.toHaveBeenCalled();
+        expect(prismaMocks.emailOutboxCreateMany).toHaveBeenCalledTimes(1);
+        expect(prismaMocks.emailOutboxCreateMany.mock.calls[0][0].data).toEqual([
             expect.objectContaining({
                 batchId: result.batchId,
                 kind: 'TICKET',
@@ -154,18 +162,22 @@ describe('emailOutbox', () => {
                 context: 'test-bulk',
                 status: 'PENDING',
             }),
-        );
-        expect(prismaMocks.emailOutboxCreate.mock.calls[1][0].data.entityId).toBe(11);
-        expect(prismaMocks.emailOutboxCreate.mock.calls[1][0].data.batchId).toBe(result.batchId);
+            expect.objectContaining({
+                batchId: result.batchId,
+                kind: 'TICKET',
+                entityId: 11,
+                context: 'test-bulk',
+                status: 'PENDING',
+            }),
+        ]);
+        expect(prismaMocks.transaction.mock.calls[0][1]).toEqual({
+            maxWait: 10_000,
+            timeout: 30_000,
+        });
     });
 
     it('reuses existing PENDING/PROCESSING rows and reassigns batchId', async () => {
-        prismaMocks.emailOutboxFindFirst.mockResolvedValueOnce({
-            id: 55,
-            kind: 'TICKET',
-            entityId: 10,
-            status: 'PENDING',
-        });
+        prismaMocks.emailOutboxFindMany.mockResolvedValueOnce([{ entityId: 10 }]);
 
         const result = await enqueueEmailJobs({
             kind: 'TICKET',
@@ -175,9 +187,13 @@ describe('emailOutbox', () => {
         });
 
         expect(result).toEqual({ batchId: 'shared-batch', queued: 1 });
-        expect(prismaMocks.emailOutboxCreate).not.toHaveBeenCalled();
-        expect(prismaMocks.emailOutboxUpdate).toHaveBeenCalledWith({
-            where: { id: 55 },
+        expect(prismaMocks.emailOutboxCreateMany).not.toHaveBeenCalled();
+        expect(prismaMocks.emailOutboxUpdateMany).toHaveBeenCalledWith({
+            where: {
+                kind: 'TICKET',
+                entityId: { in: [10] },
+                status: { in: ['PENDING', 'PROCESSING'] },
+            },
             data: { batchId: 'shared-batch', context: 'retry-bulk' },
         });
     });
@@ -196,20 +212,25 @@ describe('emailOutbox', () => {
 
         expect(result.queued).toBe(3);
         expect(result.batchId).toBeTruthy();
-        expect(prismaMocks.emailOutboxFindFirst).not.toHaveBeenCalled();
-        expect(prismaMocks.emailOutboxCreate).toHaveBeenCalledTimes(3);
+        expect(prismaMocks.emailOutboxFindMany).not.toHaveBeenCalled();
+        expect(prismaMocks.emailOutboxCreateMany).toHaveBeenCalledTimes(1);
 
-        const contexts = prismaMocks.emailOutboxCreate.mock.calls.map(
-            (call: [{ data: { context: string; batchId: string; kind: string; entityId: number } }]) =>
-                JSON.parse(call[0].data.context) as { email: string },
-        );
+        const data = prismaMocks.emailOutboxCreateMany.mock.calls[0][0].data as Array<{
+            context: string;
+            batchId: string;
+            kind: string;
+            entityId: number;
+            status: string;
+        }>;
+        expect(data).toHaveLength(3);
+        const contexts = data.map((row) => JSON.parse(row.context) as { email: string });
         expect(contexts.map((c) => c.email)).toEqual([
             'a@example.com',
             'b@example.com',
             'c@example.com',
         ]);
-        for (const call of prismaMocks.emailOutboxCreate.mock.calls) {
-            expect(call[0].data).toEqual(
+        for (const row of data) {
+            expect(row).toEqual(
                 expect.objectContaining({
                     batchId: result.batchId,
                     kind: 'ANNOUNCEMENT',
@@ -218,15 +239,14 @@ describe('emailOutbox', () => {
                 }),
             );
         }
+        expect(prismaMocks.transaction.mock.calls[0][1]).toEqual({
+            maxWait: 10_000,
+            timeout: 30_000,
+        });
     });
 
     it('TICKET enqueue still dedupes by kind+entityId after announcement path exists', async () => {
-        prismaMocks.emailOutboxFindFirst.mockResolvedValueOnce({
-            id: 77,
-            kind: 'TICKET',
-            entityId: 10,
-            status: 'PENDING',
-        });
+        prismaMocks.emailOutboxFindMany.mockResolvedValueOnce([{ entityId: 10 }]);
 
         await enqueueEmailJobs({
             kind: 'TICKET',
@@ -235,10 +255,62 @@ describe('emailOutbox', () => {
             batchId: 't-batch',
         });
 
-        expect(prismaMocks.emailOutboxCreate).not.toHaveBeenCalled();
-        expect(prismaMocks.emailOutboxUpdate).toHaveBeenCalledWith({
-            where: { id: 77 },
+        expect(prismaMocks.emailOutboxCreateMany).not.toHaveBeenCalled();
+        expect(prismaMocks.emailOutboxUpdateMany).toHaveBeenCalledWith({
+            where: {
+                kind: 'TICKET',
+                entityId: { in: [10] },
+                status: { in: ['PENDING', 'PROCESSING'] },
+            },
             data: { batchId: 't-batch', context: 'still-dedupe' },
+        });
+    });
+
+    it('mixed enqueue updates active rows and createManys only missing ids', async () => {
+        prismaMocks.emailOutboxFindMany.mockResolvedValueOnce([{ entityId: 10 }]);
+
+        const result = await enqueueEmailJobs({
+            kind: 'REMINDER',
+            entityIds: [10, 11, 12],
+            context: 'bulk-reminders',
+            batchId: 'rem-batch',
+        });
+
+        expect(result).toEqual({ batchId: 'rem-batch', queued: 3 });
+        expect(prismaMocks.emailOutboxUpdateMany).toHaveBeenCalledWith({
+            where: {
+                kind: 'REMINDER',
+                entityId: { in: [10] },
+                status: { in: ['PENDING', 'PROCESSING'] },
+            },
+            data: { batchId: 'rem-batch', context: 'bulk-reminders' },
+        });
+        expect(prismaMocks.emailOutboxCreateMany).toHaveBeenCalledTimes(1);
+        expect(prismaMocks.emailOutboxCreateMany.mock.calls[0][0].data).toEqual([
+            expect.objectContaining({ entityId: 11, batchId: 'rem-batch', kind: 'REMINDER' }),
+            expect.objectContaining({ entityId: 12, batchId: 'rem-batch', kind: 'REMINDER' }),
+        ]);
+    });
+
+    it('bulk reminder enqueue (~47 ids) uses fixed findMany/createMany queries', async () => {
+        const entityIds = Array.from({ length: 47 }, (_, i) => i + 1);
+        prismaMocks.emailOutboxFindMany.mockResolvedValueOnce([]);
+
+        const result = await enqueueEmailJobs({
+            kind: 'REMINDER',
+            entityIds,
+            context: 'bulk-send-reminders',
+            batchId: 'bulk-47',
+        });
+
+        expect(result).toEqual({ batchId: 'bulk-47', queued: 47 });
+        expect(prismaMocks.emailOutboxFindMany).toHaveBeenCalledTimes(1);
+        expect(prismaMocks.emailOutboxUpdateMany).not.toHaveBeenCalled();
+        expect(prismaMocks.emailOutboxCreateMany).toHaveBeenCalledTimes(1);
+        expect(prismaMocks.emailOutboxCreateMany.mock.calls[0][0].data).toHaveLength(47);
+        expect(prismaMocks.transaction.mock.calls[0][1]).toEqual({
+            maxWait: 10_000,
+            timeout: 30_000,
         });
     });
 

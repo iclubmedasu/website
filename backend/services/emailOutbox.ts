@@ -4,6 +4,13 @@ import { prisma } from '../db';
 
 export const EMAIL_OUTBOX_MAX_ATTEMPTS = 5;
 
+/** Interactive txn limits for bulk enqueue (route caps at 2000 ids; remote DB latency). */
+const ENQUEUE_TX_TIMEOUT_MS = 30_000;
+const ENQUEUE_TX_MAX_WAIT_MS = 10_000;
+
+/** Prisma createMany payloads stay manageable against Postgres parameter limits. */
+const CREATE_MANY_CHUNK_SIZE = 500;
+
 type NudgeFn = () => void;
 
 let nudgeFn: NudgeFn = () => {};
@@ -46,42 +53,53 @@ export async function enqueueEmailJobs(options: {
 
     const batchId = options.batchId ?? randomUUID();
 
-    const queued = await prisma.$transaction(async (tx) => {
-        let count = 0;
-        for (const entityId of uniqueIds) {
-            const existing = await tx.emailOutbox.findFirst({
+    const queued = await prisma.$transaction(
+        async (tx) => {
+            const active = await tx.emailOutbox.findMany({
                 where: {
                     kind: options.kind,
-                    entityId,
+                    entityId: { in: uniqueIds },
                     status: { in: ['PENDING', 'PROCESSING'] },
                 },
+                select: { entityId: true },
             });
 
-            if (existing) {
-                await tx.emailOutbox.update({
-                    where: { id: existing.id },
+            const activeEntityIds = [...new Set(active.map((row) => row.entityId))];
+
+            if (activeEntityIds.length > 0) {
+                await tx.emailOutbox.updateMany({
+                    where: {
+                        kind: options.kind,
+                        entityId: { in: activeEntityIds },
+                        status: { in: ['PENDING', 'PROCESSING'] },
+                    },
                     data: {
                         batchId,
                         context: options.context,
                     },
                 });
-                count += 1;
-                continue;
             }
 
-            await tx.emailOutbox.create({
-                data: {
-                    batchId,
-                    kind: options.kind,
-                    entityId,
-                    context: options.context,
-                    status: 'PENDING',
-                },
-            });
-            count += 1;
-        }
-        return count;
-    });
+            const activeSet = new Set(activeEntityIds);
+            const missingIds = uniqueIds.filter((id) => !activeSet.has(id));
+
+            for (let i = 0; i < missingIds.length; i += CREATE_MANY_CHUNK_SIZE) {
+                const chunk = missingIds.slice(i, i + CREATE_MANY_CHUNK_SIZE);
+                await tx.emailOutbox.createMany({
+                    data: chunk.map((entityId) => ({
+                        batchId,
+                        kind: options.kind,
+                        entityId,
+                        context: options.context,
+                        status: 'PENDING' as const,
+                    })),
+                });
+            }
+
+            return uniqueIds.length;
+        },
+        { maxWait: ENQUEUE_TX_MAX_WAIT_MS, timeout: ENQUEUE_TX_TIMEOUT_MS },
+    );
 
     if (queued > 0) {
         nudgeEmailOutboxWorker();
@@ -126,26 +144,29 @@ export async function queueAnnouncementBroadcast(options: {
     const subject = options.subject;
     const htmlBody = options.htmlBody;
 
-    const queued = await prisma.$transaction(async (tx) => {
-        let count = 0;
-        for (const recipient of recipients) {
-            await tx.emailOutbox.create({
-                data: {
-                    batchId,
-                    kind: 'ANNOUNCEMENT',
-                    entityId: announcementId,
-                    context: JSON.stringify({
-                        email: recipient.email,
-                        subject,
-                        htmlBody,
-                    }),
-                    status: 'PENDING',
-                },
-            });
-            count += 1;
-        }
-        return count;
-    });
+    const queued = await prisma.$transaction(
+        async (tx) => {
+            const rows = recipients.map((recipient) => ({
+                batchId,
+                kind: 'ANNOUNCEMENT' as const,
+                entityId: announcementId,
+                context: JSON.stringify({
+                    email: recipient.email,
+                    subject,
+                    htmlBody,
+                }),
+                status: 'PENDING' as const,
+            }));
+
+            for (let i = 0; i < rows.length; i += CREATE_MANY_CHUNK_SIZE) {
+                const chunk = rows.slice(i, i + CREATE_MANY_CHUNK_SIZE);
+                await tx.emailOutbox.createMany({ data: chunk });
+            }
+
+            return rows.length;
+        },
+        { maxWait: ENQUEUE_TX_MAX_WAIT_MS, timeout: ENQUEUE_TX_TIMEOUT_MS },
+    );
 
     if (queued > 0) {
         nudgeEmailOutboxWorker();

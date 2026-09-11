@@ -2,19 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Eye } from 'lucide-react';
 import { CLUB_TIMEZONE, formatDate } from '@iclub/shared/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useEmployeeKPIs } from '@/hooks/useEmployeeKPIs';
 import { getProfilePhotoUrl } from '@/services/api';
+import type { Id } from '@/types/backend-contracts';
 import PeriodControl from '@/components/PeriodControl/PeriodControl';
 import {
-    buildPeriodQuery,
     parsePeriodPreset,
     resolvePeriodRange,
     type PeriodPreset,
     type PeriodRange,
 } from '@/components/PeriodControl/periodRange';
 import { exportEmployeeKpisExcel } from './exportEmployeeKpisExcel';
+import EmployeeKPIDetailModal from './EmployeeKPIDetailModal';
 import '@/components/page/page.css';
 import '@/components/cards/universalcard.css';
 import '@/components/buttons/buttons.css';
@@ -34,6 +36,11 @@ function formatAvgDays(days: number | null | undefined): string {
     if (days == null || Number.isNaN(days)) return '—';
     const rounded = Math.round(days * 10) / 10;
     return `${rounded} day${rounded === 1 ? '' : 's'}`;
+}
+
+function formatHours(hours: number | null | undefined): string {
+    if (hours == null || Number.isNaN(hours)) return '—';
+    return String(Math.round(hours * 10) / 10);
 }
 
 function canAccessKpis(user: ReturnType<typeof useAuth>['user']): boolean {
@@ -74,6 +81,8 @@ export default function EmployeeKPIsPage() {
     const [lastRange, setLastRange] = useState<PeriodRange | null>(null);
     const [exporting, setExporting] = useState(false);
     const [exportError, setExportError] = useState('');
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [viewingMemberId, setViewingMemberId] = useState<Id | null>(null);
 
     const range = useMemo(() => {
         if (useQueryDates && initialFrom && initialTo && initialFrom <= initialTo) {
@@ -152,11 +161,9 @@ export default function EmployeeKPIsPage() {
         setPreset(next);
     };
 
-    const openDetail = (memberId: string | number) => {
-        const navRange = range ?? lastRange;
-        if (!navRange) return;
-        const query = buildPeriodQuery(navRange, preset === 'custom' ? 'custom' : preset);
-        router.push(`/kpis/members/${memberId}?${query}`);
+    const openDetail = (memberId: Id) => {
+        setViewingMemberId(memberId);
+        setShowDetailModal(true);
     };
 
     const periodLabel =
@@ -308,6 +315,7 @@ export default function EmployeeKPIsPage() {
                                                         <th>Completion Rate</th>
                                                         <th>Overdue</th>
                                                         <th>Avg Completion Time</th>
+                                                        <th>Actions</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -318,16 +326,7 @@ export default function EmployeeKPIsPage() {
                                                         return (
                                                             <tr
                                                                 key={row.memberId}
-                                                                className={`${index % 2 === 0 ? 'even-row' : 'odd-row'} kpi-table-row--clickable`}
-                                                                onClick={() => openDetail(row.memberId)}
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter' || e.key === ' ') {
-                                                                        e.preventDefault();
-                                                                        openDetail(row.memberId);
-                                                                    }
-                                                                }}
-                                                                tabIndex={0}
-                                                                role="link"
+                                                                className={index % 2 === 0 ? 'even-row' : 'odd-row'}
                                                             >
                                                                 <td>
                                                                     <div className="table-member-cell">
@@ -362,6 +361,18 @@ export default function EmployeeKPIsPage() {
                                                                         row.projectTasks.avgCompletionDays,
                                                                     )}
                                                                 </td>
+                                                                <td>
+                                                                    <div className="action-buttons">
+                                                                        <button
+                                                                            type="button"
+                                                                            className="table-action-btn view-btn"
+                                                                            onClick={() => openDetail(row.memberId)}
+                                                                            title="View employee KPIs"
+                                                                        >
+                                                                            <Eye />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
                                                             </tr>
                                                         );
                                                     })}
@@ -379,7 +390,10 @@ export default function EmployeeKPIsPage() {
                                             <thead>
                                                 <tr>
                                                     <th>Name</th>
-                                                    <th>Event Task Assignments</th>
+                                                    <th>Days</th>
+                                                    <th>Hours</th>
+                                                    <th>Tasks</th>
+                                                    <th>Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -390,16 +404,7 @@ export default function EmployeeKPIsPage() {
                                                     return (
                                                         <tr
                                                             key={row.memberId}
-                                                            className={`${index % 2 === 0 ? 'even-row' : 'odd-row'} kpi-table-row--clickable`}
-                                                            onClick={() => openDetail(row.memberId)}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === 'Enter' || e.key === ' ') {
-                                                                    e.preventDefault();
-                                                                    openDetail(row.memberId);
-                                                                }
-                                                            }}
-                                                            tabIndex={0}
-                                                            role="link"
+                                                            className={index % 2 === 0 ? 'even-row' : 'odd-row'}
                                                         >
                                                             <td>
                                                                 <div className="table-member-cell">
@@ -420,7 +425,21 @@ export default function EmployeeKPIsPage() {
                                                                     </span>
                                                                 </div>
                                                             </td>
+                                                            <td>{row.eventTasks.distinctDays}</td>
+                                                            <td>{formatHours(row.eventTasks.totalHours)}</td>
                                                             <td>{row.eventTasks.assignedCount}</td>
+                                                            <td>
+                                                                <div className="action-buttons">
+                                                                    <button
+                                                                        type="button"
+                                                                        className="table-action-btn view-btn"
+                                                                        onClick={() => openDetail(row.memberId)}
+                                                                        title="View employee KPIs"
+                                                                    >
+                                                                        <Eye />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
                                                         </tr>
                                                     );
                                                 })}
@@ -433,6 +452,17 @@ export default function EmployeeKPIsPage() {
                     </div>
                 </div>
             )}
+
+            <EmployeeKPIDetailModal
+                isOpen={showDetailModal}
+                onClose={() => {
+                    setShowDetailModal(false);
+                    setViewingMemberId(null);
+                }}
+                memberId={viewingMemberId}
+                startDate={displayRange?.startDate ?? null}
+                endDate={displayRange?.endDate ?? null}
+            />
         </div>
     );
 }

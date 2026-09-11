@@ -1,11 +1,14 @@
 import express, { NextFunction, Request, Response } from "express";
+import { CLUB_TIMEZONE } from "@iclub/shared/utils";
 import { prisma } from "../db";
 import { isPrivilegedUser } from "../lib/eventPermissions";
+import { formatEventDay } from "../services/eventDates";
 
 const router = express.Router();
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
 
 router.use((req: Request, res: Response, next: NextFunction) => {
     if (!isPrivilegedUser(req.user)) {
@@ -62,6 +65,8 @@ type ProjectMetrics = {
 
 type EventMetrics = {
     assignedCount: number;
+    distinctDays: number;
+    totalHours: number;
 };
 
 type MemberBucket = {
@@ -92,6 +97,8 @@ type MemberBucket = {
             endDateTime: string;
             event: { id: number; title: string };
         }>;
+        dayKeys: Set<string>;
+        hoursSum: number;
     };
 };
 
@@ -111,8 +118,24 @@ function emptyProjectMetrics(): MemberBucket["projectTasks"] {
 function emptyEventMetrics(): MemberBucket["eventTasks"] {
     return {
         assignedCount: 0,
+        distinctDays: 0,
+        totalHours: 0,
         tasks: [],
+        dayKeys: new Set(),
+        hoursSum: 0,
     };
+}
+
+function assignmentHours(start: Date, end: Date): number {
+    const ms = end.getTime() - start.getTime();
+    if (!Number.isFinite(ms) || ms <= 0) return 0;
+    return ms / HOUR_MS;
+}
+
+function eventAssignmentDayKey(taskDate: Date, startDateTime: Date): string {
+    const fromTaskDate = formatEventDay(taskDate, CLUB_TIMEZONE);
+    if (fromTaskDate) return fromTaskDate;
+    return formatEventDay(startDateTime, CLUB_TIMEZONE);
 }
 
 function finalizeProjectMetrics(bucket: MemberBucket["projectTasks"]): ProjectMetrics {
@@ -129,6 +152,14 @@ function finalizeProjectMetrics(bucket: MemberBucket["projectTasks"]): ProjectMe
         overdueCount: bucket.overdueCount,
         completionRate,
         avgCompletionDays,
+    };
+}
+
+function finalizeEventMetrics(bucket: MemberBucket["eventTasks"]): EventMetrics {
+    return {
+        assignedCount: bucket.assignedCount,
+        distinctDays: bucket.dayKeys.size,
+        totalHours: Math.round(bucket.hoursSum * 10) / 10,
     };
 }
 
@@ -274,10 +305,13 @@ function aggregateBuckets(
 
     for (const row of eventAssignments) {
         const bucket = getOrCreateBucket(map, row.member);
-        bucket.eventTasks.assignedCount += 1;
+        const event = bucket.eventTasks;
+        event.assignedCount += 1;
+        event.dayKeys.add(eventAssignmentDayKey(row.eventTask.taskDate, row.startDateTime));
+        event.hoursSum += assignmentHours(row.startDateTime, row.endDateTime);
 
         if (options.includeTaskLists) {
-            bucket.eventTasks.tasks.push({
+            event.tasks.push({
                 assignmentId: row.id,
                 eventTaskId: row.eventTask.id,
                 title: row.eventTask.title,
@@ -334,7 +368,7 @@ router.get("/employees", async (req: Request, res: Response) => {
             fullName: bucket.fullName,
             profilePhotoUrl: bucket.profilePhotoUrl,
             projectTasks: finalizeProjectMetrics(bucket.projectTasks),
-            eventTasks: { assignedCount: bucket.eventTasks.assignedCount },
+            eventTasks: finalizeEventMetrics(bucket.eventTasks),
         }));
 
         employees.sort((a, b) => {
@@ -408,7 +442,7 @@ router.get("/employees/:memberId", async (req: Request, res: Response) => {
                 tasks: bucket.projectTasks.tasks,
             },
             eventTasks: {
-                assignedCount: bucket.eventTasks.assignedCount,
+                ...finalizeEventMetrics(bucket.eventTasks),
                 tasks: bucket.eventTasks.tasks,
             },
         });

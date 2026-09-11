@@ -107,6 +107,45 @@ describe("GET /kpis/employees", () => {
                     event: { id: 7, title: "Open Day" },
                 },
             },
+            {
+                id: 51,
+                memberId: 10,
+                startDateTime: new Date("2026-03-09T10:00:00.000Z"),
+                endDateTime: new Date("2026-03-09T14:00:00.000Z"),
+                member: { id: 10, fullName: "Ada Lovelace", profilePhotoUrl: null },
+                eventTask: {
+                    id: 201,
+                    title: "Guest check-in",
+                    taskDate: new Date("2026-03-09T00:00:00.000Z"),
+                    event: { id: 7, title: "Open Day" },
+                },
+            },
+            {
+                id: 52,
+                memberId: 10,
+                startDateTime: new Date("2026-03-09T15:00:00.000Z"),
+                endDateTime: new Date("2026-03-09T16:30:00.000Z"),
+                member: { id: 10, fullName: "Ada Lovelace", profilePhotoUrl: null },
+                eventTask: {
+                    id: 202,
+                    title: "Closing desk",
+                    taskDate: new Date("2026-03-09T00:00:00.000Z"),
+                    event: { id: 7, title: "Open Day" },
+                },
+            },
+            {
+                id: 53,
+                memberId: 10,
+                startDateTime: new Date("2026-03-10T09:00:00.000Z"),
+                endDateTime: new Date("2026-03-10T08:00:00.000Z"),
+                member: { id: 10, fullName: "Ada Lovelace", profilePhotoUrl: null },
+                eventTask: {
+                    id: 203,
+                    title: "Invalid span",
+                    taskDate: new Date("2026-03-10T00:00:00.000Z"),
+                    event: { id: 7, title: "Open Day" },
+                },
+            },
         ]);
 
         const app = buildRouteApp(kpisRouter, { isLeadership: true });
@@ -117,7 +156,7 @@ describe("GET /kpis/employees", () => {
             totalMembers: 1,
             totalProjectTasksAssigned: 2,
             totalProjectTasksCompleted: 1,
-            totalEventTaskAssignments: 1,
+            totalEventTaskAssignments: 4,
         });
         expect(res.body.employees).toHaveLength(1);
         expect(res.body.employees[0]).toMatchObject({
@@ -130,7 +169,11 @@ describe("GET /kpis/employees", () => {
                 completionRate: 0.5,
                 avgCompletionDays: 2,
             },
-            eventTasks: { assignedCount: 1 },
+            eventTasks: {
+                assignedCount: 4,
+                distinctDays: 3,
+                totalHours: 8.5,
+            },
         });
 
         const projectWhere = prismaMocks.taskAssignmentFindMany.mock.calls[0][0].where;
@@ -206,6 +249,8 @@ describe("GET /kpis/employees/:memberId", () => {
             },
             eventTasks: {
                 assignedCount: 0,
+                distinctDays: 0,
+                totalHours: 0,
                 tasks: [],
             },
         });
@@ -247,6 +292,19 @@ describe("GET /kpis/employees/:memberId", () => {
                     event: { id: 7, title: "Open Day" },
                 },
             },
+            {
+                id: 51,
+                memberId: 10,
+                startDateTime: new Date("2026-03-09T10:00:00.000Z"),
+                endDateTime: new Date("2026-03-09T12:00:00.000Z"),
+                member: { id: 10, fullName: "Ada Lovelace", profilePhotoUrl: null },
+                eventTask: {
+                    id: 201,
+                    title: "Guest check-in",
+                    taskDate: new Date("2026-03-09T00:00:00.000Z"),
+                    event: { id: 7, title: "Open Day" },
+                },
+            },
         ]);
 
         const app = buildRouteApp(kpisRouter, { isOfficer: true });
@@ -254,6 +312,11 @@ describe("GET /kpis/employees/:memberId", () => {
 
         expect(res.status).toBe(200);
         expect(res.body.projectTasks.assignedCount).toBe(1);
+        expect(res.body.eventTasks).toMatchObject({
+            assignedCount: 2,
+            distinctDays: 2,
+            totalHours: 5,
+        });
         expect(res.body.projectTasks.tasks).toEqual([
             {
                 assignmentId: 1,
@@ -274,6 +337,15 @@ describe("GET /kpis/employees/:memberId", () => {
                 taskDate: "2026-03-08T00:00:00.000Z",
                 startDateTime: "2026-03-08T09:00:00.000Z",
                 endDateTime: "2026-03-08T12:00:00.000Z",
+                event: { id: 7, title: "Open Day" },
+            },
+            {
+                assignmentId: 51,
+                eventTaskId: 201,
+                title: "Guest check-in",
+                taskDate: "2026-03-09T00:00:00.000Z",
+                startDateTime: "2026-03-09T10:00:00.000Z",
+                endDateTime: "2026-03-09T12:00:00.000Z",
                 event: { id: 7, title: "Open Day" },
             },
         ]);
