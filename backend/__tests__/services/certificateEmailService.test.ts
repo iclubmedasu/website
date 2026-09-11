@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const prismaMocks = vi.hoisted(() => ({
     certificateFindUnique: vi.fn(),
     certificateUpdate: vi.fn(),
-    emailOutboxFindFirst: vi.fn(),
-    emailOutboxCreate: vi.fn(),
-    emailOutboxUpdate: vi.fn(),
+    emailOutboxFindMany: vi.fn(),
+    emailOutboxCreateMany: vi.fn(),
+    emailOutboxUpdateMany: vi.fn(),
     transaction: vi.fn(),
 }));
 
@@ -24,9 +24,9 @@ vi.mock('../../db', () => ({
             update: prismaMocks.certificateUpdate,
         },
         emailOutbox: {
-            findFirst: prismaMocks.emailOutboxFindFirst,
-            create: prismaMocks.emailOutboxCreate,
-            update: prismaMocks.emailOutboxUpdate,
+            findMany: prismaMocks.emailOutboxFindMany,
+            createMany: prismaMocks.emailOutboxCreateMany,
+            updateMany: prismaMocks.emailOutboxUpdateMany,
         },
         $transaction: prismaMocks.transaction,
     },
@@ -68,19 +68,20 @@ describe('certificateEmailService', () => {
         prismaMocks.certificateUpdate.mockResolvedValue({});
         prismaMocks.certificateFindUnique.mockResolvedValue(certificateFixture);
         pdfMocks.generateCertificatePdfBuffer.mockResolvedValue(Buffer.from('%PDF-1.4 mock'));
-        prismaMocks.emailOutboxFindFirst.mockResolvedValue(null);
-        prismaMocks.emailOutboxCreate.mockResolvedValue({ id: 1 });
+        prismaMocks.emailOutboxFindMany.mockResolvedValue([]);
+        prismaMocks.emailOutboxCreateMany.mockResolvedValue({ count: 1 });
+        prismaMocks.emailOutboxUpdateMany.mockResolvedValue({ count: 0 });
         prismaMocks.transaction.mockImplementation(async (fn: (tx: {
             emailOutbox: {
-                findFirst: typeof prismaMocks.emailOutboxFindFirst;
-                create: typeof prismaMocks.emailOutboxCreate;
-                update: typeof prismaMocks.emailOutboxUpdate;
+                findMany: typeof prismaMocks.emailOutboxFindMany;
+                createMany: typeof prismaMocks.emailOutboxCreateMany;
+                updateMany: typeof prismaMocks.emailOutboxUpdateMany;
             };
         }) => Promise<unknown>) => fn({
             emailOutbox: {
-                findFirst: prismaMocks.emailOutboxFindFirst,
-                create: prismaMocks.emailOutboxCreate,
-                update: prismaMocks.emailOutboxUpdate,
+                findMany: prismaMocks.emailOutboxFindMany,
+                createMany: prismaMocks.emailOutboxCreateMany,
+                updateMany: prismaMocks.emailOutboxUpdateMany,
             },
         }));
     });
@@ -167,12 +168,14 @@ describe('certificateEmailService', () => {
         queueCertificateEmail(13, 'test');
 
         await vi.waitFor(() => {
-            expect(prismaMocks.emailOutboxCreate).toHaveBeenCalledTimes(3);
+            expect(prismaMocks.emailOutboxCreateMany).toHaveBeenCalledTimes(3);
         });
 
-        expect(prismaMocks.emailOutboxCreate.mock.calls.map(
-            (call: [{ data: { entityId: number } }]) => call[0].data.entityId,
-        ).sort()).toEqual([11, 12, 13]);
+        const queuedEntityIds = prismaMocks.emailOutboxCreateMany.mock.calls.flatMap(
+            (call: [{ data: Array<{ entityId: number }> }]) =>
+                call[0].data.map((row) => row.entityId),
+        ).sort((a: number, b: number) => a - b);
+        expect(queuedEntityIds).toEqual([11, 12, 13]);
         expect(emailMocks.sendEmail).not.toHaveBeenCalled();
     });
 });
