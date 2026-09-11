@@ -23,16 +23,25 @@ function renderProtectedTree() {
 
 describe('ProtectedRoute integration', () => {
     const fetchMock = vi.fn();
+    const HF_PORTAL = 'https://iclubmedasu-members-portal.hf.space';
+    const HF_BACKEND_API = 'https://iclubmedasu-backend.hf.space/api';
 
     beforeEach(() => {
         replaceMock.mockReset();
         localStorage.clear();
         fetchMock.mockReset();
         vi.stubGlobal('fetch', fetchMock);
+        // Default direct mode on HF: browser → backend, credentials omit.
+        vi.stubEnv('NEXT_PUBLIC_API_URL', HF_BACKEND_API);
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: new URL(`${HF_PORTAL}/dashboard`),
+        });
     });
 
     afterEach(() => {
         vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
         localStorage.clear();
     });
 
@@ -50,8 +59,8 @@ describe('ProtectedRoute integration', () => {
         });
         expect(screen.queryByText('Dashboard Screen')).toBeNull();
         expect(fetchMock).toHaveBeenCalledWith(
-            expect.stringContaining('/auth/me'),
-            expect.objectContaining({ credentials: 'include' }),
+            expect.stringContaining(`${HF_BACKEND_API}/auth/me`),
+            expect.objectContaining({ credentials: 'omit' }),
         );
     });
 

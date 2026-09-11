@@ -157,8 +157,9 @@ When `BFF_PROXY_SECRET` matches on both Spaces, portal BFF traffic is keyed by `
 - **Helmet** enabled (CSP left to frontends; `crossOriginResourcePolicy: cross-origin` for API file downloads).
 - **CORS** is an explicit allowlist: localhost portal/web ports, hardcoded production HF portal/web origins, plus `FRONTEND_URL` and comma-separated `FRONTEND_ORIGINS`.
 - Production no longer allows arbitrary `*.hf.space`. Dev-only: private LAN origins for mobile testing.
-- Members portal on HF uses same-origin `/backend-api` BFF proxy (server → backend) because Spaces edge OPTIONS often omit `Access-Control-Allow-Credentials`.
-- `credentials: true` for cookie-based auth across portal ↔ API hosts (direct CORS still required for non-proxied clients).
+- Members portal on HF defaults to **direct** browser → backend API with Bearer + `localStorage` (`NEXT_PUBLIC_PORTAL_USE_BFF` unset). Temporary tradeoff to avoid HF Space→Space BFF 502/429 and credentialed CORS stripping.
+- Set `NEXT_PUBLIC_PORTAL_USE_BFF=true` + rebuild to restore same-origin `/backend-api` BFF (server → backend) for cookie auth.
+- `credentials: true` CORS still required for non-proxied clients and for BFF reversal; direct mode uses `credentials: "omit"` on cross-origin portal→backend fetches.
 
 ### Debug `/test-db`
 
@@ -177,7 +178,7 @@ Login sets an httpOnly `token` cookie via `backend/routes/auth.ts`. **Production
 
 | Risk | Why it matters | Notes |
 |------|----------------|-------|
-| **JWT in `localStorage` (PWA only)** | XSS can still steal a bearer token when the installed PWA rehydrates `auth_token` | **Regular browser tabs** no longer read/write `localStorage` or send `Authorization: Bearer`; they rely on the httpOnly cookie only ([`members-portal/src/services/api.ts`](../members-portal/src/services/api.ts)). **Installed standalone PWA** still keeps a bearer copy because `SameSite=None` cookies are unreliable in some iOS standalone contexts — deliberate tradeoff, not full cookie-only. Prefer cookie-only for PWA too once device-verified. |
+| **JWT in `localStorage` (TEMPORARY — direct mode + PWA)** | XSS can steal a bearer token when `auth_token` is persisted | **TEMPORARY — HF direct API:** with `NEXT_PUBLIC_PORTAL_USE_BFF` unset/false, **all** portal surfaces persist Bearer in `localStorage` (HF CORS/credentials bypass). When BFF is restored (`NEXT_PUBLIC_PORTAL_USE_BFF=true`), regular browser tabs again rely on httpOnly cookie only; **installed standalone PWA** still keeps a bearer copy because `SameSite=None` cookies are unreliable in some iOS standalone contexts. Prefer cookie-only once BFF is back and device-verified. |
 | **Query-string tokens** | Leak via Referer, logs, screenshots | Still used as WS / download fallback when a bearer token is available. Prefer cookie on WS upgrade when possible ([`RealtimeContext.tsx`](../members-portal/src/context/RealtimeContext.tsx)). |
 | **Certificate template GitHub paths** | Privileged users could point a **new** template at an arbitrary path if create accepted `backgroundImagePath` | **CREATE** now always stores `null` background path/SHA; assignment only via allowlisted `PATCH`/`PUT` (`isValidTemplateBackgroundPath`). |
 | **Developer backdoor JWT lifetime** | A token issued when the backdoor was enabled carries `isDeveloper` until expiry | Privilege gates (`requireDeveloperOnly`, developer short-circuits on admin/site-content) re-check `ALLOW_DEVELOPER_BACKDOOR` in production so disabling the flag revokes developer elevation immediately. |

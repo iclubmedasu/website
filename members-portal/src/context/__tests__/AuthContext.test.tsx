@@ -251,7 +251,66 @@ describe('AuthProvider direct backend auth POSTs', () => {
         expect(init.credentials).toBe('omit');
     });
 
-    it('login posts to backend host and establishes portal session cookie', async () => {
+    it('login posts to backend host and persists Bearer (skips /api/session in direct mode)', async () => {
+        const token = 'aaa.bbb.ccc';
+        fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url.includes('/auth/login')) {
+                return jsonResponse(200, {
+                    user: { id: '1', email: 'member@med.asu.edu.eg', role: 'MEMBER' },
+                    token,
+                });
+            }
+            if (url.includes('/api/session')) {
+                return jsonResponse(200, { ok: true });
+            }
+            if (url.includes('/auth/me')) {
+                return jsonResponse(200, {
+                    user: { id: '1', email: 'member@med.asu.edu.eg', role: 'MEMBER' },
+                });
+            }
+            return jsonResponse(404, { error: 'not found' });
+        });
+
+        render(
+            <AuthProvider>
+                <AuthActions />
+            </AuthProvider>,
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('boot-ready')).toBeTruthy();
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
+
+        await waitFor(() => {
+            const urls = fetchMock.mock.calls.map((call) => String(call[0]));
+            expect(urls.some((u) => u === `${HF_BACKEND_API}/auth/login`)).toBe(true);
+            expect(urls.some((u) => u.includes('/auth/me'))).toBe(true);
+        });
+
+        const loginCall = fetchMock.mock.calls.find(
+            (call) => String(call[0]) === `${HF_BACKEND_API}/auth/login`,
+        );
+        expect(String(loginCall?.[0])).not.toContain('/backend-api');
+        expect((loginCall?.[1] as RequestInit).credentials).toBe('omit');
+
+        const sessionUrls = fetchMock.mock.calls
+            .map((call) => String(call[0]))
+            .filter((url) => url === '/api/session' || url.endsWith('/api/session'));
+        expect(sessionUrls).toHaveLength(0);
+        expect(localStorage.getItem('auth_token')).toBe(token);
+
+        const meCall = fetchMock.mock.calls.find((call) =>
+            String(call[0]).includes('/auth/me'),
+        );
+        expect(String(meCall?.[0])).toBe(`${HF_BACKEND_API}/auth/me`);
+        expect(String(meCall?.[0])).not.toContain('/backend-api');
+    });
+
+    it('login establishes portal session cookie when BFF mode is enabled', async () => {
+        vi.stubEnv('NEXT_PUBLIC_PORTAL_USE_BFF', 'true');
         const token = 'aaa.bbb.ccc';
         fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
             const url = String(input);
@@ -289,12 +348,6 @@ describe('AuthProvider direct backend auth POSTs', () => {
             expect(urls.some((u) => u === `${HF_BACKEND_API}/auth/login`)).toBe(true);
             expect(urls.some((u) => u === '/api/session' || u.endsWith('/api/session'))).toBe(true);
         });
-
-        const loginCall = fetchMock.mock.calls.find(
-            (call) => String(call[0]) === `${HF_BACKEND_API}/auth/login`,
-        );
-        expect(String(loginCall?.[0])).not.toContain('/backend-api');
-        expect((loginCall?.[1] as RequestInit).credentials).toBe('omit');
 
         const sessionCall = fetchMock.mock.calls.find((call) => {
             const url = String(call[0]);

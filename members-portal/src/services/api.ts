@@ -91,6 +91,8 @@ import type {
 } from "../types/backend-contracts";
 import { ConflictError } from './conflictError';
 import {
+    isCrossOriginApiUrl,
+    isPortalBffEnabled,
     resolveApiBaseUrl as resolvePortalApiBaseUrl,
     resolveBackendOriginForWebSocket,
 } from '../lib/apiBaseUrl';
@@ -114,11 +116,15 @@ export const API_BASE_URL = resolveApiBaseUrl();
 
 /**
  * Whether fetch/XHR should send cookies to the API.
- * Always true in the browser. On HF, API traffic is same-origin via /backend-api
- * so cookies stick to the portal host; credentials still required for cookie auth.
+ * BFF mode: same-origin `/backend-api` needs credentials for httpOnly cookies.
+ * Direct mode (default): omit credentials on cross-origin backend (HF strips
+ * credentialed CORS); same-origin/local still include when not cross-origin.
  */
 export function shouldSendCredentials(): boolean {
-    return typeof window !== 'undefined';
+    if (typeof window === 'undefined') return false;
+    if (isPortalBffEnabled()) return true;
+    const apiUrl = resolveApiBaseUrl();
+    return !isCrossOriginApiUrl(apiUrl, window.location.origin);
 }
 
 export { ConflictError, isConflictError } from './conflictError';
@@ -144,16 +150,22 @@ type JsonHeaders = Record<string, string>;
 
 // Auth token management
 //
-// Split by client surface (deliberate tradeoff — see docs/security/security.md):
-// - Regular browser tabs: httpOnly cookie primary; in-memory token used for Bearer
+// TEMPORARY — direct mode (default, BFF off): Bearer + localStorage for all surfaces
+// (HF CORS/credentials bypass). See docs — restore BFF with NEXT_PUBLIC_PORTAL_USE_BFF=true.
+//
+// When BFF is enabled:
+// - Regular browser tabs: httpOnly cookie primary; in-memory token for Bearer
 //   immediately after login (before /api/session cookie round-trip). Not persisted.
-// - Installed standalone PWA: also keep a Bearer token (localStorage + memory) because
+// - Installed standalone PWA: also keep Bearer (localStorage + memory) because
 //   SameSite=None cookies are unreliable in some iOS standalone contexts.
 let authToken: string | null = null;
 
-/** True when this tab should use localStorage + Authorization: Bearer (standalone PWA only). */
+/**
+ * True when this tab should persist/rehydrate localStorage and treat Bearer as
+ * the primary auth path: direct mode (BFF off) or installed standalone PWA.
+ */
 function shouldUseBearerAuth(): boolean {
-    return isStandalonePwa();
+    return !isPortalBffEnabled() || isStandalonePwa();
 }
 
 export function getAuthToken(): string | null {
@@ -167,8 +179,8 @@ function getBearerTokenIfAllowed(): string | null {
 
 export function setToken(token: string) {
     authToken = token;
-    // Always keep in-memory token so the current tab can use WS fallback after login;
-    // only persist to localStorage for the installed PWA (rehydrate across restarts).
+    // Always keep in-memory token so the current tab can use WS/Bearer after login;
+    // persist to localStorage in direct mode or installed PWA (rehydrate across restarts).
     if (!shouldUseBearerAuth()) return;
     try {
         localStorage.setItem('auth_token', token);
@@ -183,7 +195,8 @@ export function clearToken() {
 }
 
 export function initToken() {
-    // Web tabs must not rehydrate a XSS-readable token; they rely on the httpOnly cookie.
+    // BFF web tabs must not rehydrate a XSS-readable token; they rely on the httpOnly cookie.
+    // Direct mode and PWA rehydrate Bearer from localStorage.
     if (!shouldUseBearerAuth()) {
         authToken = null;
         return null;

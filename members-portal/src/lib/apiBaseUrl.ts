@@ -1,9 +1,12 @@
 /**
  * Resolve the members-portal browser/API base URL.
  *
- * On HF Spaces (and any cross-origin portal → API host setup), credentialed
- * fetch is broken by Spaces edge OPTIONS stripping Access-Control-Allow-Credentials.
- * Prefer same-origin `/backend-api` (BFF proxy) in that case.
+ * TEMPORARY — HF direct API (default): browser → backend `/api` with Bearer
+ * (like the public site). Set `NEXT_PUBLIC_PORTAL_USE_BFF=true` to restore
+ * same-origin `/backend-api` (BFF) when HF Space→Space throttle is fixed.
+ *
+ * BFF path kept for reversal: Spaces edge OPTIONS often strips
+ * Access-Control-Allow-Credentials, which breaks cookie CORS.
  */
 
 export function isLoopbackHost(hostname: string): boolean {
@@ -12,6 +15,14 @@ export function isLoopbackHost(hostname: string): boolean {
 
 /** Path the Next.js BFF proxy mounts on (must not collide with /api/health). */
 export const PORTAL_BACKEND_API_PREFIX = "/backend-api";
+
+/**
+ * Opt-in BFF mode. Default is direct browser→backend (temporary HF bypass).
+ * Set `NEXT_PUBLIC_PORTAL_USE_BFF=true` and rebuild to restore cookie BFF.
+ */
+export function isPortalBffEnabled(): boolean {
+    return process.env.NEXT_PUBLIC_PORTAL_USE_BFF === "true";
+}
 
 function defaultBackendOrigin(): string {
     return (
@@ -34,9 +45,10 @@ export function isCrossOriginApiUrl(apiUrl: string, pageOrigin: string): boolean
 }
 
 /**
- * Prefer same-origin BFF when:
- * - caller set a relative `/backend-api` path, or
- * - browser page origin differs from configured absolute API host.
+ * Resolve browsing API base:
+ * - Explicit `/backend-api` → same-origin BFF path
+ * - Cross-origin absolute API → BFF only when {@link isPortalBffEnabled}; else direct backend URL
+ * - Localhost/LAN → direct Express (unchanged)
  */
 export function resolveApiBaseUrl(options?: {
     configuredApiUrl?: string | undefined;
@@ -89,13 +101,16 @@ export function resolveApiBaseUrl(options?: {
                     return parsed.toString().replace(/\/$/, "");
                 }
 
-                // Cross-origin absolute API → use portal BFF (HF CORS workaround).
+                // Cross-origin absolute API: BFF remap only when flag enabled.
                 // Keep direct localhost/LAN API for dev (Express CORS allowlists those).
                 if (isCrossOriginApiUrl(configured, pageOrigin)) {
                     if (isLoopbackHost(parsed.hostname)) {
                         return parsed.toString().replace(/\/$/, "");
                     }
-                    return `${pageOrigin.replace(/\/$/, "")}${PORTAL_BACKEND_API_PREFIX}`;
+                    if (isPortalBffEnabled()) {
+                        return `${pageOrigin.replace(/\/$/, "")}${PORTAL_BACKEND_API_PREFIX}`;
+                    }
+                    return parsed.toString().replace(/\/$/, "");
                 }
 
                 return parsed.toString().replace(/\/$/, "");
@@ -114,12 +129,16 @@ export function resolveApiBaseUrl(options?: {
         try {
             const { hostname, protocol } = new URL(pageOrigin);
             if (!isLoopbackHost(hostname)) {
-                // Production host without config: assume BFF.
-                return `${pageOrigin.replace(/\/$/, "")}${PORTAL_BACKEND_API_PREFIX}`;
+                if (isPortalBffEnabled()) {
+                    return `${pageOrigin.replace(/\/$/, "")}${PORTAL_BACKEND_API_PREFIX}`;
+                }
+                return `${defaultBackendOrigin()}/api`;
             }
             return `${protocol}//${hostname}:3000/api`;
         } catch {
-            return `${PORTAL_BACKEND_API_PREFIX}`;
+            return isPortalBffEnabled()
+                ? `${PORTAL_BACKEND_API_PREFIX}`
+                : `${defaultBackendOrigin()}/api`;
         }
     }
 
@@ -129,9 +148,9 @@ export function resolveApiBaseUrl(options?: {
 /**
  * Direct backend `/api` base for unauthenticated auth POSTs (check-email, login, …).
  *
- * On HF / cross-origin, browsing uses same-origin `/backend-api` (BFF), but HF
- * throttles Space→Space proxy hops. Auth POSTs go straight to the backend Space
- * instead. Localhost/LAN keep the same URL as {@link resolveApiBaseUrl}.
+ * When browsing uses BFF (`NEXT_PUBLIC_PORTAL_USE_BFF=true`), auth POSTs still go
+ * straight to the backend Space to avoid HF Space→Space 429s. When direct mode
+ * (default), this matches {@link resolveApiBaseUrl}.
  */
 export function resolveDirectBackendApiUrl(options?: {
     configuredApiUrl?: string | undefined;

@@ -1,15 +1,38 @@
 import { describe, expect, it, afterEach, vi } from "vitest";
 import {
     isCrossOriginApiUrl,
+    isPortalBffEnabled,
     PORTAL_BACKEND_API_PREFIX,
     resolveApiBaseUrl,
     resolveBackendOriginForWebSocket,
     resolveDirectBackendApiUrl,
 } from "../apiBaseUrl";
 
-describe("resolveApiBaseUrl (HF BFF proxy)", () => {
+describe("isPortalBffEnabled", () => {
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
+    it("defaults to false (direct mode)", () => {
+        vi.stubEnv("NEXT_PUBLIC_PORTAL_USE_BFF", undefined);
+        expect(isPortalBffEnabled()).toBe(false);
+    });
+
+    it("is true only when NEXT_PUBLIC_PORTAL_USE_BFF=true", () => {
+        vi.stubEnv("NEXT_PUBLIC_PORTAL_USE_BFF", "true");
+        expect(isPortalBffEnabled()).toBe(true);
+        vi.stubEnv("NEXT_PUBLIC_PORTAL_USE_BFF", "1");
+        expect(isPortalBffEnabled()).toBe(false);
+    });
+});
+
+describe("resolveApiBaseUrl (default direct mode)", () => {
     const portalOrigin = "https://iclubmedasu-members-portal.hf.space";
     const backendApi = "https://iclubmedasu-backend.hf.space/api";
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
 
     it("detects cross-origin API configuration", () => {
         expect(isCrossOriginApiUrl(backendApi, portalOrigin)).toBe(true);
@@ -17,7 +40,17 @@ describe("resolveApiBaseUrl (HF BFF proxy)", () => {
         expect(isCrossOriginApiUrl("/backend-api", portalOrigin)).toBe(false);
     });
 
-    it("remaps cross-origin HF API URL to same-origin /backend-api", () => {
+    it("keeps cross-origin HF API URL direct when BFF flag is off", () => {
+        expect(
+            resolveApiBaseUrl({
+                configuredApiUrl: backendApi,
+                pageOrigin: portalOrigin,
+            }),
+        ).toBe(backendApi);
+    });
+
+    it("remaps cross-origin HF API URL to /backend-api when BFF enabled", () => {
+        vi.stubEnv("NEXT_PUBLIC_PORTAL_USE_BFF", "true");
         expect(
             resolveApiBaseUrl({
                 configuredApiUrl: backendApi,
@@ -62,6 +95,23 @@ describe("resolveApiBaseUrl (HF BFF proxy)", () => {
             }),
         ).toBe("http://localhost:3000/api");
     });
+
+    it("defaults production host without env to backend /api when BFF off", () => {
+        expect(
+            resolveApiBaseUrl({
+                pageOrigin: portalOrigin,
+            }),
+        ).toBe("https://iclubmedasu-backend.hf.space/api");
+    });
+
+    it("defaults production host without env to BFF when flag enabled", () => {
+        vi.stubEnv("NEXT_PUBLIC_PORTAL_USE_BFF", "true");
+        expect(
+            resolveApiBaseUrl({
+                pageOrigin: portalOrigin,
+            }),
+        ).toBe(`${portalOrigin}${PORTAL_BACKEND_API_PREFIX}`);
+    });
 });
 
 describe("resolveDirectBackendApiUrl", () => {
@@ -72,7 +122,17 @@ describe("resolveDirectBackendApiUrl", () => {
         vi.unstubAllEnvs();
     });
 
-    it("returns backend /api on HF when browsing would use BFF", () => {
+    it("matches browsing URL in default direct mode", () => {
+        expect(
+            resolveDirectBackendApiUrl({
+                configuredApiUrl: backendApi,
+                pageOrigin: portalOrigin,
+            }),
+        ).toBe(backendApi);
+    });
+
+    it("returns backend /api on HF when BFF browsing is enabled", () => {
+        vi.stubEnv("NEXT_PUBLIC_PORTAL_USE_BFF", "true");
         expect(
             resolveDirectBackendApiUrl({
                 configuredApiUrl: backendApi,

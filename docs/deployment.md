@@ -30,7 +30,7 @@ Health check URLs default to the `iclubmedasu-*.hf.space` paths below; override 
 - **Space auto-revert** restores only **code** from movable `deployed-*` tags when a post-upload **health** check fails. It does **not** reverse Prisma migrations or seeds.
 - Migrations are **forward-only**. Prefer additive schema (new columns/tables) so old and new app versions can share the expanded schema. Destructive changes need a deliberate multi-step release and, if rolled back in the app, a **manual compensating migration** on Supabase — CI will not do it for you.
 - The `production` environment approval gate (when configured) is the intended human checkpoint before a risky migrate+deploy lands.
-- **HF cold starts:** after idle scale-to-zero or a rebuild, the first requests may receive HTML or temporary 429 interstitials instead of JSON. The members portal parses API bodies defensively and shows a short “try again” message rather than a raw JSON parse error. The portal **BFF** (`/backend-api`) also retries once on non-JSON 429 / 502 / 503 (HF interstitials), but **does not** retry Express JSON 429. **HF `cpu-basic` Spaces can also return 429 independently of Express rate limits** — wait 1–2 minutes and avoid hammering Continue/reload during sign-in.
+- **HF cold starts:** after idle scale-to-zero or a rebuild, the first requests may receive HTML or temporary 429 interstitials instead of JSON. The members portal parses API bodies defensively and shows a short “try again” message rather than a raw JSON parse error. When BFF is enabled (`NEXT_PUBLIC_PORTAL_USE_BFF=true`), the portal **BFF** (`/backend-api`) also retries once on non-JSON 429 / 502 / 503 (HF interstitials), but **does not** retry Express JSON 429. **TEMPORARY — default is direct API** (no BFF hop). **HF `cpu-basic` Spaces can also return 429 independently of Express rate limits** — wait 1–2 minutes and avoid hammering Continue/reload during sign-in.
 
 ### Hugging Face Spaces — CI upload only (no `create_repo`)
 
@@ -125,9 +125,9 @@ Sites and API stay on Hugging Face URLs. Outbound mail uses your verified Resend
 | `PUBLIC_WEBSITE_URL` | `https://iclubmedasu-public-website.hf.space` |
 | `API_PUBLIC_URL` | `https://iclubmedasu-backend.hf.space/api` |
 
-Restart the backend Space. Members portal browser calls use same-origin `/backend-api` (BFF) when `NEXT_PUBLIC_API_URL` points at a different host; set portal Space runtime `BACKEND_API_URL=https://iclubmedasu-backend.hf.space`. Public website keeps direct `NEXT_PUBLIC_API_URL=https://iclubmedasu-backend.hf.space/api`.
+Restart the backend Space. **TEMPORARY — HF direct API (default):** members portal browser calls go **directly** to `NEXT_PUBLIC_API_URL` (backend `/api`) with Bearer auth — same pattern as the public website. Set portal Space Variable `NEXT_PUBLIC_PORTAL_USE_BFF=true` and rebuild to restore same-origin `/backend-api` (BFF). Keep runtime `BACKEND_API_URL=https://iclubmedasu-backend.hf.space` and matching `BFF_PROXY_SECRET` for easy reversal. Public website keeps direct `NEXT_PUBLIC_API_URL=https://iclubmedasu-backend.hf.space/api`.
 
-**Required after deploy (rate-limit identity):** set the **same** `BFF_PROXY_SECRET` on both the **backend** and **members-portal** Hugging Face Spaces (Secrets). Until both are set, Express ignores `X-Iclub-Client-Ip` and all portal login POSTs still share one NAT bucket.
+**Required when BFF is enabled (rate-limit identity):** set the **same** `BFF_PROXY_SECRET` on both the **backend** and **members-portal** Hugging Face Spaces (Secrets). Until both are set, Express ignores `X-Iclub-Client-Ip` and all portal BFF login POSTs still share one NAT bucket.
 
 ### Smoke test
 
@@ -187,13 +187,18 @@ Set `NEXT_PUBLIC_*` in Settings → **Variables** (rebuild after changes). Set `
 
 | Variable                        | Value |
 |---------------------------------|-------|
-| BACKEND_API_URL                 | **Runtime.** Backend origin for the BFF proxy: `https://iclubmedasu-backend.hf.space` (no `/api`). Default if unset. |
-| BFF_PROXY_SECRET                | **Secret (runtime).** Must match backend `BFF_PROXY_SECRET`. Portal BFF sends it as `X-Iclub-Bff` with the browser client IP so auth rate limits are per visitor, not per Space NAT. |
-| NEXT_PUBLIC_API_URL             | Build-time. `https://iclubmedasu-backend.hf.space/api` (browser remaps to same-origin `/backend-api` on HF) or set `/backend-api` explicitly |
+| NEXT_PUBLIC_API_URL             | Build-time. `https://iclubmedasu-backend.hf.space/api` — **default direct mode:** browser calls this URL with Bearer (like the public site). |
+| NEXT_PUBLIC_PORTAL_USE_BFF      | Build-time (optional). Set `true` + rebuild to restore same-origin `/backend-api` BFF + cookie session. Leave unset/false for temporary direct API. |
+| BACKEND_API_URL                 | **Runtime.** Backend origin for the BFF proxy: `https://iclubmedasu-backend.hf.space` (no `/api`). Keep set for BFF reversal. |
+| BFF_PROXY_SECRET                | **Secret (runtime).** Must match backend `BFF_PROXY_SECRET`. Used when BFF is on. Keep set for reversal. |
 | NEXT_PUBLIC_BACKEND_ORIGIN      | Optional build-time WS host: `https://iclubmedasu-backend.hf.space` |
 | NEXT_PUBLIC_PUBLIC_WEBSITE_URL  | Optional: `https://iclubmedasu-public-website.hf.space` |
 
-Credentialed login goes through **same-origin** `/backend-api/*` so it is not blocked by Hugging Face Spaces OPTIONS CORS (preflight without `Access-Control-Allow-Credentials`).
+#### TEMPORARY — HF direct API
+
+Default browsing is **browser → backend** (no Space→Space BFF hop). Auth: Bearer + `localStorage`; `credentials: "omit"` for cross-origin. Portal `/api/session` is skipped for API auth. BFF code stays in the repo.
+
+**Reversal:** set `NEXT_PUBLIC_PORTAL_USE_BFF=true`, rebuild; restore matching `BFF_PROXY_SECRET` / `BACKEND_API_URL` if cleared. Then credentialed login again uses same-origin `/backend-api/*` (HF OPTIONS CORS workaround).
 
 ### Hugging Face Space Settings (Public Website)
 Set these in the public website Hugging Face Space → Settings → **Variables** (not Secrets — build-time vars must be Variables). Rebuild after any change.

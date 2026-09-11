@@ -25,6 +25,19 @@ Add the following secrets:
 - Docker Spaces must exist on HF before first deploy (create manually in HF UI). CI uploads only — it does not call `create_repo` (avoids HF 402 without PRO).
 - Set `NEXT_PUBLIC_API_URL` in each **frontend HF Space Variables** (members portal and public website — not GitHub secrets) — it is inlined at Docker build time
 
+### TEMPORARY — HF direct API (members portal)
+
+Portal **default** is browser → backend (Bearer + `localStorage`), not Space→Space BFF. Set these on the **members-portal** HF Space (Variables / Secrets), not as GitHub secrets:
+
+| Variable | Where | Value |
+|----------|-------|-------|
+| `NEXT_PUBLIC_API_URL` | Space **Variables** (build-time) | `https://iclubmedasu-backend.hf.space/api` |
+| `NEXT_PUBLIC_PORTAL_USE_BFF` | Space **Variables** (build-time) | Leave **unset** or `false` for direct mode. Set `true` + **rebuild** to restore BFF. |
+| `BACKEND_API_URL` | Space runtime Variables | `https://iclubmedasu-backend.hf.space` (keep for BFF reversal) |
+| `BFF_PROXY_SECRET` | Space **Secrets** (runtime) | Same value as backend Space (keep for BFF reversal) |
+
+**Reversal recipe:** set `NEXT_PUBLIC_PORTAL_USE_BFF=true` on the portal Space → rebuild → confirm `BFF_PROXY_SECRET` / `BACKEND_API_URL` still match backend.
+
 ## Security automation (Phase 1)
 
 These run in GitHub Actions and do **not** require paid GitHub Advanced Security. Existing deploy workflows are unchanged.

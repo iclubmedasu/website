@@ -28,6 +28,9 @@ COPY members-portal ./members-portal
 ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# TEMPORARY — HF direct API default. Set to "true" at build time to restore BFF.
+ARG NEXT_PUBLIC_PORTAL_USE_BFF
+ENV NEXT_PUBLIC_PORTAL_USE_BFF=$NEXT_PUBLIC_PORTAL_USE_BFF
 
 RUN pnpm --filter @iclub/shared build
 RUN pnpm --filter members-portal build

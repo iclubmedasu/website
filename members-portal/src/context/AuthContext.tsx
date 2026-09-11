@@ -76,9 +76,16 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-import { resolveApiBaseUrl, resolveDirectBackendApiUrl } from "../lib/apiBaseUrl";
+import {
+    isPortalBffEnabled,
+    resolveApiBaseUrl,
+    resolveDirectBackendApiUrl,
+} from "../lib/apiBaseUrl";
 
-/** Same-origin BFF (or local Express) for credentialed browsing after login. */
+/**
+ * Browsing API base: direct backend `/api` by default; same-origin BFF when
+ * `NEXT_PUBLIC_PORTAL_USE_BFF=true`.
+ */
 function resolveApiUrl(): string {
     if (typeof window !== "undefined") {
         return resolveApiBaseUrl({
@@ -95,7 +102,8 @@ function resolveApiUrl(): string {
 
 /**
  * Direct backend `/api` for unauthenticated auth POSTs.
- * Avoids HF Space→Space 429s on the portal BFF hop.
+ * When BFF is on, avoids HF Space→Space 429s on the portal hop; when direct
+ * (default), matches resolveApiUrl.
  */
 function resolveDirectAuthApiUrl(): string {
     if (typeof window !== "undefined") {
@@ -111,8 +119,15 @@ function resolveDirectAuthApiUrl(): string {
     });
 }
 
+/**
+ * Persist JWT after login/setup.
+ * Direct mode: setToken (+ localStorage via shouldUseBearerAuth) only — skip
+ * portal `/api/session` httpOnly cookie (not used for API auth).
+ * BFF mode: also POST `/api/session` for same-origin cookie auth.
+ */
 async function establishPortalSession(token: string): Promise<void> {
     setToken(token);
+    if (!isPortalBffEnabled()) return;
     try {
         await fetch("/api/session", {
             method: "POST",
@@ -126,6 +141,7 @@ async function establishPortalSession(token: string): Promise<void> {
 }
 
 function clearPortalSession(): void {
+    if (!isPortalBffEnabled()) return;
     void fetch("/api/session", {
         method: "DELETE",
         credentials: "same-origin",
@@ -282,8 +298,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const [isAlumni, setIsAlumni] = useState(false);
 
     useEffect(() => {
-        // PWA: rehydrate bearer from localStorage. Web cookies restore via /auth/me.
-        // Public auth routes skip that boot GET unless a PWA bearer is present.
+        // Direct mode / PWA: rehydrate bearer from localStorage.
+        // BFF web tabs: cookies restore via /auth/me (no localStorage).
+        // Public auth routes skip that boot GET unless a bearer is present.
         const bearer = initToken();
         const pathname = typeof window !== "undefined" ? window.location.pathname : "";
         if (shouldSkipBootAuthMe(pathname, bearer)) {
