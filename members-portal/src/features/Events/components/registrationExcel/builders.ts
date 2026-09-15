@@ -459,6 +459,44 @@ export function buildSessionAttendanceMatrix(
     return [headers, ...rows];
 }
 
+export function collectAttendanceDays(registrations: EventRegistrationRef[]): string[] {
+    const days = new Set<string>();
+    registrations.forEach((registration) => {
+        (registration.attendanceDays ?? []).forEach((day) => {
+            if (day.eventDay) days.add(day.eventDay);
+        });
+    });
+    return Array.from(days).sort();
+}
+
+function formatDayAttendanceExport(
+    registration: EventRegistrationRef,
+    eventDay: string,
+): string {
+    const dayRecord = (registration.attendanceDays ?? []).find((day) => day.eventDay === eventDay);
+    if (!dayRecord) return 'Missed';
+    return fmtDateTime(dayRecord.checkedInAt) || 'Attended';
+}
+
+export function buildDayAttendanceMatrix(registrations: EventRegistrationRef[]): string[][] {
+    const attendanceDays = collectAttendanceDays(registrations);
+    const headers = [
+        'Name',
+        'Email',
+        'Code',
+        ...attendanceDays.map(formatAttendanceDayLabel),
+    ];
+
+    const rows = registrations.map((registration) => [
+        registration.fullName,
+        registration.email,
+        registration.confirmationCode,
+        ...attendanceDays.map((eventDay) => formatDayAttendanceExport(registration, eventDay)),
+    ]);
+
+    return [headers, ...rows];
+}
+
 export function buildAttendanceLogMatrix(
     registrations: EventRegistrationRef[],
     sessions: EventSessionRef[],

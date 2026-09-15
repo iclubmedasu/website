@@ -4,6 +4,7 @@ import { downloadBlob } from '@/utils/downloadBlob';
 import {
     XLSX_MIME,
     buildAttendanceLogMatrix,
+    buildDayAttendanceMatrix,
     buildMemberSummaryMatrix,
     buildOverviewMatrix,
     buildRegistrationMatrix,
@@ -65,6 +66,7 @@ export async function exportEventRegistrationsExcel({
     const sessionAttendanceMatrix = buildSessionAttendanceMatrix(registrations, sessions, {
         trackSessionCheckOut,
     });
+    const dayAttendanceMatrix = buildDayAttendanceMatrix(registrations);
     const attendanceLogMatrix = buildAttendanceLogMatrix(registrations, sessions, {
         trackSessionCheckOut,
     });
@@ -91,6 +93,9 @@ export async function exportEventRegistrationsExcel({
 
     const sessionAttendanceSheet = workbook.addWorksheet('Session Attendance');
     styleDataSheet(sessionAttendanceSheet, sessionAttendanceMatrix);
+
+    const dayAttendanceSheet = workbook.addWorksheet('Day Attendance');
+    styleDataSheet(dayAttendanceSheet, dayAttendanceMatrix);
 
     const attendanceLogSheet = workbook.addWorksheet('Attendance Log');
     styleDataSheet(attendanceLogSheet, attendanceLogMatrix);

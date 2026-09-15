@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { EventRegistrationRef, EventSessionRef } from '@/types/backend-contracts';
+import { formatAttendanceDayLabel } from '../../eventDateUtils';
 import {
+    buildDayAttendanceMatrix,
     buildMemberSummaryMatrix,
     computeMemberMetrics,
     computeOverviewKpis,
     computeSessionMetrics,
     computeTierMetrics,
     formatAttendancePercent,
+    fmtDateTime,
 } from '../builders';
 
 function registration(overrides: Partial<EventRegistrationRef> = {}): EventRegistrationRef {
@@ -180,5 +183,71 @@ describe('registrationExcel builders', () => {
             { tierId: '10', tierName: 'Gold', registrations: 2 },
             { tierId: '20', tierName: 'Silver', registrations: 1 },
         ]);
+    });
+
+    it('buildDayAttendanceMatrix unions distinct attendance days across registrations', () => {
+        const dayA = '2026-07-20';
+        const dayB = '2026-07-21';
+        const dayC = '2026-07-22';
+        const aliceCheckIn = '2026-07-20T08:30:00.000Z';
+        const bobCheckIn = '2026-07-21T09:00:00.000Z';
+
+        const matrix = buildDayAttendanceMatrix([
+            registration({
+                id: 1,
+                fullName: 'Alice',
+                email: 'alice@example.com',
+                confirmationCode: 'AAA111',
+                attendanceDays: [
+                    { eventDay: dayA, checkedInAt: aliceCheckIn },
+                    { eventDay: dayC, checkedInAt: '' as unknown as string },
+                ],
+            }),
+            registration({
+                id: 2,
+                fullName: 'Bob',
+                email: 'bob@example.com',
+                confirmationCode: 'BBB222',
+                attendanceDays: [
+                    { eventDay: dayB, checkedInAt: bobCheckIn },
+                ],
+            }),
+        ]);
+
+        expect(matrix[0]).toEqual([
+            'Name',
+            'Email',
+            'Code',
+            formatAttendanceDayLabel(dayA),
+            formatAttendanceDayLabel(dayB),
+            formatAttendanceDayLabel(dayC),
+        ]);
+        expect(matrix[1]).toEqual([
+            'Alice',
+            'alice@example.com',
+            'AAA111',
+            fmtDateTime(aliceCheckIn),
+            'Missed',
+            'Attended',
+        ]);
+        expect(matrix[2]).toEqual([
+            'Bob',
+            'bob@example.com',
+            'BBB222',
+            'Missed',
+            fmtDateTime(bobCheckIn),
+            'Missed',
+        ]);
+    });
+
+    it('buildDayAttendanceMatrix emits Name/Email/Code only when no day records exist', () => {
+        const matrix = buildDayAttendanceMatrix([
+            registration({ id: 1, attendanceDays: [] }),
+            registration({ id: 2 }),
+        ]);
+
+        expect(matrix[0]).toEqual(['Name', 'Email', 'Code']);
+        expect(matrix).toHaveLength(3);
+        expect(matrix[1]).toEqual(['Alice Alpha', 'alice@example.com', 'ABC123']);
     });
 });
