@@ -12,3 +12,47 @@
     font-size: 0.875rem;
     color: var(--gray-600);
 }
+
+.usage-main-card {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.usage-main-card .certificates-tabs {
+    margin: -1.5rem -1.5rem 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    flex-shrink: 0;
+    overflow: visible;
+}
+
+.usage-main-card .certificates-tab-btn {
+    flex: 1 1 0;
+    flex-shrink: 1;
+    text-align: center;
+    min-width: 0;
+}
+
+.usage-main-card .table-container {
+    max-height: min(28rem, 55vh);
+    overflow: auto;
+}
+
+.usage-tab-panel {
+    padding: 1.25rem 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-height: 0;
+    flex: 1;
+}
+
+/* Size override only — base modal chrome lives in modal.css */
+.usage-detail-modal {
+    max-width: min(56rem, calc(100vw - 2rem));
+}
+
+.usage-detail-modal .table-container {
+    max-height: min(20rem, 40vh);
+    overflow: auto;
+}

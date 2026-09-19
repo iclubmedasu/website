@@ -3481,43 +3481,6 @@ export const financeAPI = {
     },
 };
 
-export type UsageDashboardSummary = {
-    windowDays: number;
-    since: string;
-    until: string;
-    counts: {
-        eventsCreated: number;
-        certificatesIssued: number;
-        checkInsScanned: number;
-        registrationsCreated: number;
-        dataExports: number;
-        logins: number;
-        activeMembers: number;
-    };
-};
-
-export type UsageDashboardSummaryParams =
-    | { days: number }
-    | { from: string; to: string };
-
-export const usageDashboardAPI = {
-    getSummary: async (params?: UsageDashboardSummaryParams) => {
-        const searchParams = new URLSearchParams();
-        if (params && "from" in params) {
-            searchParams.set("from", params.from);
-            searchParams.set("to", params.to);
-        } else if (params && "days" in params) {
-            searchParams.set("days", String(params.days));
-        }
-        const query = searchParams.toString();
-        const response = await apiFetch(
-            `${API_BASE_URL}/usage-dashboard/summary${query ? `?${query}` : ""}`,
-            { headers: getAuthHeaders() },
-        );
-        return handleResponse<UsageDashboardSummary>(response);
-    },
-};
-
 export const emailOutboxAPI = {
     getBatchStatus: async (batchId: string): Promise<EmailOutboxBatchStatus> => {
         const response = await apiFetch(
