@@ -24,6 +24,18 @@ database) is deliberately NOT part of this phase.
    set to `club`, the app must behave and look exactly as it does today.
 5. **Hiding is not protecting.** A disabled feature must be blocked in the
    backend API, not only hidden from menus.
+6. **Each deployment ships only its own profile.** A client's Spaces and
+   browser bundles contain `clients/<its id>.json` and nothing else from
+   `clients/`. Browser JavaScript is readable by anyone, and a Space's files
+   are readable by anyone if the Space is public. Bundling every profile
+   would show each client the others' names and settings.
+7. **Client Spaces are private.** The deploy uploads source code to each
+   Space, so "clients never see the source code" holds only while the
+   Spaces are private. (Check the club's current Spaces as well.)
+8. **Keep the existing deploy safety net.** `deploy.yml` already runs a
+   health check after each upload, auto-reverts on failure, and records
+   last-known-good tags (`deployed-backend`, `deployed-frontend`, ...).
+   Multi-client work must extend these per client, never remove them.
 
 ### How Claude Code changes the way you run this phase
 
@@ -34,17 +46,22 @@ database) is deliberately NOT part of this phase.
 | **Subagents** (helper agents with their own context) | The audit fans out across the repo in parallel without filling your main conversation. |
 | **Question tool** (multiple-choice popups) | Every CHECKPOINT uses it, so you tap an answer or type your own. |
 | **Task list** | Each stage shows its progress as a checklist you can watch. |
-| **Permissions** (`/permissions`, `.claude/settings.json`) | Blocks it from reading your secret `.env` files or pushing to GitHub. |
+| **Permissions** (`.claude/settings.json`) | Blocks it from reading your secret `.env` files or pushing to GitHub. In the desktop app, edit the file directly (`/permissions` is terminal-only). Deny rules on file reads are a strong guard rail, not a sandbox: a shell command could still print a file, which is why CLAUDE.md also forbids it. |
 | **Runs commands itself** | It runs typecheck, tests, and the local apps and reports real results, instead of describing what to run. |
 
 **Working rhythm:**
 1. Do **C0 once** (setup).
-2. For each stage, start a fresh conversation (`/clear`), paste that
-   stage's prompt, and watch the checklist.
+2. Run the prompts in order. You can either start a fresh conversation for
+   each one or keep going in one conversation. Every prompt re-reads
+   `docs/client-profiles-audit.md`, so nothing depends on chat memory.
+   For a long run, a fresh conversation per stage keeps things faster.
 3. After each prompt finishes, review the summary, then say "commit this"
    (it commits to the feature branch, giving you a rollback point).
 4. Never let it push to GitHub or trigger a deploy. You do that yourself
    after Stage 2 is fully verified.
+5. Each prompt only counts as done when typecheck, lint, and tests pass,
+   or when it has told you exactly which ones fail and whether they
+   already failed on `main` before this phase.
 
 ---
 
@@ -87,15 +104,28 @@ Do this setup only, then stop.
      options, put your recommendation first, explain the trade-off in
      plain language, and wait for the answer before writing code.
    - Work in small steps, and keep a task list.
+   - A deployment must contain only its own clients/<id>.json, both in
+     browser bundles and in files uploaded to Hugging Face.
+   - Keep the deploy safety net in .github/workflows/deploy.yml (health
+     checks, auto-revert, deployed-* tags). Extend it per client; never
+     remove it.
+   - Follow existing project rules: .cursor/rules/datetime.mdc and
+     docs/css-standards.md. Build packages/shared before the backend
+     (pnpm --filter @iclub/shared build).
+   - Before a stage starts, record which tests already fail on main, so
+     new failures can be told apart from old ones.
 
 3. Create or update .claude/settings.json so these are denied: reading
    backend/.env, members-portal/.env.local, public-website/.env.local,
    any other .env* file except *.example files, and the commands git push
    and gh workflow run. First check the current Claude Code permissions
-   syntax (use the /permissions command or consult the docs) rather than
-   guessing, and show me the final file.
+   syntax in the docs rather than guessing, and show me the final file.
 
-4. Report what you created, in 5 lines or fewer.
+4. Run typecheck, lint, and the unit tests once on the untouched branch,
+   and save the results (which pass, which already fail) to
+   docs/client-profiles-baseline.md.
+
+5. Report what you created, in 5 lines or fewer.
 ```
 
 ---
@@ -138,7 +168,18 @@ D. FEATURES: every major module (events, certificates, finance, projects,
    breaking anything, including its backend routes.
 E. DEPLOYMENT: how deploy.yml and the Dockerfiles pass configuration
    (secrets, Variables, build args), and which values are baked in at
-   build time versus read at runtime.
+   build time versus read at runtime. Also: which folders survive the
+   "clean workspace" steps and each Dockerfile's COPY lines (a new
+   clients/ folder must reach every build), the existing health checks,
+   auto-revert, and deployed-* tags, and the single "production"
+   Environment.
+F. HARDCODED ADDRESSES: club-specific URLs, hostnames, and repo names in
+   code or Dockerfiles (for example *.hf.space hosts, publicWebsiteUrl.ts,
+   publicApiUrl.ts, GITHUB_REPO build args, email "from" addresses, CORS
+   origins). For each, say whether it is already an environment variable.
+G. ALREADY DATA-DRIVEN: what already lives in the database or seed files
+   (site content, support content, teams/roles), so later stages reuse it
+   instead of duplicating it in the JSON profile.
 
 End with a table: item | where it lives | effort to make configurable
 (small/medium/large).
@@ -191,8 +232,16 @@ my answers), then build the client-profile system:
    frontends. A missing CLIENT_ID means "club".
 4. Make it work on the server and in browser builds. Next.js bakes
    NEXT_PUBLIC_* values in at build time, so the frontends read
-   NEXT_PUBLIC_CLIENT_ID.
-5. Add unit tests for the loader (valid profile, missing field, unknown
+   NEXT_PUBLIC_CLIENT_ID. The browser bundle must contain ONLY the
+   selected profile (not an import of every file in clients/); prove it
+   by searching the built output for example-client's name.
+5. Make clients/ reach every Docker build: update each Dockerfile's COPY
+   lines and add ARG NEXT_PUBLIC_CLIENT_ID to the two frontend
+   Dockerfiles. Do not touch deploy.yml yet (that is C8).
+6. Expose the active client id in the backend and portal health
+   responses, so a deploy can detect a backend and frontend built for
+   different clients.
+7. Add unit tests for the loader (valid profile, missing field, unknown
    client, default to club).
 
 CHECKPOINT 2: Explain in plain language that the profile is compiled in at
@@ -253,7 +302,9 @@ Using the features group in the profile:
    are blocked even for the most privileged account.
 
 Run the tests and report real results. Finish with a simple table of what
-each switch controls, saved to docs/feature-switches.md.
+each switch controls, saved to docs/feature-switches.md. Note in that file
+that changing a switch means redeploying that client's Spaces, because
+the frontends read it at build time.
 ```
 
 ### C5 — Hierarchy and permissions without hardcoded names
@@ -285,9 +336,12 @@ Read docs/client-profiles-audit.md (section C and my answers), then make
 the login identifier configurable through the profile's auth group:
 
 1. If student ID must become optional at the database level, explain the
-   Prisma migration to me in plain language BEFORE creating it, and test
-   it only against the LOCAL development database. It must not break
-   existing club data.
+   Prisma migration to me in plain language BEFORE creating it, then show
+   me the exact generated SQL and point out any line that drops, rewrites,
+   or re-creates a column, index, or unique constraint. The migration must
+   be additive only (no data loss, no reset). Test it only against the
+   LOCAL development database, using a copy of realistic club-shaped data.
+   Never run prisma migrate reset or db push against anything else.
 2. Registration, setup-password, and login must use the profile's
    identifier: studentId (current behavior), phone, or email. Reuse
    phoneUtils.ts so the same number written different ways matches one
@@ -317,7 +371,10 @@ profile:
 2. A safe way to create the FIRST administrator for a new client (a
    one-time script taking an identifier and temporary password from the
    command line), without using the developer backdoor. The temporary
-   password must be forced to change on first login.
+   password must be forced to change on first login. The script refuses
+   to run if an administrator already exists, never prints the password,
+   and reads it from a prompt or environment variable rather than a
+   command-line argument (arguments end up in shell history and CI logs).
 3. The seed must be safe to run twice (no duplicates, no overwriting real
    data), with a test proving it.
 
@@ -346,7 +403,16 @@ deployment so one release can deploy every client:
    database and passing CLIENT_ID to each deployment.
 3. A failure at one client must never be silent or leave a half-deployed
    state unreported. Propose how failures are surfaced.
-4. Leave hooks for the health check and rollback work in Phase D.
+4. Keep the existing health checks and auto-revert, and make them
+   per client: health URLs come from each Environment's variables, and
+   known-good tags become per client (for example
+   deployed-<client>-backend) so one client's deploy never moves another
+   client's rollback point. Keep the club's existing tag names working.
+5. Before each upload, delete every clients/*.json except that client's
+   own, and fail the job if the health response reports a different
+   client id than expected.
+6. Review the concurrency group: one client's slow deploy should not
+   cancel or silently queue behind another's without being reported.
 
 CHECKPOINT 5: Present the plan and ask, one question at a time, with the
 question tool:
@@ -370,8 +436,8 @@ needed to onboard one new client:
 
 1. Create the Supabase project and copy the connection string.
 2. Create the three Hugging Face Spaces (backend, members-portal,
-   public-website) and set their Variables and Secrets (say which are
-   Variables because Next.js needs them at build time).
+   public-website) as PRIVATE Spaces, and set their Variables and Secrets
+   (say which are Variables because Next.js needs them at build time).
 3. Create the Resend domain, DNS records, and sender address.
 4. Create the GitHub Environment and add its secrets.
 5. Create clients/<id>.json from a template and set CLIENT_ID everywhere
@@ -399,7 +465,9 @@ actual output:
    database. Give me a checklist of confirmed differences: name, theme,
    hierarchy, login identifier, disabled features blocked at the API
    level, emails and certificates branded correctly.
-3. Confirm the club instance is unchanged from before this phase.
+3. Confirm the club instance is unchanged from before this phase, and
+   compare test results against docs/client-profiles-baseline.md.
+   Confirm each built frontend contains only its own profile.
 4. List anything you could not verify, shortcuts taken, and new risks
    introduced. Be honest, not reassuring.
 
