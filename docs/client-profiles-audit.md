@@ -106,12 +106,20 @@ the repo root. "Effort" is small / medium / large.
 
 ### Security findings (existed before this phase — not changed)
 
-1. **Personal data leak (important).** `POST /api/auth/check-email`
-   (`backend/routes/auth.ts:344-428`) needs no login. For a member who
-   has not set a password yet, it returns full name, phone numbers,
-   secondary emails and member id. Student IDs are short sequential
-   numbers and the limit is 3000 tries per 15 minutes per IP, so someone
-   could collect this data for every member who has not activated.
+1. **Personal data leak — FIXED on `main` in `4a5a7c5`.**
+   `/check-email` and `/check-officer-identifier` no longer return name,
+   phones, secondary emails or ids; the first-login form is no longer
+   pre-filled, and blank optional fields keep stored values.
+1a. **Account takeover of un-activated accounts — STILL OPEN (critical).**
+   `/setup-password`, `/complete-profile` and `/complete-officer-profile`
+   need no proof of identity: knowing a not-yet-activated member's
+   student ID, email or phone is enough to set their password and log in
+   as them, officers included. The owner chose to defer the real fix.
+   Agreed direction: an emailed one-time setup link to the email on file
+   (members do read their university mailbox). Must be solved before
+   onboarding any new client, since a new client's accounts all start
+   un-activated. C6 (login identifier) must build on that link, not on
+   the current flow.
 2. **Account existence is revealed** by several endpoints
    (`/check-email`, `/check-student-id`, `/check-officer-identifier`,
    `/login` "Password not set", `/setup-password`). `/forgot-password`
