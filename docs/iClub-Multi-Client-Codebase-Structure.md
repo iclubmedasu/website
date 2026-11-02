@@ -9,26 +9,37 @@ database) is deliberately NOT part of this phase.
 
 ### Decisions already made (do not re-ask these)
 
-1. **One private GitHub repo, `main` branch only for deployment.** No
-   client branches, no copied repos. Clients never see the source code.
-   (Claude Code works on a temporary feature branch, `feat/client-
-   profiles`, which merges back into `main`. That is normal and different
-   from a client branch.)
-2. **A client is a profile, not a fork.** Non-secret differences live in
-   one JSON profile per client inside the repo (`clients/<id>.json`).
-   Each deployment selects its profile with a single variable: `CLIENT_ID`.
+1. **One private GitHub repo, `main` branch only.** No client branches, no
+   copied repos. Clients never see the source code. Work happens directly
+   on `main` (owner decision, 2026-11-02: one developer + Claude, working
+   sequentially). Because the next push deploys whatever is on `main`,
+   **every commit must leave the app working and deployable**; unfinished
+   work stays uncommitted or behind a default-off setting.
+2. **A tenant is data, not code (decided 2026-11-02).** Anything a client
+   could reasonably want to change — theme colors, logo, names, wording,
+   links and addresses, contact details, feature switches, team/role
+   structure, login identifiers — lives in **that client's own database**
+   and is editable from an admin screen, not in a file in the repo. Each
+   deployment already has its own database, so the database *is* the
+   tenant's configuration. Code holds only defaults (today's club values)
+   used when a setting has never been saved.
+   `clients/<id>.json`, if kept at all, is a **seed template** read by the
+   setup script (C7) to fill a new tenant's database, never read at
+   runtime and never bundled into a deployment.
 3. **Secrets never go in the repo.** Database URLs, JWT secrets, API keys,
    and Resend keys stay in Hugging Face Space secrets and GitHub
    Environment secrets.
-4. **Defaults equal today's club behavior.** If `CLIENT_ID` is missing or
-   set to `club`, the app must behave and look exactly as it does today.
+4. **Defaults equal today's club behavior.** A database with no tenant
+   settings saved must look and behave exactly like today's club, except
+   for changes the owner explicitly approves (for example the color
+   consolidation in `docs/css-standards.md` §13).
 5. **Hiding is not protecting.** A disabled feature must be blocked in the
    backend API, not only hidden from menus.
-6. **Each deployment ships only its own profile.** A client's Spaces and
-   browser bundles contain `clients/<its id>.json` and nothing else from
-   `clients/`. Browser JavaScript is readable by anyone, and a Space's files
-   are readable by anyone if the Space is public. Bundling every profile
-   would show each client the others' names and settings.
+6. **Two levels of switches.** The platform owner decides what a tenant
+   *may* use (their plan/contract); the tenant's admins switch features on
+   or off *within* that. Tenant admins can never enable something the
+   owner has not allowed. Platform-level limits are stored where tenant
+   admins cannot edit them (environment variable or an owner-only table).
 7. **Client Spaces are private.** The deploy uploads source code to each
    Space, so "clients never see the source code" holds only while the
    Spaces are private. (Check the club's current Spaces as well.)
@@ -56,7 +67,7 @@ database) is deliberately NOT part of this phase.
    `docs/client-profiles-audit.md`, so nothing depends on chat memory.
    For a long run, a fresh conversation per stage keeps things faster.
 3. After each prompt finishes, review the summary, then say "commit this"
-   (it commits to the feature branch, giving you a rollback point).
+   (it commits to `main`, giving you a rollback point; it is not pushed).
 4. Never let it push to GitHub or trigger a deploy. You do that yourself
    after Stage 2 is fully verified.
 5. Each prompt only counts as done when typecheck, lint, and tests pass,
@@ -203,90 +214,123 @@ docs/client-profiles-audit.md so later stages can read them, even after
 
 ### STAGE 2 — Build the configuration layer
 
-**Before each prompt:** `/clear`, exit plan mode, and make sure you are on
-`feat/client-profiles`. Each prompt begins by reading the audit file.
+**Before each prompt:** exit plan mode and make sure you are on `main`
+(C0's feature branch was merged into `main` on 2026-11-02). Each prompt
+begins by reading the audit file.
 
-### C2 — Client profile and typed config loader
+### C2 — Tenant settings stored in the database
 
 ```
-Read docs/client-profiles-audit.md first (it holds the Stage 1 report and
-my answers), then build the client-profile system:
+Read docs/client-profiles-audit.md (Stage 1 report, my answers, and the
+"tenant is data" decision) and docs/css-standards.md §13, then build the
+tenant-settings system. Everything a tenant may change lives in its own
+database and is edited from an admin screen; code only holds defaults.
 
-1. Create clients/ at the repo root with club.json (matching today's
-   behavior exactly, extracted from the audit) and example-client.json
-   (used only for testing).
-2. A profile contains NON-SECRET data only, in these groups:
-   - identity: displayName, shortName, websiteName
-   - theme: colors, fonts, border radius, logo/favicon paths, and any
-     other token found in the audit
-   - terminology: words that differ per organization (e.g. "member" vs
-     "employee", "club" vs "company", "team" vs "department")
-   - features: an on/off value per module from audit section D
-   - auth: loginIdentifier ("studentId" | "phone" | "email"), allowed
-     email domains if any, password rules
-   - hierarchy: display names for leadership levels, mapped to the
-     generic flags already used by the permission code
-3. A typed, validated loader in packages/shared that reads CLIENT_ID,
-   loads the matching profile, validates it (clear error for a missing or
-   wrong field), and exports one object used by the backend and both
-   frontends. A missing CLIENT_ID means "club".
-4. Make it work on the server and in browser builds. Next.js bakes
-   NEXT_PUBLIC_* values in at build time, so the frontends read
-   NEXT_PUBLIC_CLIENT_ID. The browser bundle must contain ONLY the
-   selected profile (not an import of every file in clients/); prove it
-   by searching the built output for example-client's name.
-5. Make clients/ reach every Docker build: update each Dockerfile's COPY
-   lines and add ARG NEXT_PUBLIC_CLIENT_ID to the two frontend
-   Dockerfiles. Do not touch deploy.yml yet (that is C8).
-6. Expose the active client id in the backend and portal health
-   responses, so a deploy can detect a backend and frontend built for
-   different clients.
-7. Add unit tests for the loader (valid profile, missing field, unknown
-   client, default to club).
+1. Design the settings data model (Prisma) and explain it to me in plain
+   language BEFORE writing the migration. It must cover, at minimum:
+   - identity: organization name, short name, website name, tagline,
+     legal/copyright line, contact email(s), phone(s), postal address
+   - links: social links, website URLs, any "official channel" links
+     (reuse the existing SiteContent / SocialLink tables where they
+     already fit instead of duplicating them — audit section G)
+   - theme: the 11 --brand-* values from §13 (optionally generated from
+     one base color, always stored as 11 explicit values), logo, icon /
+     favicon, email header logo
+   - terminology: words that differ per organization ("member" vs
+     "employee", "club" vs "company", "team" vs "department"), with
+     singular/plural forms
+   - features: on/off per module (audit section D), in two levels —
+     what the platform owner allows (not editable by tenant admins) and
+     what the tenant enabled within that
+   - auth: allowed login identifiers (several per tenant), allowed or
+     official email domains, phone default country
+   - email: sender display name and reply-to (the sending address itself
+     stays an environment variable, because it must match the Resend
+     domain)
+   - currency for finance
+   Use typed columns or a validated JSON document per group — recommend
+   one at CHECKPOINT 2. Every field has a default equal to today's club
+   value, so an empty table behaves exactly like today.
+2. One backend service that reads settings (cached in memory, refreshed
+   when an admin saves), validates them, and fills in defaults. Backend
+   code (emails, PDFs, permission checks, auth) reads only through it.
+3. A public read endpoint for the NON-sensitive subset the frontends
+   need before login (name, theme, logos, terminology, enabled features,
+   login identifiers), and an admin-only write endpoint with validation
+   (including the WCAG contrast check from §13.1 rule 5).
+4. Frontends: load the public settings on the server (no flash of the
+   wrong colors or name) and apply the theme as CSS variables at the
+   document root. The PWA manifest and theme-color become dynamic routes
+   instead of static files.
+5. Logos and icons uploaded by the tenant go through the existing storage
+   service; keep the club's current files as the defaults.
+6. Tests: defaults when nothing is saved, validation errors, cache
+   refresh after save, admin-only write, public endpoint never returns
+   sensitive fields.
 
-CHECKPOINT 2: Explain in plain language that the profile is compiled in at
-build time, so a theme change means redeploying that client's Spaces, and
-offer the alternative (theme stored in the client's database and fetched
-at runtime, which avoids redeploys but adds a database call and more
-code). Use the question tool; recommend one. Wait for my answer, then
-continue accordingly.
+CHECKPOINT 2: Present the data model (typed columns vs JSON document per
+group), the caching approach, and which settings tenant admins may edit
+vs only the platform owner. Use the question tool; recommend one; wait.
 
+Do NOT build the admin editing screens yet beyond what is needed to test
+— each later stage adds the screen for its own group.
 When done: run typecheck, lint, and tests, report real results, and stop.
 I will ask you to commit.
 ```
 
-### C3 — Apply branding and terminology from the profile
+### C2.5 — Color token migration (from css-standards §13)
 
 ```
-Read docs/client-profiles-audit.md and clients/club.json, then replace
-every hardcoded branding value from audit section A with values from the
-config loader:
+Read docs/css-standards.md §13. Migrate in small, reviewable commits:
+1. Add the §13 tokens to BOTH apps' :root with identical names; keep
+   --purple-* as aliases of --brand-*.
+2. Fix the broken token references in §13.3 first (real bugs today).
+3. Replace literals file by file with tokens; brand transparency becomes
+   color-mix(). Server/export code reads the theme object instead of hex.
+4. Delete the unused template folders listed in §13.6.
+5. After each batch run pnpm color:audit, typecheck, lint, tests; take
+   before/after screenshots of the affected pages and show me any
+   visible change.
+Finish when pnpm color:audit reports 0, then add --strict to CI.
+```
 
-1. Convert colors, radius, and fonts to CSS custom properties set from the
-   profile theme at the root of each app, and update existing CSS to read
-   them. Follow docs/css-standards.md.
-2. Replace hardcoded names and wording in UI text, emails, certificate
-   PDFs, the PWA manifest, page titles, and metadata with profile values.
-3. Load logos and favicons from the profile paths; put the club's current
-   assets in the club profile so nothing changes.
-4. Keep changes small and mechanical per file. If the real scope is much
+### C3 — Apply identity, links, and terminology from tenant settings
+
+```
+Read docs/client-profiles-audit.md (sections A, F, G) and the tenant
+settings service from C2, then replace every hardcoded identity value
+with tenant settings:
+
+1. Names and wording in UI text, page titles, metadata, emails,
+   certificate PDFs, and the PWA manifest come from settings
+   (identity + terminology). Colors are already handled by C2.5.
+2. Every hardcoded link, address, email address, phone number, and
+   social URL (audit sections A.7 and F) comes from settings or from the
+   existing SiteContent tables. Seed defaults stay in one place only.
+3. Hostnames that are deployment facts, not tenant choices (CORS origins,
+   API URLs), come from environment variables with NO club fallback in
+   production code; remove the always-allowed iclubmedasu origins.
+4. Logos and favicons come from settings (club files as defaults).
+5. Build the admin screen for identity, links, contact details and
+   terminology, following docs/css-standards.md.
+6. Keep changes small and mechanical per file. If the real scope is much
    larger than the audit estimated, stop and tell me before continuing.
 
 Verification (required, actually run it):
- a. Start the apps locally with CLIENT_ID unset and confirm the club looks
-    identical to before. List the pages you checked. If the Chrome or
-    built-in browser tools are available, take screenshots; otherwise
-    tell me which pages I should compare myself.
- b. Run with CLIENT_ID=example-client and show that name, colors, and logo
-    change everywhere, including one email template and one generated
-    certificate PDF.
+ a. With no settings saved, the club looks identical to before (except
+    approved §13 color changes). List the pages checked, with screenshots
+    from the built-in browser.
+ b. Save a test tenant's settings locally and show name, links, logo and
+    wording change everywhere, including one email and one certificate
+    PDF. Then restore the defaults.
 Stop and report.
 ```
 
 ### C4 — Feature switches enforced in backend AND frontend
 
 ```
-Using the features group in the profile:
+Using the features group in tenant settings (both levels: owner-allowed
+and tenant-enabled):
 
 1. BACKEND: add one middleware/helper (e.g. requireFeature("finance")) and
    apply it to every route module belonging to a switchable feature. A
@@ -302,9 +346,9 @@ Using the features group in the profile:
    are blocked even for the most privileged account.
 
 Run the tests and report real results. Finish with a simple table of what
-each switch controls, saved to docs/feature-switches.md. Note in that file
-that changing a switch means redeploying that client's Spaces, because
-the frontends read it at build time.
+each switch controls, saved to docs/feature-switches.md. Switches take
+effect without a redeploy (they are read from the database). Build the
+admin screen for switches; tenant admins see only what the owner allows.
 ```
 
 ### C5 — Hierarchy and permissions without hardcoded names
@@ -319,9 +363,17 @@ answers), then:
    of directors, and departments become ordinary database rows (teams,
    roles) that map to the same generic flags (isAdmin, isOfficer,
    isLeadership, and so on), with no code edits.
-3. Use the profile's hierarchy names for display wording only.
-4. Add tests showing a second structure ("CEO + Board") receives the
-   correct permissions through the same flags.
+3. Give each team a stored "kind" (admin / hr / finance / regular — my
+   Checkpoint 1 answer) and each role a stored level, so tenant admins
+   can rename teams and roles freely without breaking permissions. The
+   club's existing rows get their kind by migration.
+4. Build the admin screen to manage teams, roles, kinds and levels, with
+   guards that prevent locking everyone out (at least one active admin
+   must always remain).
+5. Display wording for leadership levels comes from tenant terminology.
+6. Add tests showing a second structure ("CEO + Board") receives the
+   correct permissions through the same flags, and that renaming a team
+   does not change anyone's permissions.
 
 CHECKPOINT 3: If any permission rule cannot be expressed through generic
 flags without changing behavior, list it, explain the options in plain
@@ -333,7 +385,10 @@ Run tests and report real results.
 
 ```
 Read docs/client-profiles-audit.md (section C and my answers), then make
-the login identifier configurable through the profile's auth group:
+the login identifier configurable through the auth group of tenant
+settings. First-time account activation must use the emailed one-time
+setup link (see the open account-takeover finding in the audit) — do not
+build on the current unverified setup flow.
 
 1. If student ID must become optional at the database level, explain the
    Prisma migration to me in plain language BEFORE creating it, then show
@@ -342,14 +397,14 @@ the login identifier configurable through the profile's auth group:
    be additive only (no data loss, no reset). Test it only against the
    LOCAL development database, using a copy of realistic club-shaped data.
    Never run prisma migrate reset or db push against anything else.
-2. Registration, setup-password, and login must use the profile's
-   identifier: studentId (current behavior), phone, or email. Reuse
+2. Registration, setup-password, and login must use the
+   identifiers allowed in settings: studentId, phone, and/or email. Reuse
    phoneUtils.ts so the same number written different ways matches one
    account.
 3. Keep rate limits and brute-force protections on every identifier type.
    Error messages must not reveal whether an identifier exists.
 4. Public registration forms and the member directory must show correct
-   field labels from the profile.
+   field labels from tenant settings.
 5. Add tests for each identifier type, including duplicates and
    badly-formatted input.
 
@@ -361,12 +416,12 @@ it.
 ### C7 — Per-client setup: seed scripts and first admin
 
 ```
-A new client database starts empty. Build a seeding system driven by the
-profile:
+A new client database starts empty. Build a seeding system driven by a
+seed template (clients/<id>.json — read only by this script):
 
 1. A command (e.g. pnpm --filter backend seed:client) that, given
    CLIENT_ID and a database, seeds default site content, support content,
-   the team and role structure from the profile's hierarchy, and finance
+   tenant settings, the team and role structure (with team kinds), and finance
    defaults only if the finance feature is on.
 2. A safe way to create the FIRST administrator for a new client (a
    one-time script taking an identifier and temporary password from the
@@ -460,19 +515,19 @@ Final verification for the whole phase. Run everything for real and report
 actual output:
 
 1. typecheck, lint, unit tests, and e2e tests across the repo.
-2. Run two instances locally side by side (docker compose or local dev):
-   CLIENT_ID=club and CLIENT_ID=example-client, each with its own local
-   database. Give me a checklist of confirmed differences: name, theme,
+2. Run two instances locally side by side (docker compose or local dev),
+   each with its own local database: one with no settings saved (club
+   defaults) and one seeded from clients/example-client.json. Give me a checklist of confirmed differences: name, theme,
    hierarchy, login identifier, disabled features blocked at the API
    level, emails and certificates branded correctly.
 3. Confirm the club instance is unchanged from before this phase, and
    compare test results against docs/client-profiles-baseline.md.
-   Confirm each built frontend contains only its own profile.
+   Confirm no deployment bundle contains another tenant's data.
 4. List anything you could not verify, shortcuts taken, and new risks
    introduced. Be honest, not reassuring.
 
 Then give me a one-paragraph summary of what I should test by hand before
-merging feat/client-profiles into main.
+I push main and deploy.
 ```
 
 ---

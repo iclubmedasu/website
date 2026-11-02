@@ -240,3 +240,22 @@ Answered 2026-11-02:
    identical, including `requireAdmin`'s current looser rule.
 4. **`/check-email` data leak: fix first, separately on `main`**, before
    continuing with Stage 2. Not part of `feat/client-profiles`.
+
+## Direction update (2026-11-02)
+
+- **A tenant is data, not code.** Everything a client may change (theme,
+  logo, names, wording, links, addresses, contact details, feature
+  switches, teams/roles, login identifiers) is stored in that
+  deployment's database and edited from admin screens. Code holds only
+  defaults equal to today's club. `clients/<id>.json` is at most a seed
+  template for new tenants. This also settles Checkpoint 2: settings are
+  read at runtime from the database, so changing them needs no redeploy.
+- **Feature switches have two levels:** what the platform owner allows,
+  and what the tenant's admins enable within that.
+- **Work happens directly on `main`.** Every commit must stay deployable.
+- **Colors:** the complete inventory and target tokens are in
+  `docs/css-standards.md` §13 (158 colors in live code → 62 tokens;
+  966 literals in 109 files to migrate; `pnpm color:audit` tracks it).
+  Migration is stage C2.5 in the plan.
+  Owner approved (2026-11-02): merge all near-duplicate colors, Gantt
+  violet follows the brand, delete the unused template folders.

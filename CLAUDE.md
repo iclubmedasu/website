@@ -9,11 +9,19 @@
   English and define each technical term at first use.
 - One repo. Never create client-specific branches or copy files per
   client.
-- Client differences live in clients/<id>.json (NON-SECRET only),
-  selected by CLIENT_ID (NEXT_PUBLIC_CLIENT_ID for the frontends).
-  Secrets stay in environment variables, never in the repo.
-- With CLIENT_ID unset or "club", the app must look and behave exactly
-  as today. Any visible change for the club is a bug.
+- A tenant is data, not code: anything a client may change (theme,
+  logo, names, wording, links, addresses, feature switches, teams/roles,
+  login identifiers) lives in that deployment's database and is editable
+  from an admin screen. Code holds only defaults (today's club values).
+  clients/<id>.json, if present, is a seed template only. Secrets stay in
+  environment variables, never in the repo.
+- With no tenant settings saved, the app must look and behave exactly
+  as today, except changes the owner approved. Any other visible change
+  for the club is a bug.
+- Work directly on main (no feature branches). Every commit must leave
+  the app working and deployable, because the owner's next push deploys.
+- Colors: never write a color literal; use the tokens in
+  docs/css-standards.md §13 and check with pnpm color:audit.
 - A disabled feature must be blocked in the backend, not just hidden
   in the UI.
 - After each step run typecheck, lint, and the existing tests, and
@@ -26,8 +34,8 @@
   options, put your recommendation first, explain the trade-off in
   plain language, and wait for the answer before writing code.
 - Work in small steps, and keep a task list.
-- A deployment must contain only its own clients/<id>.json, both in
-  browser bundles and in files uploaded to Hugging Face.
+- A deployment must never contain another tenant's data, in browser
+  bundles or in files uploaded to Hugging Face.
 - Keep the deploy safety net in .github/workflows/deploy.yml (health
   checks, auto-revert, deployed-* tags). Extend it per client; never
   remove it.

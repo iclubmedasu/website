@@ -172,6 +172,7 @@ This prevents future developers (or AI agents) from re-adding the styles.
 10. [File Organization & Architecture](#10-file-organization--architecture)
 11. [Quick Reference: Implementing a New Feature](#11-quick-reference-implementing-a-new-feature)
 12. [Data Tables](#12-data-tables)
+13. [Complete Color Inventory & Tenant Theme Map](#13-complete-color-inventory--tenant-theme-map)
 
 ---
 
@@ -193,6 +194,8 @@ This document covers **both** `public-website` and `members-portal`. Canonical t
 | `--font-mono` | not present | monospace stack for code/path text |
 
 Reconciling `--radius-lg` and shadow tints across apps is out of scope until deliberately planned; both sets are valid per-app today.
+
+> **Multi-tenant:** §13 is the complete list of every color in use and the token each must become. New code uses the `--brand-*` names defined there.
 
 ### 1.1 Brand Colors — Purple Scale
 
@@ -1109,3 +1112,190 @@ Context-specific layout (flex sizing, row-height vars, scroll max-height) stays 
 - Prefer `.members-table-shell` for new page tables. Keep `.event-registrations-table-shell` / `.certificates-table-shell` where layout overrides already exist — they share the same frame via the multi-selector.
 - Events registration/tickets (and similar embedded tables) may stay shell-only without a page `.card` — that exception is intentional.
 
+---
+
+## 13. Complete Color Inventory & Tenant Theme Map
+
+> **Status:** inventory complete and **approved by the owner on 2026-11-02**: merge all near-duplicates (≈) into the 62 tokens, the Gantt/timetable violet follows the brand (`--brand-600`), and the unused template folders (§13.6) are deleted. Until migrated (plan stage C2.5), existing `--purple-*` names stay valid.
+>
+> **Why this exists:** iClub is becoming multi-tenant. Every color the apps, emails, PDFs and Excel exports use must come from one token set, so a tenant can re-theme everything by changing a few values — without touching code.
+
+### 13.1 The four color layers
+
+| Layer | Tokens | Who can change it | Why |
+|---|---|---|---|
+| **Brand** | `--brand-50` … `--brand-950` (11 steps) | **Tenant** (stored per tenant in the database, editable by their admins) | Identity: buttons, headers, links, focus rings, charts, exports, emails |
+| **Surfaces & neutrals** | `--white`, `--black`, `--bg-subtle`, `--gray-50` … `--gray-900` | Platform only | Readability and contrast must stay correct whatever the brand is |
+| **Semantic & status** | `--success-*`, `--error-*`, `--warning-*`, `--info-*`, `--status-*` | Platform only | Green = good and red = danger must mean the same thing for every tenant |
+| **Fixed accents** | `--accent-teal`, `--accent-teal-strong`, `--accent-orange`, `--accent-amber` | Platform only | Categorical colors (file types, secondary actions) that must stay distinct from the brand |
+
+Rules:
+
+1. **Never write a color literal** (`#hex`, `rgb()`, `rgba()`) in CSS, TSX, emails, PDF or Excel code. Use a token — in CSS via `var(--token)`, in server/export code via the theme object (13.5).
+2. **Transparency** uses the token too: `color-mix(in srgb, var(--brand-900) 8%, transparent)` instead of `rgba(86, 23, 137, 0.08)`. A literal `rgba()` of a brand color will not follow a tenant's brand.
+3. **Brand ≠ "purple".** New code uses `--brand-*`. `--purple-*` remains as an alias only while old code is migrated, then it is removed.
+4. A tenant edits the **brand scale only**. An admin UI may generate the 11 steps from one base color, but the stored theme always holds all 11 explicit values (the club keeps its exact hand-picked values).
+5. Brand pairs used for text on a background (e.g. white on `--brand-900`, `--brand-800` on `--brand-50`) must pass WCAG AA contrast (4.5:1); the theme editor must refuse a brand scale that fails.
+
+### 13.2 Every color in the code, mapped to its token
+
+How to read: each row is a target token and its club value. The last column lists **every distinct color literal found in live code** that belongs to that token, with how often it appears and example files. No mark = already exactly the token value. **≈** = a near-duplicate (usually a Tailwind default such as slate/gray/violet) that will change very slightly when replaced by the token. "alphas" lists transparency levels it is used with (these become `color-mix`).
+
+**Totals:** 158 distinct colors in live code → 62 tokens. 668 uses already match their token value exactly; 412 uses are near-duplicates (≈) that shift slightly when consolidated.
+
+#### Brand (tenant-editable)
+
+| Target token | Club value | Colors found in code → uses (where) |
+|---|---|---|
+| `--brand-950` (**new**) | `#1a1230` | `#140528` ≈ ×2 (ProjectsPage.css, alphas 0.1,0.22)<br>`#1f1531` ≈ ×1 (page.module.css)<br>`#1a1230` ×1 (globals.css)<br>`#160c2b` ≈ ×1 (rubiks-cube.css) |
+| `--brand-900` (renamed from `--purple-900`) | `#561789` | `#561789` ×46 (PWAInstallPrompt.css, SideBarNavigationSlim.css, TicketDesignPanel.css, alphas 0.02,0.04,0.05,0.06,0.08)<br>`#4c1d95` ≈ ×17 (EventCircularGallery.tsx, GanttChart.tsx, Highlights.tsx)<br>`#5b21b6` ≈ ×14 (GanttChart.tsx, modal.css, alphas 0.35)<br>`#560b89` ≈ ×5 (globals.css, alphas 0.05,0.08,0.1,0.15)<br>`#422561` ≈ ×1 (page.module.css, alphas 0.12)<br>`#4a0f8a` ≈ ×1 (rubiks-cube.css)<br>`#3f1166` ≈ ×1 (registration.css) |
+| `--brand-800` (renamed from `--purple-800`) | `#662f91` | `#662f91` ×19 (EventExpandedContent.css, globals.css, layout.tsx, alphas 0.25)<br>`#6d28d9` ≈ ×5 (GanttChart.tsx, UnassignedGate.css, UserPage.css, alphas 0.08)<br>`#5e1fa8` ≈ ×1 (rubiks-cube.css) |
+| `--brand-700` (renamed from `--purple-700`) | `#7a47a3` | `#7a47a3` ×31 (GanttChart.css, ScheduleTimetable.css, UploadPhotoModal.css, alphas 0.02,0.03,0.05,0.06,0.08)<br>`#7c3aed` ≈ ×8 (FinanceChartsSection.tsx, GanttChart.tsx, SiteContent.css)<br>`#7e22ce` ≈ ×1 (badge.css)<br>`#6e47a3` ≈ ×1 (globals.css, alphas 0.1)<br>`#7b3dbf` ≈ ×1 (rubiks-cube.css) |
+| `--brand-600` (renamed from `--purple-600`) | `#9063b3` | `#8b5cf6` ≈ ×41 (EventTasksTimetable.css, FileUploadZone.css, GanttChart.css, alphas 0.06,0.07,0.08,0.1,0.12)<br>`#9063b3` ×13 (EventCircularGallery.css, GenerateEmbedButton.tsx, YesNoToggle.css, alphas 0.1)<br>`#9c63d4` ≈ ×1 (rubiks-cube.css) |
+| `--brand-500` (renamed from `--purple-500`) | `#af8fc8` | `#af8fc8` ×6 (certificateEmailService.ts, globals.css, passwordResetEmailService.ts) |
+| `--brand-400` (renamed from `--purple-400`) | `#c4b0d8` | `#c4b0d8` ×3 (globals.css)<br>`#c4b5fd` ≈ ×1 (SiteContent.css)<br>`#c09ee8` ≈ ×1 (rubiks-cube.css) |
+| `--brand-300` (renamed from `--purple-300`) | `#d6c8e5` | `#d6c8e5` ×3 (globals.css)<br>`#dfd7ec` ≈ ×1 (page.module.css)<br>`#e9d5f5` ≈ ×1 (members.css) |
+| `--brand-200` (**new**) | `#ebe4f2` | `#ebe4f2` ×7 (certificateEmailService.ts, eventTicketEmailService.ts, passwordResetEmailService.ts)<br>`#f0ebf5` ≈ ×6 (certificateEmailService.ts, eventTicketEmailService.ts, passwordResetEmailService.ts)<br>`#ede9fe` ≈ ×5 (GanttChart.tsx, UnassignedGate.css, eventTaskExcelExport.ts)<br>`#efe8fb` ≈ ×1 (page.module.css)<br>`#ece6f7` ≈ ×1 (page.module.css)<br>`#f0ecfa` ≈ ×1 (rubiks-cube.css) |
+| `--brand-100` (renamed from `--purple-100`) | `#f3e8ff` | `#f3e8ff` ×3 (EventExpandedContent.css, eventTicketEmailService.ts, globals.css)<br>`#f3ecfb` ≈ ×3 (ProjectsPage.css, badge.css)<br>`#faf5ff` ≈ ×2 (GanttChart.tsx, SiteContent.css)<br>`#f5f2fa` ≈ ×1 (page.module.css)<br>`#f3edff` ≈ ×1 (eventTaskExcelExport.ts)<br>`#f3f0f8` ≈ ×1 (globals.css)<br>`#f5f0fa` ≈ ×1 (certificatePdfService.ts) |
+| `--brand-50` (renamed from `--purple-50`) | `#f5f3ff` | `#f5f3ff` ×8 (EventExpandedContent.css, GanttChart.css, GanttChart.tsx, alphas 0.8)<br>`#fdf4ff` ≈ ×1 (badge.css) |
+
+#### Surfaces and neutrals
+
+| Target token | Club value | Colors found in code → uses (where) |
+|---|---|---|
+| `--white` (**new**) | `#ffffff` | `#ffffff` ×171 (GanttChart.css, GanttChart.tsx, certificateEmailService.ts, alphas 0.08,0.12,0.14,0.15,0.16) |
+| `--black` (**new**) | `#000000` | `#000000` ×24 (GanttChart.css, LifecycleCardView.css, PushNotificationPrompt.css, alphas 0.015,0.02,0.1,0.15,0.2) |
+| `--bg-subtle` (existing) | `#f8f7f9` | `#f8f7f9` ×3 (globals.css, offline.html)<br>`#f8f7fc` ≈ ×2 (globals.css) |
+| `--gray-50` (existing) | `#fafafa` | `#f8fafc` ≈ ×17 (GanttChart.css, GanttChart.tsx, SiteContent.css, alphas 0.86,0.95,0.98)<br>`#f9fafb` ≈ ×4 (exportAnnouncementResponsesExcel.ts, exportEmployeeKpisExcel.ts, exportFinanceExcel.ts)<br>`#fafafa` ×3 (SiteContent.css, globals.css) |
+| `--gray-100` (existing) | `#f5f5f5` | `#eef2f7` ≈ ×3 (certificateEmailService.ts, eventTicketEmailService.ts, passwordResetEmailService.ts)<br>`#f5f5f5` ×2 (globals.css)<br>`#eef2ff` ≈ ×1 (badge.css)<br>`#f3f4f6` ≈ ×1 (TicketDesignPanel.css) |
+| `--gray-200` (existing) | `#e5e5e5` | `#e5e7eb` ≈ ×29 (GanttChart.tsx, PeriodControl.css, TicketDesignPanel.css)<br>`#e2e8f0` ≈ ×14 (SiteContent.css, badge.css, eventTicketEmailService.ts)<br>`#e0e5f2` ≈ ×4 (NftCard.tsx, YesNoToggle.css, switch.tsx)<br>`#dce4ef` ≈ ×3 (certificateEmailService.ts, eventTicketEmailService.ts, passwordResetEmailService.ts)<br>`#e5e5e5` ×3 (globals.css)<br>`#e8e8e8` ≈ ×3 (EventStatisticsSection.tsx, FinanceChartsSection.tsx) |
+| `--gray-300` (existing) | `#d4d4d4` | `#d1dae6` ≈ ×3 (certificateEmailService.ts, eventTicketEmailService.ts, passwordResetEmailService.ts)<br>`#d1d5db` ≈ ×2 (StepProgressBar.css)<br>`#c8d4e0` ≈ ×2 (certificateEmailService.ts, eventTicketEmailService.ts)<br>`#d4d4d4` ×2 (globals.css) |
+| `--gray-400` (existing) | `#a3a3a3` | `#a3a3a3` ×4 (globals.css, offline.html, page.module.css)<br>`#b0bac7` ≈ ×3 (certificateEmailService.ts, eventTicketEmailService.ts, passwordResetEmailService.ts)<br>`#9ca3af` ≈ ×3 (EventStatisticsSection.tsx, charts.ts)<br>`#a0aec0` ≈ ×1 (UnassignedGate.css) |
+| `--gray-500` (existing) | `#737373` | `#64748b` ≈ ×26 (NewCustomCertificateModal.css, SiteContent.css, badge.css, alphas 0.35,0.92)<br>`#6b7280` ≈ ×19 (EventStatisticsSection.tsx, LoginPage.css, StepProgressBar.css, alphas 0.05,0.12,0.15,0.3)<br>`#7a8fa6` ≈ ×4 (certificateEmailService.ts, eventTicketEmailService.ts, passwordResetEmailService.ts)<br>`#718096` ≈ ×3 (ProtectedRoute.css, UnassignedGate.css, globals.css)<br>`#737373` ×3 (globals.css, offline.html)<br>`#666666` ≈ ×3 (file.svg, globe.svg, window.svg) |
+| `--gray-600` (existing) | `#525252` | `#525252` ×2 (globals.css)<br>`#4b5563` ≈ ×1 (modal.css)<br>`#5d5170` ≈ ×1 (page.module.css) |
+| `--gray-700` (existing) | `#404040` | `#374151` ≈ ×5 (idCardFields.ts, modal.css, alphas 0.35)<br>`#334155` ≈ ×4 (YesNoToggle.css, badge.css, passwordResetEmailService.ts)<br>`#404040` ×2 (globals.css) |
+| `--gray-800` (existing) | `#262626` | `#262626` ×3 (embed.css, globals.css)<br>`#1a202c` ≈ ×1 (UnassignedGate.css)<br>`#1f2937` ≈ ×1 (GanttChart.tsx)<br>`#1e293b` ≈ ×1 (SiteContent.css)<br>`#1a1f2e` ≈ ×1 (certificatePdfService.ts)<br>`#1a1a1a` ≈ ×1 (certificatePdfService.ts) |
+| `--gray-900` (existing) | `#171717` | `#0f172a` ≈ ×23 (EventPhotosSection.css, ProjectPhotosSection.css, buttons.css, alphas 0.12,0.18,0.2,0.55)<br>`#111827` ≈ ×16 (IdCardCanvasEditor.tsx, charts.ts, eventTaskExcelExport.ts)<br>`#171717` ×5 (ScheduleTimetable.css, SideBarNavigationSlim.css, globals.css, alphas 0.03,0.45)<br>`#010101` ≈ ×2 (certificatePdfService.ts) |
+
+#### Success
+
+| Target token | Club value | Colors found in code → uses (where) |
+|---|---|---|
+| `--success-bg` (existing) | `#dcfce7` | `#dcfce7` ×4 (ProjectsPage.css, embed.css, globals.css)<br>`#f0fdfa` ≈ ×1 (badge.css)<br>`#bbf7d0` ≈ ×1 (badge.css) |
+| `--success-text` (existing) | `#166534` | `#065f46` ≈ ×12 (UserPage.css, modal.css, alphas 0.35)<br>`#166534` ×4 (embed.css, globals.css, modal.css) |
+| `--success-border` (existing) | `#22c55e` | `#10b981` ≈ ×9 (UserPage.css, modal.css, alphas 0.04,0.1,0.15,0.16)<br>`#22c55e` ×8 (GanttChart.tsx, dropdown.css, globals.css)<br>`#34d399` ≈ ×2 (UserPage.css, alphas 0.2)<br>`#6ee7b7` ≈ ×2 (UserPage.css)<br>`#10c55e` ≈ ×2 (embed.css, globals.css) |
+| `--success-accent` (existing) | `#16a34a` | `#16a34a` ×31 (EventStatisticsSection.tsx, buttons.css, dropdown.css, alphas 0.08,0.1,0.15,0.3) |
+| `--status-completed-bg` (existing) | `#f0fdf4` | `#f0fdf4` ×7 (FileUploadZone.css, PhaseRow.css, badge.css) |
+| `--status-completed-text` (existing) | `#15803d` | `#15803d` ×7 (PhaseRow.css, ProjectsPage.css, badge.css) |
+
+#### Error
+
+| Target token | Club value | Colors found in code → uses (where) |
+|---|---|---|
+| `--error-bg` (existing) | `#fef2f2` | `#fef2f2` ×5 (PhaseRow.css, badge.css, globals.css)<br>`#fff1f2` ≈ ×1 (badge.css) |
+| `--error-text` (existing) | `#991b1b` | `#991b1b` ×8 (GanttChart.tsx, embed.css, globals.css, alphas 0.1)<br>`#be123c` ≈ ×1 (badge.css) |
+| `--error-border` (existing) | `#fecaca` | `#fecaca` ×4 (badge.css, globals.css) |
+| `--error-accent` (**new**) | `#dc2626` | `#dc2626` ×18 (EventPhotosSection.css, LifecycleCardView.css, LoginPage.css, alphas 0.04,0.1,0.15,0.16,0.3)<br>`#ef4444` ≈ ×5 (GanttChart.css, GanttChart.tsx, modal.css, alphas 0.15) |
+| `--status-blocked` (existing) | `#f87171` | `#f87171` ×2 (GanttChart.tsx, globals.css) |
+| `--status-blocked-bg` (existing) | `#fee2e2` | `#fee2e2` ×1 (globals.css) |
+| `--status-blocked-text` (existing) | `#b91c1c` | `#b91c1c` ×9 (EventExpandedContent.css, FileUploadZone.css, SideBarNavigationSlim.css) |
+| `--status-cancelled-text` (existing) | `#7f1d1d` | `#7f1d1d` ×10 (globals.css, modal.css, alphas 0.35) |
+
+#### Warning
+
+| Target token | Club value | Colors found in code → uses (where) |
+|---|---|---|
+| `--warning-bg` (existing) | `#fef3c7` | `#fef3c7` ×5 (UnassignedGate.css, globals.css, offline.html)<br>`#fefce8` ≈ ×1 (badge.css) |
+| `--warning-text` (existing) | `#92400e` | `#92400e` ×8 (UnassignedGate.css, globals.css, modal.css, alphas 0.35)<br>`#854d0e` ≈ ×1 (badge.css) |
+| `--warning-border` (existing) | `#fde68a` | `#fde68a` ×2 (badge.css, globals.css)<br>`#fed7aa` ≈ ×1 (badge.css) |
+| `--warning-accent` (**new**) | `#f59e0b` | `#f59e0b` ×10 (buttons.css, modal.css, table.css, alphas 0.08,0.12,0.14,0.15,0.24)<br>`#d97706` ≈ ×8 (FileUploadZone.css, buttons.css, eventTaskExcelExport.ts, alphas 0.3)<br>`#fbbf24` ≈ ×1 (modal.css) |
+| `--status-delayed` (existing) | `#f97316` | `#f97316` ×4 (GanttChart.tsx, globals.css)<br>`#ea580c` ≈ ×2 (FinanceChartsSection.tsx, GanttChart.css) |
+| `--status-delayed-bg` (existing) | `#fff7ed` | `#fff7ed` ×6 (FileUploadZone.css, PhaseRow.css, badge.css) |
+| `--status-delayed-text` (existing) | `#c2410c` | `#c2410c` ×5 (PhaseRow.css, badge.css, globals.css) |
+| `--status-on-hold` (existing) | `#ca8a04` | `#ca8a04` ×2 (GanttChart.tsx, globals.css) |
+| `--status-on-hold-text` (existing) | `#8a5b00` | `#8a5b00` ×1 (globals.css) |
+
+#### Info
+
+| Target token | Club value | Colors found in code → uses (where) |
+|---|---|---|
+| `--info-bg` (existing) | `#eff6ff` | `#eff6ff` ×9 (FileUploadZone.css, PhaseRow.css, badge.css)<br>`#f0f9ff` ≈ ×3 (badge.css, certificateEmailService.ts, eventTicketEmailService.ts)<br>`#dbeafe` ≈ ×1 (GanttChart.css) |
+| `--info-text` (existing) | `#1d4ed8` | `#1d4ed8` ×11 (FileUploadZone.css, LoginPage.css, PhaseRow.css)<br>`#1e40af` ≈ ×6 (modal.css, alphas 0.35)<br>`#0369a1` ≈ ×1 (badge.css)<br>`#0563c1` ≈ ×1 (TemplateEditor.tsx)<br>`#1e3a8a` ≈ ×1 (eventTaskExcelExport.ts) |
+| `--info-border` (existing) | `#bfdbfe` | `#bfdbfe` ×3 (badge.css, globals.css) |
+| `--info-accent` (**new**) | `#2563eb` | `#2563eb` ×53 (FileUploadZone.css, StepProgressBar.css, buttons.css, alphas 0.0,0.08,0.1,0.25,0.3)<br>`#0b5fff` ≈ ×1 (loader.js) |
+| `--status-not-started` (existing) | `#94a3b8` | `#94a3b8` ×15 (EventTasksSection.css, GanttChart.css, ScheduleTimetable.css, alphas 0.16,0.18,0.22,0.92) |
+| `--status-not-started-bg` (existing) | `#f1f5f9` | `#f1f5f9` ×10 (ScheduleTimetable.css, SiteContent.css, badge.css, alphas 0.95) |
+| `--status-not-started-text` (existing) | `#475569` | `#475569` ×8 (GanttChart.css, SiteContent.css, badge.css) |
+| `--status-in-progress` (existing) | `#3b82f6` | `#3b82f6` ×12 (GanttChart.tsx, globals.css, modal.css, alphas 0.08,0.12,0.14,0.15,0.24)<br>`#60a5fa` ≈ ×1 (modal.css) |
+| `--status-unassigned` (**new**) | `#4f46e5` | `#4f46e5` ×1 (ScheduleTimetable.css, alphas 0.9) |
+| `--status-unassigned-bg` (**new**) | `#e0e7ff` | `#e0e7ff` ×1 (table.css) |
+| `--status-unassigned-text` (**new**) | `#3730a3` | `#4338ca` ≈ ×5 (UserPage.css, badge.css)<br>`#3730a3` ×1 (table.css) |
+
+#### Fixed accents
+
+| Target token | Club value | Colors found in code → uses (where) |
+|---|---|---|
+| `--accent-teal` (**new**) | `#0097b2` | `#0097b2` ×4 (GanttChart.css, buttons.css, alphas 0.14)<br>`#06b6d4` ≈ ×2 (modal.css, alphas 0.15)<br>`#0891b2` ≈ ×1 (FinanceChartsSection.tsx)<br>`#00a3a1` ≈ ×1 (loader.js) |
+| `--accent-teal-strong` (**new**) | `#164e63` | `#164e63` ×6 (modal.css, alphas 0.35)<br>`#0f766e` ≈ ×1 (badge.css) |
+| `--accent-orange` (**new**) | `#ff571f` | `#ff571f` ×4 (FileUploadZone.css, GanttChart.css, buttons.css) |
+| `--accent-amber` (**new**) | `#ffc772` | `#ffc772` ×2 (FileUploadZone.css, GanttChart.css, alphas 0.308) |
+
+Notable consolidations to review visually:
+
+- `#8b5cf6` (Tailwind violet, ×41, mostly the Projects Gantt chart and timetables) → `--brand-600`. This is the largest visible change: bars become the muted brand purple — which is what a tenant theme needs.
+- Tailwind slate/gray (`#64748b`, `#6b7280`, `#0f172a`, `#111827`, `#e5e7eb`, `#e2e8f0`, …) → the neutral `--gray-*` scale. Slight hue shift from blue-gray to neutral gray.
+- `public-website` used `#560b89` / `#6e47a3` / `#10c55e` (typos of the brand and success values) in shadows, `--border-brand` and `--success-border` → corrected to the real tokens.
+
+### 13.3 Token references that are currently broken
+
+These `var(--…)` names are used but **never defined**, so the browser uses the fallback (or drops the property when there is none). Each maps to a real token:
+
+| Undefined token | App | Uses | Current effect | Replace with |
+|---|---|---|---|---|
+| `--color-primary` | portal (login page) | 11 | Falls back to blue `#2563eb` — login links are blue, not brand | `--brand-700` |
+| `--color-primary-dark` | portal (login page) | 3 | Falls back to `#1d4ed8` | `--brand-900` |
+| `--color-text-muted` | portal (login page) | 4 | Falls back to `#6b7280` | `--gray-500` |
+| `--text-secondary` | portal (certificates) | 7 | Fallback `#64748b`, or **property dropped** where no fallback | `--gray-500` |
+| `--text-primary` | portal (certificates) | 3 | Fallback `#0f172a` / `inherit` / dropped | `--gray-900` |
+| `--purple-200` | portal + public | 5 | **Property dropped** where no fallback | `--brand-200` |
+| `--gray-200` | public (certificate canvas) | 3 | **Property dropped** (defined only in portal) | `--gray-200` (add to public `:root`) |
+| `--brand-purple` | portal (event expanded content) | 1 | **Property dropped** | `--brand-800` |
+| `--blue-600` / `--blue-700` | portal (file upload) | 3 | Falls back to `#2563eb` / `#1d4ed8` | `--info-accent` / `--info-text` |
+| `--red-600` | portal (event photos) | 2 | Falls back to `#dc2626` | `--error-accent` |
+| `--radius-full` | portal (step progress bar) | 1 | Falls back to `50%` | add `--radius-full: 50%` |
+
+### 13.4 The two apps must share one token set
+
+`public-website` and `members-portal` define their own `:root` with different names and small value differences (§1 delta table; public adds `--background`, `--foreground`, `--surface-*`, `--color-purple-*` usages). For tenant theming both apps must read **the same** token names, generated from the same tenant theme. The §1 delta table becomes obsolete once migrated: `--radius-lg` and shadow tints stay per-app only if the owner decides so.
+
+### 13.5 Colors outside CSS (cannot use `var()`)
+
+These read the tenant theme as data (hex values) instead of CSS variables:
+
+| Consumer | Where | Today |
+|---|---|---|
+| Transactional emails | `backend/services/{certificate,eventTicket,passwordReset}EmailService.ts` | ~80 inline hex values; a `PURPLE` map copied in two files |
+| Certificate PDF fallback | `backend/services/certificatePdfService.ts` | `rgb(x/255…)` brand purple and text colors |
+| Excel exports | `members-portal/src/features/**/export*Excel.ts`, `eventTaskExcelExport.ts` | ~70 hex fills/fonts (`#4c1d95`, `#e5e7eb`, …) |
+| Charts / Gantt canvas | `GanttChart.tsx`, `FinanceChartsSection.tsx`, `charts.ts` | hex passed to chart libraries |
+| PWA manifest / `theme-color` | `members-portal/public/manifest.json`, both `layout.tsx` | `#662f91`, `#561789` |
+| Embed loader | `public-website/public/embed/loader.js` | example `data-primary-color` / `data-accent-color` (documentation only) |
+
+Rule: server code imports a single `theme` object (same keys as the tokens, e.g. `theme.brand[900]`); TSX that must pass a raw color (charts, canvas) reads it with `getComputedStyle(document.documentElement).getPropertyValue('--brand-600')` via one shared helper.
+
+### 13.6 Excluded: unused template files
+
+These portal folders are leftovers from a UI starter template and are **imported by nothing**. Their colors (`#4318ff`, `#a3aed0`, `#0b1437`, `#6a53ff`, `#01b574`, `#ee5d50`) are not part of the palette; the folders should be deleted:
+
+`components/fixedPlugin`, `nftcard`, `navbar`, `footer`, `minicalendar`, `widget`, `switch`, `popover`, `tooltip`, `pagetitle`, `fields`, `icons`, and `components/card.tsx`.
+
+### 13.7 How this inventory was produced
+
+A scan of `members-portal/{src,public,worker}`, `public-website/{src,public}`, `backend/{services,lib,routes,assets,scripts}` and `packages/shared/src` for `#hex`, `rgb()/rgba()`, PDF `rgb(x/255)`, and Excel `argb` values (tests and build output excluded). Re-run it with:
+
+```bash
+pnpm color:audit            # list remaining literals by file
+pnpm color:audit --strict   # exit 1 if any remain (add to CI once migrated)
+```
+
+Baseline on 2026-11-02: **966 literals in 109 files**. The goal state is **zero color literals outside the token definitions and the tenant theme defaults**.
