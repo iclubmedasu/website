@@ -190,9 +190,10 @@ without the owner's say-so.
     platform's address, organization reply-to.
 16. **File storage: one private GitHub repo per organization** with
     `files/` and `user-data/` folders, one platform token for all repos.
-    Each organization's record stores where its files live, so the club
-    keeps its two existing repos and nothing is moved. (Supabase Storage
-    is the upgrade path once there is revenue.)
+    **The club uses exactly the same structure** (owner decision): its
+    files move from today's two repos (`GITHUB_STORAGE_REPO`, `user-data`)
+    into one private club repo with the same two folders. (Supabase
+    Storage is the upgrade path once there is revenue.)
 17. **The console runs locally on the owner's laptop.** It keeps every
     organization's infrastructure details and setup status, automates the
     setup steps through the GitHub, Resend, Cloudflare and platform APIs,
@@ -267,8 +268,26 @@ knowing a student ID is no longer enough.
    calls without an organization context fail loudly. Raw SQL filtered by
    hand. RLS policies underneath.
 6. Organization-aware email outbox, WebSocket channels, push
-   subscriptions, usage events, site content, and file storage (each
-   organization's record says which repo(s) and folders hold its files).
+   subscriptions, usage events, site content, and file storage: each
+   organization's record names its private repo; the storage code adds
+   the `files/` or `user-data/` prefix itself, so stored paths stay
+   repo-relative.
+   **Club file move** (no data loss, nothing deleted):
+   a. Create the private club repo; copy every file from today's two
+      repos into `files/` and `user-data/` with the same relative paths.
+      The owner runs the final `git push` (preferred: a local clone that
+      moves folders, which also keeps file history).
+   b. Verify: every file present, same size and same content fingerprint
+      (GitHub's blob SHA, which the database already stores and which
+      does not change when identical content is copied).
+   c. Rewrite `Member.profilePhotoUrl` values that contain the old repo
+      name (migration with SQL shown first). The 6 tables with
+      `githubPath`/`githubSha` need no change.
+   d. Switch the club's record to the new repo; run a last sync pass for
+      anything uploaded in between; check photos, project files and
+      downloads in the browser.
+   e. Keep the old repos untouched (read-only) as a backup until the
+      owner decides to archive them.
 7. Portal and public website resolve the organization from the domain;
    unknown domains get a neutral "not found" page.
 8. Cross-organization test suite on every API route, export, download,

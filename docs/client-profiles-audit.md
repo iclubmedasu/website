@@ -282,3 +282,6 @@ fallbacks, email from each organization's own domain via one Resend account,
 one private GitHub storage repo per organization, and a local owner console
 with encrypted keys. Only console sign-in and settings storage shape remain
 open (roadmap section 4).
+
+The club also moves to the same storage structure as every other organization
+(one private repo with files/ and user-data/); plan in roadmap P2 step 6.
