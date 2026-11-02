@@ -405,21 +405,13 @@ router.post('/check-email', identityCheckLimiter, async (req, res) => {
             });
         }
 
-        // Don't pre-fill placeholder values so the form shows empty fields for the user to fill
-        const fullName = member.fullName === PLACEHOLDER_FULLNAME ? '' : (member.fullName ?? '');
-        const phoneNumber = isPlaceholderPhone(member.phoneNumber) ? '' : (member.phoneNumber ?? '');
-        const phoneNumber2 = isPlaceholderPhone(member.phoneNumber2) ? '' : (member.phoneNumber2 ?? '');
+        // Unauthenticated endpoint: never return profile details (name, phones, secondary emails, ids).
+        // The setup form starts empty and the member re-enters them.
         return res.json({
             exists: true,
             needsSetup: true,
             email: canonicalEmail,
-            fullName,
-            phoneNumber,
-            phoneNumber2,
-            email2: member.email2 ?? '',
-            email3: member.email3 ?? '',
             studentId: member.studentId ?? null,
-            memberId: member.id,
             message: 'Please set your password to sign in for the first time.'
         });
     } catch (error) {
@@ -492,14 +484,15 @@ router.post('/update-invited-profile', credentialPostLimiter, async (req, res) =
             });
             if (ex) return res.status(400).json({ error: 'Additional email 3 is already in use.' });
         }
+        // Optional fields left blank keep what an admin already stored (the form is no longer pre-filled).
         await prisma.member.update({
             where: { id: member.id },
             data: {
                 fullName: fullName.trim(),
                 phoneNumber: trimmedPhone,
-                phoneNumber2: trimmedPhone2,
-                email2: trimmedEmail2,
-                email3: trimmedEmail3
+                ...(trimmedPhone2 ? { phoneNumber2: trimmedPhone2 } : {}),
+                ...(trimmedEmail2 ? { email2: trimmedEmail2 } : {}),
+                ...(trimmedEmail3 ? { email3: trimmedEmail3 } : {})
             }
         });
         return res.status(200).json({ success: true, message: 'Profile updated. Set your password next.' });
@@ -748,16 +741,6 @@ router.post('/check-officer-identifier', identityCheckLimiter, async (req, res) 
             return res.json({ exists: false });
         }
 
-        if (isPlaceholderMember(member) && !member.user) {
-            return res.json({
-                exists: true,
-                needsSetup: true,
-                memberId: member.id,
-                email: member.email,
-                phoneNumber: isPlaceholderPhone(member.phoneNumber) ? '' : member.phoneNumber,
-            });
-        }
-
         if (member.user) {
             return res.json({
                 exists: true,
@@ -766,13 +749,10 @@ router.post('/check-officer-identifier', identityCheckLimiter, async (req, res) 
             });
         }
 
-        // Member exists with full profile but no User yet — treat as needs setup
+        // Unauthenticated endpoint: never return profile details (ids, email, phone).
         return res.json({
             exists: true,
             needsSetup: true,
-            memberId: member.id,
-            email: member.email,
-            phoneNumber: isPlaceholderPhone(member.phoneNumber) ? '' : member.phoneNumber,
         });
     } catch (error) {
         console.error('Check officer identifier error:', error);
@@ -888,12 +868,13 @@ router.post('/complete-officer-profile', credentialPostLimiter, async (req, res)
         const passwordHash = await bcrypt.hash(password, 10);
 
         // Update member data: also update primary email if officer was created with placeholder email
+        // Optional fields left blank keep what an admin already stored (the form is no longer pre-filled).
         const memberUpdateData: any = {
             fullName: trimmedName,
             phoneNumber: trimmedPhone,
-            phoneNumber2: trimmedPhone2,
-            email2: trimmedEmail2,
-            email3: trimmedEmail3
+            ...(trimmedPhone2 ? { phoneNumber2: trimmedPhone2 } : {}),
+            ...(trimmedEmail2 ? { email2: trimmedEmail2 } : {}),
+            ...(trimmedEmail3 ? { email3: trimmedEmail3 } : {})
         };
 
         // If current email is a placeholder (pending-officer-*), update it with the provided officerEmail
@@ -950,11 +931,11 @@ router.post('/complete-officer-profile', credentialPostLimiter, async (req, res)
             user: {
                 id: member.id,
                 email: updatedMember.email,
-                email2: trimmedEmail2,
-                email3: trimmedEmail3,
+                email2: updatedMember.email2 ?? null,
+                email3: updatedMember.email3 ?? null,
                 fullName: trimmedName,
                 phoneNumber: trimmedPhone,
-                phoneNumber2: trimmedPhone2 ?? null,
+                phoneNumber2: updatedMember.phoneNumber2 ?? null,
                 studentId: member.studentId ?? null,
                 profilePhotoUrl: member.profilePhotoUrl ?? null,
                 linkedInUrl: member.linkedInUrl ?? null,

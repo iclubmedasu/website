@@ -21,15 +21,6 @@ type LoginStep =
 
 type IdentifierMode = 'text' | 'phone';
 
-function resolveSignupPhonePrefill(
-    identifierMode: IdentifierMode,
-    storedPhone: string | null | undefined,
-): string {
-    if (identifierMode === 'phone') return '';
-    if (!storedPhone?.trim() || storedPhone.startsWith('pending-')) return '';
-    return storedPhone;
-}
-
 const PASSWORD_REQUIREMENTS_HINT =
     'Use at least one uppercase letter, one lowercase letter, one number, and one symbol (e.g. !@#$%^&*). Do not include your email.';
 
@@ -100,7 +91,6 @@ function LoginPage() {
     const [phoneIdentifier, setPhoneIdentifier] = useState(''); // phone value from PhoneInput
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [memberName, setMemberName] = useState('');
     const [setupFullName, setSetupFullName] = useState('');
     const [setupPhone, setSetupPhone] = useState('');
     const [setupPhone2, setSetupPhone2] = useState('');
@@ -160,18 +150,17 @@ function LoginPage() {
                         // Filter out placeholder emails (pending-officer-*)
                         const rawEmail = result.data.email || '';
                         setOfficerEmail(rawEmail.startsWith('pending-officer-') ? '' : rawEmail);
-                        setOfficerPhone(resolveSignupPhonePrefill(identifierMode, result.data.phoneNumber));
-                        setOfficerFullName(result.data.fullName || '');
-                        setOfficerEmail2(result.data.email2 || '');
-                        setOfficerEmail3(result.data.email3 || '');
+                        setOfficerPhone('');
+                        setOfficerFullName('');
+                        setOfficerEmail2('');
+                        setOfficerEmail3('');
                         setStep('officerProfileDetails');
                     } else {
-                        setMemberName(result.data.fullName || '');
-                        setSetupFullName(result.data.fullName || '');
-                        setSetupPhone(resolveSignupPhonePrefill(identifierMode, result.data.phoneNumber));
-                        setSetupPhone2(result.data.phoneNumber2 || '');
-                        setSetupEmail2(result.data.email2 || '');
-                        setSetupEmail3(result.data.email3 || '');
+                        setSetupFullName('');
+                        setSetupPhone('');
+                        setSetupPhone2('');
+                        setSetupEmail2('');
+                        setSetupEmail3('');
                         setStep('setupProfile');
                     }
                 } else {
@@ -928,7 +917,7 @@ function LoginPage() {
                         {step === 'setup' && (
                             <>
                                 <h1 className="login-title">Set your password</h1>
-                                <p className="login-subtitle">Welcome, {setupFullName || memberName}!</p>
+                                <p className="login-subtitle">Welcome, {setupFullName}!</p>
 
                                 {error && <div className="error-message">{error}</div>}
 
