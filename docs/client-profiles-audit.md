@@ -259,3 +259,19 @@ Answered 2026-11-02:
   Migration is stage C2.5 in the plan.
   Owner approved (2026-11-02): merge all near-duplicate colors, Gantt
   violet follows the brand, delete the unused template folders.
+
+## Architecture decision (2026-11-02, later the same day)
+
+The owner chose **one shared platform** (one database, tenantId on every
+tenant-owned row, owner console, new tenant = a button) instead of one
+deployment per client, with **no fixed deadline — quality first**. The
+plan is now `docs/iClub-Platform-Roadmap.md` (phases P0–P11). Earlier
+notes above about `CLIENT_ID`, per-client Spaces and `clients/<id>.json`
+are superseded by the roadmap; the findings (sections A–G and the
+security findings) remain valid input.
+
+Confirmed later on 2026-11-02 after comparing pool, silo and bridge: **pool**
+(shared platform), central login with organization discovery, separate
+accounts per organization, public websites on organizations' own domains
+via Cloudflare for SaaS, owner holds all infrastructure accounts and bills
+clients. See the checklist in `docs/iClub-Platform-Roadmap.md` §1.
