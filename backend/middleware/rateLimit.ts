@@ -65,7 +65,7 @@ function hasAuthenticatedUser(req: Request): boolean {
  */
 export const identityCheckLimiter = createLimiter({
     windowMs: 15 * 60 * 1000,
-    max: 300,
+    max: 3000,
     message: "Too many lookup attempts. Please wait a few minutes and try again.",
 });
 
@@ -75,7 +75,7 @@ export const identityCheckLimiter = createLimiter({
  */
 export const credentialPostLimiter = createLimiter({
     windowMs: 15 * 60 * 1000,
-    max: 120,
+    max: 1200,
     message: "Too many authentication attempts. Please wait a few minutes and try again.",
 });
 
@@ -85,7 +85,7 @@ export const credentialPostLimiter = createLimiter({
  */
 export const passwordResetLimiter = createLimiter({
     windowMs: 15 * 60 * 1000,
-    max: 30,
+    max: 300,
     message: "Too many password reset attempts. Please wait a few minutes and try again.",
 });
 
@@ -95,14 +95,14 @@ export const authPostLimiter = credentialPostLimiter;
 /** Public contact form (anonymous spam surface — keep tight). */
 export const contactPostLimiter = createLimiter({
     windowMs: 60 * 60 * 1000,
-    max: 15,
+    max: 150,
     message: "Too many contact submissions. Please try again later.",
 });
 
 /** Public incident reports. */
 export const incidentReportPostLimiter = createLimiter({
     windowMs: 60 * 60 * 1000,
-    max: 20,
+    max: 200,
     message: "Too many incident report submissions. Please try again later.",
 });
 
@@ -113,7 +113,7 @@ export const incidentReportPostLimiter = createLimiter({
  */
 export const registrationPostLimiter = createLimiter({
     windowMs: 15 * 60 * 1000,
-    max: 250,
+    max: 25000,
     message: "Too many registration attempts. Please wait a few minutes and try again.",
     // Logged-in portal users (check-in, walk-ins, officer tools) must never share
     // the public visitor bucket — venue Wi‑Fi NATs many phones onto one IP.
@@ -123,7 +123,7 @@ export const registrationPostLimiter = createLimiter({
 /** Unauthenticated certificate list / verify reads. */
 export const publicCertificateReadLimiter = createLimiter({
     windowMs: 15 * 60 * 1000,
-    max: 200,
+    max: 20000,
     message: "Too many certificate requests. Please try again later.",
 });
 
@@ -133,6 +133,6 @@ export const publicCertificateReadLimiter = createLimiter({
  */
 export const certificateEmailResendLimiter = createLimiter({
     windowMs: 15 * 60 * 1000,
-    max: 150,
+    max: 15000,
     message: "Too many certificate email resend attempts. Please wait a few minutes and try again.",
 });
