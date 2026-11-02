@@ -35,11 +35,6 @@ export interface CheckEmailResponse {
     isDeveloper?: boolean;
     email?: string;
     studentId?: number | null;
-    fullName?: string | null;
-    phoneNumber?: string | null;
-    phoneNumber2?: string | null;
-    email2?: string | null;
-    email3?: string | null;
     message?: string;
 }
 
