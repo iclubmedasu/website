@@ -2,10 +2,11 @@
 
 **Goal:** Turn iClub into one shared platform ("pool" model) that serves
 many organizations: the club, Dr. Ashraf's company, and future clients.
-The owner creates a new organization from a console in minutes; its
-members sign in through one central login page and land in their own
-organization; its public website runs on the organization's own domain;
-and its admins customize everything that belongs to them. No new servers,
+The owner creates a new organization from a local console in minutes;
+its members use the organization's own portal domain
+(`portal.ashraf.com`) and its visitors the organization's own website
+domain (`ashraf.com`), both served by the same shared apps; and its
+admins customize everything that belongs to them. No new servers,
 databases, or deployments per client.
 
 > Decided by the owner on 2026-11-02 after comparing pool, silo and
@@ -24,11 +25,20 @@ without the owner's say-so.
 
 ### Layer 1 — the owner (you)
 
-- [ ] **Owner console**: list all organizations, see their health and
-      usage, create / suspend / reactivate / export / delete. (P3, P9)
-- [ ] **Create an organization in minutes** from the console: name,
-      slug, plan, first admin's email → defaults seeded, first admin
-      invited by email, site ready. (P9)
+- [ ] **Owner console, run locally on the owner's laptop** (no public
+      page): list all organizations, see their health and usage, create /
+      suspend / reactivate / export / delete. (P3, P9)
+- [ ] **Create an organization in minutes** from the console, as one
+      guided checklist that remembers each step's status: create the
+      organization (defaults seeded, first admin invited by email) →
+      create its private GitHub storage repo → register its domains with
+      Cloudflare and its sending domain with Resend → show the DNS records
+      the client must add → check until everything is green. (P9, P10)
+- [ ] **Everything recorded in the console** so nothing is forgotten or
+      lost: each organization's domains, storage repo, Resend and
+      Cloudflare ids and statuses, plan, notes. Platform keys (GitHub,
+      Resend, Cloudflare, Hugging Face tokens) stored **encrypted** with a
+      master password, plus an encrypted backup file kept elsewhere. (P9)
 - [ ] **Edit all settings of any organization** from one page, including
       the ones the organization can edit itself. (P3)
 - [ ] **Owner-only controls**, read-only for the organization: plan /
@@ -37,7 +47,7 @@ without the owner's say-so.
 - [ ] **Usage meters** per organization against its limits. (P6)
 - [ ] **Separate owner sign-in** for the console, replacing today's
       developer backdoor. (P3, P9)
-- [ ] **Add a custom domain** for an organization's public website with a
+- [ ] **Connect an organization's domains** (website and portal) with a
       button; HTTPS issued automatically. (P10)
 - [ ] **Audit trail**: every settings change records who, when, old → new. (P3)
 
@@ -57,33 +67,40 @@ without the owner's say-so.
       checked so text stays readable. The club keeps its exact hand-picked
       purples. (P4)
 - [ ] **Logos and icons** (site, portal, emails, installed app). (P4)
+- [ ] **Their own installed app**: the portal installed from
+      `portal.ashraf.com` shows the organization's name, icon and colors. (P4)
 - [ ] **Identity**: organization name, short name, tagline, copyright,
       contact emails, phones, postal addresses, social and other links. (P5)
 - [ ] **Terminology**: "member"/"employee", "club"/"company",
       "team"/"department", leadership titles. (P5)
 - [ ] **Site content** (About, Contact, Support — already built; becomes
       per organization). (P2, P5)
-- [ ] **Email sender name and reply-to**. (P9)
+- [ ] **Emails sent from their own domain** (`noreply@ashraf.com`) once
+      they add the DNS records shown; until then sent as "Ashraf's
+      Company" from the platform's address with their reply-to. (P9)
 - [ ] **Currency** for finance. (P5)
 
 ### Members and visitors
 
-- [ ] **One central login page.** A member types their email / phone /
-      student ID; the platform finds their organization and takes them
-      straight in. If the same identifier exists in more than one
-      organization (rare), they pick the organization. (P2, P8)
+- [ ] **Each organization's portal on its own domain**
+      (`portal.ashraf.com`): the login page is already branded, members
+      sign in and are in their organization. Served by the one shared
+      portal app, which picks the organization from the domain. (P2, P10)
 - [ ] **Each organization's public website on its own domain**
-      (`ashraf.com`), served by the one shared public-website app, which
-      picks the organization from the domain. Organizations without a
-      domain get `name.<your-domain>` until they have one. (P2, P10)
+      (`ashraf.com`), served by the one shared public-website app the same
+      way. (P2, P10)
+- [ ] **Temporary addresses** on the anchor domain so an organization can
+      go live before connecting its own domain. (P10)
 - [ ] **Secure first-time activation** by emailed one-time link (fixes
       the open account-takeover finding). (P1)
 
 ### Quality and safety (non-negotiable)
 
-- [ ] **Isolation in three layers**: automatic organization filter on every
+- [ ] **Isolation in layers**: automatic organization filter on every
       database call, database row-level security, cross-organization tests
-      on every API route. (P2)
+      on every API route, sign-ins that only work on their own
+      organization's domain, and a separate private storage repo per
+      organization. (P2, P9)
 - [ ] **Club unchanged** except changes the owner approved. (all)
 - [ ] **No color literals**: everything through tokens
       (`docs/css-standards.md` §13, `pnpm color:audit` → 0); fix the 13
@@ -103,26 +120,36 @@ without the owner's say-so.
 ## 2. The picture
 
 ```
- members ──► portal.<your-domain>  (one login page) ─┐
-                                                     ├─► backend ─► one database
- visitors ─► ashraf.com, club domain, … ─► Cloudflare ─► public-website app ─┘   (every row
-                                                     │                             tagged with
- you ──────► console (owner-only area) ──────────────┘                             its org)
+ members ──► portal.ashraf.com, portal.<club domain>, … ─┐
+ visitors ─► ashraf.com, <club domain>, … ───────────────┴─► Cloudflare ─┬─► portal Space ──┐
+                                                                         └─► website Space ─┤
+ owner ────► console on the owner's laptop ── owner API ───────────────────────────────────┤
+                                                                                            └─► backend Space ─► one database
+                                                       backend ─► Resend (one account, a domain per org)    (rows tagged per org)
+                                                       backend ─► GitHub (one private repo per org)
 ```
 
-- **Portal:** one address for everyone. Organization comes from the
-  account, not the address.
-- **Public websites:** many domains, one app. Cloudflare for SaaS is the
-  front door: it accepts each organization's domain, issues HTTPS, and
-  forwards the visit (with the domain attached) to the public-website
-  Space, which looks up the owning organization and renders its site.
-  Cost: first 100 domains free, then $0.10/domain/month
-  ([plans](https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/plans/)).
-- **Hosting:** the same 3 Hugging Face Spaces and 1 Supabase database as
-  today, upgraded when load requires it. The owner holds all accounts and
-  bills clients. Supabase free plan: 500 MB database; Pro is $25/month for
-  the whole platform ([pricing](https://supabase.com/pricing)). Free Spaces
-  sleep when idle — paid hardware before paying clients go live.
+- **No public central domain.** The three Hugging Face Spaces keep their
+  plain `.hf.space` addresses behind the scenes; people only ever see
+  organizations' domains.
+- **One anchor domain** owned by the platform owner (~$10/year), never
+  shown to members or visitors. Cloudflare for SaaS needs it as the target
+  that organizations' domains point to; it also provides the fallback
+  email address and temporary addresses.
+- **Cloudflare for SaaS** accepts each organization's domains, issues
+  HTTPS, and forwards each visit (domain attached) to the right Space; the
+  app looks up the organization from the domain. Cost: first 100 domains
+  free, then $0.10/domain/month; each organization uses 2 (website +
+  portal) ([plans](https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/plans/)).
+- **Platform-wide accounts, one key each:** Hugging Face (3 Spaces),
+  Supabase (1 database), Resend (a sending domain per organization; Pro is
+  $20/month for 10 domains, Scale $90 for 1,000 —
+  [pricing](https://resend.com/pricing)), Cloudflare, GitHub (a repo per
+  organization). Adding an organization creates **no** new Spaces,
+  databases or secrets.
+- **Costs** stay on free tiers until there is a paying client: Supabase
+  free = 500 MB database ([pricing](https://supabase.com/pricing)); free
+  Spaces sleep when idle, so paid hardware before paying clients go live.
 
 ---
 
@@ -136,35 +163,52 @@ without the owner's say-so.
    are edited from screens; code holds defaults equal to today's club.
 3. **Two levels of control**: owner decides availability, limits and plan;
    organization admins decide within that. Enforced in the API.
-4. **Central login** with organization discovery. **Separate accounts per
-   organization** (a person in two organizations has two accounts; the
-   login page asks which one when an identifier matches several).
-5. **Public websites on organizations' own domains** via Cloudflare for
-   SaaS in front of the one public-website Space; subdomain of the owner's
-   domain as fallback. Never path-based (`/org/...`).
-6. **Isolation in three layers** (Prisma extension, RLS, cross-org tests).
+4. **Portal and public website on each organization's own domains**
+   (`portal.ashraf.com`, `ashraf.com`) via Cloudflare for SaaS in front of
+   the shared Spaces; the app picks the organization from the domain.
+   Never path-based (`/org/...`). Temporary addresses on the anchor domain
+   until the organization connects its own.
+5. **Separate accounts per organization.** A person in two organizations
+   has two accounts on two portal domains. No organization picker.
+6. **Isolation in layers** (Prisma extension, RLS, cross-org tests,
+   domain-bound sign-in, separate storage repo per organization).
 7. **Brand scale generated from one accent color**; the club keeps its
    stored hand-picked scale.
 8. **Generalize the existing About / Contact / Support customization**
    pattern for all settings screens.
-9. **Owner holds all infrastructure accounts and bills clients.**
+9. **Owner holds all infrastructure accounts and bills clients.** One
+   anchor domain (~$10/year) for Cloudflare, fallback email and temporary
+   addresses.
 10. **Secrets never in the repo or in organization settings.**
 11. **Work directly on `main`; every commit stays deployable.**
 12. **Keep the deploy safety net** in `deploy.yml`.
 13. **Security first**: P1 is done before any second organization exists.
 14. Approved earlier: merge near-duplicate colors, Gantt color follows the
     brand, delete unused template folders (`docs/css-standards.md` §13).
+15. **Email per organization from its own domain** via the one Resend
+    account; until verified: organization name as sender on the
+    platform's address, organization reply-to.
+16. **File storage: one private GitHub repo per organization** with
+    `files/` and `user-data/` folders, one platform token for all repos.
+    Each organization's record stores where its files live, so the club
+    keeps its two existing repos and nothing is moved. (Supabase Storage
+    is the upgrade path once there is revenue.)
+17. **The console runs locally on the owner's laptop.** It keeps every
+    organization's infrastructure details and setup status, automates the
+    setup steps through the GitHub, Resend, Cloudflare and platform APIs,
+    and stores platform keys encrypted with a master password (plus an
+    encrypted backup).
+18. **Installed app per organization**: name, icon and colors come from
+    the portal domain it was installed from.
 
 ## 4. Still open (asked at their checkpoints)
 
-| # | Question | Recommendation | Phase |
+Everything else is locked. Only these two remain, by the owner's choice:
+
+| # | Question | Known so far | Phase |
 |---|---|---|---|
-| D3 | How the owner signs in to the console | Separate owner account (own table, own login, later two-factor); developer backdoor removed | P3 |
-| D4 | Settings storage shape | Typed columns for what code enforces (features, limits, auth); validated JSON per group for display (theme, terminology, links) | P3 |
-| D5 | Email sending per organization | One platform sending domain with organization name as sender and organization reply-to; own sending domain later as an add-on | P9 |
-| D6 | File storage | Move from the GitHub repository to an object store before many organizations upload files | P9 |
-| D7 | The platform's own name and domain | Needed for `portal.<domain>` and fallback subdomains; owner to choose | P2 |
-| D8 | Installed app (PWA) identity | One installed app with the platform name; organization logo and colors after login | P4 |
+| D3 | How the local console signs in and talks to the platform | Console is local; exact mechanism decided later (for example an owner-only API key used only by the console) | P3 |
+| D4 | Settings storage shape | Decided later; all code reads settings through one settings service, so the shape can change without touching features | P3 |
 
 ---
 
@@ -205,25 +249,29 @@ knowing a student ID is no longer enough.
 
 ### P2 — Organization foundation (the club becomes organization #1)
 
-1. **Proof first:** a test domain → Cloudflare → the current
-   public-website Space, showing the requested domain over HTTPS. If it
-   fails, stop and re-plan before touching the database. **CHECKPOINT D7.**
+1. **Proof first:** buy the anchor domain; a test domain → Cloudflare →
+   the current public-website and portal Spaces, showing the requested
+   domain over HTTPS. If it fails, stop and re-plan before touching the
+   database.
 2. `Tenant` (organization) table; the club created as #1 by migration.
 3. `tenantId` on every organization-owned table, staged: add nullable →
    backfill with the club → required → uniqueness rules become
    `(tenantId, …)`.
-4. Every request knows its organization: from the login token (portal) or
-   from the domain (public website). A token is useless for any other
-   organization.
+4. Every request knows its organization from the domain (portal and
+   public website); the login token also carries it, and the two must
+   match. Sign-in cookies belong to the organization's portal domain
+   (today some sign-in calls go straight to the backend's address — move
+   them behind the portal's own domain). The backend accepts browser
+   requests only from verified organization domains.
 5. Prisma extension adds the organization filter to every read and write;
    calls without an organization context fail loudly. Raw SQL filtered by
    hand. RLS policies underneath.
 6. Organization-aware email outbox, WebSocket channels, push
-   subscriptions, usage events, file paths, site content.
-7. Central login: identifier → organization(s) → straight in, or a picker
-   when several match.
-8. Public website resolves the organization from the domain.
-9. Cross-organization test suite on every API route, export, download,
+   subscriptions, usage events, site content, and file storage (each
+   organization's record says which repo(s) and folders hold its files).
+7. Portal and public website resolve the organization from the domain;
+   unknown domains get a neutral "not found" page.
+8. Cross-organization test suite on every API route, export, download,
    realtime event and public page.
 
 ### P3 — Settings service, owner console, organization settings
@@ -241,8 +289,8 @@ editor pattern.
 Accent → generated scale with contrast check; color migration to tokens
 until `pnpm color:audit` is 0 (then strict in CI); broken tokens fixed;
 unused template folders deleted; theme applied on the server (no flash);
-logos and icons per organization; emails, PDFs, Excel and charts themed.
-**CHECKPOINT D8.**
+logos and icons per organization; emails, PDFs, Excel and charts themed;
+installed-app details (name, icon, theme color) served per portal domain.
 
 ### P5 — Identity, terminology, links, currency
 
@@ -267,18 +315,24 @@ One or several of email / phone / student ID with rules; builds on P1;
 phone normalization beyond Egypt; no enumeration; duplicates handled
 within and across organizations.
 
-### P9 — Organization lifecycle
+### P9 — Local console and organization lifecycle
 
-Create in minutes (seed defaults, invite first admin by email), suspend,
-export, delete with grace period, owner account replaces the developer
-backdoor. **CHECKPOINT D5, D6.**
+The console app on the owner's laptop: encrypted key store with master
+password and backup; organization list with health and usage; the
+"new organization" checklist (create organization + seed + invite first
+admin → create private storage repo → Resend sending domain → Cloudflare
+hostnames → show DNS records → verify until green), each step automated
+through its API and its status saved; suspend, export, delete with grace
+period. Per-organization email from its own domain with the fallback
+sender. The developer backdoor is removed.
 
 ### P10 — Domains and operations
 
-Custom-domain button in the console (Cloudflare for SaaS API), fallback
-subdomains, single deploy pipeline with its safety net, per-organization
-health and usage view, `docs/owner-runbook.md` with a "never do this"
-list, free-tier check before each new organization.
+Cloudflare for SaaS on the anchor domain; connect-domain step in the
+console for website and portal; temporary addresses; installed app per
+organization verified; single deploy pipeline with its safety net;
+`docs/owner-runbook.md` (plain language, with a "never do this" list);
+free-tier check before each new organization.
 
 ### P11 — Final proof
 

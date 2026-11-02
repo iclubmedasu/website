@@ -18,9 +18,11 @@
   logo, names, wording, links, addresses, features, limits, teams/roles,
   login identifiers) lives in the database and is edited from screens.
   Code holds only defaults (today's club values).
-- One central login page (organization found from the account); each
-  organization's public website on its own domain, served by the one
-  public-website app that picks the organization from the domain.
+- Each organization's portal and public website run on its own domains
+  (portal.ashraf.com, ashraf.com), served by the one shared portal and
+  public-website apps, which pick the organization from the domain.
+  Sign-ins are bound to their organization's domain. The owner console
+  runs locally on the owner's laptop.
 - Two levels of control: the owner decides what a tenant may use (plan,
   available features, limits); tenant admins choose within that.
   Owner-only fields must be enforced in the API, not just hidden.

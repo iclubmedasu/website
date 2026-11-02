@@ -271,7 +271,14 @@ are superseded by the roadmap; the findings (sections A–G and the
 security findings) remain valid input.
 
 Confirmed later on 2026-11-02 after comparing pool, silo and bridge: **pool**
-(shared platform), central login with organization discovery, separate
+(shared platform), separate
 accounts per organization, public websites on organizations' own domains
 via Cloudflare for SaaS, owner holds all infrastructure accounts and bills
 clients. See the checklist in `docs/iClub-Platform-Roadmap.md` §1.
+
+Locked later the same day: each organization's portal and public website on
+its own domains (no central login page), one anchor domain for Cloudflare and
+fallbacks, email from each organization's own domain via one Resend account,
+one private GitHub storage repo per organization, and a local owner console
+with encrypted keys. Only console sign-in and settings storage shape remain
+open (roadmap section 4).
